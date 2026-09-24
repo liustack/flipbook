@@ -154,4 +154,6 @@ read_when:
 
 `doctor --prune` 先删掉缓存里这一版用不到的东西（别的 Chromium 构建、下载了一半的字体、清单里已经没有的字体），报告多一个 `pruned` 字段（`removed` 删掉的路径、`bytesFreed`）。这是 doctor 唯一会改动机器的开关，仍然不联网、不安装。
 
-`flipbook.doctor/1`：`ok`、`exitCode`（0 或 78）、`version`、`platform`、`node`、`ffmpeg`（路径、版本、`features` 各项功能是否可用）、`chromium`（`revision`、`browserVersion`、`playwrightCore`、`executable`、`installed`）、`launch`（`ok`、`mode`、`version`、`error`）、`cache`（`root`、`fonts` 每款字体在不在）、`skillInstalls`（各宿主 skill 副本钉的版本、是否比 CLI 旧）、`problems`（环境类型码加修复命令）、`warnings`。字体还没下载只报 warning，check 和 render 首次运行时会下载。
+`flipbook.doctor/1`：`ok`、`exitCode`（0 或 78）、`version`、`platform`、`node`、`ffmpeg`（路径、版本、`features` 各项功能是否可用）、`chromium`（`revision`、`browserVersion`、`playwrightCore`、`executable`、`installed`）、`launch`（`ok`、`mode`、`version`、`error`）、`cache`（`root`、`fonts` 每款字体在不在）、`skillInstalls`（各宿主 skill 副本钉的版本、是否比 CLI 旧）、`problems`（环境类型码加修复命令）、`fix`（所有 `problems[].fix` 按顺序去重合并，退 78 时转给用户的就是它）、`warnings`。
+
+经 skill 启动器 `scripts/run.sh doctor` 跑时，不管带不带 `--json`，stdout 都是一个 JSON 对象：能跑 CLI 时是上面这份报告，最前面多一个 `launcher` 字段（钉死版本、找到的 flipbook、npx、bunx、node 和选中的启动方式），退出码取 CLI 的。什么都跑不了时是 `{ ok: false, exitCode: 78, error: "runtime-missing", message, fix, launcher }`，退 78。其他命令什么都跑不了时，同一份 JSON 打在 stderr 上。字体还没下载只报 warning，check 和 render 首次运行时会下载。

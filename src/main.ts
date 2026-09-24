@@ -143,12 +143,23 @@ program
             process.exitCode = report.exitCode;
         } catch (error) {
             if (error instanceof EnvError) {
-                writeJson(process.stderr, envDiagnosis(error));
+                const diagnosis = envDiagnosis(error);
+                writeJson(process.stderr, diagnosis);
                 if (options.json)
                     writeJson(process.stdout, {
                         ok: false,
                         exitCode: EXIT.env,
-                        error: envDiagnosis(error),
+                        error: diagnosis.error,
+                        message: diagnosis.message,
+                        problems: [
+                            {
+                                code: diagnosis.error,
+                                message: diagnosis.message,
+                                fix: diagnosis.fix,
+                            },
+                        ],
+                        fix: diagnosis.fix,
+                        detail: diagnosis.detail,
                     });
                 process.exitCode = EXIT.env;
             } else {

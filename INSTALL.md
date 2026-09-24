@@ -131,7 +131,7 @@ Codex: its sandbox has not been tested with flipbook yet. If a command fails wit
 bash ~/.claude/skills/flipbook/scripts/run.sh doctor   # replace with your TARGET
 ```
 
-On a fresh machine `doctor` exits 78 with `chromium-missing`. That is expected before the first render. Any other problem line names its fix: relay it.
+`doctor` prints one JSON object. On a fresh machine it exits 78 with `chromium-missing` in `problems`. That is expected before the first render. For any other problem, relay the lines in its top-level `fix`.
 
 Then render the example (this is the first download from step 3c):
 
@@ -151,7 +151,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh doctor
 Open `$HELLO/out/contact-sheet.png` to see the frames.
 
 **If it fails:**
-- The launcher printed a JSON diagnosis and exited 78 with `"selected": "none"`: no Node or npx was found. Relay `nextSteps` and redo 3a.
+- The launcher printed a JSON diagnosis with `"error": "runtime-missing"` and exited 78: no Node or npx was found. Relay `fix` and redo 3a.
 - Exit 78 from `check` or `render`: read `error` and `fix` in the JSON on stderr. `cache-unwritable` means 3d, `linux-deps-missing` means 3c, `ffmpeg-missing` means 3b, `font-download-failed` means the network or proxy (a mirror can be set with `FLIPBOOK_FONT_BASE_URL`).
 - Exit 1: the example failed a check on this machine. Send the report JSON to https://github.com/liustack/flipbook/issues.
 

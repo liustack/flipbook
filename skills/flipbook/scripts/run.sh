@@ -22,33 +22,44 @@ BIN="flipbook"
 PINNED="0.1.0"
 # -------------------------------------------------------------------------------
 
-# Split "X.Y.Z" (extra suffix ignored) into the globals _MAJ, _MIN, _PAT.
-# Any non-numeric component becomes 0.
+# Split "X.Y.Z[-prerelease][+build]" into the globals _MAJ, _MIN, _PAT and _PRE
+# (empty for a release). Build metadata is dropped. Returns 1 when the text is
+# not exactly three dot-separated numbers.
 parse_semver() {
-  _raw="$1"
-  _MAJ="${_raw%%.*}"
-  _rest="${_raw#*.}"
-  if [ "$_rest" = "$_raw" ]; then
-    _MIN=0
-    _PAT=0
-  else
-    _MIN="${_rest%%.*}"
-    _rest2="${_rest#*.}"
-    if [ "$_rest2" = "$_rest" ]; then _PAT=0; else _PAT="${_rest2%%.*}"; fi
-  fi
-  case "$_MAJ" in '' | *[!0-9]*) _MAJ=0 ;; esac
-  case "$_MIN" in '' | *[!0-9]*) _MIN=0 ;; esac
-  case "$_PAT" in '' | *[!0-9]*) _PAT=0 ;; esac
+  _raw="${1%%+*}"
+  case "$_raw" in
+    *-*) _PRE="${_raw#*-}"; _core="${_raw%%-*}" ;;
+    *) _PRE=""; _core="$_raw" ;;
+  esac
+  case "$_core" in
+    *.*.*.*) return 1 ;;
+    *.*.*) ;;
+    *) return 1 ;;
+  esac
+  _MAJ="${_core%%.*}"
+  _rest="${_core#*.}"
+  _MIN="${_rest%%.*}"
+  _PAT="${_rest#*.}"
+  for _part in "$_MAJ" "$_MIN" "$_PAT"; do
+    case "$_part" in '' | *[!0-9]*) return 1 ;; esac
+  done
+  return 0
 }
 
 # Compatible = not older than PINNED, with the same major.minor while PINNED is
-# 0.x and the same major from 1.0 on.
+# 0.x and the same major from 1.0 on. A prerelease on either side counts only
+# when it is exactly PINNED.
 compatible() {
-  parse_semver "$1"
+  parse_semver "$1" || return 1
   _f_maj=$_MAJ
   _f_min=$_MIN
   _f_pat=$_PAT
-  parse_semver "$PINNED"
+  _f_pre=$_PRE
+  parse_semver "$PINNED" || return 1
+  if [ -n "$_f_pre" ] || [ -n "$_PRE" ]; then
+    [ "${1%%+*}" = "${PINNED%%+*}" ]
+    return
+  fi
   [ "$_f_maj" = "$_MAJ" ] || return 1
   if [ "$_MAJ" = "0" ] && [ "$_f_min" != "$_MIN" ]; then return 1; fi
   if [ "$_f_min" -gt "$_MIN" ]; then return 0; fi
@@ -66,10 +77,11 @@ compat_range() {
   fi
 }
 
-# First "X.Y.Z" token printed by `$BIN --version`.
+# The first version printed by `$BIN --version`, anchored at its first digit so
+# "10.1.0" stays 10.1.0, suffixes included.
 cli_version() {
   "$BIN" --version 2>/dev/null | head -n 1 |
-    sed -n 's/.*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'
+    sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\([-+][0-9A-Za-z.+-]*\)\{0,1\}\).*/\1/p'
 }
 
 # npx is usable only when this machine's node meets the CLI's floor.
@@ -81,7 +93,7 @@ node_meets_floor() {
   parse_semver "$NODE_FLOOR"
   _floor_maj="$_MAJ"
   _floor_min="$_MIN"
-  parse_semver "$_nv"
+  parse_semver "$_nv" || return 1
   if [ "$_MAJ" -gt "$_floor_maj" ]; then return 0; fi
   if [ "$_MAJ" -lt "$_floor_maj" ]; then return 1; fi
   [ "$_MIN" -ge "$_floor_min" ]
@@ -181,104 +193,73 @@ collect() {
   G_SEL="$(resolve)"
 }
 
-# Build the nextSteps JSON array body (without the brackets) into G_NEXTSTEPS.
-compute_next_steps() {
-  if [ "$G_SEL" = "none" ]; then
-    if [ "$G_NPX_PRESENT" = 1 ] && [ "$G_NODE_FLOOR_OK" = 0 ]; then
-      _s1="npx is present but node ${G_NODE_VER:-missing} is below the $NODE_FLOOR floor this CLI needs. Upgrade Node at https://nodejs.org, then re-run this launcher."
-    else
-      _s1="Install Node 22.19+ from https://nodejs.org so npx can run $PKG@$PINNED, then re-run this launcher."
-    fi
-    _s2="No JavaScript runtime? Install Bun from https://bun.sh to use bunx, or put a compatible $BIN ($(compat_range)) on PATH."
-    G_NEXTSTEPS="$(printf '"%s", "%s"' "$(json_escape "$_s1")" "$(json_escape "$_s2")")"
-  else
-    G_NEXTSTEPS=""
-  fi
+# The launcher's view of this machine, as one JSON object.
+launcher_json() {
+  printf '{\n'
+  printf '    "tool": %s,\n' "$(jstr "$BIN")"
+  printf '    "package": %s,\n' "$(jstr "$PKG")"
+  printf '    "pinnedVersion": %s,\n' "$(jstr "$PINNED")"
+  printf '    "os": %s,\n' "$(jstr "$G_OS")"
+  printf '    "arch": %s,\n' "$(jstr "$G_ARCH")"
+  printf '    "checked": {\n'
+  printf '      "pathCli": { "present": %s, "path": %s, "version": %s, "compatible": %s },\n' \
+    "$(jbool "$G_CLI_PRESENT")" "$(jstr "$G_CLI_PATH")" "$(jstr "$G_CLI_VER")" "$(jbool "$G_CLI_COMPAT")"
+  printf '      "npx": { "present": %s, "path": %s, "nodeMeetsFloor": %s },\n' "$(jbool "$G_NPX_PRESENT")" "$(jstr "$G_NPX_PATH")" "$(jbool "$G_NODE_FLOOR_OK")"
+  printf '      "bunx": { "present": %s, "path": %s },\n' "$(jbool "$G_BUNX_PRESENT")" "$(jstr "$G_BUNX_PATH")"
+  printf '      "node": { "present": %s, "version": %s }\n' "$(jbool "$G_NODE_PRESENT")" "$(jstr "$G_NODE_VER")"
+  printf '    },\n'
+  printf '    "selected": %s\n' "$(jstr "$G_SEL")"
+  printf '  }'
 }
 
-# Emit the structured diagnosis. $1, when a JSON object, is embedded as cliDoctor.
-emit_json() {
-  _chained="${1:-}"
-  compute_next_steps
-  printf '{\n'
-  printf '  "tool": %s,\n' "$(jstr "$BIN")"
-  printf '  "package": %s,\n' "$(jstr "$PKG")"
-  printf '  "pinnedVersion": %s,\n' "$(jstr "$PINNED")"
-  printf '  "os": %s,\n' "$(jstr "$G_OS")"
-  printf '  "arch": %s,\n' "$(jstr "$G_ARCH")"
-  printf '  "checked": {\n'
-  printf '    "pathCli": { "present": %s, "path": %s, "version": %s, "compatible": %s },\n' \
-    "$(jbool "$G_CLI_PRESENT")" "$(jstr "$G_CLI_PATH")" "$(jstr "$G_CLI_VER")" "$(jbool "$G_CLI_COMPAT")"
-  printf '    "npx": { "present": %s, "path": %s, "nodeMeetsFloor": %s },\n' "$(jbool "$G_NPX_PRESENT")" "$(jstr "$G_NPX_PATH")" "$(jbool "$G_NODE_FLOOR_OK")"
-  printf '    "bunx": { "present": %s, "path": %s },\n' "$(jbool "$G_BUNX_PRESENT")" "$(jstr "$G_BUNX_PATH")"
-  printf '    "node": { "present": %s, "version": %s }\n' "$(jbool "$G_NODE_PRESENT")" "$(jstr "$G_NODE_VER")"
-  printf '  },\n'
-  printf '  "selected": %s,\n' "$(jstr "$G_SEL")"
-  printf '  "nextSteps": [%s],\n' "$G_NEXTSTEPS"
-  # First character of the captured output.
-  _first="${_chained%"${_chained#?}"}"
-  if [ -n "$_chained" ] && [ "$_first" = "{" ]; then
-    printf '  "cliDoctor": %s\n' "$_chained"
+# One JSON report for "nothing can run the CLI": the same top-level fields as a
+# failing doctor report (ok, exitCode, error, message, fix) plus the launcher block.
+emit_none() {
+  if [ "$G_NPX_PRESENT" = 1 ] && [ "$G_NODE_FLOOR_OK" = 0 ]; then
+    _s1="npx is present but node ${G_NODE_VER:-missing} is below the $NODE_FLOOR floor this CLI needs. Upgrade Node at https://nodejs.org, then re-run this launcher."
   else
-    printf '  "cliDoctor": null\n'
+    _s1="Install Node 22.19+ from https://nodejs.org so npx can run $PKG@$PINNED, then re-run this launcher."
   fi
+  _s2="No JavaScript runtime? Install Bun from https://bun.sh to use bunx, or put a compatible $BIN ($(compat_range)) on PATH."
+  printf '{\n'
+  printf '  "ok": false,\n'
+  printf '  "exitCode": 78,\n'
+  printf '  "error": "runtime-missing",\n'
+  printf '  "message": %s,\n' "$(jstr "No runtime can launch $BIN here: no compatible $BIN on PATH, no usable npx, no bunx.")"
+  printf '  "fix": [%s, %s],\n' "$(jstr "$_s1")" "$(jstr "$_s2")"
+  printf '  "launcher": %s\n' "$(launcher_json)"
   printf '}\n'
 }
 
-# Human-readable diagnosis for `doctor` without --json.
-emit_text() {
-  printf '%s launcher diagnosis\n\n' "$BIN"
-  printf '  os / arch:      %s / %s\n' "$G_OS" "$G_ARCH"
-  printf '  pinned version: %s (%s)\n' "$PINNED" "$PKG"
-  if [ "$G_CLI_PRESENT" = 1 ]; then
-    printf '  %s on PATH:  %s (version %s, %s)\n' "$BIN" "$G_CLI_PATH" \
-      "${G_CLI_VER:-unknown}" "$([ "$G_CLI_COMPAT" = 1 ] && echo compatible || echo incompatible)"
-  else
-    printf '  %s on PATH:  no\n' "$BIN"
-  fi
-  _npx_desc="no"
-  if [ "$G_NPX_PRESENT" = 1 ]; then
-    if [ "$G_NODE_FLOOR_OK" = 1 ]; then
-      _npx_desc="$G_NPX_PATH"
-    else
-      _npx_desc="$G_NPX_PATH (unusable: node ${G_NODE_VER:-missing} is below $NODE_FLOOR)"
-    fi
-  fi
-  printf '  npx:            %s\n' "$_npx_desc"
-  printf '  bunx:           %s\n' "$([ "$G_BUNX_PRESENT" = 1 ] && echo "$G_BUNX_PATH" || echo no)"
-  printf '  node:           %s\n' "$([ "$G_NODE_PRESENT" = 1 ] && echo "${G_NODE_VER:-yes}" || echo no)"
-  printf '  selected path:  %s\n' "$G_SEL"
-  if [ "$G_SEL" = "none" ]; then
-    printf '\nNo runtime can launch %s here.\n' "$BIN"
-    printf 'Next steps:\n'
-    printf '  - Install Node 22.19+ from https://nodejs.org, then re-run this launcher.\n'
-    printf '  - Or install Bun from https://bun.sh, or put a compatible %s on PATH.\n' "$BIN"
-  fi
-}
-
-# `doctor [--json] [extra...]`: launcher selection diagnosis, followed by the
-# CLI's own doctor when a CLI is resolvable. Extra flags pass through to it.
-# Exits with the CLI doctor's code, or 78 when no runtime can run the CLI.
+# `doctor [extra...]`: one JSON object on stdout, always. With a runnable CLI it
+# is the CLI's `doctor --json` report with the launcher block added as its first
+# field, and the CLI's exit code. Without one it is emit_none, exit 78. Extra
+# flags pass through to the CLI doctor.
 doctor() {
   collect
-  _json=0
-  for _a in "$@"; do
-    if [ "$_a" = "--json" ]; then _json=1; fi
+  for _a do
+    shift
+    [ "$_a" = "--json" ] || set -- "$@" "$_a"
   done
+  if [ "$G_SEL" = "none" ]; then
+    emit_none
+    exit 78
+  fi
   _code=0
-  if [ "$G_SEL" = "none" ]; then _code=78; fi
-  if [ "$_json" = 1 ]; then
-    _chained=""
-    if [ "$G_SEL" != "none" ]; then
-      _chained="$(run_cli doctor "$@" 2>/dev/null)" || _code=$?
-    fi
-    emit_json "$_chained"
+  _out="$(run_cli doctor --json "$@")" || _code=$?
+  _first="${_out%"${_out#?}"}"
+  if [ "$_first" = "{" ]; then
+    printf '{\n  "launcher": %s,%s\n' "$(launcher_json)" "${_out#?}"
   else
-    emit_text
-    if [ "$G_SEL" != "none" ]; then
-      printf '\n--- %s doctor ---\n' "$BIN"
-      run_cli doctor "$@" || _code=$?
-    fi
+    if [ "$_code" = 0 ]; then _code=1; fi
+    printf '{\n'
+    printf '  "ok": false,\n'
+    printf '  "exitCode": %s,\n' "$_code"
+    printf '  "error": "doctor-failed",\n'
+    printf '  "message": %s,\n' "$(jstr "$BIN doctor exited $_code without a JSON report. Its stderr is above.")"
+    printf '  "fix": [%s],\n' "$(jstr "Report it with the stderr output at https://github.com/liustack/flipbook/issues")"
+    printf '  "launcher": %s\n' "$(launcher_json)"
+    printf '}\n'
   fi
   exit "$_code"
 }
@@ -293,7 +274,7 @@ run() {
     bunx) exec bunx --bun "$PKG@$PINNED" "$@" ;;
     none)
       collect
-      emit_json "" >&2
+      emit_none >&2
       exit 78
       ;;
   esac

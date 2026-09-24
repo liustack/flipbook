@@ -11,9 +11,13 @@ describe('doctor exits 78 with a fix when something is missing', () => {
     it('reports missing ffmpeg', () => {
         const result = runCli(['doctor', '--json'], { ...process.env, PATH: nodeOnly });
         expect(result.status).toBe(78);
-        const report = result.json as { problems: { code: string; fix: string[] }[] };
+        const report = result.json as {
+            problems: { code: string; fix: string[] }[];
+            fix: string[];
+        };
         const problem = report.problems.find((p) => p.code === 'ffmpeg-missing');
         expect(problem?.fix.join('\n')).toContain('brew install ffmpeg');
+        expect(report.fix.join('\n')).toContain('brew install ffmpeg');
     });
 
     it('reports missing Chromium with a copyable install command', () => {

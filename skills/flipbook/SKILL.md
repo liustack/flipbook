@@ -27,7 +27,7 @@ bash <skill-dir>/scripts/run.sh render <dir>                    # MP4 plus accep
 | 0 | passed | continue |
 | 1 | the composition has problems | fix every code in `failures`, see `references/troubleshooting.md` |
 | 2 | the command is wrong | fix the command |
-| 78 | the machine is missing something | relay `fix` from the JSON on stderr to the user, leave the composition alone |
+| 78 | the machine is missing something | relay the `fix` lines to the user (from the JSON on stderr, or on stdout for `doctor`), leave the composition alone |
 
 If scripts cannot run, use the first line that works (the pinned version is 0.1.0):
 

@@ -48,6 +48,8 @@ export interface DoctorReport {
     /** Present after --prune. */
     pruned?: PruneResult;
     problems: DoctorProblem[];
+    /** Every fix line from problems, in order and without repeats: what to relay on exit 78. */
+    fix: string[];
     warnings: string[];
 }
 
@@ -194,6 +196,7 @@ export async function buildDoctorReport(deps: DoctorDeps): Promise<DoctorReport>
         skillInstalls,
         ...(deps.pruned ? { pruned: deps.pruned } : {}),
         problems,
+        fix: [...new Set(problems.flatMap((problem) => problem.fix))],
         warnings,
     };
 }
