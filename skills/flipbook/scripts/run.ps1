@@ -5,7 +5,8 @@
 # flipbook"); this script picks a working way to run it here.
 #
 # Invoke it per process:
-#   powershell -ExecutionPolicy Bypass -File run.ps1 -q "test"
+#   powershell -NoProfile -ExecutionPolicy Bypass -File run.ps1 doctor
+#   powershell -NoProfile -ExecutionPolicy Bypass -File run.ps1 check <dir>
 #
 # Resolution order (kept identical in run.sh):
 #   1. A compatible flipbook already on PATH  -> run it directly.
@@ -17,6 +18,14 @@
 # and has no postinstall step.
 
 $ErrorActionPreference = 'Stop'
+
+# The CLI writes UTF-8. Read and re-emit its output as UTF-8 instead of the
+# console code page, which would garble non-ASCII text in the JSON reports.
+try {
+    [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+    $OutputEncoding = [Console]::OutputEncoding
+}
+catch { }
 
 # --- Version constants: stamped by scripts/release.mjs at release time. --------
 # scripts/stamp.test.mjs asserts $Pinned equals the package.json version.
@@ -40,9 +49,31 @@ $script:NodeVer = $null
 $script:NodeFloorOk = $false
 $script:Selected = 'none'
 
+# The full path of an executable or .cmd shim on PATH, or $null. npm also
+# installs .ps1 shims, which an execution policy can refuse to run; the .cmd
+# twin next to each one runs under any policy.
+function Find-Program {
+    param([string] $Name)
+    $found = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) { return $found.Source }
+    return $null
+}
+
+# Run a native program. Windows PowerShell 5.1 turns its stderr lines into
+# errors when stderr is redirected, and 'Stop' would end the script on the
+# first one and lose the exit code, so this scope uses 'Continue'. The exit
+# code stays in $LASTEXITCODE.
+function Invoke-Native {
+    param([string] $Program, [string[]] $NativeArgs)
+    $ErrorActionPreference = 'Continue'
+    & $Program @NativeArgs
+}
+
 # First "X.Y.Z" token printed by `$Bin --version`.
 function Get-CliVersion {
-    try { $out = & $Bin --version 2>$null } catch { return '' }
+    $cli = Find-Program $Bin
+    if (-not $cli) { return '' }
+    try { $out = Invoke-Native $cli @('--version') 2>$null } catch { return '' }
     if (-not $out) { return '' }
     $line = [string]($out | Select-Object -First 1)
     $m = [regex]::Match($line, '[0-9]+\.[0-9]+\.[0-9]+')
@@ -68,8 +99,9 @@ function Test-Compatible {
 # npx is usable only when this machine's node meets the CLI's floor.
 $NodeFloor = '22.19.0'
 function Test-NodeMeetsFloor {
-    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return $false }
-    try { $nv = ((& node --version 2>$null) -replace '^v', '') } catch { return $false }
+    $node = Find-Program 'node'
+    if (-not $node) { return $false }
+    try { $nv = ((Invoke-Native $node @('--version') 2>$null) -replace '^v', '') } catch { return $false }
     if (-not $nv) { return $false }
     $n = $nv -split '\.'
     $f = $NodeFloor -split '\.'
@@ -83,33 +115,34 @@ function Test-NodeMeetsFloor {
 
 # Return exactly one word: the chosen launch path.
 function Resolve-LaunchKind {
-    $cli = Get-Command $Bin -ErrorAction SilentlyContinue
-    if ($cli) {
+    if (Find-Program $Bin) {
         $v = Get-CliVersion
         if ($v -and (Test-Compatible $v)) { return 'path' }
     }
-    if ((Get-Command npx -ErrorAction SilentlyContinue) -and (Test-NodeMeetsFloor)) { return 'npx' }
-    if (Get-Command bunx -ErrorAction SilentlyContinue) { return 'bunx' }
+    if ((Find-Program 'npx') -and (Test-NodeMeetsFloor)) { return 'npx' }
+    if (Find-Program 'bunx') { return 'bunx' }
     return 'none'
 }
 
-# Run the resolved CLI and return its output (used to chain the CLI's own
-# doctor). Passes every argument through untouched.
+# Run the CLI the way `$Kind` says, passing every argument through untouched.
+# Its exit code is left in $LASTEXITCODE.
 function Invoke-Cli {
-    param([string[]] $CliArgs)
-    switch ($script:Selected) {
-        'path' { & $Bin @CliArgs }
-        'npx' { & npx --yes --package "$Package@$Pinned" $Bin @CliArgs }
-        'bunx' { & bunx --bun "$Package@$Pinned" @CliArgs }
+    param([string] $Kind, [string[]] $CliArgs)
+    switch ($Kind) {
+        'path' { Invoke-Native (Find-Program $Bin) $CliArgs }
+        'npx' { Invoke-Native (Find-Program 'npx') (@('--yes', '--package', "$Package@$Pinned", $Bin) + $CliArgs) }
+        'bunx' { Invoke-Native (Find-Program 'bunx') (@('--bun', "$Package@$Pinned") + $CliArgs) }
     }
 }
 
 function Get-Arch {
-    switch ($env:PROCESSOR_ARCHITECTURE) {
+    # A 32-bit PowerShell on 64-bit Windows sees x86 here; the real one is in PROCESSOR_ARCHITEW6432.
+    $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+    switch ($arch) {
         'AMD64' { return 'x64' }
         'ARM64' { return 'arm64' }
         'x86' { return 'x86' }
-        default { return $env:PROCESSOR_ARCHITECTURE }
+        default { return $arch }
     }
 }
 
@@ -117,24 +150,24 @@ function Get-Arch {
 function Collect {
     $script:Arch = Get-Arch
 
-    $cli = Get-Command $Bin -ErrorAction SilentlyContinue
+    $cli = Find-Program $Bin
     if ($cli) {
         $script:CliPresent = $true
-        $script:CliPath = $cli.Source
+        $script:CliPath = $cli
         $script:CliVer = Get-CliVersion
         $script:CliCompat = [bool]($script:CliVer -and (Test-Compatible $script:CliVer))
     }
 
-    $npx = Get-Command npx -ErrorAction SilentlyContinue
-    if ($npx) { $script:NpxPresent = $true; $script:NpxPath = $npx.Source }
+    $npx = Find-Program 'npx'
+    if ($npx) { $script:NpxPresent = $true; $script:NpxPath = $npx }
 
-    $bunx = Get-Command bunx -ErrorAction SilentlyContinue
-    if ($bunx) { $script:BunxPresent = $true; $script:BunxPath = $bunx.Source }
+    $bunx = Find-Program 'bunx'
+    if ($bunx) { $script:BunxPresent = $true; $script:BunxPath = $bunx }
 
-    $node = Get-Command node -ErrorAction SilentlyContinue
+    $node = Find-Program 'node'
     if ($node) {
         $script:NodePresent = $true
-        try { $script:NodeVer = ((& node --version 2>$null) -replace '^v', '') } catch { $script:NodeVer = $null }
+        try { $script:NodeVer = ((Invoke-Native $node @('--version') 2>$null) -replace '^v', '') } catch { $script:NodeVer = $null }
         $script:NodeFloorOk = Test-NodeMeetsFloor
     }
 
@@ -221,12 +254,11 @@ function Invoke-Doctor {
     if ($json) {
         $chained = $null
         if ($script:Selected -ne 'none') {
-            try {
-                $raw = (Invoke-Cli -CliArgs (@('doctor') + $DocArgs) 2>$null | Out-String).Trim()
-                $code = $LASTEXITCODE
-                if ($raw.StartsWith('{')) { $chained = ($raw | ConvertFrom-Json) }
+            $raw = (Invoke-Cli $script:Selected (@('doctor') + $DocArgs) 2>$null | Out-String).Trim()
+            $code = $LASTEXITCODE
+            if ($raw.StartsWith('{')) {
+                try { $chained = ($raw | ConvertFrom-Json) } catch { $chained = $null }
             }
-            catch { $chained = $null }
         }
         Write-Output (Build-DiagnosisJson $chained)
     }
@@ -235,7 +267,7 @@ function Invoke-Doctor {
         if ($script:Selected -ne 'none') {
             Write-Output ''
             Write-Output "--- $Bin doctor ---"
-            Invoke-Cli -CliArgs (@('doctor') + $DocArgs)
+            Invoke-Cli $script:Selected (@('doctor') + $DocArgs)
             $code = $LASTEXITCODE
         }
     }
@@ -247,16 +279,13 @@ function Invoke-Doctor {
 function Invoke-Run {
     param([string[]] $CliArgs)
     $sel = Resolve-LaunchKind
-    switch ($sel) {
-        'path' { & $Bin @CliArgs; exit $LASTEXITCODE }
-        'npx' { & npx --yes --package "$Package@$Pinned" $Bin @CliArgs; exit $LASTEXITCODE }
-        'bunx' { & bunx --bun "$Package@$Pinned" @CliArgs; exit $LASTEXITCODE }
-        'none' {
-            Collect
-            [Console]::Error.WriteLine((Build-DiagnosisJson $null))
-            exit 78
-        }
+    if ($sel -eq 'none') {
+        Collect
+        [Console]::Error.WriteLine((Build-DiagnosisJson $null))
+        exit 78
     }
+    Invoke-Cli $sel $CliArgs
+    exit $LASTEXITCODE
 }
 
 $Command = ''
