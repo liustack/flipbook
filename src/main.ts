@@ -17,6 +17,7 @@ import {
     writeJson,
 } from './cli/report.ts';
 import { parseRegion, runSnapshot } from './cli/snapshot.ts';
+import { win32Allowed } from './engine/browser.ts';
 import { pruneCache } from './engine/prune.ts';
 import { workspaceFinding } from './engine/session.ts';
 import { WorkspaceError } from './engine/workspace.ts';
@@ -47,7 +48,7 @@ function parseNumber(raw: string, flag: string, min: number, max: number): numbe
 }
 
 function preflight(): void {
-    if (process.platform === 'win32') {
+    if (process.platform === 'win32' && !win32Allowed()) {
         throw new EnvError('platform-unsupported', 'flipbook does not run on Windows.', [
             'Install WSL2 with Ubuntu (wsl --install), then run flipbook inside it.',
         ]);

@@ -9,6 +9,7 @@ import {
     headlessShell,
     installCommand,
     installDepsCommand,
+    isSupportedPlatform,
     type LaunchFn,
     launchBrowser,
 } from '../engine/browser.ts';
@@ -83,9 +84,7 @@ export async function buildDoctorReport(deps: DoctorDeps): Promise<DoctorReport>
     const nodeVersion = deps.nodeVersion ?? process.version;
     const problems: DoctorProblem[] = [];
     const warnings: string[] = [];
-    const supported =
-        (platform === 'darwin' && (arch === 'arm64' || arch === 'x64')) ||
-        (platform === 'linux' && (arch === 'x64' || arch === 'arm64'));
+    const supported = isSupportedPlatform(platform, arch, env);
     if (!supported) {
         problems.push({
             code: 'platform-unsupported',
