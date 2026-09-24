@@ -49,10 +49,15 @@ export function auditSafeArea(
     const mx = W * SAFE_MARGIN;
     const my = H * SAFE_MARGIN;
     const time = frame / timeline.fps;
-    const items: { element: string; text: string; lines: Box[] }[] = [
+    const items: { element: string; text: string; lines: Box[]; offscreen?: boolean }[] = [
         ...dom
             .filter((d) => !d.allowOverflow)
-            .map((d) => ({ element: d.selector, text: d.text, lines: d.lines })),
+            .map((d) => ({
+                element: d.selector,
+                text: d.text,
+                lines: d.lines,
+                offscreen: d.offscreen,
+            })),
         ...registered
             .filter((r) => !r.allowOverflow)
             .map((r) => ({
@@ -66,16 +71,22 @@ export function auditSafeArea(
         const cut = item.lines.filter((line) => outside(line, 0, 0, W, H));
         if (cut.length > 0) {
             out.push(
-                finding('text-offstage', `${item.element} runs past the frame edge.`, {
-                    time,
-                    frame,
-                    element: item.element,
-                    detail: {
-                        lines: cut,
-                        text: item.text.slice(0, 80),
-                        frame: { width: W, height: H },
+                finding(
+                    'text-offstage',
+                    item.offscreen
+                        ? `${item.element} is entirely outside the frame.`
+                        : `${item.element} runs past the frame edge.`,
+                    {
+                        time,
+                        frame,
+                        element: item.element,
+                        detail: {
+                            lines: cut,
+                            text: item.text.slice(0, 80),
+                            frame: { width: W, height: H },
+                        },
                     },
-                }),
+                ),
             );
             continue;
         }
@@ -149,7 +160,8 @@ export async function auditContrast(
     const time = frame / page.timeline.fps;
     const seen = new Set<string>();
     for (const entry of dom) {
-        if (seen.has(entry.key)) continue;
+        // Text off the frame has no pixels to measure; the frame-edge check reports it.
+        if (entry.offscreen || seen.has(entry.key)) continue;
         seen.add(entry.key);
         const glyph: { i: number; diff: number }[] = [];
         for (const line of entry.lines) {

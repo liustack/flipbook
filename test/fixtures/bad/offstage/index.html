@@ -9,12 +9,14 @@
   #cut { left: 520px; top: 40px; }
   #edge { left: 8px; top: 130px; }
   #exempt { left: 500px; top: 220px; }
+  #gone { left: 700px; top: 280px; }
 </style>
 </head>
 <body>
 <p id="cut">Cut off text</p>
 <p id="edge">Near edge</p>
 <p id="exempt" data-flipbook-allow-overflow>Bleeds on purpose</p>
+<p id="gone">Entirely off the frame</p>
 <canvas id="ink"></canvas>
 <script type="module">
 import { composition, setupCanvas } from '/__flipbook/runtime.js';

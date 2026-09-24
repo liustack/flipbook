@@ -144,7 +144,7 @@ describe('bad composition corpus', () => {
         const cut = checked.failures
             .filter((f) => f.code === 'text-offstage')
             .map((f) => f.element);
-        expect(cut).toEqual(['#cut']);
+        expect(cut).toEqual(['#cut', '#gone']);
         const margin = checked.warnings
             .filter((f) => f.code === 'text-safe-area')
             .map((f) => f.element);

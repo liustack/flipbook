@@ -348,6 +348,7 @@ composition({
 - Use only flipbook's fonts: `"Noto Serif SC"` (`FONTS.serif`, weights 200 to 900) and `"LXGW WenKai"` (`FONTS.hand`, weight 400). Both cover Chinese and Latin. Other font names fall back to system fonts and fail with `font-fallback`. Characters neither font has fail with `missing-glyph`.
 - At the moment each text cue settles, check measures every line: past the frame edge is an error (`text-offstage`), inside the outer 5% margin is a warning (`text-safe-area`), contrast below 3:1 against what is behind it is a warning (`low-contrast`).
 - Text that bleeds off the frame on purpose carries `data-flipbook-allow-overflow` (DOM) or `allowOverflow: true` (canvas).
+- Text laid out entirely off the frame counts as offstage too. Text waiting outside for a later scene stays hidden (`display: none`, `visibility: hidden` or `opacity: 0`) until it enters.
 
 <!-- check: pass -->
 ```js

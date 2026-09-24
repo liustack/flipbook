@@ -81,6 +81,8 @@ export interface DomText {
     lines: Rect[];
     /** The element or an ancestor carries data-flipbook-allow-overflow. */
     allowOverflow: boolean;
+    /** Laid out but entirely outside the frame. */
+    offscreen: boolean;
 }
 
 export interface PlatformFont {
@@ -454,7 +456,10 @@ export class CompositionPage {
         );
     }
 
-    /** Visible DOM text nodes with their boxes; tags each parent element for CDP lookups. */
+    /**
+     * Visible DOM text nodes with their boxes, including text laid out outside
+     * the frame; tags each parent element for CDP lookups.
+     */
     async domTexts(): Promise<DomText[]> {
         return this.page.evaluate(() => {
             type Box = { x: number; y: number; width: number; height: number };
@@ -466,6 +471,7 @@ export class CompositionPage {
                 box: Box;
                 lines: Box[];
                 allowOverflow: boolean;
+                offscreen: boolean;
             }[] = [];
             const describe = (el: Element): string => {
                 if (el.id) return `#${el.id}`;
@@ -498,7 +504,6 @@ export class CompositionPage {
                 const top = Math.min(...rects.map((r) => r.top));
                 const right = Math.max(...rects.map((r) => r.right));
                 const bottom = Math.max(...rects.map((r) => r.bottom));
-                if (right <= 0 || bottom <= 0 || left >= innerWidth || top >= innerHeight) continue;
                 let key = el.getAttribute('data-flipbook-text');
                 if (!key) {
                     key = String(next++);
@@ -517,6 +522,9 @@ export class CompositionPage {
                         height: r.height,
                     })),
                     allowOverflow: el.closest('[data-flipbook-allow-overflow]') !== null,
+                    // Kept for the frame-edge check: text moved off the frame is not hidden text.
+                    offscreen:
+                        right <= 0 || bottom <= 0 || left >= innerWidth || top >= innerHeight,
                 });
             }
             return out;
