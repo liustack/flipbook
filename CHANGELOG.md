@@ -24,6 +24,15 @@
 - **timeline 的 audio 定稿**：新增每场强弱 `dynamics`。`preset`、`progression`、`dynamics` 只配 `preset`，`file`、`bpmOffset` 只配 `file`，写错位置报 `timeline-invalid`。`sfx` 只收这四个音效名。
 - **skill**：默认值改成有配乐，新增 `references/audio.md`，新增例子 `examples/beat-title/`。
 
+### 平台
+
+- **Codex 能加载这个 skill**：SKILL.md 的 `compatibility` 挪进 `metadata`，过 Codex 的 skill 校验。
+- **沙箱识别表**：Chromium 起不来时按实测的报错分行处理。macOS 上撞到 mach port 照旧改用单进程重试，Claude Code 和 Codex 的沙箱里都能起。Codex 的 Linux 沙箱不联网时拒绝 socket 调用、临时目录写不进，这两种单进程也没用，直接退 78 并给出对应宿主的放行办法。报告多了 `detail.signature` 和 `detail.host`。
+- **首次下载被沙箱拦**：认出没网络和代理拒绝，提示在沙箱外跑一次或打开网络。SKILL.md 和 INSTALL.md 写上 Codex 的放行设置和 Claude Code 要放行的下载域名。
+- **为 Windows 铺路**：缓存放 `%LOCALAPPDATA%\liustack\flipbook`，认出 win64 的 headless shell，设 `FLIPBOOK_ALLOW_WIN32=1` 可以绕过 `win32` 的退 78。run.ps1 在 Windows PowerShell 5.1 下保住 CLI 的退出码和 UTF-8 输出。CI 加 windows-latest 一列。原生 Windows 仍不支持。
+- **发版盖日期**：`scripts/release.mjs` 发版时把 CHANGELOG 里该版本的日期改成当天。
+- **平台文档**：新增 `docs/platform.md`，写支持矩阵、沙箱特征、受限容器的实测结果和 GPU 结论（2D 合成继续用软件光栅）。
+
 ## 0.1.0 - 2026-09-25
 
 第一个能用的版本：一句话做出一条无声或带自己音乐的 mp4，中文不缺字，交付前自动验收。
