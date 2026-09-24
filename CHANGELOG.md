@@ -46,3 +46,17 @@
 - **沙箱里能跑**：Claude Code 沙箱挡住 Chromium 多进程启动时，自动改用单进程模式，帧和正常模式一致。首次下载 Chromium 和字体需要在沙箱外跑一次。
 - **skill**：SKILL.md 写六步流程、默认值、硬规矩、重试上限，三篇 reference（合成规矩、时间轴、排错），reference 里的代码片段在 CI 里真跑 check。启动器按 PATH、npx、bunx 找钉死版本的 CLI，0.x 期间只认同 major.minor。
 - **维护工具**：`doctor --prune` 清旧缓存，`scripts/rebaseline.mjs` 比较两个版本的逐帧 PSNR，`eval/run.mjs` 跑提示词乘模型的评测并留证据。
+
+### 修复
+
+代码审查后的修复，都在打 0.1.0 标签之前。
+
+- **写入不出合成目录**：`.flipbook/` 或 `out/` 里有软链时，check、snapshot、render 报 `unsafe-output`，什么都不写。所有写入先写新名字再改名到位，不跟随软链和硬链。自带音乐按真实路径核在合成目录内，ffmpeg 只按本地文件读，格式走白名单，播放列表和 concat 一律拒收。
+- **render 锁**：用 O_EXCL 建，内容是 pid 和随机令牌，不再误夺刚建的锁，释放时只删自己的锁。
+- **不卡住、不漏资源**：送帧和收尾都有期限，超时杀掉 ffmpeg 并等它退出。失败路径逐个回收锁、临时目录、浏览器、页面和编码器。协议探测也受 ready 期限约束，关页面最多等 10 秒。
+- **check 更严**：扰动页上出的任何问题都算失败，带原类型码和扰动条件。堵住原生时钟入口，实际调用了禁用的时钟和随机函数报 `forbidden-api-call`。整段移出画面的 DOM 字也报 `text-offstage`。canvas 字按 `ctx.font` 的字体链逐字核字形，文字框按四角完整变换取包围框，并处理 `maxWidth` 压缩。量不出对比度的字报 warning，canvas 字列进 `check.contrastSkipped`。
+- **timeline**：`cueProgress` 的 settle 时长和换算一致，0 拍在 cue 时刻就到 1。文字 cue 必须在本场内出完。
+- **成片验收**：定格和空白按整条时间轴连续计时，不被场景边界和两类空画面的交替切碎。花屏证据复制到 evidence 目录，不再指向渲染完就删的临时目录。
+- **网络**：WebSocket 拦下并记进 `external-request`，页面里禁用 WebRTC 和 WebTransport，浏览器内不解析域名。
+- **启动器和 doctor**：run.sh 从第一个数字取版本，预发布版只认和钉死版本完全相同的，`doctor` 带不带 `--json` 都输出一个 JSON。缓存目录写不进时 doctor 报 `cache-unwritable` 退 78。退 78、拒写和内部错误的运行也保存报告，存不了在报告里写明。
+- **其他**：commander 钉成精确版本。SECURITY.md 写明 Chromium 自身沙箱被关掉时的边界和写入范围。skill 文件里删掉给维护者看的生成和 CI 说明。
