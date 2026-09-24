@@ -1,0 +1,33 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 20260925,
+    "bpm": 100,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "open", "bars": 1 },
+        { "id": "words", "bars": 3 },
+        { "id": "end", "bars": 1, "hold": true }
+    ],
+    "cues": [
+        { "id": "flip", "scene": "open", "beat": 1, "kind": "sfx", "sfx": "paper" },
+        { "id": "w1", "scene": "words", "beat": 0, "kind": "text", "text": "一拍", "settleBeats": 1 },
+        { "id": "d1", "scene": "words", "beat": 0, "kind": "sfx", "sfx": "drop" },
+        { "id": "w2", "scene": "words", "beat": 4, "kind": "text", "text": "一帧", "settleBeats": 1 },
+        { "id": "d2", "scene": "words", "beat": 4, "kind": "sfx", "sfx": "drop" },
+        { "id": "w3", "scene": "words", "beat": 8, "kind": "text", "text": "一个字", "settleBeats": 1 },
+        { "id": "d3", "scene": "words", "beat": 8, "kind": "sfx", "sfx": "drop" },
+        { "id": "line", "scene": "words", "beat": 11, "kind": "sfx", "sfx": "sweep" },
+        { "id": "title", "scene": "end", "beat": 0, "kind": "text", "text": "翻页书", "settleBeats": 1 },
+        { "id": "stamp", "scene": "end", "beat": 0, "kind": "sfx", "sfx": "ding" }
+    ],
+    "audio": {
+        "mode": "preset",
+        "preset": "marimba",
+        "key": "G",
+        "progression": 0,
+        "dynamics": { "open": "soft", "words": "full", "end": "medium" }
+    }
+}

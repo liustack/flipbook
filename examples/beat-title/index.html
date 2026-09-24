@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>beat-title</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #f3ede1; }
+  canvas { position: absolute; left: 0; top: 0; }
+  #title { position: absolute; left: 0; top: 380px; width: 1920px; margin: 0; text-align: center;
+           font: 700 200px/1.2 "Noto Serif SC"; letter-spacing: 24px; color: #2b2622; opacity: 0; }
+</style>
+</head>
+<body>
+<canvas id="paper" data-flipbook-layer="paper"></canvas>
+<canvas id="ink"></canvas>
+<h1 id="title">翻页书</h1>
+<script type="module">
+import {
+  composition, timeline, setupCanvas, staticLayer, fillText, rng, rand,
+  ease, lerp, progress, cue, transitionOut, FONTS,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const beat = tl.secondsPerBeat;
+const ink = setupCanvas(document.getElementById('ink'), W, H);
+// Every hit lands on the frame of its cue, where the sound peaks.
+const at = (id) => cue(tl, id).frame / tl.fps;
+const words = [
+  { id: 'w1', x: 380, half: 170 },
+  { id: 'w2', x: 872, half: 170 },
+  { id: 'w3', x: 1452, half: 250 },
+].map((w) => ({ ...w, text: cue(tl, w.id).text, land: at(w.id) }));
+const title = document.getElementById('title');
+const PAPER = '#f3ede1';
+const RED = '#c8452d';
+
+composition({
+  setup() {
+    const paper = staticLayer(W, H, (ctx) => {
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, W, H);
+      const r = rng(tl.seed);
+      for (let i = 0; i < 12000; i++) {
+        ctx.fillStyle = `rgba(90, 70, 40, ${r.range(0.02, 0.07)})`;
+        ctx.fillRect(r.range(0, W), r.range(0, H), r.range(1, 3), r.range(1, 3));
+      }
+    });
+    paper.blit(setupCanvas(document.getElementById('paper'), W, H));
+  },
+  seek(t) {
+    ink.clearRect(0, 0, W, H);
+
+    // The card slides in and flips flat on the page-turn cue.
+    const flip = at('flip');
+    const inP = ease.outCubic(progress(t, 0, flip));
+    const drift = Math.sin(t * 1.3) * 6;
+    const out = transitionOut(tl, t, 'words', 1);
+    ink.save();
+    ink.translate(lerp(W + 700, W / 2, inP) + drift, 560 + (1 - inP) * 80);
+    ink.rotate(lerp(0.22, -0.015, inP) + Math.sin(t * 0.9) * 0.004);
+    const flat = t < flip ? lerp(0.35, 1, ease.inQuad(progress(t, flip - beat, flip))) : 1;
+    ink.scale(1, flat);
+    ink.fillStyle = 'rgba(60, 45, 30, 0.12)';
+    ink.fillRect(-790, -290, 1600, 620);
+    ink.fillStyle = '#fbf7ef';
+    ink.fillRect(-800, -300, 1600, 600);
+    ink.strokeStyle = 'rgba(43, 38, 34, 0.35)';
+    ink.lineWidth = 3;
+    ink.strokeRect(-800, -300, 1600, 600);
+    ink.restore();
+
+    // A small ink ball bounces on every beat until the end card.
+    if (out < 1 && inP > 0.5) {
+      const b = (t / beat) % 1;
+      const h = 4 * b * (1 - b);
+      ink.fillStyle = `rgba(43, 38, 34, ${(1 - out) * progress(inP, 0.5, 1)})`;
+      ink.beginPath();
+      ink.ellipse(1640, 420 - h * 150, 26 * (1 + (1 - h) * 0.25), 26 * (1 - (1 - h) * 0.2), 0, 0, Math.PI * 2);
+      ink.fill();
+    }
+
+    // Words fall for half a beat, land on their cue with a squash, then breathe.
+    // They are drawn on the canvas: DOM text whose scale changes every frame
+    // does not raster the same way twice.
+    words.forEach((w, i) => {
+      const start = w.land - beat * 0.5;
+      if (t < start || out >= 1) return;
+      let y = 0;
+      let sx = 1;
+      let sy = 1;
+      if (t < w.land) {
+        const u = progress(t, start, w.land);
+        y = -(1 - u * u) * 520;
+        sx = 0.94;
+        sy = 1.08;
+      } else {
+        const k = t - w.land;
+        const wobble = Math.exp(-k * 7) * Math.cos(k * 26);
+        sy = 1 - 0.2 * wobble;
+        sx = 1 + 0.16 * wobble;
+        y = Math.sin((t - w.land) * 2.2 + i) * 6;
+      }
+      const near = t < w.land ? progress(t, start, w.land) : 1;
+      ink.fillStyle = `rgba(43, 38, 34, ${0.12 * near * (1 - out)})`;
+      ink.beginPath();
+      ink.ellipse(w.x, 640, w.half * (0.5 + near * 0.5) * sx, 16, 0, 0, Math.PI * 2);
+      ink.fill();
+      ink.save();
+      ink.translate(w.x, 608 + y);
+      ink.rotate((Math.sin(t * 1.7 + i * 2) * 1.5 * Math.PI) / 180);
+      ink.scale(sx, sy);
+      ink.font = `400 176px "${FONTS.hand}"`;
+      ink.textAlign = 'center';
+      ink.textBaseline = 'alphabetic';
+      ink.fillStyle = `rgba(43, 38, 34, ${1 - ease.inQuad(out)})`;
+      fillText(ink, w.text, 0, 0, { id: w.id });
+      ink.restore();
+    });
+
+    // The underline sweeps across and lands on the whoosh.
+    const line = at('line');
+    const draw = ease.inOutCubic(progress(t, line - beat, line));
+    if (draw > 0 && out < 1) {
+      ink.save();
+      ink.strokeStyle = `rgba(200, 69, 45, ${1 - out})`;
+      ink.lineCap = 'round';
+      ink.lineWidth = 14;
+      ink.beginPath();
+      const x0 = 220;
+      const x1 = lerp(x0, 1700, draw);
+      for (let x = x0; x <= x1; x += 20) {
+        const y = 690 + Math.sin(x * 0.012) * 8 + (rand(tl.seed, 'line', x) - 0.5) * 4;
+        if (x === x0) ink.moveTo(x, y);
+        else ink.lineTo(x, y);
+      }
+      ink.stroke();
+      ink.restore();
+    }
+
+    // End card: the title settles and the stamp pops on the ding.
+    const stamp = at('stamp');
+    const tp = ease.outBack(progress(t, stamp, stamp + beat));
+    title.style.opacity = String(progress(t, stamp, stamp + beat * 0.5));
+    title.style.transform = `translateY(${(1 - tp) * 36}px)`;
+    const pop = progress(t, stamp, stamp + beat * 0.5);
+    if (pop > 0) {
+      const s = ease.outBack(pop);
+      ink.save();
+      ink.translate(1540, 770);
+      ink.rotate(-0.2);
+      ink.scale(s, s);
+      ink.strokeStyle = RED;
+      ink.lineWidth = 10;
+      ink.beginPath();
+      ink.arc(0, 0, 70, 0, Math.PI * 2);
+      ink.stroke();
+      ink.fillStyle = RED;
+      ink.beginPath();
+      ink.arc(0, 0, 44, 0, Math.PI * 2);
+      ink.fill();
+      ink.restore();
+    }
+  },
+});
+</script>
+</body>
+</html>
