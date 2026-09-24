@@ -41,7 +41,21 @@ read_when:
 
 各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`contactSheetTiles`）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同。
 
-render 通过验收才把 `video.mp4` 和 `contact-sheet.png` 移进 `out/`。没通过的放 `.flipbook/rejected/`，`artifacts.rejectedVideo` 指向它。
+## 输出目录
+
+合成目录里只有两处是 flipbook 写的：
+
+| 路径 | 谁写 | 内容 |
+|---|---|---|
+| `out/video.mp4`、`out/contact-sheet.png` | render | 通过验收的成片和成片联系表。没通过时不动 `out/` |
+| `out/snapshot/contact-sheet.png`、`out/snapshot/zoom-f<帧号>.png` | snapshot | 预检联系表和局部放大图 |
+| `.flipbook/rejected/` | render | 没通过验收的成片和联系表，`artifacts.rejectedVideo` 指向它 |
+| `.flipbook/evidence/<命令>/` | check、render | 证据图，每次运行前清空 |
+| `.flipbook/timeline.resolved.json` | 全部 | 换算后的 timeline |
+| `.flipbook/frame-hashes.json` | render | 每帧原始截图的 sha256 和汇总 |
+| `.flipbook/attempts.json` | check、render | 重试计数 |
+| `.flipbook/tmp/` | render | 渲染中间件，结束后删掉 |
+| `.flipbook/render.lock` | render | 同一目录同时只跑一个 render，另一个报 `render-busy` 退 1，不计入重试次数 |
 
 ## Finding
 
@@ -66,9 +80,9 @@ render 通过验收才把 `video.mp4` 和 `contact-sheet.png` 移进 `out/`。�
 | `timeline-invalid` | 全部 | timeline.json 不合 v1 schema，`detail.path` 给出 JSON 路径 | 改 `detail.path` 指的字段 |
 | `protocol-missing` | 全部 | 页面没定义 `window.__flipbook` | 调运行时库的 `composition({ seek })` |
 | `protocol-mismatch` | 全部 | `window.__flipbook.protocol` 不是 1 | 设成 1 |
-| `ready-timeout` | 全部 | `ready` 超时没结束 | ready 里不等定时器和 rAF |
+| `ready-timeout` | 全部 | `ready` 60 秒内没结束（从开始加载页面算） | ready 里不等定时器和 rAF |
 | `ready-failed` | 全部 | `ready` 被拒，常见是字体或图片加载失败 | 按 message 修 |
-| `seek-timeout` | 全部 | 单次 seek 超过 10 秒 | seek 里不等 rAF、定时器和事件 |
+| `seek-timeout` | 全部 | 单次 seek 超过 10 秒（`--seek-timeout` 可改） | seek 里不等 rAF、定时器和事件 |
 | `seek-failed` | 全部 | seek 抛错 | 按 message 修 |
 | `page-error` | 全部 | 页面有未捕获的异常 | 按 message 修 |
 | `console-error` | 全部 | 页面往控制台打了错误 | 按 message 修 |
@@ -80,13 +94,13 @@ render 通过验收才把 `video.mp4` 和 `contact-sheet.png` 移进 `out/`。�
 | `clock-dependent` | check | 换虚拟时钟起点画面就变，读了 Date 或 performance.now | 只用 seek 传进来的 t |
 | `random-dependent` | check | 换随机底层种子画面就变，用了 Math.random 或 crypto | 用运行时库的 `rng` 或 `rand` |
 | `late-paint` | check | 同一个 t 不重新 seek 连截两张不一样，有迟到的绘制 | seek 里画完，图片解码放 ready |
-| `blank-frame` | check、render | 画面是一整块纯色 | 查 seek 在这些时刻有没有画 |
-| `paper-only` | check、render | 画面和只开纸底层的基线一样 | 查内容层是否因报错没画 |
+| `blank-frame` | check、render | 画面是一整块纯色：缩到 320×180 灰度后，偏离中位灰度超过 16 灰阶的像素不到 0.05%。check 里全部抽样帧都空才是 error，部分空报 warning。render 里连续 1.5 秒以上才是 error | 查 seek 在这些时刻有没有画 |
+| `paper-only` | check、render | 画面和只开纸底层的基线一样：缩到 320×180 灰度后，和最近一张基线相差超过 16 灰阶的像素不到 0.05%。check 和 render 的判定规则同 `blank-frame`。render 每秒截一张基线 | 查内容层是否因报错没画 |
 | `missing-glyph` | check、render | 文字里有 flipbook 字体都没有的字，`detail.chars` 列出 | 换掉这些字 |
 | `font-fallback` | check、render | 文字用了系统字体而不是 flipbook 字体 | font-family 用 "Noto Serif SC" 或 "LXGW WenKai" |
 | `stage-size` | check | 页面内容比 timeline 的宽高大，只报 warning | 舞台按 timeline 尺寸写，隐藏溢出 |
-| `freeze` | render | 没声明 hold 的场景里画面超过 1.5 秒不动 | 让画面动起来，或给场景加 `"hold": true` |
-| `glitch` | render | 成片解码抽样和截图原帧差太多（PSNR 低于 30 dB），或送帧管道断了 | 重渲一次，还出现就带 JSON 报 issue |
+| `freeze` | render | 没声明 hold 的场景里画面 1.5 秒以上不动：成片缩到 320×180、高斯模糊（sigma 1.5）后用 ffmpeg freezedetect（`n=-60dB`）判定，只算落在没声明 hold 的场景里的部分 | 让画面动起来，或给场景加 `"hold": true` |
+| `glitch` | render | 成片均匀抽 8 帧解码，和截图原帧在 480×270 上比 PSNR，低于 30 dB 就报。送帧管道断了也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
 | `frame-count` | render | 成片帧数和 timeline 不符 | 重渲一次，还出现就带 JSON 报 issue |
 | `duration-mismatch` | render | 成片时长和 timeline 不符（容差一帧） | 重渲一次，还出现就带 JSON 报 issue |
 | `color-tags` | render | 成片不是 yuv420p 或缺 bt709 色彩标记 | 带 JSON 报 issue |
