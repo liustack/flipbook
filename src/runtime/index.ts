@@ -66,6 +66,33 @@ export {
 export type { GrainOptions, GridOptions, PaperOptions } from './paper.ts';
 export { drawGrain, drawPaper, grainLayer, PAPER, paperLayer } from './paper.ts';
 export type {
+    AssembleOptions,
+    Assembly,
+    GlyphMaskOptions,
+    GridSlotOptions,
+    Mask,
+    PaceOptions,
+    PackOptions,
+    Piece,
+    PieceDrawer,
+    Placement,
+    ShadowOptions,
+    Slot,
+    SlotOrder,
+} from './templates/assemble.ts';
+export {
+    assemble,
+    distanceField,
+    glyphMask,
+    gridSlots,
+    markTimes,
+    orderSlots,
+    paceBeats,
+    paceTimes,
+    packSlots,
+    shapeMask,
+} from './templates/assemble.ts';
+export type {
     PathTextOptions,
     PlacedWord,
     TextBox,
