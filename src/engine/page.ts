@@ -534,15 +534,17 @@ export class CompositionPage {
         return result;
     }
 
-    /** Scroll size of the document, to compare with the stage size. */
+    /** Laid-out size of html and body, to compare with the stage size. */
     async stageSize(): Promise<{ width: number; height: number }> {
-        return this.page.evaluate(() => ({
-            width: Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth ?? 0),
-            height: Math.max(
-                document.documentElement.scrollHeight,
-                document.body?.scrollHeight ?? 0,
-            ),
-        }));
+        return this.page.evaluate(() => {
+            const boxes = [document.documentElement, document.body]
+                .filter((el): el is HTMLElement => el !== null)
+                .map((el) => el.getBoundingClientRect());
+            return {
+                width: Math.round(Math.max(...boxes.map((b) => b.width))),
+                height: Math.round(Math.max(...boxes.map((b) => b.height))),
+            };
+        });
     }
 
     async close(): Promise<void> {

@@ -48,3 +48,33 @@ composition({ seek() {} });
         expect(refused?.message).toContain('/link/secret.txt');
     });
 });
+
+describe('stage size', () => {
+    it('warns when body is laid out larger than the stage, not when content is clipped', async () => {
+        const dir = tempDir('stage');
+        fs.writeFileSync(
+            path.join(dir, 'timeline.json'),
+            JSON.stringify({
+                version: 1,
+                width: 320,
+                height: 180,
+                fps: 12,
+                seed: 1,
+                bpm: 120,
+                beatsPerBar: 4,
+                scenes: [{ id: 'main', bars: 1 }],
+            }),
+        );
+        fs.writeFileSync(
+            path.join(dir, 'index.html'),
+            `<!doctype html><body style="margin:0;width:400px;height:180px;background:#fff">
+<div style="position:absolute;left:20px;top:20px;width:80px;height:80px;background:#246"></div>
+<script type="module">
+import { composition } from '/__flipbook/runtime.js';
+composition({ seek(t) { document.body.firstElementChild.style.left = 20 + t * 40 + 'px'; } });
+</script></body>`,
+        );
+        const report = await runCheck({ dir, session: await session(), recordAttempts: false });
+        expect(report.warnings.map((w) => w.code)).toContain('stage-size');
+    });
+});

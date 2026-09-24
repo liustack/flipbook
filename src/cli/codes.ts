@@ -118,7 +118,8 @@ export const FINDING_CODES = {
         fix: 'Darken or lighten the text or its background, or add a solid panel behind it, until the contrast reaches 3:1.',
     },
     'stage-size': {
-        meaning: 'The page content is larger than the stage size from timeline.json.',
+        meaning:
+            'The html or body element is laid out larger than the stage size from timeline.json.',
         fix: 'Size the stage to timeline width and height and hide overflow on html and body.',
     },
     freeze: {

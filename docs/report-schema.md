@@ -102,7 +102,7 @@ read_when:
 | `text-offstage` | check | 文字完全出来的时刻（cue 的 settle 时刻），有一行越过画面边缘。每一行用 `Range.getClientRects` 取框，已含 transform | 把字挪进画面或缩小，故意出画的字加 `data-flipbook-allow-overflow` |
 | `text-safe-area` | check | 同一时刻，有一行落进画面外沿 5% 的边距里，只报 warning | 离四边至少留宽高的 5%，或加 `data-flipbook-allow-overflow` |
 | `low-contrast` | check | 同一时刻，文字和背后画面的对比度低于 3:1（大字标准），只报 warning。量法：同一帧截两张，第二张把 DOM 文字设成透明，变了的像素就是字形，字色取变化最大的三成像素在第一张里的均值，背景取同一批像素在第二张里的均值，按 WCAG 相对亮度算比值。Canvas 里画的字不量 | 加深或调亮文字或背景，或在字下垫一块实色底 |
-| `stage-size` | check | 页面内容比 timeline 的宽高大，只报 warning | 舞台按 timeline 尺寸写，隐藏溢出 |
+| `stage-size` | check | html 或 body 的布局尺寸比 timeline 的宽高大，只报 warning。被 `overflow: hidden` 裁掉的出画内容不算 | 舞台按 timeline 尺寸写，隐藏溢出 |
 | `freeze` | render | 没声明 hold 的场景里画面 1.5 秒以上不动：成片缩到 320×180、高斯模糊（sigma 1.5）后用 ffmpeg freezedetect（`n=-60dB`）判定，只算落在没声明 hold 的场景里的部分 | 让画面动起来，或给场景加 `"hold": true` |
 | `glitch` | render | 成片均匀抽 8 帧解码，和截图原帧在 480×270 上比 PSNR，低于 30 dB 就报。送帧管道断了也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
 | `frame-count` | render | 成片帧数和 timeline 不符 | 重渲一次，还出现就带 JSON 报 issue |
