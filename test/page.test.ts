@@ -1,4 +1,7 @@
+import * as dgram from 'dgram';
 import * as fs from 'fs';
+import * as http from 'http';
+import type { AddressInfo } from 'net';
 import * as path from 'path';
 import type { Browser } from 'playwright-core';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -52,6 +55,61 @@ composition({ seek() {} });
         const refused = report.failures.find((f) => f.code === 'path-escape');
         expect(refused?.message).toContain('/link/secret.txt');
     });
+});
+
+describe('no connection leaves the page', () => {
+    it('blocks and reports HTTP, WebSocket and WebRTC, with zero connections at a local listener', async () => {
+        const server = http.createServer((_req, res) => res.end('ok'));
+        let tcp = 0;
+        server.on('connection', () => {
+            tcp += 1;
+        });
+        server.on('upgrade', (_req, socket) => socket.destroy());
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const port = (server.address() as AddressInfo).port;
+        const udp = dgram.createSocket('udp4');
+        let datagrams = 0;
+        udp.on('message', () => {
+            datagrams += 1;
+        });
+        await new Promise<void>((resolve) => udp.bind(port, '127.0.0.1', resolve));
+        try {
+            const dir =
+                tinyComposition(`<div style="position:absolute;left:20px;top:20px;width:80px;height:80px;background:#246"></div>
+<script type="module">
+import { composition } from '/__flipbook/runtime.js';
+const base = '127.0.0.1:${port}';
+// Fire every attempt without waiting: timers are virtual, so nothing here may block ready.
+fetch('http://' + base + '/http').catch(() => undefined);
+try {
+  new WebSocket('ws://' + base + '/ws');
+} catch {}
+try {
+  const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:' + base }] });
+  pc.createDataChannel('leak');
+  pc.createOffer().then((offer) => pc.setLocalDescription(offer)).catch(() => undefined);
+} catch {}
+composition({ seek(t) { document.body.firstElementChild.style.left = 20 + t * 40 + 'px'; } });
+</script>`);
+            const report = await runCheck({
+                dir,
+                session: await session(),
+                readyTimeoutMs: 10_000,
+                recordAttempts: false,
+            });
+            const blocked = report.failures
+                .filter((f) => f.code === 'external-request')
+                .map((f) => f.detail?.url as string);
+            expect(blocked).toContain(`http://127.0.0.1:${port}/http`);
+            expect(blocked).toContain(`ws://127.0.0.1:${port}/ws`);
+            expect(blocked).toContain('webrtc:RTCPeerConnection');
+            expect(tcp).toBe(0);
+            expect(datagrams).toBe(0);
+        } finally {
+            await new Promise((resolve) => server.close(resolve));
+            udp.close();
+        }
+    }, 120_000);
 });
 
 describe('stage size', () => {

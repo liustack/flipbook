@@ -88,7 +88,7 @@ read_when:
 | `page-error` | 全部 | 页面有未捕获的异常 | 按 message 修 |
 | `console-error` | 全部 | 页面往控制台打了错误 | 按 message 修 |
 | `resource-failed` | 全部 | 请求的文件在合成目录里不存在 | 补文件或改路径，图片放 assets/ |
-| `external-request` | 全部 | 页面想联网，已拦下 | 文件拷进 assets/ 用相对路径 |
+| `external-request` | 全部 | 页面想联网，已拦下。HTTP 请求和 WebSocket 在 Playwright 这层拦，`detail.url` 是目标地址。WebRTC 和 WebTransport 在页面里直接报错，`detail.url` 是 `webrtc:<构造函数名>` 或 `webtransport:<地址>` | 文件拷进 assets/ 用相对路径 |
 | `path-escape` | 全部 | 请求的路径解析后落在合成目录外，已拒绝 | 所有文件放合成目录内 |
 | `unsafe-output` | check、snapshot、render | `.flipbook/` 或 `out/` 里有软链，或该是目录的地方是文件，这次什么都没写。`detail.paths` 列出这些路径 | 删掉这些路径（软链只删链接本身），再跑一次 |
 | `static-forbidden` | check | 源码里有禁用写法，只报 warning | 换成 t 的纯函数写法 |

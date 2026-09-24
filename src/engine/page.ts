@@ -1,6 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { Browser, BrowserContext, CDPSession, Page, Route } from 'playwright-core';
+import type {
+    Browser,
+    BrowserContext,
+    CDPSession,
+    Page,
+    Route,
+    WebSocketRoute,
+} from 'playwright-core';
 import { type Finding, finding, progress } from '../cli/report.ts';
 import { runtimeFile } from '../paths.ts';
 import { FONT_URL_PREFIX, fontFaces, fontFileFor } from './fonts.ts';
@@ -14,6 +21,8 @@ import {
 import { PROTOCOL_VERSION, type ResolvedTimeline } from './timelineResolve.ts';
 
 export const ORIGIN = 'http://flipbook.local';
+/** Where the page reports a channel the host refused (WebRTC, WebTransport). */
+const BLOCKED_PREFIX = '/__flipbook/blocked/';
 export const DEFAULT_EPOCH_MS = Date.UTC(2026, 0, 1);
 export const SEEK_TIMEOUT_MS = 10_000;
 export const READY_TIMEOUT_MS = 60_000;
@@ -158,12 +167,14 @@ export class CompositionPage {
         // Until the page is handed over, this function owns the context.
         try {
             const clock = options.clock ?? defaultClock(timeline);
-            const config: HostConfig = { ...clock, timeline, fonts: fontFaces() };
+            const config: HostConfig = { ...clock, timeline, fonts: fontFaces(), origin: ORIGIN };
             await context.addInitScript(installHost, config);
             const page = await context.newPage();
             const cdp = await context.newCDPSession(page);
             const cp = new CompositionPage(context, page, cdp, timeline, realDir, options.onClose);
             await context.route('**/*', (route) => cp.handle(route, options.env ?? process.env));
+            // context.route does not see WebSocket; every socket is refused here, unconnected.
+            await context.routeWebSocket(/.*/, (socket) => cp.refuseSocket(socket));
             cp.listen();
             const findings = await cp.load(options.readyTimeoutMs ?? READY_TIMEOUT_MS);
             return { page: cp, findings };
@@ -207,6 +218,16 @@ export class CompositionPage {
         });
     }
 
+    private async refuseSocket(socket: WebSocketRoute): Promise<void> {
+        const url = new URL(socket.url());
+        this.note(
+            finding('external-request', `Blocked WebSocket to ${url.origin}${url.pathname}`, {
+                detail: { url: url.href },
+            }),
+        );
+        await socket.close({ code: 1008, reason: 'flipbook renders without network' });
+    }
+
     private async handle(route: Route, env: NodeJS.ProcessEnv): Promise<void> {
         const url = new URL(route.request().url());
         if (url.origin !== ORIGIN) {
@@ -230,6 +251,14 @@ export class CompositionPage {
             const served = this.internalFile(pathname, env);
             if (served) {
                 await route.fulfill({ path: served.file, contentType: served.type, headers });
+                return;
+            }
+            if (pathname.startsWith(BLOCKED_PREFIX)) {
+                const what = pathname.slice(BLOCKED_PREFIX.length);
+                this.note(
+                    finding('external-request', `Blocked ${what}`, { detail: { url: what } }),
+                );
+                await route.fulfill({ status: 204, headers });
                 return;
             }
             if (pathname === '/__flipbook/timeline.json') {

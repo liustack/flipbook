@@ -11,6 +11,8 @@ export interface HostConfig {
     randomSeed: number;
     timeline: ResolvedTimeline;
     fonts: { family: string; url: string; weight: string; style: string }[];
+    /** The fake origin; blocked channels are reported to <origin>/__flipbook/blocked/<what>. */
+    origin: string;
 }
 
 /** Attribute on <html> that hides every layer except the paper layer. */
@@ -214,6 +216,37 @@ export function installHost(config: HostConfig): void {
         },
         configurable: true,
     });
+
+    // Channels the HTTP and WebSocket routes cannot see. Each constructor reports
+    // itself through the fake origin (recorded as external-request) and throws.
+    const realFetch = window.fetch.bind(window);
+    const refuse = (name: string, what: (args: unknown[]) => string) =>
+        function refused(...args: unknown[]): never {
+            // Best effort: the report fails only when the page is already closing.
+            realFetch(
+                `${config.origin}/__flipbook/blocked/${encodeURIComponent(what(args))}`,
+            ).catch(() => undefined);
+            throw new DOMException(
+                `${name} is not available: flipbook renders without network.`,
+                'NotSupportedError',
+            );
+        };
+    for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection']) {
+        if (name in w) {
+            Object.defineProperty(w, name, {
+                value: refuse(name, () => `webrtc:${name}`),
+                writable: true,
+                configurable: true,
+            });
+        }
+    }
+    if ('WebTransport' in w) {
+        Object.defineProperty(w, 'WebTransport', {
+            value: refuse('WebTransport', (args) => `webtransport:${String(args[0])}`),
+            writable: true,
+            configurable: true,
+        });
+    }
 
     let nextId = 1;
     const frames = new Map<number, FrameRequestCallback>();
