@@ -126,7 +126,7 @@ Take every position, opacity and cut from `t` and the resolved timeline:
 | `await timeline()` | seconds and frames for every scene and cue, plus `width`, `height`, `fps`, `seed`, `durationSec` |
 | `sceneAt(tl, t)` | the scene playing at `t`, its `progress` (0 to 1), `local` seconds, `beat`, `localBeat` |
 | `sceneProgress(tl, t, id)` | 0 before the scene, 1 after it |
-| `cueProgress(tl, t, id)` | 0 at the cue, 1 once it settles (`settleBeats` later) |
+| `cueProgress(tl, t, id)` | 0 at the cue, 1 once it settles (`settleBeats` later, at once when `settleBeats` is 0 or missing) |
 | `transitionOut(tl, t, id, beats)` | 0 until `beats` before the scene ends, 1 at the cut |
 | `ease.*`, `progress`, `lerp`, `remap`, `clamp`, `smoothstep` | easing and interpolation |
 | `onTwos(t, fps)`, `onFrames(t, fps, n)` | a time that only changes every 2 (or n) frames, for a hand-drawn cadence |

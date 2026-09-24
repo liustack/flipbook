@@ -3,6 +3,7 @@ import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 import { loadTimeline, validateTimeline } from '../src/engine/timeline.ts';
 import { resolveTimeline, sceneAtFrame, type TimelineV1 } from '../src/engine/timelineResolve.ts';
+import { cueProgress } from '../src/runtime/core/timeline.ts';
 import { repoRoot, tempDir } from './helpers.ts';
 
 const base = (): Record<string, unknown> => ({
@@ -117,4 +118,34 @@ describe('resolveTimeline', () => {
         fs.writeFileSync(path.join(dir, 'timeline.json'), '{ nope');
         expect(loadTimeline(dir).findings[0].code).toBe('timeline-invalid');
     });
+});
+
+describe('settle contract between the resolver and cueProgress', () => {
+    const settleCases: [string, number | undefined][] = [
+        ['omitted', undefined],
+        ['zero', 0],
+        ['two beats', 2],
+    ];
+    for (const [name, settleBeats] of settleCases) {
+        it(`settleBeats ${name}: the text is fully in at the frame check samples`, () => {
+            const t = base();
+            const cue: Record<string, unknown> = {
+                id: 'x',
+                scene: 'a',
+                beat: 1,
+                kind: 'text',
+                text: '字',
+            };
+            if (settleBeats !== undefined) cue.settleBeats = settleBeats;
+            t.cues = [cue];
+            expect(validateTimeline(t).errors).toEqual([]);
+            const r = resolveTimeline(t as unknown as TimelineV1);
+            const c = r.cues[0];
+            expect(cueProgress(r, c.settleFrame / r.fps, 'x')).toBe(1);
+            if (c.settleFrame > c.frame) {
+                expect(cueProgress(r, c.frame / r.fps, 'x')).toBe(0);
+                expect(cueProgress(r, (c.settleFrame - 1) / r.fps, 'x')).toBeLessThan(1);
+            }
+        });
+    }
 });

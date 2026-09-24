@@ -89,12 +89,12 @@ export function cue(tl: ResolvedTimeline, id: string): ResolvedCue {
 }
 
 /**
- * Progress of a cue: 0 at its time, 1 once it settles (settleBeats later), or
- * over `beats` beats when given.
+ * Progress of a cue: 0 at its time, 1 once it settles (settleBeats later, so
+ * with settleBeats 0 it is 1 from the cue on), or over `beats` beats when given.
  */
 export function cueProgress(tl: ResolvedTimeline, t: number, id: string, beats?: number): number {
     const c = cue(tl, id);
-    const span = (beats ?? (c.settleBeats || 1)) * tl.secondsPerBeat;
+    const span = (beats ?? c.settleBeats) * tl.secondsPerBeat;
     return progress(t, c.time, c.time + span);
 }
 

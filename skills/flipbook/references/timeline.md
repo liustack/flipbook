@@ -157,7 +157,7 @@ render reports `freeze` when the picture stops changing for more than 1.5 second
 
 ## settleBeats
 
-check inspects text (glyphs, fonts, frame edges, safe area, contrast) at the moment each text cue settles. Make the text fully visible by then and drive its entrance from the same numbers with `cueProgress`, which runs from 0 at the cue to 1 after `settleBeats`:
+check inspects text (glyphs, fonts, frame edges, safe area, contrast) at the moment each text cue settles. Make the text fully visible by then and drive its entrance from the same numbers with `cueProgress`, which runs from 0 at the cue to 1 after `settleBeats` (with `settleBeats` 0 or missing, the text is fully in at the cue):
 
 <!-- check: pass -->
 ```js
