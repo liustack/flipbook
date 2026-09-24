@@ -43,14 +43,14 @@ const shells = (isWindows ? ['powershell', 'pwsh'] : ['pwsh'])
     .filter((s): s is { name: string; exe: string } => s.exe !== null);
 
 /** A fake flipbook on its own PATH directory: a .cmd shim on Windows, a sh script elsewhere. */
-function fakeCli(): string {
+function fakeCli(version: string = pinned): string {
     const dir = tempDir('fakeps1');
     const script = path.join(dir, 'fake.mjs');
     fs.writeFileSync(
         script,
         [
             'const [cmd] = process.argv.slice(2);',
-            `if (cmd === '--version') { process.stdout.write('${pinned}\\n'); process.exit(0); }`,
+            `if (cmd === '--version') { process.stdout.write('${version}\\n'); process.exit(0); }`,
             "if (cmd === 'doctor') {",
             '    process.stderr.write(\'{"error":"platform-unsupported"}\\n\');',
             "    process.stdout.write(JSON.stringify({ ok: false, exitCode: 78, path: 'C:\\\\用户\\\\翻页书' }) + '\\n');",
@@ -96,26 +96,49 @@ describe.runIf(shells.length > 0)('run.ps1', () => {
                 expect(runPs1(exe, ['where'], env).stdout.trim()).toBe('path');
             });
 
+            it('reads the version from its first digit and takes a prerelease only when it is the pin', () => {
+                const [major, minor, patch] = pinned.split('.').map(Number);
+                const cases: [string, string][] = [
+                    [`flipbook v${pinned}`, 'path'],
+                    [`${pinned}+build.7`, 'path'],
+                    [`${major + 10}.${minor}.${patch}`, 'none'],
+                    [`${pinned}-beta.1`, 'none'],
+                    [`${major}.${minor}`, 'none'],
+                ];
+                for (const [version, expected] of cases) {
+                    const only = withPath(fakeCli(version));
+                    expect(runPs1(exe, ['where'], only).stdout.trim(), version).toBe(expected);
+                }
+            });
+
             it('passes the exit code and UTF-8 stdout through', () => {
                 const result = runPs1(exe, ['check', 'somewhere'], env);
                 expect(result.status).toBe(1);
                 expect(JSON.parse(result.stdout).text).toBe('你好，翻页书');
             });
 
-            it('keeps the CLI doctor exit code and JSON when the CLI also writes stderr', () => {
-                const result = runPs1(exe, ['doctor', '--json'], env);
-                expect(result.status).toBe(78);
-                const diagnosis = JSON.parse(result.stdout);
-                expect(diagnosis.selected).toBe('path');
-                expect(diagnosis.cliDoctor.path).toBe('C:\\用户\\翻页书');
+            it('prints the CLI doctor report plus the launcher block, with or without --json', () => {
+                for (const args of [['doctor'], ['doctor', '--json']]) {
+                    const result = runPs1(exe, args, env);
+                    expect(result.status, args.join(' ')).toBe(78);
+                    const report = JSON.parse(result.stdout);
+                    expect(report.launcher.selected).toBe('path');
+                    expect(report.path).toBe('C:\\用户\\翻页书');
+                }
             });
 
-            it('exits 78 with a JSON diagnosis when nothing can run the CLI', () => {
-                const result = runPs1(exe, ['check', 'somewhere'], withPath(tempDir('emptypath')));
+            it('exits 78 with a runtime-missing report carrying fix when nothing can run the CLI', () => {
+                const empty = withPath(tempDir('emptypath'));
+                const result = runPs1(exe, ['check', 'somewhere'], empty);
                 expect(result.status).toBe(78);
                 const diagnosis = JSON.parse(result.stderr);
-                expect(diagnosis.selected).toBe('none');
-                expect(diagnosis.pinnedVersion).toBe(pinned);
+                expect(diagnosis.error).toBe('runtime-missing');
+                expect(diagnosis.launcher.selected).toBe('none');
+                expect(diagnosis.launcher.pinnedVersion).toBe(pinned);
+                expect(diagnosis.fix).toHaveLength(2);
+                const doctor = runPs1(exe, ['doctor'], empty);
+                expect(doctor.status).toBe(78);
+                expect(JSON.parse(doctor.stdout).launcher.selected).toBe('none');
             });
         });
     }

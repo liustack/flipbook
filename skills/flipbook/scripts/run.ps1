@@ -1,7 +1,7 @@
 # flipbook skill launcher (Windows, PowerShell 5.1 compatible).
 #
-# The Windows twin of run.sh: identical resolution order, identical diagnostic
-# fields, identical exit codes. One stable action for the agent ("run
+# The Windows twin of run.sh: identical resolution order, identical JSON
+# fields (fix, launcher), identical exit codes. One stable action for the agent ("run
 # flipbook"); this script picks a working way to run it here.
 #
 # Invoke it per process:
@@ -69,31 +69,57 @@ function Invoke-Native {
     & $Program @NativeArgs
 }
 
-# First "X.Y.Z" token printed by `$Bin --version`.
+# Split "X.Y.Z[-prerelease][+build]" into Major, Minor, Patch, Pre (empty for a
+# release) and Bare (the text without build metadata). $null when the text is
+# not exactly three dot-separated numbers.
+function ConvertTo-SemVer {
+    param([string] $Text)
+    if ($null -eq $Text) { return $null }
+    $bare = ($Text -split '\+', 2)[0]
+    $m = [regex]::Match($bare, '^([0-9]+)\.([0-9]+)\.([0-9]+)(?:-(.*))?$')
+    if (-not $m.Success) { return $null }
+    return [pscustomobject]@{
+        Major = [decimal]$m.Groups[1].Value
+        Minor = [decimal]$m.Groups[2].Value
+        Patch = [decimal]$m.Groups[3].Value
+        Pre   = $m.Groups[4].Value
+        Bare  = $bare
+    }
+}
+
+# The first version printed by `$Bin --version`, anchored at its first digit so
+# "10.1.0" stays 10.1.0, suffixes included.
 function Get-CliVersion {
     $cli = Find-Program $Bin
     if (-not $cli) { return '' }
     try { $out = Invoke-Native $cli @('--version') 2>$null } catch { return '' }
     if (-not $out) { return '' }
     $line = [string]($out | Select-Object -First 1)
-    $m = [regex]::Match($line, '[0-9]+\.[0-9]+\.[0-9]+')
-    if ($m.Success) { return $m.Value } else { return '' }
+    $m = [regex]::Match($line, '^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]*)?)')
+    if ($m.Success) { return $m.Groups[1].Value } else { return '' }
 }
 
 # Compatible = not older than $Pinned, with the same major.minor while $Pinned is
-# 0.x and the same major from 1.0 on.
+# 0.x and the same major from 1.0 on. A prerelease on either side counts only
+# when it is exactly $Pinned.
 function Test-Compatible {
     param([string] $Ver)
-    $f = $Ver -split '\.'
-    $p = $Pinned -split '\.'
-    if ($f.Count -lt 3 -or $p.Count -lt 3) { return $false }
-    $fMaj = [int]$f[0]; $fMin = [int]$f[1]; $fPat = [int]$f[2]
-    $pMaj = [int]$p[0]; $pMin = [int]$p[1]; $pPat = [int]$p[2]
-    if ($fMaj -ne $pMaj) { return $false }
-    if ($pMaj -eq 0 -and $fMin -ne $pMin) { return $false }
-    if ($fMin -gt $pMin) { return $true }
-    if ($fMin -lt $pMin) { return $false }
-    return ($fPat -ge $pPat)
+    $f = ConvertTo-SemVer $Ver
+    $p = ConvertTo-SemVer $Pinned
+    if (-not $f -or -not $p) { return $false }
+    if ($f.Pre -or $p.Pre) { return ($f.Bare -ceq $p.Bare) }
+    if ($f.Major -ne $p.Major) { return $false }
+    if ($p.Major -eq 0 -and $f.Minor -ne $p.Minor) { return $false }
+    if ($f.Minor -gt $p.Minor) { return $true }
+    if ($f.Minor -lt $p.Minor) { return $false }
+    return ($f.Patch -ge $p.Patch)
+}
+
+# Human wording of the compatible range, e.g. "0.1.x, at or above 0.1.0".
+function Get-CompatRange {
+    $p = ConvertTo-SemVer $Pinned
+    if ($p.Major -eq 0) { return "$($p.Major).$($p.Minor).x, at or above $Pinned" }
+    return "major $($p.Major), at or above $Pinned"
 }
 
 # npx is usable only when this machine's node meets the CLI's floor.
@@ -102,15 +128,12 @@ function Test-NodeMeetsFloor {
     $node = Find-Program 'node'
     if (-not $node) { return $false }
     try { $nv = ((Invoke-Native $node @('--version') 2>$null) -replace '^v', '') } catch { return $false }
-    if (-not $nv) { return $false }
-    $n = $nv -split '\.'
-    $f = $NodeFloor -split '\.'
-    if ($n.Count -lt 2) { return $false }
-    $nMaj = [int]$n[0]; $nMin = [int]$n[1]
-    $fMaj = [int]$f[0]; $fMin = [int]$f[1]
-    if ($nMaj -gt $fMaj) { return $true }
-    if ($nMaj -lt $fMaj) { return $false }
-    return ($nMin -ge $fMin)
+    $n = ConvertTo-SemVer ([string]$nv)
+    $f = ConvertTo-SemVer $NodeFloor
+    if (-not $n) { return $false }
+    if ($n.Major -gt $f.Major) { return $true }
+    if ($n.Major -lt $f.Major) { return $false }
+    return ($n.Minor -ge $f.Minor)
 }
 
 # Return exactly one word: the chosen launch path.
@@ -174,102 +197,73 @@ function Collect {
     $script:Selected = Resolve-LaunchKind
 }
 
-# Assemble the structured diagnosis. $Chained, when a parsed object, becomes
-# cliDoctor; otherwise cliDoctor is null.
-function Build-DiagnosisJson {
-    param($Chained)
-    $checked = [ordered]@{
-        pathCli = [ordered]@{ present = $script:CliPresent; path = $script:CliPath; version = $script:CliVer; compatible = $script:CliCompat }
-        npx     = [ordered]@{ present = $script:NpxPresent; path = $script:NpxPath; nodeMeetsFloor = $script:NodeFloorOk }
-        bunx    = [ordered]@{ present = $script:BunxPresent; path = $script:BunxPath }
-        node    = [ordered]@{ present = $script:NodePresent; version = $script:NodeVer }
-    }
-    $steps = @()
-    if ($script:Selected -eq 'none') {
-        $parts = $Pinned.Split('.')
-        $range = if ($parts[0] -eq '0') { "$($parts[0]).$($parts[1]).x, at or above $Pinned" } else { "major $($parts[0]), at or above $Pinned" }
-        $first = "Install Node 22.19+ from https://nodejs.org so npx can run $Package@$Pinned, then re-run this launcher."
-        if ($script:NpxPresent -and (-not $script:NodeFloorOk)) {
-            $first = "npx is present but node $(if ($script:NodeVer) { $script:NodeVer } else { 'missing' }) is below the $NodeFloor floor this CLI needs. Upgrade Node at https://nodejs.org, then re-run this launcher."
+# The launcher's view of this machine, the same fields run.sh prints.
+function Get-LauncherInfo {
+    return [ordered]@{
+        tool          = $Bin
+        package       = $Package
+        pinnedVersion = $Pinned
+        os            = 'windows'
+        arch          = $script:Arch
+        checked       = [ordered]@{
+            pathCli = [ordered]@{ present = $script:CliPresent; path = $script:CliPath; version = $script:CliVer; compatible = $script:CliCompat }
+            npx     = [ordered]@{ present = $script:NpxPresent; path = $script:NpxPath; nodeMeetsFloor = $script:NodeFloorOk }
+            bunx    = [ordered]@{ present = $script:BunxPresent; path = $script:BunxPath }
+            node    = [ordered]@{ present = $script:NodePresent; version = $script:NodeVer }
         }
-        $steps = @(
-            $first,
-            "No JavaScript runtime? Install Bun from https://bun.sh to use bunx, or put a compatible $Bin ($range) on PATH."
-        )
-    }
-    $obj = [ordered]@{
-        tool           = $Bin
-        package        = $Package
-        pinnedVersion  = $Pinned
-        os             = 'windows'
-        arch           = $script:Arch
-        checked        = $checked
-        selected       = $script:Selected
-        nextSteps      = @($steps)
-        cliDoctor      = $Chained
-    }
-    return ($obj | ConvertTo-Json -Depth 20)
-}
-
-# Human-readable diagnosis for `doctor` without --json.
-function Write-DiagnosisText {
-    Write-Output "$Bin launcher diagnosis"
-    Write-Output ''
-    Write-Output ("  os / arch:      windows / {0}" -f $script:Arch)
-    Write-Output ("  pinned version: {0} ({1})" -f $Pinned, $Package)
-    if ($script:CliPresent) {
-        $verdict = if ($script:CliCompat) { 'compatible' } else { 'incompatible' }
-        Write-Output ("  {0} on PATH:  {1} (version {2}, {3})" -f $Bin, $script:CliPath, $script:CliVer, $verdict)
-    }
-    else {
-        Write-Output ("  {0} on PATH:  no" -f $Bin)
-    }
-    $npxDesc = 'no'
-    if ($script:NpxPresent) {
-        if ($script:NodeFloorOk) { $npxDesc = $script:NpxPath }
-        else { $npxDesc = "$($script:NpxPath) (unusable: node $(if ($script:NodeVer) { $script:NodeVer } else { 'missing' }) is below $NodeFloor)" }
-    }
-    Write-Output ("  npx:            {0}" -f $npxDesc)
-    Write-Output ("  bunx:           {0}" -f $(if ($script:BunxPresent) { $script:BunxPath } else { 'no' }))
-    Write-Output ("  node:           {0}" -f $(if ($script:NodePresent) { $script:NodeVer } else { 'no' }))
-    Write-Output ("  selected path:  {0}" -f $script:Selected)
-    if ($script:Selected -eq 'none') {
-        Write-Output ''
-        Write-Output ("No runtime can launch {0} here." -f $Bin)
-        Write-Output 'Next steps:'
-        Write-Output '  - Install Node 22.19+ from https://nodejs.org, then re-run this launcher.'
-        Write-Output ("  - Or install Bun from https://bun.sh, or put a compatible {0} on PATH." -f $Bin)
+        selected      = $script:Selected
     }
 }
 
-# `doctor [--json] [extra...]`: launcher selection diagnosis, followed by the
-# CLI's own doctor when a CLI is resolvable. Extra flags pass through to it.
+# One JSON report for "nothing can run the CLI": the same top-level fields as a
+# failing doctor report (ok, exitCode, error, message, fix) plus the launcher block.
+function Get-NoneJson {
+    $first = "Install Node 22.19+ from https://nodejs.org so npx can run $Package@$Pinned, then re-run this launcher."
+    if ($script:NpxPresent -and (-not $script:NodeFloorOk)) {
+        $node = if ($script:NodeVer) { $script:NodeVer } else { 'missing' }
+        $first = "npx is present but node $node is below the $NodeFloor floor this CLI needs. Upgrade Node at https://nodejs.org, then re-run this launcher."
+    }
+    $second = "No JavaScript runtime? Install Bun from https://bun.sh to use bunx, or put a compatible $Bin ($(Get-CompatRange)) on PATH."
+    $report = [ordered]@{
+        ok       = $false
+        exitCode = 78
+        error    = 'runtime-missing'
+        message  = "No runtime can launch $Bin here: no compatible $Bin on PATH, no usable npx, no bunx."
+        fix      = @($first, $second)
+        launcher = Get-LauncherInfo
+    }
+    return (ConvertTo-Json -InputObject $report -Depth 20)
+}
+
+# `doctor [extra...]`: one JSON object on stdout, always. With a runnable CLI it
+# is the CLI's `doctor --json` report with the launcher block added as its first
+# field, and the CLI's exit code. Without one it is the runtime-missing report,
+# exit 78. Extra flags pass through to the CLI doctor.
 function Invoke-Doctor {
     param([string[]] $DocArgs)
     Collect
-    $json = $false
-    foreach ($a in $DocArgs) { if ($a -eq '--json') { $json = $true } }
-    $code = 0
-    if ($script:Selected -eq 'none') { $code = 78 }
-    if ($json) {
-        $chained = $null
-        if ($script:Selected -ne 'none') {
-            $raw = (Invoke-Cli $script:Selected (@('doctor') + $DocArgs) 2>$null | Out-String).Trim()
-            $code = $LASTEXITCODE
-            if ($raw.StartsWith('{')) {
-                try { $chained = ($raw | ConvertFrom-Json) } catch { $chained = $null }
-            }
-        }
-        Write-Output (Build-DiagnosisJson $chained)
+    $pass = @($DocArgs | Where-Object { $_ -ne '--json' })
+    if ($script:Selected -eq 'none') {
+        Write-Output (Get-NoneJson)
+        exit 78
+    }
+    $raw = (Invoke-Cli $script:Selected (@('doctor', '--json') + $pass) | Out-String).Trim()
+    $code = $LASTEXITCODE
+    $launcher = ConvertTo-Json -InputObject (Get-LauncherInfo) -Depth 20
+    if ($raw.StartsWith('{')) {
+        Write-Output ("{`n  `"launcher`": " + $launcher + ',' + $raw.Substring(1))
     }
     else {
-        Write-DiagnosisText
-        if ($script:Selected -ne 'none') {
-            Write-Output ''
-            Write-Output "--- $Bin doctor ---"
-            Invoke-Cli $script:Selected (@('doctor') + $DocArgs)
-            $code = $LASTEXITCODE
+        if ($code -eq 0) { $code = 1 }
+        $report = [ordered]@{
+            ok       = $false
+            exitCode = $code
+            error    = 'doctor-failed'
+            message  = "$Bin doctor exited $code without a JSON report. Its stderr is above."
+            fix      = @('Report it with the stderr output at https://github.com/liustack/flipbook/issues')
+            launcher = Get-LauncherInfo
         }
+        Write-Output (ConvertTo-Json -InputObject $report -Depth 20)
     }
     exit $code
 }
@@ -281,7 +275,7 @@ function Invoke-Run {
     $sel = Resolve-LaunchKind
     if ($sel -eq 'none') {
         Collect
-        [Console]::Error.WriteLine((Build-DiagnosisJson $null))
+        [Console]::Error.WriteLine((Get-NoneJson))
         exit 78
     }
     Invoke-Cli $sel $CliArgs
