@@ -9,6 +9,7 @@ import { runCheck } from '../src/cli/check.ts';
 import { runRender } from '../src/cli/render.ts';
 import { runSnapshot } from '../src/cli/snapshot.ts';
 import { CompositionPage } from '../src/engine/page.ts';
+import { openPage } from '../src/engine/session.ts';
 import { loadTimeline } from '../src/engine/timeline.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, codes, copyFixture, tempDir } from './helpers.ts';
@@ -283,6 +284,31 @@ function undeletable(dir: string): () => void {
 }
 
 const asRoot = process.getuid?.() === 0;
+
+describe('a renderer the system takes away', () => {
+    it('makes close() throw resource-exhausted, while a page that crashes on its own stays page-error', async () => {
+        const s = await session();
+        const dir = copyFixture('hello', 'examples');
+        const timeline = loadTimeline(dir).resolved;
+        if (!timeline) throw new Error('hello has no timeline');
+
+        // chrome://kill ends the renderer from outside, as the OOM killer would.
+        const killed = await openPage(s, { dir, timeline });
+        expect(await killed.page.seek(0)).toBeNull();
+        await killed.page.page.goto('chrome://kill').catch(() => undefined);
+        await expect(killed.page.close()).rejects.toMatchObject({
+            name: 'EnvError',
+            code: 'resource-exhausted',
+            detail: { status: 'killed' },
+        });
+
+        // chrome://crash is the renderer crashing by itself.
+        const crashed = await openPage(s, { dir, timeline });
+        await crashed.page.page.goto('chrome://crash').catch(() => undefined);
+        await crashed.page.close();
+        expect(crashed.page.issues.map((f) => f.code)).toContain('page-error');
+    });
+});
 
 describe('cleanup when something fails half way', () => {
     it('closes the context when the page cannot be set up', async () => {

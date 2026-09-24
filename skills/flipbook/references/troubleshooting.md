@@ -312,6 +312,12 @@ Chromium could not create its temporary directory: TMPDIR is missing or read-onl
 
 Fix: Point TMPDIR at an existing writable directory and run the command again, or ask the user for a sandbox that can write (Codex: workspace-write).
 
+### `resource-exhausted`
+
+The system killed a Chromium or ffmpeg process flipbook started, which it does when memory or the process count runs out.
+
+Fix: Give flipbook at least 2 GB of memory and 128 processes (close heavy programs, or raise container limits), then run the same command again. Leave the composition as it is.
+
 ### `linux-deps-missing`
 
 Chromium is missing Linux system libraries.

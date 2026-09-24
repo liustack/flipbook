@@ -29,6 +29,7 @@
 - **Codex 能加载这个 skill**：SKILL.md 的 `compatibility` 挪进 `metadata`，过 Codex 的 skill 校验。
 - **沙箱识别表**：Chromium 起不来时按实测的报错分行处理。macOS 上撞到 mach port 照旧改用单进程重试，Claude Code 和 Codex 的沙箱里都能起。Codex 的 Linux 沙箱不联网时拒绝 socket 调用、临时目录写不进，这两种单进程也没用，直接退 78 并给出对应宿主的放行办法，临时目录写不进单独报 `tmp-unwritable`。报告多了 `detail.signature` 和 `detail.host`。
 - **首次下载被沙箱拦**：认出没网络和代理拒绝，提示在沙箱外跑一次或打开网络。SKILL.md 和 INSTALL.md 写上 Codex 的放行设置和 Claude Code 要放行的下载域名。
+- **资源不够时退 78**：渲染中途 Chromium 渲染进程被系统杀掉、浏览器整个退出、ffmpeg 被 SIGKILL，都报 `resource-exhausted`，不再报成 `page-error` 或 `glitch`。页面自己崩溃照旧是 `page-error`。
 - **为 Windows 铺路**：缓存放 `%LOCALAPPDATA%\liustack\flipbook`，认出 win64 的 headless shell，设 `FLIPBOOK_ALLOW_WIN32=1` 可以绕过 `win32` 的退 78。run.ps1 在 Windows PowerShell 5.1 下保住 CLI 的退出码和 UTF-8 输出。CI 加 windows-latest 一列。原生 Windows 仍不支持。
 - **发版盖日期**：`scripts/release.mjs` 发版时把 CHANGELOG 的 `## Unreleased` 改成 `## 版本号 - 当天日期`，没有 Unreleased 时给该版本的标题盖当天日期。两者都有时拒绝发版。
 - **平台文档**：新增 `docs/platform.md`，写支持矩阵、沙箱特征、受限容器的实测结果和 GPU 结论（2D 合成继续用软件光栅）。

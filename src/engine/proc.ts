@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { EnvError } from '../cli/report.ts';
 
 export interface RunResult {
     code: number | null;
@@ -15,6 +16,30 @@ export interface RunOptions {
     timeoutMs?: number;
     env?: NodeJS.ProcessEnv;
     cwd?: string;
+}
+
+/** What to do when the system killed a process flipbook started. */
+export const RESOURCE_FIX = [
+    'Give flipbook at least 2 GB of memory and 128 processes: close other heavy programs, or raise the container limits (for example docker run --memory 2g --pids-limit 128).',
+    'Then run the same command again. Leave the composition as it is.',
+];
+
+/**
+ * Exit 78 for a process the system took away. The OOM killer, a cgroup memory
+ * limit and a pids limit all end processes from outside.
+ */
+export function resourceExhausted(message: string, detail: Record<string, unknown>): EnvError {
+    return new EnvError('resource-exhausted', message, [...RESOURCE_FIX], detail);
+}
+
+/** A helper killed by SIGKILL that flipbook did not kill itself. */
+export function killedBySystem(program: string, signal: NodeJS.Signals | null): EnvError | null {
+    if (signal !== 'SIGKILL') return null;
+    const name = path.basename(program);
+    return resourceExhausted(
+        `${name} was killed (SIGKILL) while flipbook was running. The system does this when memory or the process count runs out.`,
+        { program: name, signal },
+    );
 }
 
 /** Time allowed for pipes to drain after the child exits. */
@@ -61,7 +86,8 @@ export function terminate(child: ChildProcess): void {
 
 /**
  * Run a command to completion. stdout stays bytes, stderr is decoded once at
- * the end. Resolves on `exit` plus a short drain window.
+ * the end. Resolves on `exit` plus a short drain window. A child the system
+ * killed (SIGKILL outside the time limit) rejects with resource-exhausted.
  */
 export function run(cmd: string, args: string[], options: RunOptions = {}): Promise<RunResult> {
     return new Promise((resolve, reject) => {
@@ -88,6 +114,11 @@ export function run(cmd: string, args: string[], options: RunOptions = {}): Prom
             if (settled) return;
             settled = true;
             if (timer) clearTimeout(timer);
+            const killed = timedOut ? null : killedBySystem(cmd, signal);
+            if (killed) {
+                reject(killed);
+                return;
+            }
             resolve({
                 code,
                 signal,

@@ -174,6 +174,7 @@ read_when:
 | `browser-launch-failed` | Chromium 起不来 |
 | `sandbox-blocked` | 宿主沙箱挡住了 Chromium，正常和单进程两种方式都起不来 |
 | `tmp-unwritable` | Chromium 建不了临时目录：TMPDIR 不存在或只读（常见于只读沙箱），单进程也没用，不重试 |
+| `resource-exhausted` | 系统杀掉了 flipbook 起的 Chromium 或 ffmpeg 进程，内存或进程数不够时会这样。认法：Chromium 通过 CDP `Target.targetCrashed` 报渲染进程的终止状态是 `killed`、`oom`、`failed to launch` 或 `evicted for memory`（`detail.process` 为 `renderer`，带 `status` 和 `errorCode`），或浏览器整个退出（`detail.process` 为 `browser`，单进程模式下被杀只有这一种），或 ffmpeg 等辅助进程被 SIGKILL 且不是 flipbook 自己按时限杀的（`detail.program`、`detail.signal`）。页面自己崩溃（状态 `crashed`，把 V8 堆撑爆也是这种）仍报 `page-error` |
 | `linux-deps-missing` | Linux 缺 Chromium 需要的系统库 |
 | `font-download-failed` | 字体下载失败或校验不过 |
 | `cache-unwritable` | 缓存目录写不进（常见于沙箱内首次运行） |

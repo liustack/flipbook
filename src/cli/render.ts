@@ -203,7 +203,8 @@ async function encodeFrames(
                     dropFrames: options.dropFrames,
                 });
             } catch (error) {
-                // A crashed page is already in page.issues as page-error.
+                // A crashed page is in page.issues as page-error, or page.close() below
+                // throws resource-exhausted when the system killed it.
                 if (page.broken) return null;
                 if (!(error instanceof EncoderError)) throw error;
                 rb.add(

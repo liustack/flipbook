@@ -1,5 +1,6 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'child_process';
-import { tail, terminate } from './proc.ts';
+import type { EnvError } from '../cli/report.ts';
+import { killedBySystem, tail, terminate } from './proc.ts';
 
 export interface EncoderOptions {
     fps: number;
@@ -69,7 +70,8 @@ export class EncoderError extends Error {
 /**
  * A running ffmpeg that takes PNG frames on stdin. Every wait on it has a
  * limit. When a limit runs out, or render gives up, ffmpeg is stopped
- * (SIGTERM, then SIGKILL) and the call returns only after it has exited.
+ * (SIGTERM, then SIGKILL) and the call returns only after it has exited. An
+ * ffmpeg the system killed fails the next call with resource-exhausted.
  */
 export class Encoder {
     private readonly stderr: Buffer[] = [];
@@ -78,8 +80,15 @@ export class Encoder {
     private readonly exited: Promise<number | null>;
     private done = false;
     private failure: Error | null = null;
+    private signal: NodeJS.Signals | null = null;
+    /** Set once flipbook itself stops ffmpeg, so its own SIGKILL is not blamed on the system. */
+    private stopping = false;
 
-    private constructor(child: ChildProcessWithoutNullStreams, writeTimeoutMs: number) {
+    private constructor(
+        private readonly ffmpeg: string,
+        child: ChildProcessWithoutNullStreams,
+        writeTimeoutMs: number,
+    ) {
         this.child = child;
         this.writeTimeoutMs = writeTimeoutMs;
         child.stderr.on('data', (chunk: Buffer) => this.stderr.push(chunk));
@@ -92,8 +101,9 @@ export class Encoder {
                 this.done = true;
                 resolve(null);
             });
-            child.on('exit', (code) => {
+            child.on('exit', (code, signal) => {
                 this.done = true;
+                this.signal = signal;
                 resolve(code);
             });
         });
@@ -106,6 +116,7 @@ export class Encoder {
             windowsHide: true,
         });
         return new Encoder(
+            ffmpeg,
             child as unknown as ChildProcessWithoutNullStreams,
             options.writeTimeoutMs ?? WRITE_TIMEOUT_MS,
         );
@@ -116,7 +127,10 @@ export class Encoder {
         return this.child.pid;
     }
 
-    private error(prefix: string): EncoderError {
+    /** resource-exhausted when the system killed ffmpeg, otherwise an EncoderError. */
+    private error(prefix: string): EncoderError | EnvError {
+        const killed = this.stopping ? null : killedBySystem(this.ffmpeg, this.signal);
+        if (killed) return killed;
         const log = tail(Buffer.concat(this.stderr).toString('utf-8'));
         return new EncoderError(
             `${prefix}${this.failure ? `: ${this.failure.message}` : ''}${log ? `\n${log}` : ''}`,
@@ -136,6 +150,7 @@ export class Encoder {
 
     /** Stop ffmpeg and wait until it has exited. */
     private async stop(): Promise<void> {
+        this.stopping = true;
         if (!this.done) terminate(this.child);
         await this.exited;
     }

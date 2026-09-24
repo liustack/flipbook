@@ -2,7 +2,7 @@
 // gray or RGB bytes, the math happens here.
 import { spawn } from 'child_process';
 import * as path from 'path';
-import { run, tail, terminate } from './proc.ts';
+import { killedBySystem, run, tail, terminate } from './proc.ts';
 import type { Workspace } from './workspace.ts';
 
 /** Analysis size for blank, paper-only and freeze checks. */
@@ -135,7 +135,11 @@ export function streamGray(
         let pending: Buffer = Buffer.alloc(0);
         let index = 0;
         const errors: Buffer[] = [];
-        const timer = setTimeout(() => terminate(child), 600_000);
+        let timedOut = false;
+        const timer = setTimeout(() => {
+            timedOut = true;
+            terminate(child);
+        }, 600_000);
         child.stdout.on('data', (chunk: Buffer) => {
             pending = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
             while (pending.length >= size) {
@@ -148,9 +152,12 @@ export function streamGray(
             clearTimeout(timer);
             reject(error);
         });
-        child.on('close', (code) => {
+        child.on('close', (code, signal) => {
             clearTimeout(timer);
-            if (code !== 0) {
+            const killed = timedOut ? null : killedBySystem(ffmpeg, signal);
+            if (killed) {
+                reject(killed);
+            } else if (code !== 0) {
                 reject(
                     new Error(
                         `ffmpeg gray stream failed: ${tail(Buffer.concat(errors).toString('utf-8'))}`,

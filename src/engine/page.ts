@@ -18,6 +18,7 @@ import {
     installHost,
     type RegisteredText,
 } from './host.ts';
+import { RendererWatch } from './rendererWatch.ts';
 import { PROTOCOL_VERSION, type ResolvedTimeline } from './timelineResolve.ts';
 
 export const ORIGIN = 'http://flipbook.local';
@@ -139,6 +140,8 @@ export class CompositionPage {
     readonly issues: Finding[] = [];
     /** Set once a seek timed out or the page crashed; later calls are refused. */
     broken = false;
+    /** Set when the renderer went away; close() then asks the watch why. */
+    private crashed = false;
     private readonly seenIssues = new Set<string>();
 
     private constructor(
@@ -147,6 +150,7 @@ export class CompositionPage {
         readonly cdp: CDPSession,
         readonly timeline: ResolvedTimeline,
         private readonly realDir: string,
+        private readonly watch: RendererWatch,
         private readonly onClose?: () => Promise<void>,
     ) {}
 
@@ -164,14 +168,24 @@ export class CompositionPage {
             serviceWorkers: 'block',
             acceptDownloads: false,
         });
-        // Until the page is handed over, this function owns the context.
+        const watch = await RendererWatch.start(browser);
+        // Until the page is handed over, this function owns the context and the watch.
         try {
             const clock = options.clock ?? defaultClock(timeline);
             const config: HostConfig = { ...clock, timeline, fonts: fontFaces(), origin: ORIGIN };
             await context.addInitScript(installHost, config);
             const page = await context.newPage();
             const cdp = await context.newCDPSession(page);
-            const cp = new CompositionPage(context, page, cdp, timeline, realDir, options.onClose);
+            await watch.follow(cdp);
+            const cp = new CompositionPage(
+                context,
+                page,
+                cdp,
+                timeline,
+                realDir,
+                watch,
+                options.onClose,
+            );
             await context.route('**/*', (route) => cp.handle(route, options.env ?? process.env));
             // context.route does not see WebSocket; every socket is refused here, unconnected.
             await context.routeWebSocket(/.*/, (socket) => cp.refuseSocket(socket));
@@ -179,8 +193,11 @@ export class CompositionPage {
             const findings = await cp.load(options.readyTimeoutMs ?? READY_TIMEOUT_MS);
             return { page: cp, findings };
         } catch (error) {
-            await context.close();
-            throw error;
+            // A renderer that could not start, or was killed while starting, is the machine's problem.
+            const lost = await watch.systemExit(true);
+            await watch.stop();
+            await context.close().catch(() => undefined);
+            throw lost ?? error;
         }
     }
 
@@ -214,6 +231,7 @@ export class CompositionPage {
         });
         this.page.on('crash', () => {
             this.broken = true;
+            this.crashed = true;
             this.note(finding('page-error', 'The page crashed.'));
         });
     }
@@ -631,13 +649,26 @@ export class CompositionPage {
     /**
      * Close the context, waiting at most CLOSE_TIMEOUT_MS: a page whose main
      * thread never returns must not hold the command. A context that is already
-     * gone (crashed page, closed browser) counts as closed.
+     * gone (crashed page, closed browser) counts as closed. When the system
+     * killed the renderer or the browser, this throws resource-exhausted
+     * (exit 78) after closing, in place of the page-error the crash left.
      */
     async close(): Promise<void> {
+        // A renderer that died a moment ago may not have fired 'crash' yet; one quick call tells.
+        if (!this.crashed && this.watch.browserConnected()) {
+            const alive = await withTimeout(
+                this.page.evaluate(() => true),
+                1000,
+            );
+            if (!alive.ok && !alive.timedOut) this.crashed = true;
+        }
+        const lost = await this.watch.systemExit(this.crashed);
+        await this.watch.stop();
         const closed = await withTimeout(this.context.close(), CLOSE_TIMEOUT_MS);
         if (!closed.ok && closed.timedOut) {
             progress(`a page did not close within ${CLOSE_TIMEOUT_MS} ms; moving on`);
         }
         await this.onClose?.();
+        if (lost) throw lost;
     }
 }

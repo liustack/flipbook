@@ -5,11 +5,13 @@ import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Page } from 'playwright-core';
+import type { EnvError } from '../cli/report.ts';
 import { runtimeFile } from '../paths.ts';
 import { buildScore, SAMPLE_RATE, type Score } from './audioScore.ts';
 import { type FfmpegFeatures, requireFfmpeg, VIDEO_FEATURES } from './ffmpeg.ts';
 import { ORIGIN } from './page.ts';
 import { run, tail } from './proc.ts';
+import { RendererWatch } from './rendererWatch.ts';
 import type { Session } from './session.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
 import type { Workspace } from './workspace.ts';
@@ -153,8 +155,14 @@ function readMeta(ws: Workspace): StemSet | null {
     }
 }
 
-async function openAudioPage(session: Session): Promise<{ page: Page; close(): Promise<void> }> {
+async function openAudioPage(session: Session): Promise<{
+    page: Page;
+    /** resource-exhausted when the system took the page's renderer or browser away. */
+    systemExit(): Promise<EnvError | null>;
+    close(): Promise<void>;
+}> {
     const { browser, dispose } = await session.browserForPage();
+    const watch = await RendererWatch.start(browser);
     const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: false });
     await context.route('**/*', async (route) => {
         const url = route.request().url();
@@ -174,9 +182,16 @@ async function openAudioPage(session: Session): Promise<{ page: Page; close(): P
         }
     });
     const page = await context.newPage();
+    let crashed = false;
+    page.on('crash', () => {
+        crashed = true;
+    });
+    await watch.follow(await context.newCDPSession(page));
     return {
         page,
+        systemExit: () => watch.systemExit(crashed),
         async close() {
+            await watch.stop();
             await context.close().catch(() => undefined);
             await dispose();
         },
@@ -290,10 +305,12 @@ export async function synthesize(
         ws.remove(path.join(out, name));
     }
     const started = Date.now();
-    const { page, close } = await openAudioPage(session);
+    const { page, systemExit, close } = await openAudioPage(session);
     let rendered: Awaited<ReturnType<typeof renderInPage>>;
     try {
         rendered = await renderInPage(page, score, ws, out);
+    } catch (error) {
+        throw (await systemExit()) ?? error;
     } finally {
         await close();
     }

@@ -102,6 +102,8 @@ ubuntu:24.04 arm64，除第一行外都用非 root 用户（uid 1000），缓存
 
 进程数和内存不足时报错五花八门，没法认成一行特征，所以不进识别表。1080p 渲染按至少 2 GB 内存、128 个进程准备。
 
+渲染中途被杀的情况现在认得出：渲染进程按 CDP 报的终止状态（`killed`、`oom`、`failed to launch`、`evicted for memory`），浏览器整个退出，ffmpeg 被 SIGKILL，都报 78 `resource-exhausted`，不再报 `page-error` 或 `glitch`。ffmpeg 被杀后送帧和收尾立刻出错，不会卡住。启动阶段进程数不够时仍然各报各的。单进程模式下拿不到浏览器的退出信号，页面自己把整个进程搞崩也会报成 `resource-exhausted`。
+
 单进程模式在 Linux arm64 上：flipbook 自己的截帧没问题（用包装脚本逼它走单进程，check 和 render 退 0，约 13 帧/秒），但 Playwright 的 `page.screenshot` 在这个模式下经常报 `Unable to capture screenshot`。只有 Linux 上真撞到能靠单进程绕过的特征时才会走到这里，目前实测的 Linux 沙箱都不是这种。
 
 ## GPU
