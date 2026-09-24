@@ -4,7 +4,7 @@ DOM text stays the default (see `rules.md`). Use these calls for text drawn on a
 
 Sample image: `docs/samples/text.png` in the flipbook repository and npm package.
 
-The JavaScript snippets in this file run through `flipbook check` in CI against this timeline:
+The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 
 <!-- snippet-timeline -->
 ```json

@@ -4,7 +4,7 @@ Hand-made marks for canvas drawing: pencil lines, hatching, cross-hatching, half
 
 Sample image: `docs/samples/materials.png` in the flipbook repository and npm package.
 
-The JavaScript snippets in this file run through `flipbook check` in CI against this timeline:
+The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 
 <!-- snippet-timeline -->
 ```json

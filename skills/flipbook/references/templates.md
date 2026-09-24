@@ -6,7 +6,7 @@ N objects fly in one after another and land on slots packed inside a digit, a le
 
 Sample image: `docs/samples/templates.png` in the flipbook repository and npm package. Full example with bird eggs: `examples/eggs-five/` (`five` builds a 5, `shu` builds 书).
 
-The JavaScript snippets in this file run through `flipbook check` in CI against this timeline:
+The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 
 <!-- snippet-timeline -->
 ```json
