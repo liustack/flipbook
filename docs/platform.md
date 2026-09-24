@@ -149,12 +149,13 @@ run.ps1 按 modlens 在 Windows 上踩过的坑逐条查过：
 | 退出码透传 | 修了一个：Windows PowerShell 5.1 在 `$ErrorActionPreference = 'Stop'` 下把重定向的 stderr 当成终止错误，`doctor --json` 撞上 CLI 往 stderr 写诊断时丢掉 78、退 0。现在原生命令都在 `Continue` 的作用域里跑，退出码取 `$LASTEXITCODE` |
 | 编码 | 修了一个：5.1 按控制台代码页解读 CLI 的 UTF-8 输出，报告里的中文会乱。现在先把控制台编码设成 UTF-8 |
 
-`test/launcherPs1.test.ts` 在找得到的每个 PowerShell 上跑这些情况。PowerShell 7.4（Linux 容器）上已过。Windows PowerShell 5.1 要等 CI。
+`test/launcherPs1.test.ts` 在找得到的每个 PowerShell 上跑这些情况。旧契约在 PowerShell 7.4（Linux 容器）上过过。run.ps1 后来跟 run.sh 对齐了新契约（`fix`、`launcher`、doctor 始终输出 JSON、预发布只认钉死版本），新版本还没在任何 PowerShell 上跑过，要等 CI 的 windows 列。
 
-代码审查预计 Windows 上还会失败的地方，都在别的文件里：
+代码审查时列出的 Windows 问题，前四条已经修了：
 
-1. `src/engine/proc.ts` 的 `findOnPath` 只找不带扩展名的 `ffmpeg`，Windows 上永远找不到 `ffmpeg.exe`，doctor、check、render 都会退 78 `ffmpeg-missing`。这是头号问题。
-2. `src/engine/proc.ts`、`encode.ts`、`pixels.ts` 起 ffmpeg 时没带 `windowsHide: true`，宿主没有控制台时（桌面应用）每起一个都会闪一下黑窗。
-3. `test/globalSetup.ts` 用 `execFileSync('pnpm', ...)` 构建，pnpm 在 Windows 上多半是 `.cmd`，会报 ENOENT 或 EINVAL。CI 先单独 `pnpm build` 再设 `FLIPBOOK_TEST_SKIP_BUILD=1` 绕开。
-4. `test/doctor.test.ts` 用 `{ ...process.env, PATH: ... }` 改 PATH，Windows 上原来的 `Path` 键还在，子进程看到两个。
-5. Node 24.0 到 24.13 在 Windows 上 `fs.rmSync` 遇到非 ASCII 路径会直接崩（nodejs/node#58759，24.13.1 修复），中文用户名很常见。要支持 Windows 时 Node 下限得避开这一段。
+- `findOnPath` 在 win32 上给程序名补 `.exe`，PATH 键不分大小写，doctor、check、render 找得到 `ffmpeg.exe`。
+- 起 ffmpeg 的地方（`proc.ts`、`encode.ts`、`pixels.ts`）都带 `windowsHide: true`，没有控制台的宿主不再闪黑窗。
+- `test/globalSetup.ts` 经 shell 跑 `pnpm build`，Windows 上起得了 `pnpm.cmd`。
+- `test/doctor.test.ts` 换 PATH 时先删掉任何大小写的 PATH 键，安装命令按平台断言，Windows 上跳过靠目录写权限的用例。
+
+还没修的一条：Node 24.0 到 24.13 在 Windows 上 `fs.rmSync` 遇到非 ASCII 路径会直接崩（nodejs/node#58759，24.13.1 修复），中文用户名很常见。要支持 Windows 时 Node 下限得避开这一段。
