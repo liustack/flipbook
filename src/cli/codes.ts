@@ -1,0 +1,195 @@
+// Every finding code the CLI can emit, with the default fix text.
+// docs/report-schema.md lists the same set; test/units.test.ts checks it.
+
+export interface CodeInfo {
+    /** What went wrong, one line. */
+    meaning: string;
+    /** What the agent should change. */
+    fix: string;
+}
+
+/** Composition problems: the agent edits index.html or timeline.json. Exit 1. */
+export const FINDING_CODES = {
+    'index-missing': {
+        meaning: 'The composition directory has no index.html.',
+        fix: 'Create index.html in the composition directory.',
+    },
+    'timeline-missing': {
+        meaning: 'The composition directory has no timeline.json.',
+        fix: 'Create timeline.json (see docs/timeline-schema.md).',
+    },
+    'timeline-invalid': {
+        meaning: 'timeline.json does not match timeline schema v1.',
+        fix: 'Fix the field named in `detail.path`; the message says what it must be.',
+    },
+    'protocol-missing': {
+        meaning: 'The page never defined window.__flipbook.',
+        fix: 'Call composition({ seek }) from /__flipbook/runtime.js, or assign window.__flipbook = { protocol: 1, ready, seek } in a module script.',
+    },
+    'protocol-mismatch': {
+        meaning: 'window.__flipbook.protocol is not a protocol this CLI speaks.',
+        fix: 'Set window.__flipbook.protocol to 1.',
+    },
+    'ready-timeout': {
+        meaning: 'window.__flipbook.ready did not settle in time.',
+        fix: 'Make ready resolve without waiting on setTimeout, setInterval or requestAnimationFrame; the renderer holds virtual time still until ready settles.',
+    },
+    'ready-failed': {
+        meaning: 'window.__flipbook.ready rejected.',
+        fix: 'Fix the error in `message`; a font or image that fails to load rejects ready.',
+    },
+    'seek-timeout': {
+        meaning: 'seek(t) did not finish within the time limit.',
+        fix: 'Do not await requestAnimationFrame, setTimeout or events inside seek; draw synchronously from t, or await only promises that settle on their own.',
+    },
+    'seek-failed': {
+        meaning: 'seek(t) threw or rejected.',
+        fix: 'Fix the error in `message` at the time shown.',
+    },
+    'page-error': {
+        meaning: 'The page threw an uncaught exception.',
+        fix: 'Fix the exception in `message`; content that fails to draw leaves only the paper layer.',
+    },
+    'console-error': {
+        meaning: 'The page logged an error to the console.',
+        fix: 'Fix the cause in `message`.',
+    },
+    'resource-failed': {
+        meaning: 'A file the page requested does not exist in the composition directory.',
+        fix: 'Add the file under the composition directory or fix its path; put images in assets/.',
+    },
+    'external-request': {
+        meaning: 'The page tried to reach the network; the request was blocked.',
+        fix: 'Copy the file into assets/ and load it by relative path. Fonts come from /__flipbook/fonts/.',
+    },
+    'path-escape': {
+        meaning: 'The page requested a file outside the composition directory; it was refused.',
+        fix: 'Keep every file the page loads inside the composition directory.',
+    },
+    'static-forbidden': {
+        meaning: 'The source uses a construct the rules forbid.',
+        fix: 'Replace it with a pure function of t: seeded rng from the runtime instead of Math.random, t instead of clocks, direct drawing in seek instead of timers or CSS animation.',
+    },
+    'seek-order-dependent': {
+        meaning: 'The same t renders differently depending on which frames were drawn before it.',
+        fix: 'Remove state carried between frames (counters, positions updated per frame, appended DOM). Compute everything from t; bake simulations into a lookup table in setup.',
+    },
+    'clock-dependent': {
+        meaning:
+            'The frame changes when the wall clock origin changes: the page reads Date or performance.now.',
+        fix: 'Drive every change from the t passed to seek; never read Date.now, new Date() or performance.now.',
+    },
+    'random-dependent': {
+        meaning:
+            'The frame changes when the random seed changes: the page uses Math.random or crypto.',
+        fix: 'Use rng(seed) or rand(seed, ...keys) from the runtime with a fixed seed.',
+    },
+    'late-paint': {
+        meaning:
+            'Two captures of the same t without a seek in between differ: something paints after seek returns.',
+        fix: 'Finish drawing inside seek; await image decode in ready, not in seek; do not start work that lands on a later frame.',
+    },
+    'blank-frame': {
+        meaning: 'Frames are a single flat color: nothing was drawn.',
+        fix: 'Check that seek draws at these times and that no error stopped the script.',
+    },
+    'paper-only': {
+        meaning: 'Frames match the paper layer alone: the content layer drew nothing.',
+        fix: 'Check that seek draws content at these times; a script error often leaves only the paper.',
+    },
+    'missing-glyph': {
+        meaning: 'Text uses characters that no flipbook font covers.',
+        fix: 'Replace the characters listed in `detail.chars`, or drop them.',
+    },
+    'font-fallback': {
+        meaning: 'Text rendered with a system font instead of a flipbook font.',
+        fix: 'Set font-family to "Noto Serif SC" or "LXGW WenKai" (served from /__flipbook/fonts/); system fonts differ between machines.',
+    },
+    'stage-size': {
+        meaning: 'The page content is larger than the stage size from timeline.json.',
+        fix: 'Size the stage to timeline width and height and hide overflow on html and body.',
+    },
+    freeze: {
+        meaning: 'The picture does not change for longer than allowed in a scene without hold.',
+        fix: 'Keep something moving in that scene, or set "hold": true on it in timeline.json when the still is intended.',
+    },
+    glitch: {
+        meaning: 'Decoded video frames do not match the captured frames.',
+        fix: 'Render again. If it repeats, report it with this JSON: the encoder pipeline, not the composition, is at fault.',
+    },
+    'frame-count': {
+        meaning: 'The video has a different number of frames than the timeline.',
+        fix: 'Render again. If it repeats, report it with this JSON.',
+    },
+    'duration-mismatch': {
+        meaning: 'The video duration does not match the timeline.',
+        fix: 'Render again. If it repeats, report it with this JSON.',
+    },
+    'color-tags': {
+        meaning: 'The video is missing yuv420p or bt709 color tags.',
+        fix: 'Report it with this JSON; the ffmpeg build may be ignoring color options.',
+    },
+    'audio-skipped': {
+        meaning: 'timeline.json asks for audio, which this version does not render yet.',
+        fix: 'Set "audio": { "mode": "none" } to silence this, or add the soundtrack after rendering.',
+    },
+    'render-busy': {
+        meaning: 'Another render of this composition is running.',
+        fix: 'Wait for it to finish, then run render again.',
+    },
+    'internal-error': {
+        meaning: 'flipbook itself failed.',
+        fix: 'Do not edit the composition for this. Report it with this JSON at https://github.com/liustack/flipbook/issues.',
+    },
+} as const satisfies Record<string, CodeInfo>;
+
+/** Environment problems: the machine is missing something. Exit 78. */
+export const ENV_CODES = {
+    'platform-unsupported': {
+        meaning: 'This operating system is not supported.',
+        fix: 'Run flipbook inside WSL2 (Ubuntu) on Windows, or on macOS or Linux.',
+    },
+    'node-too-old': {
+        meaning: 'Node is older than the supported floor.',
+        fix: 'Install Node 22.19 or newer from https://nodejs.org.',
+    },
+    'ffmpeg-missing': {
+        meaning: 'ffmpeg or ffprobe is not on PATH.',
+        fix: 'Install ffmpeg (macOS: brew install ffmpeg; Debian/Ubuntu: sudo apt-get install -y ffmpeg).',
+    },
+    'ffmpeg-feature-missing': {
+        meaning: 'ffmpeg lacks a required encoder or filter.',
+        fix: 'Install a full ffmpeg build with libx264 (macOS: brew install ffmpeg; Debian/Ubuntu: sudo apt-get install -y ffmpeg).',
+    },
+    'chromium-missing': {
+        meaning: 'The pinned Chromium headless shell is not installed.',
+        fix: 'Run check or render once outside the sandbox to install it, or run the install command in `fix`.',
+    },
+    'chromium-install-failed': {
+        meaning: 'Installing the Chromium headless shell failed.',
+        fix: 'Check the network or proxy (HTTPS_PROXY) and run the install command in `fix` again.',
+    },
+    'browser-launch-failed': {
+        meaning: 'Chromium was installed but did not start.',
+        fix: 'Read `detail.log`; on Linux install the system libraries with the command in `fix`.',
+    },
+    'sandbox-blocked': {
+        meaning: 'The host sandbox stopped Chromium from starting, even in single-process mode.',
+        fix: 'Allow Chromium in the sandbox: set sandbox.network.allowMachLookup, or add the flipbook launcher to sandbox.excludedCommands.',
+    },
+    'linux-deps-missing': {
+        meaning: 'Chromium is missing Linux system libraries.',
+        fix: 'Install them with the command in `fix` (needs sudo).',
+    },
+    'font-download-failed': {
+        meaning: 'A font could not be downloaded or failed its checksum.',
+        fix: 'Check the network or proxy, or set FLIPBOOK_FONT_BASE_URL to a mirror that serves the same files.',
+    },
+    'cache-unwritable': {
+        meaning: 'The flipbook cache directory cannot be written.',
+        fix: 'Run the command outside the sandbox once, or set FLIPBOOK_CACHE_DIR to a writable directory.',
+    },
+} as const satisfies Record<string, CodeInfo>;
+
+export type FindingCode = keyof typeof FINDING_CODES;
+export type EnvCode = keyof typeof ENV_CODES;
