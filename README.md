@@ -58,11 +58,14 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 |---|---|
 | macOS arm64 | 支持，已实测 |
 | Linux x64（Ubuntu 22.04、24.04，Debian 12） | 支持 |
-| macOS Intel、Linux arm64 | 尽力而为（Ubuntu 24.04 arm64 容器里按 INSTALL.md 装通并渲出 hello） |
+| Linux arm64 | 尽力而为（Ubuntu 24.04 arm64 容器里按 INSTALL.md 装通并渲出 hello，受限容器和两家宿主的 Linux 沙箱都测过） |
+| macOS Intel | 尽力而为，没测 |
 | Windows | 在 WSL2 里用，原生不支持 |
-| Claude Code | 已实测，沙箱内能跑（首次下载需要在沙箱外跑一次） |
-| Codex | 还没测 |
+| Claude Code | 已实测，macOS 沙箱里能跑，Linux 用它的沙箱运行时在容器里测过也能跑（首次下载在沙箱外跑一次，或加放行设置） |
+| Codex | 已实测，macOS 的 `workspace-write` 沙箱里能跑（首次下载同上），Linux 上要开 `network_access`，`read-only` 跑不了 |
 | 模型 | 门槛按旗舰 Claude Opus 5.5 和最低 Claude Opus 5 设，评测数字随 v0.1 评测公布 |
+
+每个平台实测了什么、沙箱怎么放行、容器至少要多少内存，见 [平台](docs/platform.md)。
 
 ## 文档
 
@@ -74,6 +77,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 | [时间轴](skills/flipbook/references/timeline.md) | 写 timeline.json，凑片长 |
 | [排错](skills/flipbook/references/troubleshooting.md) | 每个类型码的含义和改法 |
 | [报告格式](docs/report-schema.md) | 解析 JSON 报告、判定阈值、输出目录 |
+| [平台](docs/platform.md) | 支持矩阵、沙箱报错和放行办法、容器限制、GPU 结论 |
 | [评测](docs/eval.md) | 评测怎么跑、怎么判 |
 
 ## 参与
