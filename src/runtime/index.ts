@@ -1,5 +1,7 @@
 // flipbook browser runtime, served at /__flipbook/runtime.js.
 
+export type { Rgb } from './color.ts';
+export { hex, mix, rgb, rgba, shade } from './color.ts';
 export type { CompositionOptions, FlipbookProtocol } from './core/composition.ts';
 export { composition, decodeImages, loadFonts } from './core/composition.ts';
 export type { Easing } from './core/ease.ts';
@@ -35,6 +37,8 @@ export {
     timeline,
     transitionOut,
 } from './core/timeline.ts';
+export type { GrainOptions, GridOptions, PaperOptions } from './paper.ts';
+export { drawGrain, drawPaper, grainLayer, PAPER, paperLayer } from './paper.ts';
 export type { TextBox, TextEntry } from './text.ts';
 export { fillText, registerText } from './text.ts';
 
