@@ -90,6 +90,13 @@ export function docTargets(root, pkgName, slug) {
             format: (version) => `${slug}#v${version}`,
             required: false,
         },
+        {
+            name: `${relative} git tag pin`,
+            file: join(root, relative),
+            pattern: /--branch v(\d+\.\d+\.\d+)/g,
+            format: (version) => `--branch v${version}`,
+            required: false,
+        },
     ]);
 }
 

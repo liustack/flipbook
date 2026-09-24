@@ -64,6 +64,21 @@ describe('launcher version stamping', () => {
         expect(offenders, 'these install whatever the registry serves that day').toEqual([]);
     });
 
+    it('names the playwright-core version package.json depends on', () => {
+        const pinned = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf-8'))
+            .dependencies['playwright-core'];
+        const stale = [];
+        for (const file of trackedFiles(repoRoot)) {
+            if (!DOC.test(file) || LOCKFILE.test(file)) continue;
+            for (const match of readFileSync(file, 'utf-8').matchAll(
+                /playwright-core@(\d+\.\d+\.\d+)/g,
+            )) {
+                if (match[1] !== pinned) stale.push(`${file}: ${match[0]}`);
+            }
+        }
+        expect(stale).toEqual([]);
+    });
+
     it('recognizes every shape of an unpinned install', () => {
         const unpinned = [
             'add @liustack/flipbook@latest',
