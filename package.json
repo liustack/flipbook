@@ -50,7 +50,7 @@
     },
     "packageManager": "pnpm@10.33.0",
     "dependencies": {
-        "commander": "^15.0.0",
+        "commander": "15.0.0",
         "playwright-core": "1.63.0"
     },
     "devDependencies": {

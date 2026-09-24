@@ -70,6 +70,17 @@ describe('pixel math', () => {
     });
 });
 
+describe('package contract', () => {
+    it('pins every runtime dependency to an exact version', () => {
+        const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf-8')) as {
+            dependencies: Record<string, string>;
+        };
+        for (const [name, range] of Object.entries(pkg.dependencies)) {
+            expect(range, name).toMatch(/^\d+\.\d+\.\d+$/);
+        }
+    });
+});
+
 describe('report contract', () => {
     it('documents every finding and environment code in docs/report-schema.md', () => {
         const doc = fs.readFileSync(path.join(repoRoot, 'docs', 'report-schema.md'), 'utf-8');
