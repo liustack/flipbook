@@ -95,6 +95,10 @@ describe('bad composition corpus', () => {
             .filter((f) => f.code === 'font-fallback')
             .map((f) => f.element);
         expect(fallback).toContain('#system');
+        const hexagram = checked.failures.find(
+            (f) => f.code === 'font-fallback' && f.element === 'canvas text "hexagram"',
+        );
+        expect(hexagram?.detail?.chars).toEqual(['\u4DC0']);
     });
 
     it('clock: drawing from Date.now', async () => {

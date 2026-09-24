@@ -6,6 +6,7 @@ import { ENV_CODES, FINDING_CODES } from '../src/cli/codes.ts';
 import { LIMITS, recordCheck, recordRender } from '../src/engine/attempts.ts';
 import { covered, uncoveredChars } from '../src/engine/fonts.ts';
 import { psnr, sheetLayout } from '../src/engine/pixels.ts';
+import { auditCanvasText } from '../src/engine/textAudit.ts';
 import { acquireLock } from '../src/engine/workspace.ts';
 import { repoRoot, tempDir } from './helpers.ts';
 
@@ -16,6 +17,35 @@ describe('font coverage tables', () => {
         expect(uncoveredChars('\u{20000}😀')).toEqual(['\u{20000}', '😀']);
         expect(covered(0x4f60, 'noto-serif-sc')).toBe(true);
         expect(covered(0x4f60, 'lxgw-wenkai')).toBe(true);
+    });
+});
+
+describe('canvas text against the font it is drawn with', () => {
+    const audit = (text: string, font: string) =>
+        auditCanvasText(
+            [{ id: 't', text, font, box: { x: 0, y: 0, width: 1, height: 1 } }],
+            0,
+            12,
+        ).map((f) => [f.code, f.detail?.chars ?? null]);
+
+    it('checks each character against the listed fonts in order', () => {
+        expect(audit('\u4DC0', '40px "Noto Serif SC"')).toEqual([['font-fallback', ['\u4DC0']]]);
+        expect(audit('\u4DC0', '40px "LXGW WenKai"')).toEqual([]);
+        expect(audit('\u4DC0', '40px "Noto Serif SC", "LXGW WenKai"')).toEqual([]);
+        expect(audit('Hello 你好', '600 44px "Noto Serif SC", serif')).toEqual([]);
+    });
+
+    it('treats any other family before a flipbook font as a system font', () => {
+        expect(audit('Hello', '40px Arial')).toEqual([['font-fallback', ['H', 'e', 'l', 'o']]]);
+        expect(audit('Hello', '40px serif, "Noto Serif SC"')).toEqual([
+            ['font-fallback', ['H', 'e', 'l', 'o']],
+        ]);
+    });
+
+    it('reports characters no flipbook font has as missing', () => {
+        expect(audit('\u{20000}', '40px "Noto Serif SC"')).toEqual([
+            ['missing-glyph', ['\u{20000}']],
+        ]);
     });
 });
 

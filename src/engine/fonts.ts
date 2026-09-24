@@ -232,7 +232,7 @@ export function covered(cp: number, fontId?: string): boolean {
 }
 
 /** Characters that need no glyph: whitespace, controls, joiners and variation selectors. */
-function ignorable(cp: number): boolean {
+export function ignorable(cp: number): boolean {
     return (
         cp <= 0x20 ||
         (cp >= 0x7f && cp <= 0x9f) ||

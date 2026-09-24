@@ -15,13 +15,17 @@
 <p id="system">System font text</p>
 <canvas id="ink"></canvas>
 <script type="module">
-import { composition, setupCanvas } from '/__flipbook/runtime.js';
+import { composition, setupCanvas, fillText } from '/__flipbook/runtime.js';
 const ink = setupCanvas(document.getElementById('ink'), 640, 360);
 composition({
   seek(t) {
     ink.clearRect(0, 0, 640, 360);
     ink.fillStyle = '#c8452d';
     ink.fillRect(40 + t * 100, 280, 60, 60);
+    // U+4DC0 is in LXGW WenKai but not in Noto Serif SC, the only font named here.
+    ink.font = '40px "Noto Serif SC"';
+    ink.fillStyle = '#222';
+    fillText(ink, '\u4DC0', 400, 300, { id: 'hexagram' });
   },
 });
 </script>

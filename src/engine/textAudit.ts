@@ -1,5 +1,6 @@
 import { type Finding, finding } from '../cli/report.ts';
-import { fontIdForFamily, uncoveredChars } from './fonts.ts';
+import { covered, fontIdForFamily, ignorable, uncoveredChars } from './fonts.ts';
+import type { RegisteredText } from './host.ts';
 import type { CompositionPage, DomText } from './page.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
 
@@ -33,12 +34,95 @@ export function auditCueText(timeline: ResolvedTimeline): Finding[] {
     return out;
 }
 
-function firstFamily(fontShorthand: string): string {
+/** The font-family list of a CSS font shorthand, quotes removed, in order. */
+export function fontFamilies(fontShorthand: string): string[] {
     const match = /(?:\d+(?:\.\d+)?(?:px|pt|em|rem|%)(?:\/\S+)?\s+)(.+)$/.exec(
         fontShorthand.trim(),
     );
-    const families = (match ? match[1] : fontShorthand).split(',');
-    return families[0]?.trim() ?? '';
+    const list = match ? match[1] : fontShorthand;
+    const families: string[] = [];
+    let current = '';
+    let quote: string | null = null;
+    for (const ch of list) {
+        if (quote) {
+            if (ch === quote) quote = null;
+            else current += ch;
+        } else if (ch === '"' || ch === "'") {
+            quote = ch;
+        } else if (ch === ',') {
+            families.push(current.trim());
+            current = '';
+        } else {
+            current += ch;
+        }
+    }
+    families.push(current.trim());
+    return families.filter(Boolean);
+}
+
+/**
+ * Canvas text against the fonts it is drawn with. For each character the
+ * families are tried in order, as Chromium does: the first flipbook font that
+ * has the glyph draws it. A character reaching a family that is not a flipbook
+ * font (or the end of the list) is drawn with a system font: font-fallback,
+ * or missing-glyph when no flipbook font has it at all.
+ */
+export function auditCanvasText(entries: RegisteredText[], frame: number, fps: number): Finding[] {
+    const out: Finding[] = [];
+    const time = frame / fps;
+    for (const entry of entries) {
+        const label = entry.id
+            ? `canvas text "${entry.id}"`
+            : `canvas text "${entry.text.slice(0, 24)}"`;
+        const families = fontFamilies(entry.font);
+        const missing = new Set<string>();
+        const fallback = new Set<string>();
+        for (const ch of entry.text) {
+            const cp = ch.codePointAt(0) as number;
+            if (ignorable(cp)) continue;
+            let drawn = false;
+            for (const family of families) {
+                const id = fontIdForFamily(family);
+                if (!id) break;
+                if (covered(cp, id)) {
+                    drawn = true;
+                    break;
+                }
+            }
+            if (drawn) continue;
+            if (covered(cp)) fallback.add(ch);
+            else missing.add(ch);
+        }
+        if (missing.size > 0) {
+            out.push(
+                finding(
+                    'missing-glyph',
+                    `${label} uses characters no flipbook font has: ${[...missing].join(' ')}`,
+                    {
+                        time,
+                        frame,
+                        element: label,
+                        detail: { chars: [...missing], box: entry.box },
+                    },
+                ),
+            );
+        }
+        if (fallback.size > 0) {
+            out.push(
+                finding(
+                    'font-fallback',
+                    `${label} is drawn with ${families.map((f) => `"${f}"`).join(', ') || 'no font family'}, which does not cover ${[...fallback].join(' ')}: Chromium draws them with a system font.`,
+                    {
+                        time,
+                        frame,
+                        element: label,
+                        detail: { chars: [...fallback], font: entry.font, box: entry.box },
+                    },
+                ),
+            );
+        }
+    }
+    return out;
 }
 
 /**
@@ -92,41 +176,7 @@ export async function auditFrameText(
             );
         }
     }
-    for (const entry of await page.registeredTexts()) {
-        const label = entry.id
-            ? `canvas text "${entry.id}"`
-            : `canvas text "${entry.text.slice(0, 24)}"`;
-        const missing = uncoveredChars(entry.text);
-        if (missing.length > 0) {
-            out.push(
-                finding(
-                    'missing-glyph',
-                    `${label} uses characters no flipbook font has: ${missing.join(' ')}`,
-                    {
-                        time,
-                        frame,
-                        element: label,
-                        detail: { chars: missing, box: entry.box },
-                    },
-                ),
-            );
-        }
-        const family = firstFamily(entry.font);
-        if (!fontIdForFamily(family)) {
-            out.push(
-                finding(
-                    'font-fallback',
-                    `${label} is drawn with "${family}", not a flipbook font`,
-                    {
-                        time,
-                        frame,
-                        element: label,
-                        detail: { font: entry.font, box: entry.box },
-                    },
-                ),
-            );
-        }
-    }
+    out.push(...auditCanvasText(await page.registeredTexts(), frame, page.timeline.fps));
     return out;
 }
 

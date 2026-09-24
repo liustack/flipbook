@@ -100,7 +100,7 @@ read_when:
 | `blank-frame` | check、render | 画面是一整块纯色：缩到 320×180 灰度后，偏离中位灰度超过 16 灰阶的像素不到 0.05%。check 里全部抽样帧都空才是 error，部分空报 warning。render 里连续 1.5 秒以上才是 error | 查 seek 在这些时刻有没有画 |
 | `paper-only` | check、render | 画面和只开纸底层的基线一样：缩到 320×180 灰度后，和最近一张基线相差超过 16 灰阶的像素不到 0.05%。check 和 render 的判定规则同 `blank-frame`。render 每秒截一张基线。render 里空白帧和只剩纸底的帧合起来按「没有内容」连续计时，两类交替出现也不会被切断，类型码取两类里帧数多的那个，`detail` 里有 `blankFrames` 和 `paperFrames` | 查内容层是否因报错没画 |
 | `missing-glyph` | check、render | 文字里有 flipbook 字体都没有的字，`detail.chars` 列出 | 换掉这些字 |
-| `font-fallback` | check、render | 文字用了系统字体而不是 flipbook 字体 | font-family 用 "Noto Serif SC" 或 "LXGW WenKai" |
+| `font-fallback` | check、render | 文字用了系统字体而不是 flipbook 字体。DOM 字看 Chromium 实际用的字体。Canvas 字按 `ctx.font` 的字体链逐字核：某个字在找到含它的 flipbook 字体之前先碰到别的字体名（系统字体或 `serif` 这类通用名），或者整条链都不含它，就报，`detail.chars` 列出这些字 | font-family 用 "Noto Serif SC" 或 "LXGW WenKai" |
 | `text-offstage` | check | 文字完全出来的时刻（cue 的 settle 时刻），有一行越过画面边缘。每一行用 `Range.getClientRects` 取框，已含 transform。整段落在画面外的字也报，只有 `display: none`、`visibility: hidden` 或 `opacity: 0` 的字不算 | 把字挪进画面或缩小，故意出画的字加 `data-flipbook-allow-overflow` |
 | `text-safe-area` | check | 同一时刻，有一行落进画面外沿 5% 的边距里，只报 warning | 离四边至少留宽高的 5%，或加 `data-flipbook-allow-overflow` |
 | `low-contrast` | check | 同一时刻，文字和背后画面的对比度低于 3:1（大字标准），只报 warning。量法：同一帧截两张，第二张把 DOM 文字设成透明，变了的像素就是字形，字色取变化最大的三成像素在第一张里的均值，背景取同一批像素在第二张里的均值，按 WCAG 相对亮度算比值。Canvas 里画的字不量 | 加深或调亮文字或背景，或在字下垫一块实色底 |
