@@ -23,6 +23,8 @@ export const SANDBOX_ARGS = ['--single-process', '--no-zygote'];
 const SANDBOX_SIGNATURE =
     /mach_port_rendezvous|bootstrap_check_in|Permission denied \(1100\)|\bEPERM\b|Operation not permitted/;
 const MISSING_LIBS_SIGNATURE = /error while loading shared libraries/;
+/** Lines of the boxed notice playwright-core prints when its CLI runs from an npx cache. */
+const BANNER_LINE = /^[\u2554\u2551\u255a]/;
 
 export type LaunchMode = 'normal' | 'single-process';
 
@@ -115,8 +117,14 @@ export async function installHeadlessShell(
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         const forward = (chunk: Buffer) => {
-            output.push(chunk.toString('utf-8'));
-            if (process.env.FLIPBOOK_QUIET !== '1') process.stderr.write(chunk);
+            const text = chunk.toString('utf-8');
+            output.push(text);
+            if (process.env.FLIPBOOK_QUIET === '1') return;
+            const shown = text
+                .split('\n')
+                .filter((line) => !BANNER_LINE.test(line))
+                .join('\n');
+            if (shown.trim()) process.stderr.write(shown);
         };
         child.stdout.on('data', forward);
         child.stderr.on('data', forward);
