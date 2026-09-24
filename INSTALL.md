@@ -93,7 +93,7 @@ No output means ffmpeg is missing or lacks libx264:
 
 The first `check` or `render` downloads the pinned Chromium headless shell (about 95 MB) and two fonts (about 50 MB) into the user cache: `~/Library/Caches/liustack/flipbook` on macOS, `${XDG_CACHE_HOME:-~/.cache}/liustack/flipbook` on Linux. Step 4 triggers it. `doctor` never downloads anything.
 
-On Linux, Chromium needs system libraries. When a command exits 78 with `linux-deps-missing`, run the command from its `fix` (it needs sudo):
+On Linux, Chromium needs system libraries (on Ubuntu 24.04 with ffmpeg already installed, the first missing ones are `libnspr4` and `libnss3`). When a command exits 78 with `linux-deps-missing`, run the command from its `fix`. It needs sudo, or drop `sudo` when you are root. On Ubuntu 24.04 it installs about 26 packages (105 MB, including Xvfb and fonts):
 
 ```bash
 sudo npx --yes playwright-core@1.63.0 install-deps chromium-headless-shell

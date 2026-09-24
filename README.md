@@ -58,7 +58,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 |---|---|
 | macOS arm64 | 支持，已实测 |
 | Linux x64（Ubuntu 22.04、24.04，Debian 12） | 支持 |
-| macOS Intel、Linux arm64 | 尽力而为 |
+| macOS Intel、Linux arm64 | 尽力而为（Ubuntu 24.04 arm64 容器里按 INSTALL.md 装通并渲出 hello） |
 | Windows | 在 WSL2 里用，原生不支持 |
 | Claude Code | 已实测，沙箱内能跑（首次下载需要在沙箱外跑一次） |
 | Codex | 还没测 |
