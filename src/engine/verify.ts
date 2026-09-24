@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
 import { sequencePattern } from './capture.ts';
@@ -107,12 +106,48 @@ export interface VerifyOutput {
     probe: VideoProbe;
 }
 
-type Kind = 'blank' | 'paper' | 'content';
-
-interface Run {
-    kind: Kind;
+/** Consecutive frames without content, whether flat or paper only. */
+interface EmptyRun {
     from: number;
     to: number;
+    blank: number;
+    paper: number;
+}
+
+/** Part of a frozen span that lies in consecutive scenes without hold. */
+export interface FreezePiece {
+    start: number;
+    end: number;
+    scenes: string[];
+}
+
+/**
+ * Cut a frozen span at the scenes marked hold. Neighbouring scenes without
+ * hold stay together: a scene boundary does not mean the picture changed.
+ */
+export function freezePieces(
+    span: { start: number; end: number },
+    scenes: ResolvedTimeline['scenes'],
+): FreezePiece[] {
+    const pieces: FreezePiece[] = [];
+    let current: FreezePiece | null = null;
+    for (const scene of scenes) {
+        const from = Math.max(span.start, scene.start);
+        const to = Math.min(span.end, scene.end);
+        if (to <= from) continue;
+        if (scene.hold) {
+            if (current) pieces.push(current);
+            current = null;
+        } else if (current && Math.abs(current.end - from) < 1e-9) {
+            current.end = to;
+            current.scenes.push(scene.id);
+        } else {
+            if (current) pieces.push(current);
+            current = { start: from, end: to, scenes: [scene.id] };
+        }
+    }
+    if (current) pieces.push(current);
+    return pieces.filter((piece) => piece.end - piece.start >= STILL_LIMIT_SEC - 1e-6);
 }
 
 /** Frozen spans reported by ffmpeg freezedetect on the downscaled, blurred video. */
@@ -218,75 +253,93 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
         }
         return best === null ? null : (byFrame.get(best) ?? null);
     };
-    const runs: Run[] = [];
-    let current: Run | null = null;
+    const runs: EmptyRun[] = [];
+    let current: EmptyRun | null = null;
     await streamGray(ffmpeg.ffmpeg, video, (index, pixels) => {
-        let kind: Kind = 'content';
+        let kind: 'blank' | 'paper' | 'content' = 'content';
         if (isFlat(pixels)) kind = 'blank';
         else {
             const base = nearestBaseline(index);
             if (base && matchesBaseline(pixels, base)) kind = 'paper';
         }
-        if (current && current.kind === kind && current.to === index - 1) {
-            current.to = index;
-        } else {
+        if (kind === 'content') {
             if (current) runs.push(current);
-            current = { kind, from: index, to: index };
+            current = null;
+            return;
         }
+        current ??= { from: index, to: index, blank: 0, paper: 0 };
+        current.to = index;
+        current[kind] += 1;
     });
     if (current) runs.push(current);
     const minFrames = Math.ceil(STILL_LIMIT_SEC * fps);
     for (const r of runs) {
-        if (r.kind === 'content' || r.to - r.from + 1 < minFrames) continue;
-        const evidence = path.join(
-            options.evidenceDir,
-            `${r.kind === 'blank' ? 'blank-frame' : 'paper-only'}-f${r.from}.png`,
-        );
-        await extractFrame(ffmpeg.ffmpeg, video, r.from, evidence).catch(() => undefined);
+        if (r.to - r.from + 1 < minFrames) continue;
+        // One run of frames without content; the code names the more common reason.
+        const code = r.blank >= r.paper ? 'blank-frame' : 'paper-only';
+        const evidence = path.join(options.evidenceDir, `${code}-f${r.from}.png`);
+        await extractFrame(ffmpeg.ffmpeg, video, r.from, evidence);
         const seconds = (r.to - r.from + 1) / fps;
+        const reason =
+            r.blank > 0 && r.paper > 0
+                ? `${r.blank} flat and ${r.paper} paper-only`
+                : r.blank > 0
+                  ? 'flat, empty'
+                  : 'paper-only';
         findings.push(
             finding(
-                r.kind === 'blank' ? 'blank-frame' : 'paper-only',
-                `${seconds.toFixed(2)} s of ${r.kind === 'blank' ? 'flat, empty' : 'paper-only'} frames from ${(r.from / fps).toFixed(2)} s to ${((r.to + 1) / fps).toFixed(2)} s.`,
+                code,
+                `${seconds.toFixed(2)} s without content (${reason} frames) from ${(r.from / fps).toFixed(2)} s to ${((r.to + 1) / fps).toFixed(2)} s.`,
                 {
                     time: r.from / fps,
                     frame: r.from,
-                    evidence: fs.existsSync(evidence) ? [evidence] : [],
-                    detail: { fromFrame: r.from, toFrame: r.to, seconds },
+                    evidence: [evidence],
+                    detail: {
+                        fromFrame: r.from,
+                        toFrame: r.to,
+                        seconds,
+                        blankFrames: r.blank,
+                        paperFrames: r.paper,
+                    },
                 },
             ),
         );
     }
 
-    // Freezes longer than the limit inside scenes without hold.
+    // Freezes longer than the limit, outside scenes marked hold.
     for (const span of await freezeSpans(ffmpeg.ffmpeg, video, probe.durationSec)) {
-        for (const scene of timeline.scenes) {
-            if (scene.hold) continue;
-            const overlap = Math.min(span.end, scene.end) - Math.max(span.start, scene.start);
-            if (overlap < STILL_LIMIT_SEC - 1e-6) continue;
-            const from = Math.max(span.start, scene.start);
-            const frame = Math.round(from * fps);
+        for (const piece of freezePieces(span, timeline.scenes)) {
+            const seconds = piece.end - piece.start;
+            const frame = Math.round(piece.start * fps);
             const evidence = path.join(options.evidenceDir, `freeze-f${frame}.png`);
             await extractFrame(
                 ffmpeg.ffmpeg,
                 video,
                 Math.min(frame, Math.max(0, probe.frames - 1)),
                 evidence,
-            ).catch(() => undefined);
+            );
+            const where =
+                piece.scenes.length === 1
+                    ? `in scene "${piece.scenes[0]}"`
+                    : `across scenes ${piece.scenes.map((id) => `"${id}"`).join(', ')}`;
             findings.push(
                 finding(
                     'freeze',
-                    `The picture does not change for ${overlap.toFixed(2)} s in scene "${scene.id}" (from ${from.toFixed(2)} s).`,
+                    `The picture does not change for ${seconds.toFixed(2)} s ${where} (from ${piece.start.toFixed(2)} s).`,
                     {
-                        time: from,
+                        time: piece.start,
                         frame,
-                        element: `scene ${scene.id}`,
-                        evidence: fs.existsSync(evidence) ? [evidence] : [],
+                        element:
+                            piece.scenes.length === 1
+                                ? `scene ${piece.scenes[0]}`
+                                : `scenes ${piece.scenes.join(', ')}`,
+                        evidence: [evidence],
                         detail: {
-                            scene: scene.id,
-                            start: span.start,
-                            end: span.end,
-                            seconds: overlap,
+                            scene: piece.scenes[0],
+                            scenes: piece.scenes,
+                            start: piece.start,
+                            end: piece.end,
+                            seconds,
                         },
                     },
                 ),

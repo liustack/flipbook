@@ -1,0 +1,16 @@
+{
+    "version": 1,
+    "width": 640,
+    "height": 360,
+    "fps": 12,
+    "seed": 7,
+    "bpm": 120,
+    "beatsPerBar": 2,
+    "scenes": [
+        { "id": "one", "bars": 1 },
+        { "id": "two", "bars": 1 },
+        { "id": "three", "bars": 1 },
+        { "id": "four", "bars": 1 }
+    ],
+    "audio": { "mode": "none" }
+}

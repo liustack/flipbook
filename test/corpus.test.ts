@@ -60,6 +60,25 @@ describe('bad composition corpus', () => {
         expect(freezes.map((f) => f.element)).toEqual(['scene still']);
     });
 
+    it('freeze: one still picture across several short scenes', async () => {
+        const rendered = await render('freeze-split');
+        const freezes = rendered.failures.filter((f) => f.code === 'freeze');
+        expect(freezes).toHaveLength(1);
+        expect(freezes[0].element).toBe('scenes one, two, three, four');
+        expect(freezes[0].detail?.seconds as number).toBeGreaterThan(3.5);
+    });
+
+    it('empty: bare paper and a flat fill taking turns, never content', async () => {
+        const rendered = await render('empty-alternate');
+        const empty = rendered.failures.filter(
+            (f) => f.code === 'blank-frame' || f.code === 'paper-only',
+        );
+        expect(empty).toHaveLength(1);
+        expect(empty[0].detail?.seconds as number).toBeGreaterThan(3.5);
+        expect(empty[0].detail?.blankFrames as number).toBeGreaterThan(0);
+        expect(empty[0].detail?.paperFrames as number).toBeGreaterThan(0);
+    });
+
     it('glitch: a frame lost in the pipe to ffmpeg', async () => {
         const rendered = await render('glitch', [3]);
         expect(codes(rendered)).toContain('glitch');

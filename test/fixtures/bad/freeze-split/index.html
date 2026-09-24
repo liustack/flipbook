@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="ink"></canvas>
+<script type="module">
+import { composition, setupCanvas } from '/__flipbook/runtime.js';
+const ink = setupCanvas(document.getElementById('ink'), 640, 360);
+composition({
+  seek() {
+    ink.clearRect(0, 0, 640, 360);
+    ink.fillStyle = '#2a6f97';
+    ink.fillRect(220, 110, 200, 140);
+  },
+});
+</script>
+</body>
+</html>
