@@ -258,25 +258,29 @@ emit_text() {
 
 # `doctor [--json] [extra...]`: launcher selection diagnosis, followed by the
 # CLI's own doctor when a CLI is resolvable. Extra flags pass through to it.
+# Exits with the CLI doctor's code, or 78 when no runtime can run the CLI.
 doctor() {
   collect
   _json=0
   for _a in "$@"; do
     if [ "$_a" = "--json" ]; then _json=1; fi
   done
+  _code=0
+  if [ "$G_SEL" = "none" ]; then _code=78; fi
   if [ "$_json" = 1 ]; then
     _chained=""
     if [ "$G_SEL" != "none" ]; then
-      _chained="$(run_cli doctor "$@" 2>/dev/null)" || _chained=""
+      _chained="$(run_cli doctor "$@" 2>/dev/null)" || _code=$?
     fi
     emit_json "$_chained"
   else
     emit_text
     if [ "$G_SEL" != "none" ]; then
       printf '\n--- %s doctor ---\n' "$BIN"
-      run_cli doctor "$@" || true
+      run_cli doctor "$@" || _code=$?
     fi
   fi
+  exit "$_code"
 }
 
 # Default action: forward every argument to the resolved CLI, inheriting stdio

@@ -40,4 +40,21 @@ describe('skill launcher', () => {
         expect(diagnosis.pinnedVersion).toBe(pinned);
         expect(diagnosis.nextSteps.length).toBe(2);
     });
+
+    it('keeps the CLI doctor JSON and exit code when the CLI reports problems', () => {
+        const bin = tempDir('fakedoctor');
+        fs.writeFileSync(
+            path.join(bin, 'flipbook'),
+            `#!/bin/sh\nif [ "$1" = "--version" ]; then echo "${pinned}"; exit 0; fi\necho '{"ok":false,"problems":[{"code":"chromium-missing"}]}'\nexit 78\n`,
+            { mode: 0o755 },
+        );
+        const result = spawnSync('sh', [launcher, 'doctor', '--json'], {
+            env: { PATH: `${bin}:/usr/bin:/bin` },
+            encoding: 'utf-8',
+        });
+        expect(result.status).toBe(78);
+        const report = JSON.parse(result.stdout);
+        expect(report.selected).toBe('path');
+        expect(report.cliDoctor.problems[0].code).toBe('chromium-missing');
+    });
 });

@@ -216,11 +216,14 @@ function Invoke-Doctor {
     Collect
     $json = $false
     foreach ($a in $DocArgs) { if ($a -eq '--json') { $json = $true } }
+    $code = 0
+    if ($script:Selected -eq 'none') { $code = 78 }
     if ($json) {
         $chained = $null
         if ($script:Selected -ne 'none') {
             try {
                 $raw = (Invoke-Cli -CliArgs (@('doctor') + $DocArgs) 2>$null | Out-String).Trim()
+                $code = $LASTEXITCODE
                 if ($raw.StartsWith('{')) { $chained = ($raw | ConvertFrom-Json) }
             }
             catch { $chained = $null }
@@ -233,8 +236,10 @@ function Invoke-Doctor {
             Write-Output ''
             Write-Output "--- $Bin doctor ---"
             Invoke-Cli -CliArgs (@('doctor') + $DocArgs)
+            $code = $LASTEXITCODE
         }
     }
+    exit $code
 }
 
 # Default action: forward every argument to the resolved CLI and exit with its
