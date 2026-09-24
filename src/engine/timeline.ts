@@ -2,6 +2,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
 import {
+    DYNAMICS,
+    type Dynamic,
+    KEY_PATTERN,
+    PRESETS,
+    PROGRESSION_COUNT,
+    type PresetName,
+    SFX_NAMES,
+    type SfxName,
+} from './audioScore.ts';
+import {
     type ResolvedScene,
     type ResolvedTimeline,
     resolveTimeline,
@@ -21,7 +31,6 @@ export interface SchemaError {
 type Json = unknown;
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-const KEY_PATTERN = /^[A-G](#|b)?m?$/;
 
 function isObject(value: Json): value is Record<string, Json> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -210,7 +219,12 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
                     c.fail(`${at}.text`, 'is only allowed on kind "text"');
                 }
                 if (cue.kind === 'sfx') {
-                    c.str(cue.sfx, `${at}.sfx`, ID_PATTERN, 'a sound effect name');
+                    if (!SFX_NAMES.includes(cue.sfx as SfxName)) {
+                        c.fail(
+                            `${at}.sfx`,
+                            `must be one of ${SFX_NAMES.map((n) => `"${n}"`).join(', ')} (got ${describe(cue.sfx)})`,
+                        );
+                    }
                 } else if (cue.sfx !== undefined) {
                     c.fail(`${at}.sfx`, 'is only allowed on kind "sfx"');
                 }
@@ -226,31 +240,86 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
         if (!isObject(audio)) {
             c.fail('$.audio', `must be an object (got ${describe(audio)})`);
         } else {
-            c.keys(audio, '$.audio', ['mode', 'preset', 'key', 'progression', 'file', 'bpmOffset']);
-            if (audio.mode !== 'preset' && audio.mode !== 'file' && audio.mode !== 'none') {
+            c.keys(audio, '$.audio', [
+                'mode',
+                'preset',
+                'key',
+                'progression',
+                'dynamics',
+                'file',
+                'bpmOffset',
+            ]);
+            const mode = audio.mode;
+            if (mode !== 'preset' && mode !== 'file' && mode !== 'none') {
                 c.fail(
                     '$.audio.mode',
-                    `must be "preset", "file" or "none" (got ${describe(audio.mode)})`,
+                    `must be "preset", "file" or "none" (got ${describe(mode)})`,
                 );
             }
-            if (audio.mode === 'preset' || audio.preset !== undefined) {
-                c.str(audio.preset, '$.audio.preset', ID_PATTERN, 'a preset name');
+            const onlyWith = (field: string, needed: string) => {
+                if (audio[field] !== undefined && mode !== needed) {
+                    c.fail(`$.audio.${field}`, `is only used with "mode": "${needed}"`);
+                    return false;
+                }
+                return true;
+            };
+            if (mode === 'preset') {
+                if (!PRESETS.includes(audio.preset as PresetName)) {
+                    c.fail(
+                        '$.audio.preset',
+                        `must be one of ${PRESETS.map((p) => `"${p}"`).join(', ')} (got ${describe(audio.preset)})`,
+                    );
+                }
+            } else {
+                onlyWith('preset', 'preset');
             }
             if (audio.key !== undefined) {
                 c.str(audio.key, '$.audio.key', KEY_PATTERN, 'a key such as D, F# or Bbm');
             }
-            if (audio.progression !== undefined) {
-                c.int(audio.progression, '$.audio.progression', 0, 99);
+            if (onlyWith('progression', 'preset') && audio.progression !== undefined) {
+                c.int(
+                    audio.progression,
+                    '$.audio.progression',
+                    0,
+                    PROGRESSION_COUNT - 1,
+                    'see references/audio.md for the list',
+                );
             }
-            if (audio.mode === 'file' || audio.file !== undefined) {
+            if (onlyWith('dynamics', 'preset') && audio.dynamics !== undefined) {
+                if (!isObject(audio.dynamics)) {
+                    c.fail(
+                        '$.audio.dynamics',
+                        `must map scene ids to levels (got ${describe(audio.dynamics)})`,
+                    );
+                } else {
+                    for (const [scene, level] of Object.entries(audio.dynamics)) {
+                        const at = `$.audio.dynamics.${scene}`;
+                        if (!sceneBeats.has(scene)) {
+                            c.fail(
+                                at,
+                                `names no scene (known: ${[...sceneBeats.keys()].join(', ') || 'none'})`,
+                            );
+                        }
+                        if (!DYNAMICS.includes(level as Dynamic)) {
+                            c.fail(
+                                at,
+                                `must be one of ${DYNAMICS.map((d) => `"${d}"`).join(', ')} (got ${describe(level)})`,
+                            );
+                        }
+                    }
+                }
+            }
+            if (mode === 'file') {
                 if (c.str(audio.file, '$.audio.file', undefined, 'a path inside the composition')) {
                     const file = audio.file as string;
                     if (path.isAbsolute(file) || file.split(/[\\/]/).includes('..')) {
                         c.fail('$.audio.file', 'must be a relative path inside the composition');
                     }
                 }
+            } else {
+                onlyWith('file', 'file');
             }
-            if (audio.bpmOffset !== undefined) {
+            if (onlyWith('bpmOffset', 'file') && audio.bpmOffset !== undefined) {
                 c.num(audio.bpmOffset, '$.audio.bpmOffset', 0, 60);
             }
         }

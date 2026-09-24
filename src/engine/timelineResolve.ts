@@ -23,11 +23,15 @@ export interface CueV1 {
     sfx?: string;
 }
 
+export type AudioLevel = 'rest' | 'soft' | 'medium' | 'full';
+
 export interface AudioV1 {
     mode: AudioMode;
     preset?: string;
     key?: string;
     progression?: number;
+    /** Scene id to level, for preset music. */
+    dynamics?: Record<string, AudioLevel>;
     file?: string;
     bpmOffset?: number;
 }

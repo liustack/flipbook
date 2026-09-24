@@ -26,9 +26,9 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
     ],
     "cues": [
         { "id": "zh", "scene": "intro", "beat": 1, "kind": "text", "text": "你好，翻页书", "settleBeats": 1 },
-        { "id": "tap", "scene": "title", "beat": 0, "kind": "sfx", "sfx": "tap" }
+        { "id": "tap", "scene": "title", "beat": 0, "kind": "sfx", "sfx": "drop" }
     ],
-    "audio": { "mode": "none" }
+    "audio": { "mode": "preset", "preset": "pluck", "key": "D", "dynamics": { "intro": "soft" } }
 }
 ```
 
@@ -68,22 +68,60 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `kind` | 是 | `text`、`sfx`、`mark` | |
 | `text` | kind 为 text 时必填 | 非空字符串 | 上屏文字，check 用它核对字形覆盖 |
 | `settleBeats` | 否 | 0 到 64 | 文字完全出来要几拍，check 和 render 在这个时刻做文字检查，缺省 0（在 cue 时刻就完全出来）。文字 cue 必须在本场结束前出完 |
-| `sfx` | kind 为 sfx 时必填 | 音效名 | v0.3 起用于音效峰值对帧 |
+| `sfx` | kind 为 sfx 时必填 | `paper`、`drop`、`ding`、`sweep` | 音效名，峰值对准 cue 所在的帧，见 audio 一节 |
 
 ## audio
 
-| 字段 | 说明 |
-|---|---|
-| `mode` | 必填，`preset`、`file` 或 `none` |
-| `preset` | mode 为 preset 时必填，预设名 |
-| `key` | 调，如 `D`、`F#`、`Bbm` |
-| `progression` | 和声进行编号，0 到 99 |
-| `file` | mode 为 file 时必填，合成目录内的相对路径 |
-| `bpmOffset` | 用户音乐第一拍的偏移秒数，0 到 60 |
+| 字段 | 用于哪个 mode | 取值 | 说明 |
+|---|---|---|---|
+| `mode` | 全部，必填 | `preset`、`file`、`none` | 配乐从哪来 |
+| `preset` | preset，必填 | `pluck`、`marimba`、`pad` | 预设音色和编配 |
+| `key` | 全部 | `A` 到 `G`，可带 `#` 或 `b`，末尾加 `m` 是小调，缺省 `C` | 配乐的调，`ding` 音效也按它的主音定音高 |
+| `progression` | preset | 0 到 5 的整数，缺省 0 | 和声进行编号，见下表 |
+| `dynamics` | preset | 场景 id 到 `rest`、`soft`、`medium`、`full` 的映射 | 每场强弱，没写的场景按 `medium` |
+| `file` | file，必填 | 合成目录内的相对路径 | 用户自带音乐，文件不在合成目录里时报 `timeline-invalid` |
+| `bpmOffset` | file | 0 到 60，缺省 0 | 用户音乐里第一拍落在第几秒 |
 
-- `none`：成片无声。
-- `file`：用户自带音乐。render 从 `bpmOffset` 秒处截起，让第一拍落在 t = 0，不够长补静音，超长截掉，最后一秒（片长不足 4 秒时取片长四分之一）淡出，编成 AAC 48 kHz 立体声 192 kbps 放进成片。文件解析软链后必须是合成目录里的普通文件，否则报 `timeline-invalid`。ffmpeg 只按本地文件读它，格式限 wav、w64、mp3、flac、ogg、aac、mov 系（m4a、mp4）、aiff、matroska 系（mkv、webm），播放列表和 concat 这类会引用别的文件的格式不收。v0.1 不做响度归一。
-- `preset`：预设配乐随 v0.3 的 `audio` 命令上线，v0.1 出无声成片并报 `audio-skipped` warning。
+字段写在不用它的 mode 下（比如 `mode: none` 带 `preset`）报 `timeline-invalid`，路径指到那个字段。
+
+- `none`：没有配乐。有 `sfx` cue 时成片只带音效，没有 `sfx` cue 时是无声成片。
+- `preset`：`audio` 命令按预设、调、和声进行和每场强弱合成配乐，render 自动调用。
+- `file`：用户自带音乐，不做节拍检测，`bpm` 和 `bpmOffset` 由用户给。文件解析软链后必须是合成目录里的普通文件，否则报 `timeline-invalid`。ffmpeg 只按本地文件读它，格式限 wav、w64、mp3、flac、ogg、aac、mov 系（m4a、mp4）、aiff、matroska 系（mkv、webm），播放列表和 concat 这类会引用别的文件的格式不收。
+
+### 和声进行
+
+一小节一个和弦，四小节一轮，按全片的小节数往下排，不随场景重来。最后一小节换成主和弦（大调 I，小调 i）收尾。
+
+| 编号 | 大调 | 小调 |
+|---|---|---|
+| 0 | I V vi IV | i VI III VII |
+| 1 | I vi IV V | i iv VI V |
+| 2 | vi IV I V | i VII VI VII |
+| 3 | I IV vi V | i VI iv V |
+| 4 | IV V iii vi | VI VII i i |
+| 5 | ii V I vi | i iv VII III |
+
+### 强弱
+
+| 值 | 效果 |
+|---|---|
+| `rest` | 这一场不出新音符，前面的余音自然衰减 |
+| `soft` | 稀疏，只留低音和少量旋律音，力度低 |
+| `medium` | 完整织体 |
+| `full` | 加一层（拨弦加扫弦和摇铃，马林巴加花和铃声，铺底加脉动），力度高 |
+
+强弱按音符的起点所在的场景算，跨场的长音保持起音时的力度。
+
+### 音效
+
+| `sfx` | 声音 | 峰值在哪 |
+|---|---|---|
+| `paper` | 翻纸：碎响、掠过、纸落下的一拍 | 纸落下那一下，起声在峰值前约 0.14 秒 |
+| `drop` | 轻物落在纸上：下沉的闷响、一声咔嗒 | 起音处 |
+| `ding` | 小铃，音高是 `key` 的主音 | 起音处 |
+| `sweep` | 扫频的呼声，越来越响，到峰值后很快收住 | 起声后约 0.32 秒 |
+
+每个音效单独合成，找到自己的最大采样，再把这个采样放到 cue 帧在 48 kHz 上的位置（帧号乘 48000 除以 fps 取整）。峰值前的部分落到 t = 0 之前的截掉。
 
 ## 换算规则
 
