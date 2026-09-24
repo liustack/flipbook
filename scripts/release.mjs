@@ -6,7 +6,8 @@
 //   pnpm release patch        bump from the current one
 //
 // Runs every refusal check first, then the gates (lint, typecheck, test,
-// build), then bumps, stamps, commits, tags and pushes main and the tag
+// build), regenerates docs/samples, then bumps, stamps, commits, tags and
+// pushes main and the tag
 // atomically. It does not publish: the pushed tag triggers
 // .github/workflows/release.yml, which publishes to npm and creates the
 // GitHub Release.
@@ -101,6 +102,7 @@ runLoud('pnpm', ['lint']);
 runLoud('pnpm', ['typecheck']);
 runLoud('pnpm', ['test']);
 runLoud('pnpm', ['build']);
+runLoud('node', ['scripts/samples.mjs']);
 
 // --- from here on it is real ---
 
