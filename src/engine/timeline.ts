@@ -272,6 +272,30 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
     return { errors: [], timeline: input as unknown as TimelineV1 };
 }
 
+/**
+ * The real path of audio.file: it must resolve (links followed) to a regular
+ * file inside the real composition directory.
+ */
+export function audioSource(dir: string, file: string): { file: string } | { problem: string } {
+    const root = fs.realpathSync(dir);
+    let real: string;
+    try {
+        real = fs.realpathSync(path.resolve(dir, file));
+    } catch {
+        return { problem: `names ${file}, which does not exist in the composition directory.` };
+    }
+    const inside = path.relative(root, real);
+    if (inside === '' || inside.startsWith('..') || path.isAbsolute(inside)) {
+        return {
+            problem: `names ${file}, which resolves to ${real}, outside the composition directory.`,
+        };
+    }
+    if (!fs.statSync(real).isFile()) {
+        return { problem: `names ${file}, which is not a regular file.` };
+    }
+    return { file: real };
+}
+
 export interface LoadedTimeline {
     timeline?: TimelineV1;
     resolved?: ResolvedTimeline;
@@ -314,18 +338,13 @@ export function loadTimeline(dir: string, write = true): LoadedTimeline {
         };
     }
     if (timeline.audio?.mode === 'file' && timeline.audio.file) {
-        const file = path.resolve(dir, timeline.audio.file);
-        const inside = path.relative(dir, file);
-        if (!fs.existsSync(file) || inside.startsWith('..') || path.isAbsolute(inside)) {
+        const source = audioSource(dir, timeline.audio.file);
+        if ('problem' in source) {
             return {
                 findings: [
-                    finding(
-                        'timeline-invalid',
-                        `$.audio.file names ${timeline.audio.file}, which is not in the composition directory.`,
-                        {
-                            detail: { path: '$.audio.file' },
-                        },
-                    ),
+                    finding('timeline-invalid', `$.audio.file ${source.problem}`, {
+                        detail: { path: '$.audio.file' },
+                    }),
                 ],
             };
         }

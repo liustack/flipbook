@@ -68,7 +68,7 @@ Any other field is an error, so a typo never passes silently.
 | Mode | What render does |
 |---|---|
 | `none` | a silent video |
-| `file` | the user's music at `file` (a path inside the composition), cut so the first beat at `bpmOffset` seconds lands on t = 0, padded or trimmed to the video length, faded out over the last second, encoded as AAC |
+| `file` | the user's music at `file` (a regular file inside the composition: wav, mp3, flac, ogg, aac, m4a, aiff or webm, not a playlist), cut so the first beat at `bpmOffset` seconds lands on t = 0, padded or trimmed to the video length, faded out over the last second, encoded as AAC |
 | `preset` | reserved for v0.3, v0.1 renders silent and warns `audio-skipped` |
 
 ## From beats to seconds and frames

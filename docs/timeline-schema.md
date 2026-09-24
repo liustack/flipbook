@@ -82,7 +82,7 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `bpmOffset` | 用户音乐第一拍的偏移秒数，0 到 60 |
 
 - `none`：成片无声。
-- `file`：用户自带音乐。render 从 `bpmOffset` 秒处截起，让第一拍落在 t = 0，不够长补静音，超长截掉，最后一秒（片长不足 4 秒时取片长四分之一）淡出，编成 AAC 48 kHz 立体声 192 kbps 放进成片。文件不在合成目录里时报 `timeline-invalid`。v0.1 不做响度归一。
+- `file`：用户自带音乐。render 从 `bpmOffset` 秒处截起，让第一拍落在 t = 0，不够长补静音，超长截掉，最后一秒（片长不足 4 秒时取片长四分之一）淡出，编成 AAC 48 kHz 立体声 192 kbps 放进成片。文件解析软链后必须是合成目录里的普通文件，否则报 `timeline-invalid`。ffmpeg 只按本地文件读它，格式限 wav、w64、mp3、flac、ogg、aac、mov 系（m4a、mp4）、aiff、matroska 系（mkv、webm），播放列表和 concat 这类会引用别的文件的格式不收。v0.1 不做响度归一。
 - `preset`：预设配乐随 v0.3 的 `audio` 命令上线，v0.1 出无声成片并报 `audio-skipped` warning。
 
 ## 换算规则

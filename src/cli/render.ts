@@ -12,7 +12,7 @@ import {
     type Session,
 } from '../engine/session.ts';
 import { dedupe } from '../engine/textAudit.ts';
-import { loadTimeline } from '../engine/timeline.ts';
+import { audioSource, loadTimeline } from '../engine/timeline.ts';
 import { verifySoundtrack, verifyVideo } from '../engine/verify.ts';
 import { acquireLock, compositionHash, Workspace } from '../engine/workspace.ts';
 import { appVersion } from '../paths.ts';
@@ -218,9 +218,11 @@ export async function runRender(options: RenderOptions): Promise<Report> {
             progress('render: adding the soundtrack');
             delivered = path.join(tmp, 'video-with-audio.mp4');
             try {
+                const source = audioSource(dir, timeline.audio.file);
+                if ('problem' in source) throw new Error(source.problem);
                 await muxSoundtrack(session.ffmpeg.ffmpeg, {
                     video,
-                    audio: path.resolve(dir, timeline.audio.file),
+                    audio: source.file,
                     offsetSec: timeline.audio.bpmOffset ?? 0,
                     durationSec: timeline.frameCount / timeline.fps,
                     output: delivered,

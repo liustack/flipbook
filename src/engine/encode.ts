@@ -123,6 +123,22 @@ export class Encoder {
     }
 }
 
+/**
+ * Demuxers accepted for a soundtrack. Playlist and concat formats, which name
+ * other files, are left out, and the input may only be read as a local file.
+ */
+export const SOUNDTRACK_FORMATS = [
+    'wav',
+    'w64',
+    'mp3',
+    'flac',
+    'ogg',
+    'aac',
+    'mov',
+    'aiff',
+    'matroska',
+];
+
 export interface MuxOptions {
     video: string;
     audio: string;
@@ -153,6 +169,10 @@ export async function muxSoundtrack(ffmpeg: string, options: MuxOptions): Promis
             '-y',
             '-i',
             options.video,
+            '-protocol_whitelist',
+            'file',
+            '-format_whitelist',
+            SOUNDTRACK_FORMATS.join(','),
             '-i',
             options.audio,
             '-filter_complex',

@@ -7,6 +7,9 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../src/cli/check.ts';
 import { runRender } from '../src/cli/render.ts';
 import { runSnapshot } from '../src/cli/snapshot.ts';
+import { run } from '../src/engine/proc.ts';
+import { loadTimeline } from '../src/engine/timeline.ts';
+import { probeAudio } from '../src/engine/verify.ts';
 import { Workspace, WorkspaceError } from '../src/engine/workspace.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, codes, tempDir } from './helpers.ts';
@@ -152,6 +155,80 @@ describe('commands never write or delete through links in .flipbook/ and out/', 
             }
         });
     }
+});
+
+/** A composition whose timeline asks for audio.file. */
+function withAudio(file: string): string {
+    const dir = composition();
+    fs.writeFileSync(
+        path.join(dir, 'timeline.json'),
+        JSON.stringify({ ...TIMELINE, audio: { mode: 'file', file, bpmOffset: 0 } }),
+    );
+    fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
+    return dir;
+}
+
+async function tone(ffmpeg: string, file: string, codec: string[] = []): Promise<void> {
+    const made = await run(ffmpeg, [
+        '-v',
+        'error',
+        '-y',
+        '-f',
+        'lavfi',
+        '-i',
+        'sine=frequency=440:sample_rate=48000:duration=3',
+        ...codec,
+        file,
+    ]);
+    expect(made.code, made.stderr).toBe(0);
+}
+
+describe('audio.file stays inside the composition', () => {
+    it('refuses a linked assets/music.wav that leads outside, in check, snapshot and render', async () => {
+        const s = await session();
+        const ext = tempDir('ws-audio-ext');
+        await tone(s.ffmpeg.ffmpeg, path.join(ext, 'music.wav'));
+        const before = state(ext);
+        for (const runIt of [
+            (dir: string) => runCheck({ dir, session: s, recordAttempts: false }),
+            (dir: string) => runSnapshot({ dir, session: s }),
+            (dir: string) => runRender({ dir, session: s, recordAttempts: false }),
+        ]) {
+            const dir = withAudio('assets/music.wav');
+            fs.symlinkSync(path.join(ext, 'music.wav'), path.join(dir, 'assets', 'music.wav'));
+            const report = await runIt(dir);
+            const invalid = report.failures.find((f) => f.code === 'timeline-invalid');
+            expect(invalid?.detail?.path, report.command).toBe('$.audio.file');
+            expect(report.artifacts.video, report.command).toBeUndefined();
+            expect(state(ext)).toEqual(before);
+        }
+    });
+
+    it('accepts a link that stays inside and refuses a directory', () => {
+        const dir = withAudio('assets/music.wav');
+        fs.writeFileSync(path.join(dir, 'assets', 'real.wav'), 'x');
+        fs.symlinkSync('real.wav', path.join(dir, 'assets', 'music.wav'));
+        expect(loadTimeline(dir, false).findings).toEqual([]);
+        const folder = withAudio('assets/music.wav');
+        fs.mkdirSync(path.join(folder, 'assets', 'music.wav'));
+        expect(loadTimeline(folder, false).findings[0]?.detail?.path).toBe('$.audio.file');
+    });
+
+    it('does not let ffmpeg follow a playlist to a file outside', async () => {
+        const s = await session();
+        const ext = tempDir('ws-playlist-ext');
+        await tone(s.ffmpeg.ffmpeg, path.join(ext, 'secret.aac'), ['-c:a', 'aac']);
+        const dir = withAudio('assets/list.m3u8');
+        fs.writeFileSync(
+            path.join(dir, 'assets', 'list.m3u8'),
+            `#EXTM3U\n#EXT-X-TARGETDURATION:3\n#EXTINF:3,\n${path.join(ext, 'secret.aac')}\n#EXT-X-ENDLIST\n`,
+        );
+        const report = await runRender({ dir, session: s, recordAttempts: false });
+        const invalid = report.failures.find((f) => f.code === 'timeline-invalid');
+        expect(invalid?.detail?.path).toBe('$.audio.file');
+        const delivered = report.artifacts.rejectedVideo ?? report.artifacts.video;
+        expect(await probeAudio(s.ffmpeg.ffprobe, delivered)).toBeNull();
+    });
 });
 
 describe('Workspace', () => {
