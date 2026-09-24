@@ -37,6 +37,32 @@ export {
     timeline,
     transitionOut,
 } from './core/timeline.ts';
+export type {
+    Box,
+    CrossHatchOptions,
+    Field,
+    HalftoneOptions,
+    HatchOptions,
+    PencilOptions,
+    Point,
+    StippleOptions,
+    TornOptions,
+    TornPaperOptions,
+} from './materials.ts';
+export {
+    arcPoints,
+    boxPoints,
+    crossHatch,
+    ellipsePoints,
+    halftone,
+    hatch,
+    hatchPaths,
+    pencil,
+    resample,
+    stipple,
+    tornPaper,
+    tornPath,
+} from './materials.ts';
 export type { GrainOptions, GridOptions, PaperOptions } from './paper.ts';
 export { drawGrain, drawPaper, grainLayer, PAPER, paperLayer } from './paper.ts';
 export type { TextBox, TextEntry } from './text.ts';
