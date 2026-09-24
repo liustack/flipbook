@@ -97,6 +97,13 @@ export function docTargets(root, pkgName, slug) {
             format: (version) => `--branch v${version}`,
             required: false,
         },
+        {
+            name: `${relative} tagged link pin`,
+            file: join(root, relative),
+            pattern: new RegExp(`${escapeRe(slug)}/blob/v(\\d+\\.\\d+\\.\\d+)`, 'g'),
+            format: (version) => `${slug}/blob/v${version}`,
+            required: false,
+        },
     ]);
 }
 
