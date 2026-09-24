@@ -48,3 +48,63 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  install:
+    # INSTALL.md from scratch on a fresh Ubuntu x64 runner. Before a release the
+    # npm package and the git tag do not exist yet, so the packed tarball is
+    # installed globally and the skill is copied from the checkout.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19'
+          cache: pnpm
+      - name: Pack the CLI
+        run: pnpm install --frozen-lockfile && pnpm build && npm pack --pack-destination "$RUNNER_TEMP"
+      - name: Steps 1 and 2, the skill folder
+        run: |
+          mkdir -p ~/.claude/skills/flipbook
+          cp -R skills/flipbook/. ~/.claude/skills/flipbook/
+          ls ~/.claude/skills/flipbook/SKILL.md ~/.claude/skills/flipbook/scripts/run.sh ~/.claude/skills/flipbook/references
+      - name: Step 3, Node, ffmpeg and the CLI
+        run: |
+          node --version
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          ffmpeg -hide_banner -encoders | grep libx264
+          npm install -g "$RUNNER_TEMP"/liustack-flipbook-*.tgz
+      - name: Step 4, doctor before the first download exits 78
+        run: |
+          code=0
+          bash ~/.claude/skills/flipbook/scripts/run.sh doctor --json > doctor.json || code=$?
+          cat doctor.json
+          test "$code" -eq 78
+          grep -q chromium-missing doctor.json
+      - name: Step 4, check and render hello
+        run: |
+          HELLO="$RUNNER_TEMP/flipbook-hello"
+          cp -R examples/hello "$HELLO"
+          code=0
+          bash ~/.claude/skills/flipbook/scripts/run.sh check "$HELLO" > check.json 2> check.err || code=$?
+          if [ "$code" -eq 78 ] && grep -q linux-deps-missing check.err; then
+            cat check.err
+            sudo npx --yes playwright-core@1.63.0 install-deps chromium-headless-shell
+            code=0
+            bash ~/.claude/skills/flipbook/scripts/run.sh check "$HELLO" > check.json 2> check.err || code=$?
+          fi
+          if [ "$code" -ne 0 ]; then cat check.json check.err; exit 1; fi
+          bash ~/.claude/skills/flipbook/scripts/run.sh render "$HELLO" > render.json
+          bash ~/.claude/skills/flipbook/scripts/run.sh doctor
+          ffprobe -v error -show_entries stream=width,height,pix_fmt,nb_frames:format=duration -of compact "$HELLO/out/video.mp4"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: install-smoke
+          path: |
+            doctor.json
+            check.json
+            check.err
+            render.json
