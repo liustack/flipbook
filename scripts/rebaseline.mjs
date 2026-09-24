@@ -198,9 +198,9 @@ function compare(name, opts, outDir) {
         const batch = changed.slice(i, i + 24);
         const a = framesRgb(before.video, batch, width, height);
         const b = framesRgb(after.video, batch, width, height);
-        batch.forEach((frame, j) =>
-            scores.push({ frame, psnr: a[j] && b[j] ? psnr(a[j], b[j]) : 0 }),
-        );
+        for (const [j, frame] of batch.entries()) {
+            scores.push({ frame, psnr: a[j] && b[j] ? psnr(a[j], b[j]) : 0 });
+        }
     }
     const below = scores.filter((s) => s.psnr < opts.threshold).sort((x, y) => x.psnr - y.psnr);
     Object.assign(entry, {
