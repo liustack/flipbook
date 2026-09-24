@@ -130,12 +130,15 @@ describe.concurrent('reference snippets pass check as marked', () => {
     }
 });
 
-/** references/troubleshooting.md, rendered from src/cli/codes.ts. */
+/**
+ * references/troubleshooting.md, rendered from src/cli/codes.ts. After changing
+ * a code, run UPDATE_REFERENCES=1 pnpm test test/references.test.ts.
+ */
 function troubleshooting(): string {
     const lines = [
         '# Troubleshooting',
         '',
-        'Every code flipbook reports, what it means, and what to change. Generated from `src/cli/codes.ts` (edit it there, then run `UPDATE_REFERENCES=1 pnpm test test/references.test.ts`).',
+        'Every code flipbook reports, what it means, and what to change.',
         '',
         '- Exit 1: the composition has a problem. Fix the codes under `failures`, then run `check` again.',
         '- Exit 2: the command itself is wrong (a flag, a missing directory). Fix the command.',
@@ -155,6 +158,18 @@ function troubleshooting(): string {
     }
     return `${lines.join('\n').trimEnd()}\n`;
 }
+
+describe('skill files speak to the agent using the skill', () => {
+    it('carry no maintainer steps (regenerating files, CI)', () => {
+        const skillDir = path.join(repoRoot, 'skills', 'flipbook');
+        for (const file of [path.join(skillDir, 'SKILL.md'), ...files]) {
+            const text = fs.readFileSync(file, 'utf-8');
+            for (const phrase of ['UPDATE_REFERENCES', 'src/cli/', ' in CI', 'Generated from']) {
+                expect(text, `${path.basename(file)} mentions ${phrase}`).not.toContain(phrase);
+            }
+        }
+    });
+});
 
 describe('troubleshooting reference', () => {
     it('matches src/cli/codes.ts', () => {

@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Every code flipbook reports, what it means, and what to change. Generated from `src/cli/codes.ts` (edit it there, then run `UPDATE_REFERENCES=1 pnpm test test/references.test.ts`).
+Every code flipbook reports, what it means, and what to change.
 
 - Exit 1: the composition has a problem. Fix the codes under `failures`, then run `check` again.
 - Exit 2: the command itself is wrong (a flag, a missing directory). Fix the command.

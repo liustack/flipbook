@@ -61,7 +61,7 @@ Defaults:
 | duration | about 30 s, within 5% of what the user asked, at most 180 s |
 | look | warm paper background, dark ink, one or two accent colors, serif type |
 | music | none (`"audio": { "mode": "none" }`) |
-| the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls, use `"mode": "file"` with `bpm` and `bpmOffset` |
+| the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
 | characters, photos | none unless asked |
 
 ## Hard rules

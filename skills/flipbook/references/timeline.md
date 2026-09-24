@@ -2,7 +2,7 @@
 
 `timeline.json` is the only source of time for picture and sound. Write everything in beats. flipbook converts beats to seconds and frames, writes the result to `.flipbook/timeline.resolved.json`, and hands it to the page through `await timeline()`.
 
-The JavaScript snippets in this file run through `flipbook check` in CI against this timeline:
+The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 
 <!-- snippet-timeline -->
 ```json

@@ -2,7 +2,7 @@
 
 A composition is a directory with `index.html`, `timeline.json` and optionally `assets/`. flipbook opens the page at `http://flipbook.local/index.html`, calls `seek(t)` for every frame and screenshots the result. The picture at time `t` must depend on `t` and nothing else.
 
-Every snippet in this file runs through `flipbook check` in CI. JavaScript snippets run inside a 640×360 page with `<canvas id="stage">` and this timeline:
+The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 
 <!-- snippet-timeline -->
 ```json
