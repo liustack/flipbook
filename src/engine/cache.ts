@@ -21,10 +21,10 @@ export function cacheRoot(
     }
     const home = env.HOME || os.homedir();
     if (platform === 'darwin') {
-        return path.join(home, 'Library', 'Caches', OWNER, NAME);
+        return path.posix.join(home, 'Library', 'Caches', OWNER, NAME);
     }
-    const xdg = env.XDG_CACHE_HOME || path.join(home, '.cache');
-    return path.join(xdg, OWNER, NAME);
+    const xdg = env.XDG_CACHE_HOME || path.posix.join(home, '.cache');
+    return path.posix.join(xdg, OWNER, NAME);
 }
 
 /** PLAYWRIGHT_BROWSERS_PATH for flipbook's own Chromium. */
