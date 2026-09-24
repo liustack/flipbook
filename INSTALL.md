@@ -101,17 +101,29 @@ sudo npx --yes playwright-core@1.63.0 install-deps chromium-headless-shell
 
 ### 3d. Host sandbox
 
-Claude Code: Chromium starts inside the sandbox by itself, but the sandbox does not allow writing the cache. The first download therefore has to run outside the sandbox once. When a command exits 78 with `cache-unwritable`, ask the user to approve running that same command outside the sandbox. Later runs work inside it.
+Claude Code and Codex run commands in a sandbox. Chromium starts inside the Claude Code sandbox and the Codex `workspace-write` sandbox by itself: when the normal start is refused, flipbook retries in single-process mode. What those sandboxes block is the first download, which writes the cache and needs the network. When a command exits 78 with `cache-unwritable` or `chromium-install-failed`, ask the user to approve running that same command outside the sandbox. Later runs work inside it.
 
-To avoid the prompt for good, the user can add one of these to `~/.claude/settings.json` (use the absolute home path):
+To avoid the prompt for good, the user can add a lasting setting instead.
+
+Claude Code, `~/.claude/settings.json`: let the sandbox write the cache and reach the download hosts (Chromium comes from `cdn.playwright.dev`, which redirects to `storage.googleapis.com`, the fonts from GitHub):
 
 ```json
 {
     "sandbox": {
-        "filesystem": { "allowWrite": ["/Users/<user>/Library/Caches/liustack/flipbook"] }
+        "filesystem": { "allowWrite": ["~/Library/Caches/liustack/flipbook"] },
+        "network": {
+            "allowedDomains": [
+                "cdn.playwright.dev",
+                "storage.googleapis.com",
+                "github.com",
+                "*.githubusercontent.com"
+            ]
+        }
     }
 }
 ```
+
+Or run the launcher outside the sandbox (use the absolute home path):
 
 ```json
 {
@@ -121,7 +133,15 @@ To avoid the prompt for good, the user can add one of these to `~/.claude/settin
 }
 ```
 
-Codex: its sandbox has not been tested with flipbook yet. If a command fails with a permission error, run it with the sandbox relaxed for that command and tell the user.
+Codex, `~/.codex/config.toml`:
+
+```toml
+[sandbox_workspace_write]
+writable_roots = ["/Users/<user>/Library/Caches/liustack/flipbook"]
+network_access = true
+```
+
+On Linux the cache is `~/.cache/liustack/flipbook` for both hosts. Codex on Linux needs `network_access = true` for every run, not only the first: without it Chromium cannot start at all (exit 78 with `sandbox-blocked`). Codex in `read-only` mode cannot run flipbook: ask the user to switch to `workspace-write`.
 
 ---
 

@@ -39,9 +39,12 @@ If scripts cannot run, use the first line that works (the pinned version is 0.1.
 
 ## Sandbox
 
-- Chromium runs inside the Claude Code sandbox on its own.
-- The first check or render downloads Chromium and fonts into `~/Library/Caches/liustack/flipbook` (macOS) or `~/.cache/liustack/flipbook` (Linux). Inside a sandbox this exits 78 with `cache-unwritable`: run that one command outside the sandbox after the user approves. Later runs work inside it.
-- Two lasting settings the user can add to `~/.claude/settings.json`: the cache directory in `sandbox.filesystem.allowWrite`, or the launcher command in `sandbox.excludedCommands`.
+- Chromium starts inside the Claude Code sandbox and the Codex `workspace-write` sandbox on its own.
+- The first check or render downloads Chromium and fonts into `~/Library/Caches/liustack/flipbook` (macOS) or `~/.cache/liustack/flipbook` (Linux). Inside a sandbox this exits 78 with `cache-unwritable` or `chromium-install-failed`: run that one command outside the sandbox after the user approves. Later runs work inside it.
+- Lasting settings the user can add instead:
+  - Claude Code, `~/.claude/settings.json`: the cache directory in `sandbox.filesystem.allowWrite` plus `cdn.playwright.dev`, `storage.googleapis.com`, `github.com` and `*.githubusercontent.com` in `sandbox.network.allowedDomains`. Or the launcher command in `sandbox.excludedCommands`.
+  - Codex, `~/.codex/config.toml` under `[sandbox_workspace_write]`: the cache directory in `writable_roots` and `network_access = true`. Codex on Linux needs `network_access = true` for every run.
+- Codex `read-only` cannot run flipbook: ask the user for `workspace-write`.
 - Exit 78 with `sandbox-blocked`: relay its `fix` lines.
 
 ## The six steps
