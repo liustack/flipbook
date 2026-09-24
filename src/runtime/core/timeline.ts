@@ -1,10 +1,4 @@
-import {
-    type ResolvedCue,
-    type ResolvedScene,
-    type ResolvedTimeline,
-    resolveTimeline,
-    type TimelineV1,
-} from '../../engine/timelineResolve.ts';
+import type { ResolvedCue, ResolvedScene, ResolvedTimeline } from '../../engine/timelineResolve.ts';
 import { progress } from './ease.ts';
 
 export type { ResolvedCue, ResolvedScene, ResolvedTimeline };
@@ -29,8 +23,8 @@ export function isRendering(): boolean {
 let cached: ResolvedTimeline | null = null;
 
 /**
- * The resolved timeline (seconds and frames for every scene and cue). Under
- * the renderer it comes from the host; otherwise from ./timeline.json.
+ * The resolved timeline (seconds and frames for every scene and cue), as
+ * flipbook check, snapshot and render hand it to the page.
  */
 export async function timeline(): Promise<ResolvedTimeline> {
     if (cached) return cached;
@@ -39,9 +33,11 @@ export async function timeline(): Promise<ResolvedTimeline> {
         cached = fromHost.timeline;
         return cached;
     }
-    const response = await fetch('./timeline.json');
-    if (!response.ok) throw new Error(`timeline.json: HTTP ${response.status}`);
-    cached = resolveTimeline((await response.json()) as TimelineV1);
+    const response = await fetch('/__flipbook/timeline.json');
+    if (!response.ok) {
+        throw new Error('timeline() only works under flipbook check, snapshot or render');
+    }
+    cached = (await response.json()) as ResolvedTimeline;
     return cached;
 }
 

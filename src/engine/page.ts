@@ -444,8 +444,7 @@ export class CompositionPage {
                 const text = node.nodeValue ?? '';
                 if (!text.trim()) continue;
                 const el = node.parentElement;
-                if (!el || el.closest('script,style,noscript,template,[data-flipbook-preview]'))
-                    continue;
+                if (!el || el.closest('script,style,noscript,template')) continue;
                 if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
                     continue;
                 const range = document.createRange();

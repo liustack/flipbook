@@ -12,7 +12,7 @@
 - TTS 旁白、节拍检测、机器学习抠图
 - Remotion 或 HyperFrames 当底座、p5.js
 - Windows 原生支持（`win32` 退 78，提示用 WSL2）
-- `preview` 命令（预览由运行时库的时间滑杆提供）
+- 预览（`preview` 命令和双击打开的预览都不做，0.x 看画面靠 `snapshot`）
 
 ## 技术路线
 
