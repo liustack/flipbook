@@ -93,7 +93,7 @@ SOFTWARE.
 | 包 | 版本 | 许可证 |
 |---|---|---|
 | playwright-core | 1.63.0 | Apache-2.0，Copyright (c) Microsoft Corporation |
-| commander | ^15.0.0 | MIT，Copyright (c) 2011 TJ Holowaychuk |
+| commander | 15.0.0 | MIT，Copyright (c) 2011 TJ Holowaychuk |
 
 ## 首次运行时下载的资源
 

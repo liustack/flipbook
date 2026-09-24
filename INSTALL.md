@@ -6,7 +6,7 @@ The whole install is four steps:
 
 1. Find the skill directory for your harness.
 2. Put the `skills/flipbook` folder into it.
-3. Prepare the machine: Node, ffmpeg, the first download, the sandbox.
+3. Prepare the machine: Node, ffmpeg, memory and processes, the first download, the sandbox.
 4. Verify with `doctor` and a 5-second test render.
 
 ---
@@ -89,9 +89,22 @@ No output means ffmpeg is missing or lacks libx264:
 - macOS: `brew install ffmpeg`
 - Debian or Ubuntu: `sudo apt-get update && sudo apt-get install -y ffmpeg`
 
-### 3c. First download (Chromium and fonts)
+### 3c. Memory and processes
+
+Rendering at 1920×1080 needs at least 2 GB of memory and room for 128 processes for the user. Desktops have that. In a container, give it `--memory 2g --pids-limit 128` or more. Below that the system kills Chromium or ffmpeg halfway, and flipbook exits 78 with `resource-exhausted`.
+
+### 3d. First download (Chromium and fonts)
 
 The first `check` or `render` downloads the pinned Chromium headless shell (about 95 MB) and two fonts (about 50 MB) into the user cache: `~/Library/Caches/liustack/flipbook` on macOS, `${XDG_CACHE_HOME:-~/.cache}/liustack/flipbook` on Linux. Step 4 triggers it. `doctor` never downloads anything.
+
+A firewall, proxy or sandbox allowlist must let these four hosts through for the first download:
+
+- `cdn.playwright.dev` (Chromium)
+- `storage.googleapis.com` (where the Chromium download redirects)
+- `github.com` (fonts)
+- `*.githubusercontent.com` (fonts, and where GitHub release downloads redirect)
+
+When GitHub cannot be reached, the fonts are tried once more through the `ghfast.top` mirror (same files, checked by SHA-256). `FLIPBOOK_FONT_BASE_URL` points font downloads at a mirror of your own.
 
 On Linux, Chromium needs system libraries (on Ubuntu 24.04 with ffmpeg already installed, the first missing ones are `libnspr4` and `libnss3`). When a command exits 78 with `linux-deps-missing`, run the command from its `fix`. It needs sudo, or drop `sudo` when you are root. On Ubuntu 24.04 it installs about 26 packages (105 MB, including Xvfb and fonts):
 
@@ -99,13 +112,13 @@ On Linux, Chromium needs system libraries (on Ubuntu 24.04 with ffmpeg already i
 sudo npx --yes playwright-core@1.63.0 install-deps chromium-headless-shell
 ```
 
-### 3d. Host sandbox
+### 3e. Host sandbox
 
 Claude Code and Codex run commands in a sandbox. Chromium starts inside the Claude Code sandbox and the Codex `workspace-write` sandbox by itself: when the normal start is refused, flipbook retries in single-process mode. What those sandboxes block is the first download, which writes the cache and needs the network. When a command exits 78 with `cache-unwritable` or `chromium-install-failed`, ask the user to approve running that same command outside the sandbox. Later runs work inside it.
 
 To avoid the prompt for good, the user can add a lasting setting instead.
 
-Claude Code, `~/.claude/settings.json`: let the sandbox write the cache and reach the download hosts (Chromium comes from `cdn.playwright.dev`, which redirects to `storage.googleapis.com`, the fonts from GitHub):
+Claude Code, `~/.claude/settings.json`: let the sandbox write the cache and reach the four download hosts from 3d:
 
 ```json
 {
@@ -141,7 +154,7 @@ writable_roots = ["/Users/<user>/Library/Caches/liustack/flipbook"]
 network_access = true
 ```
 
-On Linux the cache is `~/.cache/liustack/flipbook` for both hosts. Codex on Linux needs `network_access = true` for every run, not only the first: without it Chromium cannot start at all (exit 78 with `sandbox-blocked`). Codex in `read-only` mode cannot run flipbook: ask the user to switch to `workspace-write`.
+On Linux the cache is `~/.cache/liustack/flipbook` for both hosts. Codex on Linux needs `network_access = true` for every run, not only the first: without it Chromium cannot start at all (exit 78 with `sandbox-blocked`). Codex in `read-only` mode cannot run flipbook (exit 78 with `tmp-unwritable`): ask the user to switch to `workspace-write`.
 
 ---
 
@@ -153,7 +166,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh doctor   # replace with your TARGE
 
 `doctor` prints one JSON object. On a fresh machine it exits 78 with `chromium-missing` in `problems`. That is expected before the first render. For any other problem, relay the lines in its top-level `fix`.
 
-Then render the example (this is the first download from step 3c):
+Then render the example (this is the first download from step 3d):
 
 ```bash
 HELLO="${TMPDIR:-/tmp}/flipbook-hello"
@@ -172,7 +185,7 @@ Open `$HELLO/out/contact-sheet.png` to see the frames.
 
 **If it fails:**
 - The launcher printed a JSON diagnosis with `"error": "runtime-missing"` and exited 78: no Node or npx was found. Relay `fix` and redo 3a.
-- Exit 78 from `check` or `render`: read `error` and `fix` in the JSON on stderr. `cache-unwritable` means 3d, `linux-deps-missing` means 3c, `ffmpeg-missing` means 3b, `font-download-failed` means the network or proxy (a mirror can be set with `FLIPBOOK_FONT_BASE_URL`).
+- Exit 78 from `check` or `render`: read `error` and `fix` in the JSON on stderr. `cache-unwritable`, `chromium-install-failed`, `sandbox-blocked` and `tmp-unwritable` mean 3e, `linux-deps-missing` means 3d, `ffmpeg-missing` means 3b, `resource-exhausted` means 3c, `font-download-failed` means the network or proxy (see the hosts in 3d, a mirror can be set with `FLIPBOOK_FONT_BASE_URL`).
 - Exit 1: the example failed a check on this machine. Send the report JSON to https://github.com/liustack/flipbook/issues.
 
 ---

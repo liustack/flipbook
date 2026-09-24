@@ -20,7 +20,7 @@ read_when:
 
 | 宿主 | 状态 |
 |---|---|
-| Claude Code | 沙箱里能跑。首次下载要在沙箱外跑一次，或加放行设置（INSTALL.md 第 3d 步） |
+| Claude Code | 沙箱里能跑。首次下载要在沙箱外跑一次，或加放行设置（INSTALL.md 第 3e 步） |
 | Codex | macOS 上 `workspace-write` 沙箱里能跑，首次下载同上。Linux 上要开 `network_access = true` 才起得来。`read-only` 跑不了 |
 
 ## 实测环境

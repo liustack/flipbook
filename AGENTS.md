@@ -11,7 +11,7 @@
 - 3D 角色、真实素材剪辑、生成式图像或视频当画面主体、实时录屏
 - TTS 旁白、节拍检测、机器学习抠图
 - Remotion 或 HyperFrames 当底座、p5.js
-- Windows 原生支持（`win32` 退 78，提示用 WSL2）
+- Windows 原生支持（`win32` 退 78，提示用 WSL2。`FLIPBOOK_ALLOW_WIN32=1` 只给 CI 用）
 - 预览（`preview` 命令和双击打开的预览都不做，0.x 看画面靠 `snapshot`）
 
 ## 技术路线
@@ -32,14 +32,15 @@ src/
   names.ts         包名、命令名、skill 名、仓库名的唯一来源
   paths.ts         包根目录和运行时文件定位
   skillPin.ts      读各宿主 skill 副本钉的版本
-  cli/             doctor、check、snapshot、render、报告和类型码
-  engine/          浏览器、页面、时钟、timeline、截帧、编码、验收、字体、缓存、扫描
-  runtime/         浏览器端运行时库（core、text、audio）
+  cli/             doctor、check、snapshot、audio、render、报告和类型码
+  engine/          浏览器、页面、时钟、timeline、截帧、编码、验收、字体、缓存、扫描、配乐合成和混音、渲染进程监视
+  runtime/         浏览器端运行时库（core、text、paper、materials、templates、audio）
   fonts/           字体清单、码位表、OFL 全文
-scripts/           发版、版本号改写、码位表生成、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）
-skills/flipbook/   SKILL.md（英文）、references/（rules、timeline、troubleshooting）、scripts/run.sh 和 run.ps1
-docs/              report-schema.md、timeline-schema.md、eval.md
-examples/          每个例子一份源码加 expected.json，不提交 mp4
+scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）
+skills/flipbook/   SKILL.md（英文）、references/（rules、timeline、audio、paper、materials、text、templates、troubleshooting）、scripts/run.sh 和 run.ps1
+docs/              report-schema.md、timeline-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
+docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
+examples/          hello、eggs-five（five 和 shu 两条）、beat-title，每个例子一份源码加 expected.json，不提交 mp4
 eval/              评测用例、models.json、run.mjs，证据写到 eval/results/（不入库）
 test/              vitest，坏片语料在 test/fixtures/bad/
 ```
