@@ -7,12 +7,15 @@ import {
     type HeadlessShell,
     installCommand,
     installError,
+    isSupportedPlatform,
     launchBrowser,
     matchSandboxSignature,
     resetLaunchMode,
     SANDBOX_SIGNATURES,
     sandboxHost,
+    shellLayout,
 } from '../src/engine/browser.ts';
+import { cacheRoot } from '../src/engine/cache.ts';
 
 process.env.FLIPBOOK_QUIET = '1';
 
@@ -162,5 +165,52 @@ describe('first download inside a sandbox', () => {
             {},
         );
         expect(error.code).toBe('cache-unwritable');
+    });
+});
+
+describe('Windows', () => {
+    it('has an x64 headless shell layout and nothing for arm64', () => {
+        expect(shellLayout('win32', 'x64')).toEqual([
+            'chrome-headless-shell-win64',
+            'chrome-headless-shell.exe',
+        ]);
+        expect(shellLayout('win32', 'arm64')).toBeNull();
+        expect(shellLayout('linux', 'arm64')).toEqual([
+            'chrome-headless-shell-linux-arm64',
+            'chrome-headless-shell',
+        ]);
+    });
+
+    it('stays unsupported unless FLIPBOOK_ALLOW_WIN32=1', () => {
+        expect(isSupportedPlatform('win32', 'x64', {})).toBe(false);
+        expect(isSupportedPlatform('win32', 'x64', { FLIPBOOK_ALLOW_WIN32: '1' })).toBe(true);
+        expect(isSupportedPlatform('win32', 'arm64', { FLIPBOOK_ALLOW_WIN32: '1' })).toBe(false);
+        expect(isSupportedPlatform('darwin', 'arm64', {})).toBe(true);
+        expect(isSupportedPlatform('linux', 'x64', {})).toBe(true);
+        expect(isSupportedPlatform('freebsd', 'x64', {})).toBe(false);
+    });
+
+    it('prints the install command in PowerShell syntax', () => {
+        const win = {
+            ...shell,
+            browsersPath: 'C:\\Users\\me\\AppData\\Local\\liustack\\flipbook\\browsers',
+        };
+        expect(installCommand(win, 'win32')).toBe(
+            '$env:PLAYWRIGHT_BROWSERS_PATH="C:\\Users\\me\\AppData\\Local\\liustack\\flipbook\\browsers"; npx --yes playwright-core@1.63.0 install chromium-headless-shell',
+        );
+        expect(installCommand(shell, 'linux')).toMatch(/^PLAYWRIGHT_BROWSERS_PATH="/);
+    });
+
+    it('keeps the cache under %LOCALAPPDATA%\\liustack\\flipbook', () => {
+        expect(cacheRoot({ LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'win32')).toBe(
+            'C:\\Users\\me\\AppData\\Local\\liustack\\flipbook',
+        );
+        expect(cacheRoot({ USERPROFILE: 'C:\\Users\\me' }, 'win32')).toBe(
+            'C:\\Users\\me\\AppData\\Local\\liustack\\flipbook',
+        );
+        expect(cacheRoot({ HOME: '/home/me' }, 'linux')).toBe('/home/me/.cache/liustack/flipbook');
+        expect(cacheRoot({ HOME: '/Users/me' }, 'darwin')).toBe(
+            '/Users/me/Library/Caches/liustack/flipbook',
+        );
     });
 });

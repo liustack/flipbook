@@ -140,6 +140,7 @@ const SHELL_LAYOUT: Record<string, [string, string]> = {
     'darwin-x64': ['chrome-headless-shell-mac-x64', 'chrome-headless-shell'],
     'linux-x64': ['chrome-headless-shell-linux64', 'chrome-headless-shell'],
     'linux-arm64': ['chrome-headless-shell-linux-arm64', 'chrome-headless-shell'],
+    'win32-x64': ['chrome-headless-shell-win64', 'chrome-headless-shell.exe'],
 };
 
 /** The headless shell's directory and file name for a platform, or null when there is no build. */
@@ -148,6 +149,21 @@ export function shellLayout(
     arch: string = process.arch,
 ): [string, string] | null {
     return SHELL_LAYOUT[`${platform}-${arch}`] ?? null;
+}
+
+/** Windows is not supported. FLIPBOOK_ALLOW_WIN32=1 lets it run anyway, for CI. */
+export function win32Allowed(env: NodeJS.ProcessEnv = process.env): boolean {
+    return env.FLIPBOOK_ALLOW_WIN32 === '1';
+}
+
+/** True for macOS and Linux on arm64 or x64, and for Windows x64 only when win32 is allowed. */
+export function isSupportedPlatform(
+    platform: string = process.platform,
+    arch: string = process.arch,
+    env: NodeJS.ProcessEnv = process.env,
+): boolean {
+    if (platform === 'win32' && !win32Allowed(env)) return false;
+    return shellLayout(platform, arch) !== null;
 }
 
 /** Where the pinned headless shell lives and whether it is there. */
@@ -177,8 +193,15 @@ export function headlessShell(env: NodeJS.ProcessEnv = process.env): HeadlessShe
 }
 
 /** The copyable command that installs the pinned headless shell into the flipbook cache. */
-export function installCommand(shell: HeadlessShell): string {
-    return `PLAYWRIGHT_BROWSERS_PATH="${shell.browsersPath}" npx --yes playwright-core@${shell.playwrightVersion} install chromium-headless-shell`;
+export function installCommand(
+    shell: HeadlessShell,
+    platform: NodeJS.Platform = process.platform,
+): string {
+    const install = `npx --yes playwright-core@${shell.playwrightVersion} install chromium-headless-shell`;
+    if (platform === 'win32') {
+        return `$env:PLAYWRIGHT_BROWSERS_PATH="${shell.browsersPath}"; ${install}`;
+    }
+    return `PLAYWRIGHT_BROWSERS_PATH="${shell.browsersPath}" ${install}`;
 }
 
 export function installDepsCommand(shell: HeadlessShell): string {
@@ -211,6 +234,7 @@ export async function installHeadlessShell(
         const child = spawn(process.execPath, [cli, 'install', 'chromium-headless-shell'], {
             env: { ...env, PLAYWRIGHT_BROWSERS_PATH: shell.browsersPath },
             stdio: ['ignore', 'pipe', 'pipe'],
+            windowsHide: true,
         });
         const forward = (chunk: Buffer) => {
             const text = chunk.toString('utf-8');

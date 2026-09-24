@@ -5,12 +5,22 @@ import { NAME, OWNER } from '../names.ts';
 
 /**
  * The per-user cache: macOS ~/Library/Caches/liustack/flipbook, Linux
- * ${XDG_CACHE_HOME:-~/.cache}/liustack/flipbook. FLIPBOOK_CACHE_DIR overrides.
+ * ${XDG_CACHE_HOME:-~/.cache}/liustack/flipbook, Windows
+ * %LOCALAPPDATA%\liustack\flipbook. FLIPBOOK_CACHE_DIR overrides.
  */
-export function cacheRoot(env: NodeJS.ProcessEnv = process.env): string {
+export function cacheRoot(
+    env: NodeJS.ProcessEnv = process.env,
+    platform: NodeJS.Platform = process.platform,
+): string {
     if (env.FLIPBOOK_CACHE_DIR) return path.resolve(env.FLIPBOOK_CACHE_DIR);
+    if (platform === 'win32') {
+        const local =
+            env.LOCALAPPDATA ||
+            path.win32.join(env.USERPROFILE || os.homedir(), 'AppData', 'Local');
+        return path.win32.join(local, OWNER, NAME);
+    }
     const home = env.HOME || os.homedir();
-    if (process.platform === 'darwin') {
+    if (platform === 'darwin') {
         return path.join(home, 'Library', 'Caches', OWNER, NAME);
     }
     const xdg = env.XDG_CACHE_HOME || path.join(home, '.cache');
