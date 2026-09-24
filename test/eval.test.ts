@@ -14,7 +14,7 @@ describe('eval runner', () => {
             },
         );
         expect(result.status, result.stdout + result.stderr).toBe(0);
-        expect(result.stdout).toMatch(/5\/5 cases valid/);
+        expect(result.stdout).toMatch(/8\/8 cases valid/);
         expect(result.stdout).toMatch(/workspace install ok, flipbook shim \d+\.\d+\.\d+/);
     });
 });

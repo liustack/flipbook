@@ -161,8 +161,8 @@ function loadCases(ids) {
             const range = spec.expect?.durationSec;
             if (!Array.isArray(range) || range.length !== 2 || range[0] >= range[1])
                 problems.push('expect.durationSec must be [min, max]');
-            if (!['none', 'file'].includes(spec.expect?.audio))
-                problems.push('expect.audio must be "none" or "file"');
+            if (!['none', 'preset', 'file'].includes(spec.expect?.audio))
+                problems.push('expect.audio must be "none", "preset" or "file"');
             return { name: d.name, spec, problems };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -340,8 +340,10 @@ function judge(spec, evidence) {
                 );
             if (e.width && (c.probe.width !== e.width || c.probe.height !== e.height))
                 reasons.push(`size ${c.probe.width}x${c.probe.height}`);
-            if (e.audio === 'file' && !c.probe.audio) reasons.push('no audio track');
+            if (e.audio !== 'none' && !c.probe.audio) reasons.push('no audio track');
         }
+        if (e.audio !== 'none' && c.audioMode !== e.audio)
+            reasons.push(`timeline audio.mode is "${c.audioMode}", expected "${e.audio}"`);
         const missingText = (e.textInSource ?? []).filter((text) => !c.source.includes(text));
         if (missingText.length > 0)
             reasons.push(`text missing from the source: ${missingText.join(', ')}`);
@@ -408,6 +410,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
             lastRender: readJson(join(dir, '.flipbook', 'reports', 'render.json')),
             attempts: readJson(join(dir, '.flipbook', 'attempts.json')),
             recheck: recheck(dir),
+            audioMode: readJson(join(dir, 'timeline.json'))?.audio?.mode ?? 'none',
             source: ['index.html', 'timeline.json']
                 .map((f) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf-8') : ''))
                 .join('\n'),
