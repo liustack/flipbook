@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Browser, BrowserContext, CDPSession, Page, Route } from 'playwright-core';
-import { type Finding, finding } from '../cli/report.ts';
+import { type Finding, finding, progress } from '../cli/report.ts';
 import { runtimeFile } from '../paths.ts';
 import { FONT_URL_PREFIX, fontFaces, fontFileFor } from './fonts.ts';
 import {
@@ -17,6 +17,8 @@ export const ORIGIN = 'http://flipbook.local';
 export const DEFAULT_EPOCH_MS = Date.UTC(2026, 0, 1);
 export const SEEK_TIMEOUT_MS = 10_000;
 export const READY_TIMEOUT_MS = 60_000;
+/** Longest wait for a page's context to close. */
+export const CLOSE_TIMEOUT_MS = 10_000;
 
 const MIME: Record<string, string> = {
     '.html': 'text/html; charset=utf-8',
@@ -306,11 +308,34 @@ export class CompositionPage {
             return [finding('page-error', `index.html did not load: ${nav.message}`)];
         }
         for (;;) {
-            const state = await this.page.evaluate(() => {
-                const fb = (window as unknown as { __flipbook?: { protocol?: unknown } })
-                    .__flipbook;
-                return fb ? { present: true, protocol: fb.protocol } : { present: false };
-            });
+            // The read itself runs page code (a getter can loop or throw), so it gets the
+            // rest of the ready limit too.
+            const probe = await withTimeout(
+                this.page.evaluate(() => {
+                    const fb = (window as unknown as { __flipbook?: { protocol?: unknown } })
+                        .__flipbook;
+                    return fb ? { present: true, protocol: fb.protocol } : { present: false };
+                }),
+                Math.max(1, deadline - Date.now()),
+            );
+            if (!probe.ok) {
+                this.broken = true;
+                return [
+                    probe.timedOut
+                        ? finding(
+                              'ready-timeout',
+                              `The page stopped answering while flipbook read window.__flipbook: no reply within ${readyTimeoutMs} ms.`,
+                              {
+                                  fix: 'Look for an endless loop in a page script or in a getter on window.__flipbook. Nothing may run without end while the page loads.',
+                              },
+                          )
+                        : finding(
+                              'protocol-missing',
+                              `Reading window.__flipbook failed: ${probe.message}`,
+                          ),
+                ];
+            }
+            const state = probe.value;
             if (state.present) {
                 if (state.protocol !== PROTOCOL_VERSION) {
                     this.broken = true;
@@ -574,8 +599,16 @@ export class CompositionPage {
         });
     }
 
+    /**
+     * Close the context, waiting at most CLOSE_TIMEOUT_MS: a page whose main
+     * thread never returns must not hold the command. A context that is already
+     * gone (crashed page, closed browser) counts as closed.
+     */
     async close(): Promise<void> {
-        await this.context.close().catch(() => undefined);
+        const closed = await withTimeout(this.context.close(), CLOSE_TIMEOUT_MS);
+        if (!closed.ok && closed.timedOut) {
+            progress(`a page did not close within ${CLOSE_TIMEOUT_MS} ms; moving on`);
+        }
         await this.onClose?.();
     }
 }

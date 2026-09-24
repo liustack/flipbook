@@ -84,6 +84,68 @@ composition({ seek(t) { document.body.firstElementChild.style.left = 20 + t * 40
     });
 });
 
+/** A 320x180 composition whose index.html body is `body`. */
+function tinyComposition(body: string): string {
+    const dir = tempDir('tiny');
+    fs.writeFileSync(
+        path.join(dir, 'timeline.json'),
+        JSON.stringify({
+            version: 1,
+            width: 320,
+            height: 180,
+            fps: 12,
+            seed: 1,
+            bpm: 120,
+            beatsPerBar: 4,
+            scenes: [{ id: 'main', bars: 1 }],
+        }),
+    );
+    fs.writeFileSync(
+        path.join(dir, 'index.html'),
+        `<!doctype html><body style="margin:0;background:#fff">${body}</body>`,
+    );
+    return dir;
+}
+
+describe('protocol discovery has a time limit', () => {
+    it('gives up on a window.__flipbook getter that never returns', async () => {
+        const s = await session();
+        const dir = tinyComposition(
+            `<script>Object.defineProperty(window, '__flipbook', { get() { for (;;) {} } });</script>`,
+        );
+        const started = Date.now();
+        const report = await runCheck({
+            dir,
+            session: s,
+            readyTimeoutMs: 3000,
+            recordAttempts: false,
+        });
+        expect(Date.now() - started).toBeLessThan(30_000);
+        expect(codes(report)).toContain('ready-timeout');
+        const after = await runCheck({
+            dir: copyFixture('hello', 'examples'),
+            session: s,
+            recordAttempts: false,
+        });
+        expect(after.failures).toEqual([]);
+    }, 90_000);
+
+    it('reports a getter that throws as a finding, not a crash', async () => {
+        const s = await session();
+        const dir = tinyComposition(
+            `<script>Object.defineProperty(window, '__flipbook', { get() { throw new Error('no protocol here'); } });</script>`,
+        );
+        const report = await runCheck({
+            dir,
+            session: s,
+            readyTimeoutMs: 3000,
+            recordAttempts: false,
+        });
+        const missing = report.failures.find((f) => f.code === 'protocol-missing');
+        expect(missing?.message).toContain('no protocol here');
+    }, 60_000);
+});
+
 describe('virtual clock', () => {
     it('gives the virtual time through every native clock entry point', async () => {
         const s = await session();

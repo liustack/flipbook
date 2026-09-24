@@ -79,9 +79,9 @@ read_when:
 | `index-missing` | 全部 | 目录里没有 index.html | 建 index.html |
 | `timeline-missing` | 全部 | 目录里没有 timeline.json | 按 docs/timeline-schema.md 写 |
 | `timeline-invalid` | 全部 | timeline.json 不合 v1 schema，`detail.path` 给出 JSON 路径 | 改 `detail.path` 指的字段 |
-| `protocol-missing` | 全部 | 页面没定义 `window.__flipbook` | 调运行时库的 `composition({ seek })` |
+| `protocol-missing` | 全部 | 页面没定义 `window.__flipbook`，或读它时抛错 | 调运行时库的 `composition({ seek })` |
 | `protocol-mismatch` | 全部 | `window.__flipbook.protocol` 不是 1 | 设成 1 |
-| `ready-timeout` | 全部 | `ready` 60 秒内没结束（从开始加载页面算） | ready 里不等定时器和 rAF |
+| `ready-timeout` | 全部 | `ready` 60 秒内没结束（从开始加载页面算）。读 `window.__flipbook` 时页面不再应答（脚本或 getter 里死循环）也算在这 60 秒里，超时报这个码并关掉页面 | ready 里不等定时器和 rAF |
 | `ready-failed` | 全部 | `ready` 被拒，常见是字体或图片加载失败 | 按 message 修 |
 | `seek-timeout` | 全部 | 单次 seek 超过 10 秒（`--seek-timeout` 可改） | seek 里不等 rAF、定时器和事件 |
 | `seek-failed` | 全部 | seek 抛错 | 按 message 修 |
