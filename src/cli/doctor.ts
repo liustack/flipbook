@@ -13,6 +13,7 @@ import {
 import { cacheRoot } from '../engine/cache.ts';
 import { ALL_FEATURES, FFMPEG_INSTALL, type FfmpegStatus, probeFfmpeg } from '../engine/ffmpeg.ts';
 import { type FontStatus, fontStatus } from '../engine/fonts.ts';
+import type { PruneResult } from '../engine/prune.ts';
 import { findSkillInstalls, type SkillInstall } from '../skillPin.ts';
 import { ENV_CODES, type EnvCode } from './codes.ts';
 import { EnvError, EXIT, type ExitCode, platformId } from './report.ts';
@@ -44,6 +45,8 @@ export interface DoctorReport {
     launch: { ok: boolean; skipped: boolean; mode?: string; version?: string; error?: string };
     cache: { root: string; exists: boolean; fonts: FontStatus[] };
     skillInstalls: SkillInstall[];
+    /** Present after --prune. */
+    pruned?: PruneResult;
     problems: DoctorProblem[];
     warnings: string[];
 }
@@ -59,6 +62,8 @@ export interface DoctorDeps {
     shell?: (env: NodeJS.ProcessEnv) => HeadlessShell;
     /** Replaces the real Chromium launch (tests). */
     launch?: LaunchFn;
+    /** Result of --prune, reported as is. */
+    pruned?: PruneResult;
 }
 
 function nodeOk(version: string, minimum: string): boolean {
@@ -187,6 +192,7 @@ export async function buildDoctorReport(deps: DoctorDeps): Promise<DoctorReport>
         launch,
         cache: { root, exists: fs.existsSync(root), fonts },
         skillInstalls,
+        ...(deps.pruned ? { pruned: deps.pruned } : {}),
         problems,
         warnings,
     };
@@ -229,6 +235,12 @@ export function renderDoctorReport(report: DoctorReport): string {
         lines.push(
             `${install.outdated ? '[!!]' : '[ok]'} skill copy (${install.harness}) pins ${install.pinned ?? 'nothing'}`,
         );
+    }
+    if (report.pruned) {
+        lines.push(
+            `[ok] pruned ${report.pruned.removed.length} cache entries, ${(report.pruned.bytesFreed / 1e6).toFixed(1)} MB freed`,
+        );
+        for (const removed of report.pruned.removed) lines.push(`     removed ${removed}`);
     }
     if (report.problems.length > 0) {
         lines.push('', 'Problems:');

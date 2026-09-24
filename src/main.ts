@@ -17,6 +17,7 @@ import {
     writeJson,
 } from './cli/report.ts';
 import { parseRegion, runSnapshot } from './cli/snapshot.ts';
+import { pruneCache } from './engine/prune.ts';
 import { COMMAND_NAME } from './names.ts';
 import { appVersion } from './paths.ts';
 
@@ -126,10 +127,12 @@ program
     .command('doctor')
     .description('Offline self-check: Node, ffmpeg features, Chromium, launch, cache, skill copies')
     .option('--json', 'Emit the report as JSON')
-    .action(async (options: { json?: boolean }) => {
+    .option('--prune', 'Delete cached browsers and fonts this version does not use')
+    .action(async (options: { json?: boolean; prune?: boolean }) => {
         try {
             preflight();
-            const report = await buildDoctorReport({ version: appVersion() });
+            const pruned = options.prune ? pruneCache() : undefined;
+            const report = await buildDoctorReport({ version: appVersion(), pruned });
             process.stdout.write(
                 `${options.json ? JSON.stringify(report, null, 2) : renderDoctorReport(report)}\n`,
             );
