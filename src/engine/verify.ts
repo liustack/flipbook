@@ -90,7 +90,7 @@ export function verifyAudio(timeline: ResolvedTimeline): Finding[] {
     return [
         finding(
             'audio-skipped',
-            `audio mode "${timeline.audio.mode}" is not rendered in this version; the video is silent.`,
+            `audio mode "${timeline.audio.mode}" is not rendered in this version, so the video is silent.`,
             {
                 severity: 'warning',
                 detail: { audio: timeline.audio },
@@ -162,7 +162,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
         findings.push(
             finding(
                 'frame-count',
-                `The video has ${probe.frames} frames; the timeline has ${timeline.frameCount}.`,
+                `The video has ${probe.frames} frames, the timeline has ${timeline.frameCount}.`,
                 {
                     detail: { video: probe.frames, timeline: timeline.frameCount },
                 },
@@ -174,7 +174,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
         findings.push(
             finding(
                 'duration-mismatch',
-                `The video lasts ${probe.durationSec.toFixed(3)} s; the timeline lasts ${expected.toFixed(3)} s.`,
+                `The video lasts ${probe.durationSec.toFixed(3)} s, the timeline lasts ${expected.toFixed(3)} s.`,
                 {
                     detail: { video: probe.durationSec, timeline: expected },
                 },
@@ -186,7 +186,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
         findings.push(
             finding(
                 'color-tags',
-                `Stream reports ${probe.pixFmt} ${probe.colorSpace}/${probe.colorPrimaries}/${probe.colorTransfer}; expected yuv420p bt709.`,
+                `Stream reports ${probe.pixFmt} ${probe.colorSpace}/${probe.colorPrimaries}/${probe.colorTransfer}, expected yuv420p bt709.`,
                 {
                     detail: { ...probe },
                 },
@@ -410,7 +410,7 @@ export async function verifySoundtrack(
                 ? [
                       finding(
                           'duration-mismatch',
-                          `The audio lasts ${audio.durationSec.toFixed(3)} s; the picture lasts ${expected.toFixed(3)} s.`,
+                          `The audio lasts ${audio.durationSec.toFixed(3)} s, the picture lasts ${expected.toFixed(3)} s.`,
                           {
                               detail: { audio: audio.durationSec, video: expected, tolerance },
                           },

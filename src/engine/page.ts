@@ -353,7 +353,7 @@ export class CompositionPage {
             ];
         }
         if (ready.value.length > 0) {
-            return [finding('ready-failed', `Fonts failed to load: ${ready.value.join('; ')}`)];
+            return [finding('ready-failed', `Fonts failed to load: ${ready.value.join(', ')}`)];
         }
         return [];
     }

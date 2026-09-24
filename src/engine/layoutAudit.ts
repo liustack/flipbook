@@ -193,7 +193,7 @@ export async function auditContrast(
             out.push(
                 finding(
                     'low-contrast',
-                    `${entry.selector} has contrast ${ratio.toFixed(2)}:1 against its background (text ${hex(text)}, background ${hex(background)}); the minimum is ${MIN_CONTRAST}:1.`,
+                    `${entry.selector} has contrast ${ratio.toFixed(2)}:1 against its background (text ${hex(text)}, background ${hex(background)}). The minimum is ${MIN_CONTRAST}:1.`,
                     {
                         severity: 'warning',
                         time,

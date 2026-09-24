@@ -162,7 +162,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     rb.add(
                         finding(
                             'stage-size',
-                            `The page is ${size.width}x${size.height}; the stage is ${timeline.width}x${timeline.height}.`,
+                            `The page is laid out at ${size.width}x${size.height}, the stage is ${timeline.width}x${timeline.height}.`,
                             {
                                 severity: 'warning',
                                 detail: {

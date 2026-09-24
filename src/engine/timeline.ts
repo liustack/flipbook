@@ -259,7 +259,7 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
         if (duration > MAX_DURATION_SEC) {
             c.fail(
                 '$.scenes',
-                `add up to ${duration.toFixed(2)} s; the limit is ${MAX_DURATION_SEC} s`,
+                `add up to ${duration.toFixed(2)} s, over the ${MAX_DURATION_SEC} s limit`,
             );
         }
         if (Math.round(duration * (input.fps as number)) < 1) {

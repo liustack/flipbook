@@ -124,7 +124,7 @@ export async function buildDoctorReport(deps: DoctorDeps): Promise<DoctorReport>
             message: `Chromium headless shell ${shell.browserVersion} (r${shell.revision}) is not installed at ${shell.executable}.`,
             fix: [
                 installCommand(shell),
-                'Or run flipbook check <dir> once outside the sandbox; it installs Chromium on first use.',
+                'Or run flipbook check <dir> once outside the sandbox. It installs Chromium on first use.',
             ],
         });
     }
@@ -161,7 +161,7 @@ export async function buildDoctorReport(deps: DoctorDeps): Promise<DoctorReport>
     for (const font of fonts) {
         if (!font.present) {
             warnings.push(
-                `${font.family} is not cached yet; check and render download it on first use (network needed).`,
+                `${font.family} is not cached yet. check and render download it on first use (network needed).`,
             );
         }
     }

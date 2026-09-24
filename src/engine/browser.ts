@@ -98,7 +98,7 @@ export async function installHeadlessShell(
             `Cannot write ${shell.browsersPath} to install Chromium.`,
             [
                 installCommand(shell),
-                'Or run the same flipbook command once outside the sandbox; later runs work inside it.',
+                'Or run the same flipbook command once outside the sandbox. Later runs work inside it.',
             ],
             { browsersPath: shell.browsersPath },
         );
@@ -235,7 +235,7 @@ export async function launchBrowser(shell: HeadlessShell, launch?: LaunchFn): Pr
     } catch (error) {
         const message = String((error as Error).message);
         if (!SANDBOX_SIGNATURE.test(message)) throw launchError(message, shell, false);
-        progress('Chromium hit the host sandbox; retrying with --single-process --no-zygote');
+        progress('Chromium hit the host sandbox, retrying with --single-process --no-zygote');
         try {
             const browser = await doLaunch([...FIXED_ARGS, ...SANDBOX_ARGS]);
             preferredMode = 'single-process';

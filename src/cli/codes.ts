@@ -16,11 +16,11 @@ export const FINDING_CODES = {
     },
     'timeline-missing': {
         meaning: 'The composition directory has no timeline.json.',
-        fix: 'Create timeline.json (see docs/timeline-schema.md).',
+        fix: 'Create timeline.json as references/timeline.md describes.',
     },
     'timeline-invalid': {
         meaning: 'timeline.json does not match timeline schema v1.',
-        fix: 'Fix the field named in `detail.path`; the message says what it must be.',
+        fix: 'Fix the field named in `detail.path` as the message says.',
     },
     'protocol-missing': {
         meaning: 'The page never defined window.__flipbook.',
@@ -32,15 +32,15 @@ export const FINDING_CODES = {
     },
     'ready-timeout': {
         meaning: 'window.__flipbook.ready did not settle in time.',
-        fix: 'Make ready resolve without waiting on setTimeout, setInterval or requestAnimationFrame; the renderer holds virtual time still until ready settles.',
+        fix: 'Make ready resolve without waiting on setTimeout, setInterval or requestAnimationFrame.',
     },
     'ready-failed': {
         meaning: 'window.__flipbook.ready rejected.',
-        fix: 'Fix the error in `message`; a font or image that fails to load rejects ready.',
+        fix: 'Fix the error in `message`. A font or image that fails to load rejects ready.',
     },
     'seek-timeout': {
         meaning: 'seek(t) did not finish within the time limit.',
-        fix: 'Do not await requestAnimationFrame, setTimeout or events inside seek; draw synchronously from t, or await only promises that settle on their own.',
+        fix: 'Do not await requestAnimationFrame, setTimeout or events inside seek. Draw from t and return.',
     },
     'seek-failed': {
         meaning: 'seek(t) threw or rejected.',
@@ -48,7 +48,7 @@ export const FINDING_CODES = {
     },
     'page-error': {
         meaning: 'The page threw an uncaught exception.',
-        fix: 'Fix the exception in `message`; content that fails to draw leaves only the paper layer.',
+        fix: 'Fix the exception in `message`.',
     },
     'console-error': {
         meaning: 'The page logged an error to the console.',
@@ -56,14 +56,14 @@ export const FINDING_CODES = {
     },
     'resource-failed': {
         meaning: 'A file the page requested does not exist in the composition directory.',
-        fix: 'Add the file under the composition directory or fix its path; put images in assets/.',
+        fix: 'Add the file under the composition directory or fix its path. Put images in assets/.',
     },
     'external-request': {
-        meaning: 'The page tried to reach the network; the request was blocked.',
+        meaning: 'The page tried to reach the network and the request was blocked.',
         fix: 'Copy the file into assets/ and load it by relative path. Fonts come from /__flipbook/fonts/.',
     },
     'path-escape': {
-        meaning: 'The page requested a file outside the composition directory; it was refused.',
+        meaning: 'The page requested a file outside the composition directory and it was refused.',
         fix: 'Keep every file the page loads inside the composition directory.',
     },
     'static-forbidden': {
@@ -72,12 +72,12 @@ export const FINDING_CODES = {
     },
     'seek-order-dependent': {
         meaning: 'The same t renders differently depending on which frames were drawn before it.',
-        fix: 'Remove state carried between frames (counters, positions updated per frame, appended DOM). Compute everything from t; bake simulations into a lookup table in setup.',
+        fix: 'Remove state carried between frames (counters, positions updated per frame, appended DOM). Compute everything from t. Bake simulations into a lookup table in setup.',
     },
     'clock-dependent': {
         meaning:
             'The frame changes when the wall clock origin changes: the page reads Date or performance.now.',
-        fix: 'Drive every change from the t passed to seek; never read Date.now, new Date() or performance.now.',
+        fix: 'Drive every change from the t passed to seek. Never read Date.now, new Date() or performance.now.',
     },
     'random-dependent': {
         meaning:
@@ -87,7 +87,7 @@ export const FINDING_CODES = {
     'late-paint': {
         meaning:
             'Two captures of the same t without a seek in between differ: something paints after seek returns.',
-        fix: 'Finish drawing inside seek; await image decode in ready, not in seek; do not start work that lands on a later frame.',
+        fix: 'Finish drawing inside seek. Decode images in ready, not in seek. Do not start work that lands on a later frame.',
     },
     'blank-frame': {
         meaning: 'Frames are a single flat color: nothing was drawn.',
@@ -95,7 +95,7 @@ export const FINDING_CODES = {
     },
     'paper-only': {
         meaning: 'Frames match the paper layer alone: the content layer drew nothing.',
-        fix: 'Check that seek draws content at these times; a script error often leaves only the paper.',
+        fix: 'Check that seek draws content at these times and that no script error stopped it.',
     },
     'missing-glyph': {
         meaning: 'Text uses characters that no flipbook font covers.',
@@ -103,7 +103,7 @@ export const FINDING_CODES = {
     },
     'font-fallback': {
         meaning: 'Text rendered with a system font instead of a flipbook font.',
-        fix: 'Set font-family to "Noto Serif SC" or "LXGW WenKai" (served from /__flipbook/fonts/); system fonts differ between machines.',
+        fix: 'Set font-family to "Noto Serif SC" or "LXGW WenKai", the fonts flipbook serves.',
     },
     'text-offstage': {
         meaning: 'A line of text runs past the edge of the frame at the moment it settles.',
@@ -140,7 +140,7 @@ export const FINDING_CODES = {
     },
     'color-tags': {
         meaning: 'The video is missing yuv420p or bt709 color tags.',
-        fix: 'Report it with this JSON; the ffmpeg build may be ignoring color options.',
+        fix: 'Report it with this JSON and the output of ffmpeg -version.',
     },
     'audio-skipped': {
         meaning: 'timeline.json asks for audio, which this version does not render yet.',
@@ -168,11 +168,11 @@ export const ENV_CODES = {
     },
     'ffmpeg-missing': {
         meaning: 'ffmpeg or ffprobe is not on PATH.',
-        fix: 'Install ffmpeg (macOS: brew install ffmpeg; Debian/Ubuntu: sudo apt-get install -y ffmpeg).',
+        fix: 'Install ffmpeg. macOS: brew install ffmpeg. Debian or Ubuntu: sudo apt-get install -y ffmpeg.',
     },
     'ffmpeg-feature-missing': {
         meaning: 'ffmpeg lacks a required encoder or filter.',
-        fix: 'Install a full ffmpeg build with libx264 (macOS: brew install ffmpeg; Debian/Ubuntu: sudo apt-get install -y ffmpeg).',
+        fix: 'Install a full ffmpeg build with libx264. macOS: brew install ffmpeg. Debian or Ubuntu: sudo apt-get install -y ffmpeg.',
     },
     'chromium-missing': {
         meaning: 'The pinned Chromium headless shell is not installed.',
@@ -184,7 +184,7 @@ export const ENV_CODES = {
     },
     'browser-launch-failed': {
         meaning: 'Chromium was installed but did not start.',
-        fix: 'Read `detail.log`; on Linux install the system libraries with the command in `fix`.',
+        fix: 'Read `detail.log`. On Linux, install the system libraries with the command in `fix`.',
     },
     'sandbox-blocked': {
         meaning: 'The host sandbox stopped Chromium from starting, even in single-process mode.',
