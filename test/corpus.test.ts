@@ -89,5 +89,25 @@ describe('bad composition corpus', () => {
         expect(codes(checked)).toContain('seek-timeout');
     });
 
+    it('text past the frame edge, in the margin, and a marked bleed', async () => {
+        const checked = await check('offstage');
+        const cut = checked.failures
+            .filter((f) => f.code === 'text-offstage')
+            .map((f) => f.element);
+        expect(cut).toEqual(['#cut']);
+        const margin = checked.warnings
+            .filter((f) => f.code === 'text-safe-area')
+            .map((f) => f.element);
+        expect(margin).toEqual(['#edge']);
+    });
+
+    it('low contrast text is measured in pixels', async () => {
+        const checked = await check('low-contrast');
+        const low = checked.warnings.filter((f) => f.code === 'low-contrast');
+        expect(low.map((f) => f.element)).toEqual(['#pale']);
+        expect(low[0].detail?.ratio as number).toBeLessThan(3);
+        expect(checked.failures).toEqual([]);
+    });
+
     it.todo('audio out of sync with its sfx cue (v0.3, needs the audio command)');
 });

@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+  p { position: absolute; margin: 0; font: 400 36px/1.2 "Noto Serif SC"; white-space: nowrap; color: #222; }
+  #pale { left: 60px; top: 60px; color: #d8d8d8; }
+  #strong { left: 60px; top: 160px; }
+</style>
+</head>
+<body>
+<p id="pale">Pale words 浅色文字</p>
+<p id="strong">Strong words 深色文字</p>
+<canvas id="ink"></canvas>
+<script type="module">
+import { composition, setupCanvas } from '/__flipbook/runtime.js';
+const ink = setupCanvas(document.getElementById('ink'), 640, 360);
+composition({
+  seek(t) {
+    ink.clearRect(0, 0, 640, 360);
+    ink.fillStyle = '#2a6f97';
+    ink.fillRect(200 + t * 40, 300, 40, 40);
+  },
+});
+</script>
+</body>
+</html>

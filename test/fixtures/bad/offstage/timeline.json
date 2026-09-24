@@ -1,0 +1,28 @@
+{
+    "version": 1,
+    "width": 640,
+    "height": 360,
+    "fps": 12,
+    "seed": 7,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [
+        {
+            "id": "main",
+            "bars": 2
+        }
+    ],
+    "cues": [
+        {
+            "id": "cut",
+            "scene": "main",
+            "beat": 1,
+            "kind": "text",
+            "text": "Cut off text",
+            "settleBeats": 1
+        }
+    ],
+    "audio": {
+        "mode": "none"
+    }
+}

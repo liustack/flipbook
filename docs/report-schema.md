@@ -98,6 +98,9 @@ read_when:
 | `paper-only` | check、render | 画面和只开纸底层的基线一样：缩到 320×180 灰度后，和最近一张基线相差超过 16 灰阶的像素不到 0.05%。check 和 render 的判定规则同 `blank-frame`。render 每秒截一张基线 | 查内容层是否因报错没画 |
 | `missing-glyph` | check、render | 文字里有 flipbook 字体都没有的字，`detail.chars` 列出 | 换掉这些字 |
 | `font-fallback` | check、render | 文字用了系统字体而不是 flipbook 字体 | font-family 用 "Noto Serif SC" 或 "LXGW WenKai" |
+| `text-offstage` | check | 文字完全出来的时刻（cue 的 settle 时刻），有一行越过画面边缘。每一行用 `Range.getClientRects` 取框，已含 transform | 把字挪进画面或缩小，故意出画的字加 `data-flipbook-allow-overflow` |
+| `text-safe-area` | check | 同一时刻，有一行落进画面外沿 5% 的边距里，只报 warning | 离四边至少留宽高的 5%，或加 `data-flipbook-allow-overflow` |
+| `low-contrast` | check | 同一时刻，文字和背后画面的对比度低于 3:1（大字标准），只报 warning。量法：同一帧截两张，第二张把 DOM 文字设成透明，变了的像素就是字形，字色取变化最大的三成像素在第一张里的均值，背景取同一批像素在第二张里的均值，按 WCAG 相对亮度算比值。Canvas 里画的字不量 | 加深或调亮文字或背景，或在字下垫一块实色底 |
 | `stage-size` | check | 页面内容比 timeline 的宽高大，只报 warning | 舞台按 timeline 尺寸写，隐藏溢出 |
 | `freeze` | render | 没声明 hold 的场景里画面 1.5 秒以上不动：成片缩到 320×180、高斯模糊（sigma 1.5）后用 ffmpeg freezedetect（`n=-60dB`）判定，只算落在没声明 hold 的场景里的部分 | 让画面动起来，或给场景加 `"hold": true` |
 | `glitch` | render | 成片均匀抽 8 帧解码，和截图原帧在 480×270 上比 PSNR，低于 30 dB 就报。送帧管道断了也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
@@ -107,6 +110,8 @@ read_when:
 | `audio-skipped` | render | timeline 要求配乐，这一版还不渲染声音，只报 warning | 把 audio 设成 `{ "mode": "none" }`，或成片后自己配乐 |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
+
+文字类检查（`missing-glyph`、`font-fallback`、`text-offstage`、`text-safe-area`、`low-contrast`）在 timeline 里每个文字 cue 的 settle 时刻取样，没有文字 cue 时取三个抽样帧。带 `data-flipbook-allow-overflow` 的元素及其子元素不做 `text-offstage` 和 `text-safe-area` 检查，运行时库 `registerText` 登记的 canvas 文字可以传 `allowOverflow: true`。
 
 `blank-frame` 和 `paper-only` 在 check 里只看抽样帧：全部抽样帧都空才是 error，部分为空报 warning。在 render 里逐帧看，连续超过 1.5 秒才报 error。
 

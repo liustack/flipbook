@@ -57,12 +57,24 @@ export interface OpenOptions {
     onClose?: () => Promise<void>;
 }
 
+export interface Rect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 export interface DomText {
     key: string;
     text: string;
     family: string;
     selector: string;
-    box: { x: number; y: number; width: number; height: number };
+    /** Union of the line boxes. */
+    box: Rect;
+    /** One box per rendered line (Range.getClientRects), transforms included. */
+    lines: Rect[];
+    /** The element or an ancestor carries data-flipbook-allow-overflow. */
+    allowOverflow: boolean;
 }
 
 export interface PlatformFont {
@@ -403,6 +415,13 @@ export class CompositionPage {
         return Buffer.from(data, 'base64');
     }
 
+    /** Make DOM text transparent (false) or restore it (true); backgrounds stay. */
+    async setTextVisible(visible: boolean): Promise<void> {
+        await this.page.evaluate((on) => {
+            (window as unknown as { __flipbookHost: HostApi }).__flipbookHost.setTextVisible(on);
+        }, visible);
+    }
+
     async setContent(visible: boolean): Promise<void> {
         await this.page.evaluate((on) => {
             (window as unknown as { __flipbookHost: HostApi }).__flipbookHost.setContent(on);
@@ -419,12 +438,15 @@ export class CompositionPage {
     /** Visible DOM text nodes with their boxes; tags each parent element for CDP lookups. */
     async domTexts(): Promise<DomText[]> {
         return this.page.evaluate(() => {
+            type Box = { x: number; y: number; width: number; height: number };
             const out: {
                 key: string;
                 text: string;
                 family: string;
                 selector: string;
-                box: { x: number; y: number; width: number; height: number };
+                box: Box;
+                lines: Box[];
+                allowOverflow: boolean;
             }[] = [];
             const describe = (el: Element): string => {
                 if (el.id) return `#${el.id}`;
@@ -469,6 +491,13 @@ export class CompositionPage {
                     family: getComputedStyle(el).fontFamily,
                     selector: describe(el),
                     box: { x: left, y: top, width: right - left, height: bottom - top },
+                    lines: rects.map((r) => ({
+                        x: r.left,
+                        y: r.top,
+                        width: r.width,
+                        height: r.height,
+                    })),
+                    allowOverflow: el.closest('[data-flipbook-allow-overflow]') !== null,
                 });
             }
             return out;

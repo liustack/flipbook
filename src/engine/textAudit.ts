@@ -1,6 +1,6 @@
 import { type Finding, finding } from '../cli/report.ts';
 import { fontIdForFamily, uncoveredChars } from './fonts.ts';
-import type { CompositionPage } from './page.ts';
+import type { CompositionPage, DomText } from './page.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
 
 /** Glyph coverage of the text cues in timeline.json; needs no browser. */
@@ -46,10 +46,14 @@ function firstFamily(fontShorthand: string): string {
  * text and registered canvas text against the font tables, and the fonts
  * Chromium actually used for DOM text.
  */
-export async function auditFrameText(page: CompositionPage, frame: number): Promise<Finding[]> {
+export async function auditFrameText(
+    page: CompositionPage,
+    frame: number,
+    domTexts?: DomText[],
+): Promise<Finding[]> {
     const out: Finding[] = [];
     const time = frame / page.timeline.fps;
-    const dom = await page.domTexts();
+    const dom = domTexts ?? (await page.domTexts());
     const used = dom.length > 0 ? await page.platformFonts() : new Map();
     for (const entry of dom) {
         const missing = uncoveredChars(entry.text);

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { recordCheck } from '../engine/attempts.ts';
+import { auditContrast, auditSafeArea } from '../engine/layoutAudit.ts';
 import { type ClockConfig, defaultClock } from '../engine/page.ts';
 import { decodeGray, isFlat, matchesBaseline, writeSequence } from '../engine/pixels.ts';
 import { scanComposition } from '../engine/scan.ts';
@@ -254,7 +255,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     ),
                 );
             }
-            // Glyphs and fonts at the moments text cues settle (or at sampled frames).
+            // Text at the moments text cues settle (or at sampled frames): glyphs, fonts, safe area, contrast.
             const textFrames = [
                 ...new Set(
                     timeline.cues.filter((c) => c.kind === 'text').map((c) => c.settleFrame),
@@ -271,7 +272,23 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     usable = false;
                     break;
                 }
-                dynamic.push(...(await auditFrameText(page, frame)));
+                const shown = await page.capture();
+                const texts = await page.domTexts();
+                dynamic.push(...(await auditFrameText(page, frame, texts)));
+                dynamic.push(
+                    ...auditSafeArea(timeline, frame, texts, await page.registeredTexts()),
+                );
+                dynamic.push(
+                    ...(await auditContrast(
+                        page,
+                        frame,
+                        texts,
+                        shown,
+                        session.ffmpeg.ffmpeg,
+                        freshDir(path.join(workDir(dir), 'check', 'contrast')),
+                        evidenceDir,
+                    )),
+                );
             }
         } finally {
             rb.addAll(page.issues);

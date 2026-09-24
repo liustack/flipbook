@@ -23,6 +23,8 @@ export interface RegisteredText {
     text: string;
     font: string;
     box: { x: number; y: number; width: number; height: number };
+    /** Exempt from the safe-area checks, like data-flipbook-allow-overflow. */
+    allowOverflow?: boolean;
 }
 
 export interface HostApi {
@@ -32,6 +34,7 @@ export interface HostApi {
     advance(ms: number): void;
     syncAnimations(): void;
     setContent(visible: boolean): void;
+    setTextVisible(visible: boolean): void;
     texts: RegisteredText[];
     registerText(entry: RegisteredText): void;
 }
@@ -213,6 +216,24 @@ export function installHost(config: HostConfig): void {
             else document.documentElement.setAttribute(attr, 'off');
         },
         texts: [],
+        setTextVisible(visible: boolean) {
+            const attr = 'data-flipbook-textlayer';
+            if (!document.getElementById('__flipbook-text-style')) {
+                const style = document.createElement('style');
+                style.id = '__flipbook-text-style';
+                style.textContent =
+                    `html[${attr}="off"] body * { color: transparent !important;` +
+                    ' -webkit-text-fill-color: transparent !important;' +
+                    ' -webkit-text-stroke-color: transparent !important;' +
+                    ' text-shadow: none !important; text-decoration-color: transparent !important;' +
+                    ' caret-color: transparent !important; }' +
+                    `html[${attr}="off"] body svg text, html[${attr}="off"] body svg tspan` +
+                    ' { fill: transparent !important; stroke: transparent !important; }';
+                (document.head ?? document.documentElement).appendChild(style);
+            }
+            if (visible) document.documentElement.removeAttribute(attr);
+            else document.documentElement.setAttribute(attr, 'off');
+        },
         registerText(entry: RegisteredText) {
             api.texts.push(entry);
         },

@@ -13,6 +13,8 @@ export interface TextEntry {
     /** CSS font shorthand the text was drawn with. */
     font: string;
     box: TextBox;
+    /** Exempt from the frame-edge and safe-area checks. */
+    allowOverflow?: boolean;
 }
 
 /**
@@ -26,6 +28,8 @@ export function registerText(entry: TextEntry): void {
 export interface FillTextOptions {
     id?: string;
     maxWidth?: number;
+    /** Exempt from the frame-edge and safe-area checks. */
+    allowOverflow?: boolean;
 }
 
 /**
@@ -56,6 +60,12 @@ export function fillText(
         width: (width * transform.a) / dpr,
         height: (height * transform.d) / dpr,
     };
-    registerText({ id: options.id, text, font: ctx.font, box });
+    registerText({
+        id: options.id,
+        text,
+        font: ctx.font,
+        box,
+        allowOverflow: options.allowOverflow,
+    });
     return box;
 }

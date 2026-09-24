@@ -105,6 +105,18 @@ export const FINDING_CODES = {
         meaning: 'Text rendered with a system font instead of a flipbook font.',
         fix: 'Set font-family to "Noto Serif SC" or "LXGW WenKai" (served from /__flipbook/fonts/); system fonts differ between machines.',
     },
+    'text-offstage': {
+        meaning: 'A line of text runs past the edge of the frame at the moment it settles.',
+        fix: 'Move or shrink the text so every line sits inside the frame, or mark a deliberate bleed with data-flipbook-allow-overflow.',
+    },
+    'text-safe-area': {
+        meaning: 'A line of text reaches into the outer 5% margin of the frame.',
+        fix: 'Keep text at least 5% of the width and height away from the edges, or mark it with data-flipbook-allow-overflow.',
+    },
+    'low-contrast': {
+        meaning: 'Text contrast against what is drawn behind it is below 3:1.',
+        fix: 'Darken or lighten the text or its background, or add a solid panel behind it, until the contrast reaches 3:1.',
+    },
     'stage-size': {
         meaning: 'The page content is larger than the stage size from timeline.json.',
         fix: 'Size the stage to timeline width and height and hide overflow on html and body.',
