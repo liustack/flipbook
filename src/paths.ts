@@ -29,8 +29,13 @@ export function packageRoot(): string {
     }
 }
 
-/** Built browser runtime files served under /__flipbook/. */
+/**
+ * Built browser runtime files served under /__flipbook/: the runtime/ folder
+ * beside the running bundle, or dist/runtime/ when running from source.
+ */
 export function runtimeFile(name: 'runtime.js' | 'audio.js'): string {
+    const beside = path.join(path.dirname(fileURLToPath(import.meta.url)), 'runtime', name);
+    if (fs.existsSync(beside)) return beside;
     return path.join(packageRoot(), 'dist', 'runtime', name);
 }
 
