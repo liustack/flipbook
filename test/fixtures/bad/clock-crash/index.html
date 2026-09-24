@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="ink"></canvas>
+<script type="module">
+import { composition, setupCanvas } from '/__flipbook/runtime.js';
+const ink = setupCanvas(document.getElementById('ink'), 640, 360);
+// Fine on the first day of a month, broken on any other day.
+const firstOfMonth = () => new Date().getUTCDate() === 1;
+if (!firstOfMonth()) fetch('https://example.com/beacon').catch(() => undefined);
+composition({
+  seek(t) {
+    if (!firstOfMonth()) throw new Error('only draws on the first of the month');
+    ink.clearRect(0, 0, 640, 360);
+    ink.fillStyle = '#2a6f97';
+    ink.fillRect(40 + t * 100, 140, 80, 80);
+  },
+});
+</script>
+</body>
+</html>

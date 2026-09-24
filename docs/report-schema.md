@@ -113,6 +113,8 @@ read_when:
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 
+`clock-dependent` 和 `random-dependent` 各开一个新页面，把虚拟时钟起点推后约 34 小时或换掉随机底层种子，再取三帧和基准比。扰动页上出的任何问题（加载失败、协议、`seek-failed`、`seek-timeout`、`external-request`、`page-error` 等）只要基准页上没有，就照原类型码报成失败，`message` 末尾写明是在哪种扰动下出现的，`detail.perturbation` 给出扰动条件（`change` 为 `clock` 或 `random seed`，以及偏移量或种子）。
+
 文字类检查（`missing-glyph`、`font-fallback`、`text-offstage`、`text-safe-area`、`low-contrast`）在 timeline 里每个文字 cue 的 settle 时刻取样，没有文字 cue 时取三个抽样帧。带 `data-flipbook-allow-overflow` 的元素及其子元素不做 `text-offstage` 和 `text-safe-area` 检查，运行时库 `registerText` 登记的 canvas 文字可以传 `allowOverflow: true`。
 
 `blank-frame` 和 `paper-only` 在 check 里只看抽样帧：全部抽样帧都空才是 error，部分为空报 warning。在 render 里逐帧看，没有内容的画面（两类合起来）连续超过 1.5 秒才报 error。

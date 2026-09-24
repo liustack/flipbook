@@ -101,6 +101,16 @@ describe('bad composition corpus', () => {
         expect(codes(await check('clock'))).toContain('clock-dependent');
     });
 
+    it('fails only under the shifted clock: every perturbed failure counts', async () => {
+        const checked = await check('clock-crash');
+        const seek = checked.failures.find((f) => f.code === 'seek-failed');
+        expect(seek?.detail?.perturbation).toMatchObject({ change: 'clock' });
+        expect(seek?.message).toContain('only draws on the first of the month');
+        const network = checked.failures.find((f) => f.code === 'external-request');
+        expect(network?.detail?.perturbation).toMatchObject({ change: 'clock' });
+        expect(checked.exitCode).toBe(1);
+    });
+
     it('random: drawing from Math.random', async () => {
         const checked = await check('random');
         expect(codes(checked)).toContain('random-dependent');

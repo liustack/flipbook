@@ -12,7 +12,7 @@ import {
     outputLinksFinding,
     type Session,
 } from '../engine/session.ts';
-import { auditCueText, auditFrameText, dedupe } from '../engine/textAudit.ts';
+import { auditCueText, auditFrameText, dedupe, findingKey } from '../engine/textAudit.ts';
 import { loadTimeline } from '../engine/timeline.ts';
 import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
 import { compositionHash, sha256, Workspace } from '../engine/workspace.ts';
@@ -70,6 +70,12 @@ function different<T>(a: T[], b: T[]): boolean {
     return a.some((value, i) => value !== b[i]);
 }
 
+/** Frames from a page under a changed clock or seed, and everything that went wrong there. */
+interface PerturbedRun {
+    shots: Map<number, Buffer>;
+    findings: Finding[];
+}
+
 async function perturbed(
     session: Session,
     dir: string,
@@ -79,7 +85,7 @@ async function perturbed(
     readyTimeoutMs: number | undefined,
     seekTimeoutMs: number | undefined,
     env: NodeJS.ProcessEnv | undefined,
-): Promise<Map<number, Buffer> | null> {
+): Promise<PerturbedRun> {
     const { page, findings } = await openPage(session, {
         dir,
         timeline,
@@ -87,15 +93,20 @@ async function perturbed(
         readyTimeoutMs,
         env,
     });
+    const run: PerturbedRun = { shots: new Map(), findings: [...findings] };
     try {
-        if (findings.length > 0 || page.broken) return null;
-        const shots = new Map<number, Buffer>();
+        if (findings.length > 0 || page.broken) return run;
         for (const frame of frames) {
-            if (await page.seek(frame, seekTimeoutMs)) return null;
-            shots.set(frame, await page.capture());
+            const failed = await page.seek(frame, seekTimeoutMs);
+            if (failed) {
+                run.findings.push(failed);
+                break;
+            }
+            run.shots.set(frame, await page.capture());
         }
-        return shots;
+        return run;
     } finally {
+        run.findings.push(...page.issues);
         await page.close();
     }
 }
@@ -145,6 +156,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
     rb.report.environment.chromium = session.chromium;
     rb.report.environment.ffmpeg = session.ffmpeg.version ?? undefined;
     try {
+        const dynamic: Finding[] = [];
         progress(`check: loading ${path.join(dir, 'index.html')}`);
         const { page, findings: loadFindings } = await openPage(session, {
             dir,
@@ -152,14 +164,13 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
             readyTimeoutMs: options.readyTimeoutMs,
             env: options.env,
         });
-        rb.addAll(loadFindings);
+        dynamic.push(...loadFindings);
         const frames = sampleFrames(timeline.frameCount, options.samples ?? 8, seed);
         const first = shuffle(frames, seed);
         let second = shuffle(frames, seed + 1);
         if (!different(first, second)) second = [...first].reverse();
         const shots = new Map<number, Buffer>();
         const baselines = new Map<number, Buffer>();
-        const dynamic: Finding[] = [];
         let usable = !page.broken && loadFindings.length === 0;
         try {
             if (usable) {
@@ -298,7 +309,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                 );
             }
         } finally {
-            rb.addAll(page.issues);
+            dynamic.push(...page.issues);
             await page.close();
         }
 
@@ -306,21 +317,36 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
         const probe = first.slice(0, Math.min(3, first.length));
         if (usable && probe.length > 0) {
             const base = defaultClock(timeline);
-            const variants: { code: 'clock-dependent' | 'random-dependent'; clock: ClockConfig }[] =
-                [
-                    {
-                        code: 'clock-dependent',
-                        clock: {
-                            ...base,
-                            epochMs: base.epochMs + CLOCK_SHIFT.epochMs,
-                            perfOriginMs: base.perfOriginMs + CLOCK_SHIFT.perfOriginMs,
-                        },
+            const variants: {
+                code: 'clock-dependent' | 'random-dependent';
+                clock: ClockConfig;
+                condition: Record<string, unknown>;
+                label: string;
+            }[] = [
+                {
+                    code: 'clock-dependent',
+                    clock: {
+                        ...base,
+                        epochMs: base.epochMs + CLOCK_SHIFT.epochMs,
+                        perfOriginMs: base.perfOriginMs + CLOCK_SHIFT.perfOriginMs,
                     },
-                    {
-                        code: 'random-dependent',
-                        clock: { ...base, randomSeed: (base.randomSeed ^ RANDOM_SHIFT) >>> 0 },
+                    condition: {
+                        change: 'clock',
+                        epochShiftMs: CLOCK_SHIFT.epochMs,
+                        perfShiftMs: CLOCK_SHIFT.perfOriginMs,
                     },
-                ];
+                    label: `the clock moved ${(CLOCK_SHIFT.epochMs / 3_600_000).toFixed(1)} hours later`,
+                },
+                {
+                    code: 'random-dependent',
+                    clock: { ...base, randomSeed: (base.randomSeed ^ RANDOM_SHIFT) >>> 0 },
+                    condition: {
+                        change: 'random seed',
+                        randomSeed: (base.randomSeed ^ RANDOM_SHIFT) >>> 0,
+                    },
+                    label: 'a different random seed underneath',
+                },
+            ];
             for (const variant of variants) {
                 progress(
                     `check: ${variant.code === 'clock-dependent' ? 'shifted clock' : 'shifted random seed'}`,
@@ -335,10 +361,21 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     options.seekTimeoutMs,
                     options.env,
                 );
-                if (!result) continue;
+                // A failure the base page did not have is a failure of this check too.
+                const known = new Set(dynamic.map(findingKey));
+                for (const item of result.findings) {
+                    if (known.has(findingKey(item))) continue;
+                    dynamic.push({
+                        ...item,
+                        message: `${item.message} This happens only with ${variant.label}.`,
+                        detail: { ...item.detail, perturbation: variant.condition },
+                    });
+                }
                 const changed = probe.filter(
                     (frame) =>
-                        sha256(result.get(frame) as Buffer) !== sha256(shots.get(frame) as Buffer),
+                        result.shots.has(frame) &&
+                        sha256(result.shots.get(frame) as Buffer) !==
+                            sha256(shots.get(frame) as Buffer),
                 );
                 if (changed.length > 0) {
                     const frame = changed[0];
@@ -347,7 +384,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                         path.join(evidenceDir, `${variant.code}-f${frame}-shifted.png`),
                     ];
                     ws.writeFile(files[0], shots.get(frame) as Buffer);
-                    ws.writeFile(files[1], result.get(frame) as Buffer);
+                    ws.writeFile(files[1], result.shots.get(frame) as Buffer);
                     dynamic.push(
                         finding(
                             variant.code,
@@ -358,7 +395,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                                 time: frame / timeline.fps,
                                 frame,
                                 evidence: files,
-                                detail: { frames: changed },
+                                detail: { frames: changed, perturbation: variant.condition },
                             },
                         ),
                     );

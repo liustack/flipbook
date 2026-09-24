@@ -130,12 +130,17 @@ export async function auditFrameText(
     return out;
 }
 
+/** What makes two findings the same problem: code, element, and the characters or message. */
+export function findingKey(item: Finding): string {
+    return `${item.code}|${item.element ?? ''}|${JSON.stringify(item.detail?.chars ?? item.message)}`;
+}
+
 /** Drop repeats of the same problem on the same element, keeping the earliest. */
 export function dedupe(findings: Finding[]): Finding[] {
     const seen = new Set<string>();
     const out: Finding[] = [];
     for (const item of findings) {
-        const key = `${item.code}|${item.element ?? ''}|${JSON.stringify(item.detail?.chars ?? item.message)}`;
+        const key = findingKey(item);
         if (seen.has(key)) continue;
         seen.add(key);
         out.push(item);
