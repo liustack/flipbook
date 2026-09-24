@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>eggs-five: 书</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #cfbd9f; }
+  canvas { position: absolute; left: 0; top: 0; }
+  #title { position: absolute; left: 0; top: 452px; width: 1920px; margin: 0; text-align: center;
+           font: 600 120px/1.2 "Noto Serif SC"; color: #1d1813; letter-spacing: 8px; opacity: 0; }
+</style>
+</head>
+<body>
+<canvas id="eggs"></canvas>
+<h1 id="title">鸟蛋之书</h1>
+<script type="module">
+import { film } from './film.js';
+
+await film({
+  glyph: '书',
+  font: '400 100px "LXGW WenKai"',
+  grow: 16,
+  box: { x: 510, y: 80, width: 900, height: 920 },
+});
+</script>
+</body>
+</html>
