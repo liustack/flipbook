@@ -1,6 +1,89 @@
 ---
 name: flipbook
-description: 占位。flipbook 把 HTML 合成逐帧渲染成 mp4 并自动验收，完整流程随 v0.1 补上。
+description: "Make short animated videos as MP4: motion graphics, explainers, animated titles, data stories, kinetic text, beat-synced clips. You write one HTML composition plus timeline.json, flipbook renders it frame by frame and checks the result before delivery. Use when the user asks for a video, an animation exported to MP4, or a clip built with HTML, CSS, canvas or SVG. Hard rules: the picture is a pure function of t (no CSS animation or transition, timers, requestAnimationFrame, Date.now, performance.now, unseeded Math.random, network), text uses only the fonts \"Noto Serif SC\" and \"LXGW WenKai\", every command runs through this skill's scripts/run.sh, and a video is delivered only after flipbook render exits 0."
+compatibility: "Node 22.19+ (or Bun) and ffmpeg with libx264. macOS arm64 or Linux x64, Windows through WSL2. The first check or render downloads Chromium (about 95 MB) and two fonts (about 50 MB)."
 ---
 
-占位文件，v0.1 补全流程、默认值、硬规矩和 references 索引。
+# flipbook
+
+Use it to turn a video request into a verified MP4. Do not use it for editing real footage, 3D characters, voice-over, or AI-generated video.
+
+## Run it
+
+Every command goes through the launcher next to this file. Replace `<skill-dir>` with the directory this SKILL.md lives in:
+
+```bash
+bash <skill-dir>/scripts/run.sh doctor                          # can this machine render?
+bash <skill-dir>/scripts/run.sh check <dir>                     # test the composition
+bash <skill-dir>/scripts/run.sh snapshot <dir>                  # contact sheet of frames
+bash <skill-dir>/scripts/run.sh snapshot <dir> --zoom x,y,w,h --at 3.5
+bash <skill-dir>/scripts/run.sh render <dir>                    # MP4 plus acceptance checks
+```
+
+`<dir>` is the composition directory. stdout carries one JSON report, progress goes to stderr, and each report is also saved to `<dir>/.flipbook/reports/<command>.json`.
+
+| Exit | Meaning | Do |
+|---|---|---|
+| 0 | passed | continue |
+| 1 | the composition has problems | fix every code in `failures`, see `references/troubleshooting.md` |
+| 2 | the command is wrong | fix the command |
+| 78 | the machine is missing something | relay `fix` from the JSON on stderr to the user, leave the composition alone |
+
+If scripts cannot run, use the first line that works (the pinned version is 0.1.0):
+
+1. A `flipbook` on PATH with the same major.minor as 0.1.0 and at least 0.1.0: `flipbook <args>`.
+2. `npx --yes --package @liustack/flipbook@0.1.0 flipbook <args>`.
+3. `bunx --bun @liustack/flipbook@0.1.0 <args>`.
+4. None: tell the user to install Node 22.19+ from https://nodejs.org.
+
+## Sandbox
+
+- Chromium runs inside the Claude Code sandbox on its own.
+- The first check or render downloads Chromium and fonts into `~/Library/Caches/liustack/flipbook` (macOS) or `~/.cache/liustack/flipbook` (Linux). Inside a sandbox this exits 78 with `cache-unwritable`: run that one command outside the sandbox after the user approves. Later runs work inside it.
+- Two lasting settings the user can add to `~/.claude/settings.json`: the cache directory in `sandbox.filesystem.allowWrite`, or the launcher command in `sandbox.excludedCommands`.
+- Exit 78 with `sandbox-blocked`: relay its `fix` lines.
+
+## The six steps
+
+1. **Spec.** Settle size, duration, frame rate, look, text and music. Use the defaults for anything the user did not say.
+2. **timeline.json.** Scenes in bars, text and marker cues in beats. Read `references/timeline.md` before writing the first one.
+3. **index.html.** One composition that calls `composition({ setup, seek })` from `/__flipbook/runtime.js`. Read `references/rules.md` before writing the first one.
+4. **Check and look.** Run `check`, fix every failure, repeat until it exits 0. Then run `snapshot`, open `out/snapshot/contact-sheet.png` and fix what looks wrong. Rerun `check` after every edit.
+5. **Render.** Run `render`. Exit 1 means the finished video failed acceptance: fix the codes and go back to step 4.
+6. **Deliver.** Open `out/contact-sheet.png`, confirm it shows what the user asked for, then give the user `out/video.mp4` and the contact sheet path.
+
+Defaults:
+
+| Setting | Default |
+|---|---|
+| size | 1920×1080 (16:9) |
+| frame rate | 24 fps |
+| duration | about 30 s, within 5% of what the user asked, at most 180 s |
+| look | warm paper background, dark ink, one or two accent colors, serif type |
+| music | none (`"audio": { "mode": "none" }`) |
+| the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls, use `"mode": "file"` with `bpm` and `bpmOffset` |
+| characters, photos | none unless asked |
+
+## Hard rules
+
+- `seek(t)` draws the frame for `t` from `t` alone. No CSS animation or transition, timers, `requestAnimationFrame`, `Date.now()`, `new Date()`, `performance.now()`, `Math.random()`, `crypto` random, state carried between frames, or network. Use `rng(seed)`, `rand(seed, ...)`, `ease`, `cueProgress` and the other runtime helpers.
+- `seek(t)` must not await frames, timers or events.
+- Size `html` and `body` to the timeline width and height with `overflow: hidden`. Mark paper and grain layers `data-flipbook-layer="paper"`. Draw static layers once in `setup()`.
+- Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"` only. Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1. Mark deliberate bleeds `data-flipbook-allow-overflow`.
+- Scenes where the picture stands still for more than 1.5 s need `"hold": true`.
+- Images go in `assets/` with their source and license in `assets/SOURCES.json`.
+- Never edit `.flipbook/` or `out/`.
+
+## Stopping
+
+- The CLI counts attempts per composition. When a report has `stop: true`, stop: tell the user where it is stuck and give them the contact sheet, the report path and `stopReason`.
+- The limits are 3 consecutive runs failing with the same code, 8 check rounds, 3 failed renders.
+- `internal-error` is a flipbook bug: stop and give the user the report.
+
+## References
+
+| Read | When |
+|---|---|
+| `references/rules.md` | before the first index.html, and when a determinism, text or layer code is unclear |
+| `references/timeline.md` | before the first timeline.json, and when matching a requested duration |
+| `references/troubleshooting.md` | whenever check or render exits non-zero |

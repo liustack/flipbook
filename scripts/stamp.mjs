@@ -55,6 +55,13 @@ export function stampTargets(base) {
             format: (version) => `$Pinned = '${version}'`,
             required: true,
         },
+        {
+            name: 'SKILL.md pinned prose',
+            file: join(base, 'SKILL.md'),
+            pattern: /the pinned version is (\d+\.\d+\.\d+)/,
+            format: (version) => `the pinned version is ${version}`,
+            required: true,
+        },
     ];
 }
 
