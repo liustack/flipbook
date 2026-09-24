@@ -29,3 +29,7 @@ bun.lockb
 .issues/
 .claude/settings.local.json
 .playwright-cli/
+
+# rebaseline comparisons and eval evidence
+rebaseline/
+eval/results/
