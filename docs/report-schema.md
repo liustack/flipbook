@@ -54,6 +54,7 @@ read_when:
 | `.flipbook/timeline.resolved.json` | 全部 | 换算后的 timeline |
 | `.flipbook/frame-hashes.json` | render | 每帧原始截图的 sha256 和汇总 |
 | `.flipbook/attempts.json` | check、render | 重试计数 |
+| `.flipbook/reports/<命令>.json` | check、snapshot、render | 这条命令最近一次的报告，和 stdout 上的相同 |
 | `.flipbook/tmp/` | render | 渲染中间件，结束后删掉 |
 | `.flipbook/render.lock` | render | 同一目录同时只跑一个 render，另一个报 `render-busy` 退 1，不计入重试次数 |
 

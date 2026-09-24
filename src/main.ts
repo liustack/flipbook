@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { Command, CommanderError } from 'commander';
+import * as fs from 'fs';
+import * as path from 'path';
 import { runCheck } from './cli/check.ts';
 import { buildDoctorReport, MIN_NODE, renderDoctorReport } from './cli/doctor.ts';
 import { runRender } from './cli/render.ts';
@@ -56,6 +58,22 @@ function preflight(): void {
     }
 }
 
+/** Keep the latest report of each command at .flipbook/reports/<command>.json. */
+function saveReport(report: Report): void {
+    const dir = report.composition?.dir;
+    if (!dir) return;
+    try {
+        const target = path.join(dir, '.flipbook', 'reports');
+        fs.mkdirSync(target, { recursive: true });
+        fs.writeFileSync(
+            path.join(target, `${report.command}.json`),
+            `${JSON.stringify(report, null, 2)}\n`,
+        );
+    } catch (error) {
+        process.stderr.write(`[flipbook] could not save the report: ${(error as Error).message}\n`);
+    }
+}
+
 function usageReport(message: string): Report {
     const rb = new ReportBuilder('usage');
     rb.report.usageError = message;
@@ -72,6 +90,7 @@ async function execute(
         preflight();
         const report = await fn();
         writeJson(process.stdout, report);
+        saveReport(report);
         process.exitCode = report.exitCode;
     } catch (error) {
         if (error instanceof EnvError) {
