@@ -1,0 +1,39 @@
+{
+    "version": 1,
+    "fonts": [
+        {
+            "id": "noto-serif-sc",
+            "family": "Noto Serif SC",
+            "file": "NotoSerifSC-wght.ttf",
+            "weight": "200 900",
+            "style": "normal",
+            "size": 25125512,
+            "sha256": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9",
+            "license": "OFL-1.1",
+            "licenseFile": "noto-serif-sc.OFL.txt",
+            "reservedNames": [],
+            "source": "google/fonts 8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5 ofl/notoserifsc/NotoSerifSC[wght].ttf",
+            "urls": [
+                "https://raw.githubusercontent.com/google/fonts/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf",
+                "https://ghfast.top/https://raw.githubusercontent.com/google/fonts/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
+            ]
+        },
+        {
+            "id": "lxgw-wenkai",
+            "family": "LXGW WenKai",
+            "file": "LXGWWenKai-Regular.ttf",
+            "weight": "400",
+            "style": "normal",
+            "size": 25575676,
+            "sha256": "39ad71264b588165b469e35e6afb162a378dacd1f95348160240ba9038ac3009",
+            "license": "OFL-1.1",
+            "licenseFile": "lxgw-wenkai.OFL.txt",
+            "reservedNames": [],
+            "source": "lxgw/LxgwWenKai release v1.522 LXGWWenKai-Regular.ttf",
+            "urls": [
+                "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
+                "https://ghfast.top/https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf"
+            ]
+        }
+    ]
+}
