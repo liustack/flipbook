@@ -171,8 +171,12 @@ describe('bad composition corpus', () => {
     it('low contrast text is measured in pixels', async () => {
         const checked = await check('low-contrast');
         const low = checked.warnings.filter((f) => f.code === 'low-contrast');
-        expect(low.map((f) => f.element)).toEqual(['#pale']);
+        expect(low.map((f) => f.element)).toEqual(['#pale', '#ghost', '#faint']);
         expect(low[0].detail?.ratio as number).toBeLessThan(3);
+        expect(low.slice(1).map((f) => f.detail?.measured)).toEqual([false, false]);
+        const skipped = (checked.check as { contrastSkipped: { element: string }[] })
+            .contrastSkipped;
+        expect(skipped.map((s) => s.element)).toEqual(['canvas text "note"']);
         expect(checked.failures).toEqual([]);
     });
 

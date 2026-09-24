@@ -8,20 +8,27 @@
   p { position: absolute; margin: 0; font: 400 36px/1.2 "Noto Serif SC"; white-space: nowrap; color: #222; }
   #pale { left: 60px; top: 60px; color: #d8d8d8; }
   #strong { left: 60px; top: 160px; }
+  #ghost { left: 60px; top: 220px; color: #ffffff; }
+  #faint { left: 400px; top: 220px; color: #fbfbfb; }
 </style>
 </head>
 <body>
 <p id="pale">Pale words 浅色文字</p>
 <p id="strong">Strong words 深色文字</p>
+<p id="ghost">Ghost words</p>
+<p id="faint">Faint</p>
 <canvas id="ink"></canvas>
 <script type="module">
-import { composition, setupCanvas } from '/__flipbook/runtime.js';
+import { composition, setupCanvas, fillText } from '/__flipbook/runtime.js';
 const ink = setupCanvas(document.getElementById('ink'), 640, 360);
 composition({
   seek(t) {
     ink.clearRect(0, 0, 640, 360);
     ink.fillStyle = '#2a6f97';
     ink.fillRect(200 + t * 40, 300, 40, 40);
+    ink.font = '24px "Noto Serif SC"';
+    ink.fillStyle = '#222';
+    fillText(ink, 'Canvas note', 440, 110, { id: 'note' });
   },
 });
 </script>

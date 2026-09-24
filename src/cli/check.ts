@@ -171,6 +171,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
         if (!different(first, second)) second = [...first].reverse();
         const shots = new Map<number, Buffer>();
         const baselines = new Map<number, Buffer>();
+        const contrastSkipped: { frame: number; element: string; reason: string }[] = [];
         let usable = !page.broken && loadFindings.length === 0;
         try {
             if (usable) {
@@ -291,10 +292,21 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                 }
                 const shown = await page.capture();
                 const texts = await page.domTexts();
+                const registered = await page.registeredTexts();
                 dynamic.push(...(await auditFrameText(page, frame, texts)));
-                dynamic.push(
-                    ...auditSafeArea(timeline, frame, texts, await page.registeredTexts()),
-                );
+                dynamic.push(...auditSafeArea(timeline, frame, texts, registered));
+                for (const entry of registered) {
+                    const element = entry.id
+                        ? `canvas text "${entry.id}"`
+                        : `canvas text "${entry.text.slice(0, 24)}"`;
+                    if (!contrastSkipped.some((skip) => skip.element === element)) {
+                        contrastSkipped.push({
+                            frame,
+                            element,
+                            reason: 'canvas text is not measured',
+                        });
+                    }
+                }
                 dynamic.push(
                     ...(await auditContrast(
                         page,
@@ -471,7 +483,14 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
             }
         }
         rb.addAll(dedupe(dynamic));
-        rb.report.check = { seed, frames, firstOrder: first, secondOrder: second, evidenceDir };
+        rb.report.check = {
+            seed,
+            frames,
+            firstOrder: first,
+            secondOrder: second,
+            evidenceDir,
+            contrastSkipped,
+        };
     } finally {
         if (!options.session) await session.close();
     }

@@ -4,7 +4,7 @@ import type { RegisteredText } from './host.ts';
 import type { CompositionPage, DomText, Rect } from './page.ts';
 import { decodeRgb, writeSequence } from './pixels.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
-import { sha256, type Workspace } from './workspace.ts';
+import type { Workspace } from './workspace.ts';
 
 /** Safe area inset on each side, as a share of width and height. */
 export const SAFE_MARGIN = 0.05;
@@ -136,7 +136,8 @@ const hex = (c: [number, number, number]) =>
  * pixels: the frame is captured as is and again with DOM text transparent.
  * Pixels that change are glyph pixels; the text color is the mean of the most
  * changed ones in the first capture, the background is the mean of the same
- * pixels in the second.
+ * pixels in the second. Text with too few glyph pixels to measure gets a
+ * warning with measured: false. Canvas text is not measured here.
  */
 export async function auditContrast(
     page: CompositionPage,
@@ -152,7 +153,6 @@ export async function auditContrast(
     await page.setTextVisible(false);
     const hidden = await page.capture();
     await page.setTextVisible(true);
-    if (sha256(hidden) === sha256(shown)) return [];
     const { width: W, height: H } = page.timeline;
     const pattern = writeSequence(ws, path.join(workDir, `contrast-f${frame}`), [shown, hidden]);
     const [a, b] = await decodeRgb(ffmpeg, ['-i', pattern], W, H);
@@ -181,7 +181,31 @@ export async function auditContrast(
                 }
             }
         }
-        if (glyph.length < MIN_GLYPH_PIXELS) continue;
+        if (glyph.length < MIN_GLYPH_PIXELS) {
+            // Visible text that barely changes the picture when hidden: likely the
+            // color of what is behind it. Say so instead of skipping it.
+            const evidence = path.join(evidenceDir, `low-contrast-f${frame}.png`);
+            ws.writeFile(evidence, shown);
+            out.push(
+                finding(
+                    'low-contrast',
+                    `${entry.selector} could not be told apart from what is behind it: hiding it changes ${glyph.length} pixels by more than ${GLYPH_DIFF} levels. It is probably the same color as its background.`,
+                    {
+                        severity: 'warning',
+                        time,
+                        frame,
+                        element: entry.selector,
+                        evidence: [evidence],
+                        detail: {
+                            measured: false,
+                            glyphPixels: glyph.length,
+                            box: entry.box as Rect,
+                        },
+                    },
+                ),
+            );
+            continue;
+        }
         const core = [...glyph]
             .sort((p, q) => q.diff - p.diff)
             .slice(0, Math.max(MIN_GLYPH_PIXELS, Math.floor(glyph.length * 0.3)));
@@ -213,6 +237,7 @@ export async function auditContrast(
                         element: entry.selector,
                         evidence: [evidence],
                         detail: {
+                            measured: true,
                             ratio: Number(ratio.toFixed(2)),
                             text: hex(text),
                             background: hex(background),
