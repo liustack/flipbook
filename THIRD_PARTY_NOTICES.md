@@ -73,3 +73,71 @@ SOFTWARE.
 ## 尚未借用
 
 design 里列出的 alesha、hanif（MIT）和 HyperFrames（Apache-2.0）的代码在 M0 还没有搬进来。搬进来时在这里登记来源、许可证和改动。
+
+## 纸感通道借用的做法
+
+### alesha-pro/tools
+
+- 来源：https://github.com/alesha-pro/tools ，`skills/hand-drawn-canvas-animation/assets/materials.js` 和 `assets/core.js`
+- 许可证：MIT，Copyright (c) 2026 Alexey Fateev
+- 借用的做法：`formHatch` 用网格格子的哈希决定每一笔在不在、落在哪、多长，不依赖随机数的调用顺序，所以同一笔在每一帧都在原地。`src/runtime/materials.ts` 的 `hatch`、`crossHatch`、`stipple` 按这个做法重写：改成 TypeScript 和整数哈希，笔画中心按格子定，分粗细两档，裁剪时算上笔画的弯曲。`dotScreen` 在旋转网屏上逐点铺的做法用在 `halftone` 的色调场分支。
+
+### IshaanKalra2103/creative-skills（riso-rooms）
+
+- 来源：https://github.com/IshaanKalra2103/creative-skills ，`skills/riso-rooms/template/index.html`
+- 许可证：MIT，Copyright (c) 2026 Ishaan Kalra
+- 借用的做法：每种墨、每档色调先画一块半调小图块并缓存，用 `createPattern` 加旋转变换铺满，色调不到一半时画变大的网点，超过一半时在实底上挖变小的孔。`src/runtime/materials.ts` 的 `halftone` 在色调为常数时照此实现，改成 32 档色调，按颜色、网距、档位缓存。
+
+以上两个项目的 MIT 许可证全文：
+
+```
+MIT License
+
+Copyright (c) 2026 Alexey Fateev
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+```
+MIT License
+
+Copyright (c) 2026 Ishaan Kalra
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### 算法
+
+- 欧氏距离变换（`src/runtime/templates/assemble.ts` 的 `distanceField`）：按 Felzenszwalb 和 Huttenlocher 的论文《Distance Transforms of Sampled Functions》自行实现。
