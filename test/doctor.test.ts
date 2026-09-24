@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 import { buildDoctorReport } from '../src/cli/doctor.ts';
@@ -75,6 +76,65 @@ describe('doctor exits 78 with a fix when something is missing', () => {
         const problem = report.problems.find((p) => p.code === 'sandbox-blocked');
         expect(problem?.fix.join('\n')).toContain('allowMachLookup');
         expect(problem?.fix.join('\n')).toContain('excludedCommands');
+    });
+});
+
+describe('doctor checks that the cache can be written', () => {
+    /** Everything else healthy, so only the cache decides. */
+    const healthy = (cache: string) =>
+        buildDoctorReport({
+            version: '0.1.0',
+            env: { ...process.env, FLIPBOOK_CACHE_DIR: cache },
+            probeFfmpeg: async () => ({
+                ffmpeg: '/bin/ffmpeg',
+                ffprobe: '/bin/ffprobe',
+                version: '8.1',
+                features: {
+                    libx264: true,
+                    amixNormalize: true,
+                    loudnorm: true,
+                    ebur128: true,
+                    freezedetect: true,
+                    tile: true,
+                    gblur: true,
+                },
+                missing: [],
+            }),
+            shell: () => ({
+                revision: '1243',
+                browserVersion: '153.0.8010.12',
+                browsersPath: path.join(cache, 'browsers'),
+                executable: path.join(cache, 'browsers', 'chrome-headless-shell'),
+                installed: true,
+                playwrightVersion: '1.63.0',
+            }),
+            launch: async () =>
+                ({ version: () => '153.0.8010.12', close: async () => undefined }) as never,
+        });
+
+    it('reports a writable cache as fine', async () => {
+        resetLaunchMode();
+        const report = await healthy(tempDir('cache-ok'));
+        resetLaunchMode();
+        expect(report.cache.writable).toBe(true);
+        expect(report.problems.map((p) => p.code)).not.toContain('cache-unwritable');
+    });
+
+    it.skipIf(process.getuid?.() === 0)('exits 78 when the cache cannot be written', async () => {
+        const cache = tempDir('cache-readonly');
+        fs.chmodSync(cache, 0o500);
+        try {
+            resetLaunchMode();
+            const report = await healthy(cache);
+            resetLaunchMode();
+            expect(report.cache.writable).toBe(false);
+            expect(report.exitCode).toBe(78);
+            const problem = report.problems.find((p) => p.code === 'cache-unwritable');
+            expect(problem?.message).toContain(cache);
+            expect(report.fix.join('\n')).toContain('FLIPBOOK_CACHE_DIR');
+        } finally {
+            fs.chmodSync(cache, 0o700);
+        }
     });
 });
 

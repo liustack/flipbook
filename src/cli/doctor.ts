@@ -1,5 +1,7 @@
-// flipbook doctor: offline self-check. Reads the machine only; never
-// installs, never downloads, never touches the network.
+// flipbook doctor: offline self-check. Never installs, never downloads, never
+// touches the network. Its one write is a probe: an empty file created and
+// deleted at once in the cache directory (or its nearest existing parent), the
+// only reliable way to learn whether a sandbox lets the cache be written.
 import * as fs from 'fs';
 import * as os from 'os';
 import {
@@ -10,7 +12,7 @@ import {
     type LaunchFn,
     launchBrowser,
 } from '../engine/browser.ts';
-import { cacheRoot } from '../engine/cache.ts';
+import { cacheRoot, isWritable } from '../engine/cache.ts';
 import { ALL_FEATURES, FFMPEG_INSTALL, type FfmpegStatus, probeFfmpeg } from '../engine/ffmpeg.ts';
 import { type FontStatus, fontStatus } from '../engine/fonts.ts';
 import type { PruneResult } from '../engine/prune.ts';
@@ -43,7 +45,7 @@ export interface DoctorReport {
         installed: boolean;
     };
     launch: { ok: boolean; skipped: boolean; mode?: string; version?: string; error?: string };
-    cache: { root: string; exists: boolean; fonts: FontStatus[] };
+    cache: { root: string; exists: boolean; writable: boolean; fonts: FontStatus[] };
     skillInstalls: SkillInstall[];
     /** Present after --prune. */
     pruned?: PruneResult;
@@ -159,6 +161,14 @@ export async function buildDoctorReport(deps: DoctorDeps): Promise<DoctorReport>
     }
 
     const root = cacheRoot(env);
+    const writable = isWritable(root);
+    if (!writable) {
+        problems.push({
+            code: 'cache-unwritable',
+            message: `The cache at ${root} cannot be written, so Chromium and the fonts cannot be installed or updated.`,
+            fix: [ENV_CODES['cache-unwritable'].fix],
+        });
+    }
     const fonts = fontStatus(env);
     for (const font of fonts) {
         if (!font.present) {
@@ -192,7 +202,7 @@ export async function buildDoctorReport(deps: DoctorDeps): Promise<DoctorReport>
             installed: shell.installed,
         },
         launch,
-        cache: { root, exists: fs.existsSync(root), fonts },
+        cache: { root, exists: fs.existsSync(root), writable, fonts },
         skillInstalls,
         ...(deps.pruned ? { pruned: deps.pruned } : {}),
         problems,
@@ -228,7 +238,9 @@ export function renderDoctorReport(report: DoctorReport): string {
     else if (report.launch.ok)
         lines.push(`[ok] launch ${report.launch.version} (${report.launch.mode})`);
     else lines.push(`[!!] launch failed: ${report.launch.error}`);
-    lines.push(`     cache ${report.cache.root}`);
+    lines.push(
+        `${mark(report.cache.writable)} cache ${report.cache.root}${report.cache.writable ? '' : ' (not writable)'}`,
+    );
     for (const font of report.cache.fonts) {
         lines.push(
             `${font.present ? '[ok]' : '[--]'} font ${font.family}${font.present ? '' : ' (downloads on first use)'}`,
