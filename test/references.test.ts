@@ -106,7 +106,9 @@ describe.concurrent('reference snippets pass check as marked', () => {
                 const report = await runCheck({
                     dir,
                     session: await session(),
-                    seekTimeoutMs: 1500,
+                    // Only the seek-timeout snippet needs a short limit; the others run
+                    // concurrently and keep the default so a busy machine does not fail them.
+                    seekTimeoutMs: snippet.expect === 'fail seek-timeout' ? 1500 : undefined,
                     recordAttempts: false,
                 });
                 const [verdict, code] = snippet.expect.split(/\s+/);
