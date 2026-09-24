@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { describe, expect, it } from 'vitest';
@@ -212,6 +212,22 @@ describe('package contract', () => {
         for (const [name, range] of Object.entries(pkg.dependencies)) {
             expect(range, name).toMatch(/^\d+\.\d+\.\d+$/);
         }
+    });
+
+    it('ships the docs pages but not the sample images', () => {
+        // Through a shell: on Windows npm is a .cmd shim.
+        const out = execSync('npm pack --dry-run --json --ignore-scripts', {
+            cwd: repoRoot,
+            encoding: 'utf-8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            windowsHide: true,
+        });
+        const files = (JSON.parse(out) as { files: { path: string }[] }[])[0].files.map(
+            (f) => f.path,
+        );
+        expect(files).toContain('docs/report-schema.md');
+        expect(files).toContain('THIRD_PARTY_NOTICES.md');
+        expect(files.filter((f) => f.startsWith('docs/samples'))).toEqual([]);
     });
 });
 

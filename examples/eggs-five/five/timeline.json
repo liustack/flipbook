@@ -45,7 +45,7 @@
         { "id": "egg-32", "scene": "gather", "beat": 5.25, "kind": "mark" },
         { "id": "egg-33", "scene": "gather", "beat": 5.25, "kind": "mark" },
         { "id": "egg-34", "scene": "gather", "beat": 5.25, "kind": "mark" },
-        { "id": "title", "scene": "title", "beat": 0, "kind": "text", "text": "Clutch 5", "settleBeats": 0.5 }
+        { "id": "title", "scene": "title", "beat": 0, "kind": "text", "text": "flipbook", "settleBeats": 0.5 }
     ],
     "audio": { "mode": "none" }
 }

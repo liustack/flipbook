@@ -4,7 +4,7 @@
 
 N objects fly in one after another and land on slots packed inside a digit, a letter or a Chinese character, each landing on a mark cue. The camera eases in while the finished glyph rests, then the film cuts to a title.
 
-Sample image: `docs/samples/templates.png` in the flipbook repository and npm package. Full example with bird eggs: `examples/eggs-five/` (`five` builds a 5, `shu` builds 书).
+Sample image: `docs/samples/templates.png` in the flipbook repository, https://github.com/liustack/flipbook/blob/main/docs/samples/templates.png. Full example with bird eggs: `examples/eggs-five/` (`five` builds a 5, `shu` builds 书).
 
 The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 

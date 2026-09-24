@@ -29,7 +29,7 @@ export interface GridOptions {
 
 export interface PaperOptions {
     seed?: number;
-    /** Base color. Default PAPER.cream. */
+    /** Base color. Default PAPER.beige. */
     color?: string;
     /** Large soft blotches of lighter and darker stock, 0 to 2. Default 1. */
     mottle?: number;
@@ -254,7 +254,7 @@ export function drawPaper(
     options: PaperOptions = {},
 ): void {
     const seed = options.seed ?? 1;
-    const base = rgb(options.color ?? PAPER.cream);
+    const base = rgb(options.color ?? PAPER.beige);
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, width, height);

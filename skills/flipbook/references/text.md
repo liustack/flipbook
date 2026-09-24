@@ -2,7 +2,7 @@
 
 DOM text stays the default (see `rules.md`). Use these calls for text drawn on a canvas: handwriting, words that appear one by one, text along a curve. Each call registers what it draws, so check verifies its glyphs, font, frame edges and safe area.
 
-Sample image: `docs/samples/text.png` in the flipbook repository and npm package.
+Sample image: `docs/samples/text.png` in the flipbook repository, https://github.com/liustack/flipbook/blob/main/docs/samples/text.png.
 
 The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 

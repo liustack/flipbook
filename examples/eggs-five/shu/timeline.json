@@ -91,7 +91,7 @@
         { "id": "egg-78", "scene": "gather", "beat": 5.75, "kind": "mark" },
         { "id": "egg-79", "scene": "gather", "beat": 5.75, "kind": "mark" },
         { "id": "egg-80", "scene": "gather", "beat": 5.75, "kind": "mark" },
-        { "id": "title", "scene": "title", "beat": 0, "kind": "text", "text": "鸟蛋之书", "settleBeats": 0.5 }
+        { "id": "title", "scene": "title", "beat": 0, "kind": "text", "text": "手翻书", "settleBeats": 0.5 }
     ],
     "audio": { "mode": "none" }
 }

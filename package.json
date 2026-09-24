@@ -17,7 +17,7 @@
     },
     "files": [
         "dist",
-        "docs",
+        "docs/*.md",
         "skills/flipbook",
         "CHANGELOG.md",
         "SECURITY.md",

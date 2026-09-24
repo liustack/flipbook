@@ -2,7 +2,7 @@
 
 The paper skin is the default look: warm stock under the picture and a grain overlay over it, both drawn once in `setup()`.
 
-Sample image: `docs/samples/paper.png` in the flipbook repository and npm package.
+Sample image: `docs/samples/paper.png` in the flipbook repository, https://github.com/liustack/flipbook/blob/main/docs/samples/paper.png.
 
 The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 
@@ -56,7 +56,7 @@ Options of `paperLayer` and `drawPaper`:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `color` | `PAPER.cream` | base color, `#rrggbb` |
+| `color` | `PAPER.beige` | base color, `#rrggbb` |
 | `seed` | `1` | same seed, same stock |
 | `mottle` | `1` | soft clouds of lighter and darker stock, 0 to 2 |
 | `fibers` | `1` | short pale fibers, 0 to 3 |
@@ -67,9 +67,9 @@ Options of `paperLayer` and `drawPaper`:
 
 | Preset | Color | Use for |
 |---|---|---|
-| `PAPER.cream` | `#efe5d0` | the default, anything with a lot of text |
+| `PAPER.cream` | `#efe5d0` | anything with a lot of text |
 | `PAPER.ivory` | `#f5f0e5` | a light, almost white page |
-| `PAPER.beige` | `#cfbd9f` | museum plates, specimens, archive scans |
+| `PAPER.beige` | `#cfbd9f` | the default, museum plates, specimens, archive scans |
 | `PAPER.sage` | `#b9bca3` | botanical subjects |
 | `PAPER.clay` | `#b86b4e` | a strong ground, with light grid lines or light type |
 
