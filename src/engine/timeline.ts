@@ -312,6 +312,23 @@ export function loadTimeline(dir: string, write = true): LoadedTimeline {
             ),
         };
     }
+    if (timeline.audio?.mode === 'file' && timeline.audio.file) {
+        const file = path.resolve(dir, timeline.audio.file);
+        const inside = path.relative(dir, file);
+        if (!fs.existsSync(file) || inside.startsWith('..') || path.isAbsolute(inside)) {
+            return {
+                findings: [
+                    finding(
+                        'timeline-invalid',
+                        `$.audio.file names ${timeline.audio.file}, which is not in the composition directory.`,
+                        {
+                            detail: { path: '$.audio.file' },
+                        },
+                    ),
+                ],
+            };
+        }
+    }
     const resolved = resolveTimeline(timeline);
     if (write) {
         const outDir = path.join(dir, '.flipbook');

@@ -86,7 +86,7 @@ export interface VerifyOptions {
  * silent, and a timeline that asks for sound gets a warning.
  */
 export function verifyAudio(timeline: ResolvedTimeline): Finding[] {
-    if (timeline.audio.mode === 'none') return [];
+    if (timeline.audio.mode !== 'preset') return [];
     return [
         finding(
             'audio-skipped',
@@ -335,4 +335,87 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     }
     findings.push(...verifyAudio(timeline));
     return { findings, probe };
+}
+
+export interface AudioProbe {
+    codec: string;
+    sampleRate: number;
+    channels: number;
+    durationSec: number;
+}
+
+export async function probeAudio(ffprobe: string, file: string): Promise<AudioProbe | null> {
+    const result = await run(
+        ffprobe,
+        [
+            '-v',
+            'error',
+            '-select_streams',
+            'a:0',
+            '-show_entries',
+            'stream=codec_name,sample_rate,channels,duration',
+            '-of',
+            'json',
+            file,
+        ],
+        { timeoutMs: 120_000 },
+    );
+    if (result.code !== 0) return null;
+    const stream = (
+        JSON.parse(result.stdout.toString('utf-8')) as {
+            streams?: Record<string, string | number>[];
+        }
+    ).streams?.[0];
+    if (!stream) return null;
+    return {
+        codec: String(stream.codec_name ?? ''),
+        sampleRate: Number(stream.sample_rate ?? 0),
+        channels: Number(stream.channels ?? 0),
+        durationSec: Number(stream.duration ?? 0),
+    };
+}
+
+/**
+ * The muxed soundtrack against the picture: an audio stream must exist and
+ * its length must match the video within one frame or one AAC packet,
+ * whichever is longer.
+ */
+export async function verifySoundtrack(
+    ffprobe: string,
+    video: string,
+    timeline: ResolvedTimeline,
+): Promise<{ findings: Finding[]; audio: AudioProbe | null }> {
+    const audio = await probeAudio(ffprobe, video);
+    const expected = timeline.frameCount / timeline.fps;
+    if (!audio) {
+        return {
+            audio,
+            findings: [
+                finding(
+                    'duration-mismatch',
+                    'The video has no audio stream although timeline.json sets audio.mode "file".',
+                    {
+                        detail: { audio: timeline.audio },
+                    },
+                ),
+            ],
+        };
+    }
+    const tolerance = Math.max(1 / timeline.fps, 1024 / (audio.sampleRate || 48000));
+    const drift = Math.abs(audio.durationSec - expected);
+    return {
+        audio,
+        findings:
+            drift > tolerance + 1e-6
+                ? [
+                      finding(
+                          'duration-mismatch',
+                          `The audio lasts ${audio.durationSec.toFixed(3)} s; the picture lasts ${expected.toFixed(3)} s.`,
+                          {
+                              detail: { audio: audio.durationSec, video: expected, tolerance },
+                          },
+                      ),
+                  ]
+                : [],
+    };
 }

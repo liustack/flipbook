@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #f4efe4; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="ink"></canvas>
+<script type="module">
+import { composition, setupCanvas, timeline, ease, progress } from '/__flipbook/runtime.js';
+const tl = await timeline();
+const ink = setupCanvas(document.getElementById('ink'), 640, 360);
+composition({
+  seek(t) {
+    const beat = t / tl.secondsPerBeat;
+    const pop = ease.outBack(progress(beat % 1, 0, 0.4));
+    ink.clearRect(0, 0, 640, 360);
+    ink.fillStyle = '#c8452d';
+    ink.beginPath();
+    ink.arc(120 + Math.floor(beat) * 120, 180, 10 + 30 * pop, 0, Math.PI * 2);
+    ink.fill();
+  },
+});
+</script>
+</body>
+</html>

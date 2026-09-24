@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "width": 640,
+    "height": 360,
+    "fps": 12,
+    "seed": 7,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [{ "id": "main", "bars": 1 }],
+    "audio": { "mode": "file", "file": "music.wav", "bpmOffset": 0.5 }
+}

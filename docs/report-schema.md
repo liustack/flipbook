@@ -105,9 +105,9 @@ read_when:
 | `freeze` | render | 没声明 hold 的场景里画面 1.5 秒以上不动：成片缩到 320×180、高斯模糊（sigma 1.5）后用 ffmpeg freezedetect（`n=-60dB`）判定，只算落在没声明 hold 的场景里的部分 | 让画面动起来，或给场景加 `"hold": true` |
 | `glitch` | render | 成片均匀抽 8 帧解码，和截图原帧在 480×270 上比 PSNR，低于 30 dB 就报。送帧管道断了也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
 | `frame-count` | render | 成片帧数和 timeline 不符 | 重渲一次，还出现就带 JSON 报 issue |
-| `duration-mismatch` | render | 成片时长和 timeline 不符（容差一帧） | 重渲一次，还出现就带 JSON 报 issue |
+| `duration-mismatch` | render | 成片时长和 timeline 不符（容差一帧）。用了自带音乐时，音轨时长和画面差超过一帧和一个 AAC 包（1024 个采样）中较大者也报这个码，没有音轨也报 | 重渲一次，还出现就带 JSON 报 issue |
 | `color-tags` | render | 成片不是 yuv420p 或缺 bt709 色彩标记 | 带 JSON 报 issue |
-| `audio-skipped` | render | timeline 要求配乐，这一版还不渲染声音，只报 warning | 把 audio 设成 `{ "mode": "none" }`，或成片后自己配乐 |
+| `audio-skipped` | render | timeline 用了 `audio.mode: "preset"`，预设配乐 v0.3 才有，成片无声，只报 warning | 改成 `{ "mode": "none" }`，或用 `"file"` 放自带音乐 |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 

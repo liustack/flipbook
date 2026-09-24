@@ -81,7 +81,9 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `file` | mode 为 file 时必填，合成目录内的相对路径 |
 | `bpmOffset` | 用户音乐第一拍的偏移秒数，0 到 60 |
 
-v0.1 只校验这些字段，配乐合成随 v0.3 的 `audio` 命令上线。
+- `none`：成片无声。
+- `file`：用户自带音乐。render 从 `bpmOffset` 秒处截起，让第一拍落在 t = 0，不够长补静音，超长截掉，最后一秒（片长不足 4 秒时取片长四分之一）淡出，编成 AAC 48 kHz 立体声 192 kbps 放进成片。文件不在合成目录里时报 `timeline-invalid`。v0.1 不做响度归一。
+- `preset`：预设配乐随 v0.3 的 `audio` 命令上线，v0.1 出无声成片并报 `audio-skipped` warning。
 
 ## 换算规则
 

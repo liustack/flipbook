@@ -1,7 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { tail, terminate } from './proc.ts';
+import { run, tail, terminate } from './proc.ts';
 
 export interface EncoderOptions {
     fps: number;
@@ -123,4 +123,62 @@ export class Encoder {
     abort(): void {
         terminate(this.child);
     }
+}
+
+export interface MuxOptions {
+    video: string;
+    audio: string;
+    /** Seconds into the audio file where the first beat falls; that point lands on t = 0. */
+    offsetSec: number;
+    durationSec: number;
+    output: string;
+}
+
+/**
+ * Put the user's soundtrack under the picture: trim the file at the first
+ * beat, pad or cut it to the video length, fade out over the last second,
+ * encode AAC 48 kHz stereo, copy the video stream as is.
+ */
+export async function muxSoundtrack(ffmpeg: string, options: MuxOptions): Promise<void> {
+    const d = options.durationSec;
+    const fade = Math.min(1, d / 4);
+    const filter =
+        `[1:a]atrim=start=${options.offsetSec},asetpts=PTS-STARTPTS,aresample=48000,` +
+        `aformat=channel_layouts=stereo,apad,atrim=0:${d},` +
+        `afade=t=out:st=${Math.max(0, d - fade)}:d=${fade}[a]`;
+    const result = await run(
+        ffmpeg,
+        [
+            '-hide_banner',
+            '-loglevel',
+            'error',
+            '-y',
+            '-i',
+            options.video,
+            '-i',
+            options.audio,
+            '-filter_complex',
+            filter,
+            '-map',
+            '0:v',
+            '-map',
+            '[a]',
+            '-c:v',
+            'copy',
+            '-c:a',
+            'aac',
+            '-b:a',
+            '192k',
+            '-ar',
+            '48000',
+            '-map_metadata',
+            '0',
+            '-movflags',
+            '+faststart',
+            options.output,
+        ],
+        { timeoutMs: 600_000 },
+    );
+    if (result.code !== 0)
+        throw new Error(`ffmpeg could not add the soundtrack: ${tail(result.stderr)}`);
 }

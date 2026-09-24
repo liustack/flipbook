@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { recordRender } from '../engine/attempts.ts';
 import { captureFrames, evenFrames } from '../engine/capture.ts';
-import { Encoder } from '../engine/encode.ts';
+import { Encoder, muxSoundtrack } from '../engine/encode.ts';
 import { contactSheet, selectExpr, sheetLayout } from '../engine/pixels.ts';
 import {
     compositionDir,
@@ -14,7 +14,7 @@ import {
 } from '../engine/session.ts';
 import { dedupe } from '../engine/textAudit.ts';
 import { loadTimeline } from '../engine/timeline.ts';
-import { verifyVideo } from '../engine/verify.ts';
+import { verifySoundtrack, verifyVideo } from '../engine/verify.ts';
 import { acquireLock, compositionHash, workDir } from '../engine/workspace.ts';
 import { appVersion } from '../paths.ts';
 import { finding, platformId, progress, type Report, ReportBuilder } from './report.ts';
@@ -211,6 +211,35 @@ export async function runRender(options: RenderOptions): Promise<Report> {
             sheet,
             selectExpr(sheetFrames),
         );
+        let delivered = video;
+        let soundtrack: Awaited<ReturnType<typeof verifySoundtrack>>['audio'] = null;
+        if (timeline.audio.mode === 'file' && timeline.audio.file) {
+            progress('render: adding the soundtrack');
+            delivered = path.join(tmp, 'video-with-audio.mp4');
+            try {
+                await muxSoundtrack(session.ffmpeg.ffmpeg, {
+                    video,
+                    audio: path.resolve(dir, timeline.audio.file),
+                    offsetSec: timeline.audio.bpmOffset ?? 0,
+                    durationSec: timeline.frameCount / timeline.fps,
+                    output: delivered,
+                });
+                const checked = await verifySoundtrack(session.ffmpeg.ffprobe, delivered, timeline);
+                rb.addAll(checked.findings);
+                soundtrack = checked.audio;
+            } catch (error) {
+                delivered = video;
+                rb.add(
+                    finding(
+                        'timeline-invalid',
+                        `$.audio.file could not be used as a soundtrack: ${(error as Error).message.split('\n')[0]}`,
+                        {
+                            detail: { path: '$.audio.file', log: (error as Error).message },
+                        },
+                    ),
+                );
+            }
+        }
         const verifyMs = Date.now() - verifyStart;
         rb.report.render = {
             frames: timeline.frameCount,
@@ -222,6 +251,7 @@ export async function runRender(options: RenderOptions): Promise<Report> {
             totalMs: Date.now() - started,
             captureFps: Number((timeline.frameCount / (captured.captureMs / 1000)).toFixed(1)),
             probe: verified.probe,
+            audio: soundtrack,
             contactSheetTiles: sheetFrames.map((frame) => ({
                 frame,
                 time: Number((frame / timeline.fps).toFixed(3)),
@@ -229,13 +259,13 @@ export async function runRender(options: RenderOptions): Promise<Report> {
         };
         if (rb.hasErrors()) {
             const rejected = freshDir(path.join(workDir(dir), 'rejected'));
-            moveInto(video, path.join(rejected, 'video.mp4'));
+            moveInto(delivered, path.join(rejected, 'video.mp4'));
             moveInto(sheet, path.join(rejected, 'contact-sheet.png'));
             rb.report.artifacts.rejectedVideo = path.join(rejected, 'video.mp4');
             rb.report.artifacts.contactSheet = path.join(rejected, 'contact-sheet.png');
         } else {
             const out = path.join(dir, 'out');
-            moveInto(video, path.join(out, 'video.mp4'));
+            moveInto(delivered, path.join(out, 'video.mp4'));
             moveInto(sheet, path.join(out, 'contact-sheet.png'));
             rb.report.artifacts.video = path.join(out, 'video.mp4');
             rb.report.artifacts.contactSheet = path.join(out, 'contact-sheet.png');

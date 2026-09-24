@@ -104,3 +104,52 @@ describe('color', () => {
         fs.writeFileSync(path.join(dir, 'decoded.json'), JSON.stringify({ blue, red }));
     });
 });
+
+describe('user soundtrack', () => {
+    it('lands the first beat of music.wav on t = 0 and matches the picture length', async () => {
+        const dir = copyFixture('music');
+        const s = await session();
+        const clicks = "volume='if(gte(t,0.5)*lt(mod(t-0.5,0.5),0.04),1,0)':eval=frame";
+        const made = await run(s.ffmpeg.ffmpeg, [
+            '-v',
+            'error',
+            '-y',
+            '-f',
+            'lavfi',
+            '-i',
+            'sine=frequency=880:sample_rate=48000:duration=6',
+            '-af',
+            clicks,
+            path.join(dir, 'music.wav'),
+        ]);
+        expect(made.code).toBe(0);
+        const rendered = await runRender({ dir, session: s, recordAttempts: false });
+        expect(rendered.failures).toEqual([]);
+        const audio = (rendered.render as { audio: { codec: string; durationSec: number } }).audio;
+        expect(audio.codec).toBe('aac');
+        expect(Math.abs(audio.durationSec - 2)).toBeLessThan(1 / 12);
+        const pcm = await run(s.ffmpeg.ffmpeg, [
+            '-v',
+            'error',
+            '-i',
+            rendered.artifacts.video,
+            '-map',
+            '0:a',
+            '-ac',
+            '1',
+            '-ar',
+            '48000',
+            '-f',
+            's16le',
+            '-',
+        ]);
+        const samples = new Int16Array(
+            pcm.stdout.buffer,
+            pcm.stdout.byteOffset,
+            pcm.stdout.length / 2,
+        );
+        const first = samples.findIndex((v) => Math.abs(v) > 1000);
+        expect(first).toBeGreaterThanOrEqual(0);
+        expect(first / 48000).toBeLessThan(1 / 12);
+    });
+});
