@@ -1,10 +1,9 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, progress } from '../cli/report.ts';
 import type { Encoder } from './encode.ts';
 import type { CompositionPage } from './page.ts';
 import { auditFrameText } from './textAudit.ts';
-import { sha256 } from './workspace.ts';
+import { sha256, type Workspace } from './workspace.ts';
 
 export interface CaptureOptions {
     page: CompositionPage;
@@ -16,6 +15,8 @@ export interface CaptureOptions {
     baselineFrames: number[];
     /** Frames that get the glyph and font audit. */
     textFrames: number[];
+    workspace: Workspace;
+    /** Scratch directory inside the workspace for sample and baseline PNGs. */
     workDir: string;
     seekTimeoutMs?: number;
     /** Test hook: frames never written to the encoder. */
@@ -49,11 +50,9 @@ function ordinals(frames: number[]): Map<number, number> {
 
 /** Seek every frame in order, capture it, hash it and feed it to the encoder. */
 export async function captureFrames(options: CaptureOptions): Promise<CaptureOutput> {
-    const { page, encoder, frameCount } = options;
-    const samplesDir = path.join(options.workDir, 'samples');
-    const baselineDir = path.join(options.workDir, 'baseline');
-    fs.mkdirSync(samplesDir, { recursive: true });
-    fs.mkdirSync(baselineDir, { recursive: true });
+    const { page, encoder, frameCount, workspace: ws } = options;
+    const samplesDir = ws.fresh(path.join(options.workDir, 'samples'));
+    const baselineDir = ws.fresh(path.join(options.workDir, 'baseline'));
     const sampleSet = ordinals(options.sampleFrames);
     const baselineSet = ordinals(options.baselineFrames);
     const textSet = new Set(options.textFrames);
@@ -83,7 +82,7 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
         const sampleOrdinal = sampleSet.get(frame);
         if (sampleOrdinal !== undefined) {
             const file = sequenceFile(samplesDir, sampleOrdinal);
-            fs.writeFileSync(file, png);
+            ws.writeFile(file, png);
             samples.set(frame, file);
         }
         if (textSet.has(frame)) findings.push(...(await auditFrameText(page, frame)));
@@ -93,7 +92,7 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
             const base = await page.capture();
             await page.setContent(true);
             const file = sequenceFile(baselineDir, baselineOrdinal);
-            fs.writeFileSync(file, base);
+            ws.writeFile(file, base);
             baselines.set(frame, file);
         }
         if (!dropSet.has(frame)) await encoder.write(png);

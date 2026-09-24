@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { recordCheck } from '../engine/attempts.ts';
 import { auditContrast, auditSafeArea } from '../engine/layoutAudit.ts';
@@ -7,16 +6,16 @@ import { decodeGray, isFlat, matchesBaseline, writeSequence } from '../engine/pi
 import { scanComposition } from '../engine/scan.ts';
 import {
     compositionDir,
-    freshDir,
     indexFinding,
     openPage,
     openSession,
+    outputLinksFinding,
     type Session,
 } from '../engine/session.ts';
 import { auditCueText, auditFrameText, dedupe } from '../engine/textAudit.ts';
 import { loadTimeline } from '../engine/timeline.ts';
 import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
-import { compositionHash, sha256, workDir } from '../engine/workspace.ts';
+import { compositionHash, sha256, Workspace } from '../engine/workspace.ts';
 import { type Finding, finding, progress, type Report, ReportBuilder } from './report.ts';
 
 export interface CheckOptions {
@@ -106,7 +105,14 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
     const dir = compositionDir(options.dir);
     const rb = new ReportBuilder('check', dir);
     const seed = options.seed ?? 1;
-    const evidenceDir = freshDir(path.join(workDir(dir), 'evidence', 'check'));
+    const ws = Workspace.open(dir);
+    const unsafe = outputLinksFinding(ws);
+    if (unsafe) {
+        rb.add(unsafe);
+        return rb.finish();
+    }
+    const evidenceDir = ws.fresh(ws.path('.flipbook', 'evidence', 'check'));
+    const scratch = (name: string) => ws.path('.flipbook', 'check', name);
     const finish = () => {
         if (options.recordAttempts !== false) {
             const verdict = recordCheck(dir, [...new Set(rb.report.failures.map((f) => f.code))]);
@@ -190,8 +196,8 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                         path.join(evidenceDir, `late-paint-f${frame}-a.png`),
                         path.join(evidenceDir, `late-paint-f${frame}-b.png`),
                     ];
-                    fs.writeFileSync(files[0], a);
-                    fs.writeFileSync(files[1], b);
+                    ws.writeFile(files[0], a);
+                    ws.writeFile(files[1], b);
                     dynamic.push(
                         finding(
                             'late-paint',
@@ -222,11 +228,11 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                 if (sha256(shot) !== sha256(before)) {
                     orderMismatch.push(frame);
                     if (orderMismatch.length === 1) {
-                        fs.writeFileSync(
+                        ws.writeFile(
                             path.join(evidenceDir, `seek-order-f${frame}-first.png`),
                             before,
                         );
-                        fs.writeFileSync(
+                        ws.writeFile(
                             path.join(evidenceDir, `seek-order-f${frame}-second.png`),
                             shot,
                         );
@@ -285,7 +291,8 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                         texts,
                         shown,
                         session.ffmpeg.ffmpeg,
-                        freshDir(path.join(workDir(dir), 'check', 'contrast')),
+                        ws,
+                        scratch('contrast'),
                         evidenceDir,
                     )),
                 );
@@ -339,8 +346,8 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                         path.join(evidenceDir, `${variant.code}-f${frame}-base.png`),
                         path.join(evidenceDir, `${variant.code}-f${frame}-shifted.png`),
                     ];
-                    fs.writeFileSync(files[0], shots.get(frame) as Buffer);
-                    fs.writeFileSync(files[1], result.get(frame) as Buffer);
+                    ws.writeFile(files[0], shots.get(frame) as Buffer);
+                    ws.writeFile(files[1], result.get(frame) as Buffer);
                     dynamic.push(
                         finding(
                             variant.code,
@@ -365,14 +372,16 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
             const content = await decodeGray(session.ffmpeg.ffmpeg, [
                 '-i',
                 writeSequence(
-                    freshDir(path.join(workDir(dir), 'check', 'frames')),
+                    ws,
+                    scratch('frames'),
                     order.map((f) => shots.get(f) as Buffer),
                 ),
             ]);
             const paper = await decodeGray(session.ffmpeg.ffmpeg, [
                 '-i',
                 writeSequence(
-                    freshDir(path.join(workDir(dir), 'check', 'baseline')),
+                    ws,
+                    scratch('baseline'),
                     order.map((f) => baselines.get(f) as Buffer),
                 ),
             ]);
@@ -388,7 +397,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                 const code = blank.length >= paperOnly.length ? 'blank-frame' : 'paper-only';
                 const frame = (code === 'blank-frame' ? blank : paperOnly)[0];
                 const evidence = path.join(evidenceDir, `${code}-f${frame}.png`);
-                fs.writeFileSync(evidence, shots.get(frame) as Buffer);
+                ws.writeFile(evidence, shots.get(frame) as Buffer);
                 dynamic.push(
                     finding(
                         code,

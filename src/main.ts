@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import { Command, CommanderError } from 'commander';
-import * as fs from 'fs';
-import * as path from 'path';
 import { runCheck } from './cli/check.ts';
 import { buildDoctorReport, MIN_NODE, renderDoctorReport } from './cli/doctor.ts';
 import { runRender } from './cli/render.ts';
@@ -18,6 +16,8 @@ import {
 } from './cli/report.ts';
 import { parseRegion, runSnapshot } from './cli/snapshot.ts';
 import { pruneCache } from './engine/prune.ts';
+import { workspaceFinding } from './engine/session.ts';
+import { Workspace, WorkspaceError } from './engine/workspace.ts';
 import { COMMAND_NAME } from './names.ts';
 import { appVersion } from './paths.ts';
 
@@ -64,10 +64,9 @@ function saveReport(report: Report): void {
     const dir = report.composition?.dir;
     if (!dir) return;
     try {
-        const target = path.join(dir, '.flipbook', 'reports');
-        fs.mkdirSync(target, { recursive: true });
-        fs.writeFileSync(
-            path.join(target, `${report.command}.json`),
+        const ws = Workspace.open(dir);
+        ws.writeFile(
+            ws.path('.flipbook', 'reports', `${report.command}.json`),
             `${JSON.stringify(report, null, 2)}\n`,
         );
     } catch (error) {
@@ -101,6 +100,11 @@ async function execute(
             writeJson(process.stdout, rb.finish(EXIT.env));
             writeJson(process.stderr, diagnosis);
             process.exitCode = EXIT.env;
+        } else if (error instanceof WorkspaceError) {
+            const rb = new ReportBuilder(command, dir);
+            rb.add(workspaceFinding(error));
+            writeJson(process.stdout, rb.finish());
+            process.exitCode = EXIT.failed;
         } else if (error instanceof UsageError) {
             process.stderr.write(`Error: ${error.message}\n`);
             writeJson(process.stdout, usageReport(error.message));

@@ -94,6 +94,12 @@ The page requested a file outside the composition directory and it was refused.
 
 Fix: Keep every file the page loads inside the composition directory.
 
+### `unsafe-output`
+
+A path flipbook writes under .flipbook/ or out/ is a symbolic link or the wrong kind of file, so nothing was written.
+
+Fix: Delete the paths in `detail.paths` (for a link, the link itself, not what it points to), then run the command again. flipbook recreates .flipbook/ and out/ on its own.
+
 ### `static-forbidden`
 
 The source uses a construct the rules forbid.

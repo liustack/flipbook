@@ -66,6 +66,11 @@ export const FINDING_CODES = {
         meaning: 'The page requested a file outside the composition directory and it was refused.',
         fix: 'Keep every file the page loads inside the composition directory.',
     },
+    'unsafe-output': {
+        meaning:
+            'A path flipbook writes under .flipbook/ or out/ is a symbolic link or the wrong kind of file, so nothing was written.',
+        fix: 'Delete the paths in `detail.paths` (for a link, the link itself, not what it points to), then run the command again. flipbook recreates .flipbook/ and out/ on its own.',
+    },
     'static-forbidden': {
         meaning: 'The source uses a construct the rules forbid.',
         fix: 'Replace it with a pure function of t: seeded rng from the runtime instead of Math.random, t instead of clocks, direct drawing in seek instead of timers or CSS animation.',

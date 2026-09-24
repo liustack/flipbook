@@ -11,6 +11,7 @@ import {
 import { type Ffmpeg, requireFfmpeg, VIDEO_FEATURES } from './ffmpeg.ts';
 import { ensureFonts } from './fonts.ts';
 import { CompositionPage, type OpenOptions } from './page.ts';
+import type { Workspace, WorkspaceError } from './workspace.ts';
 
 /** Everything a check, snapshot or render needs from the machine. */
 export interface Session {
@@ -103,9 +104,18 @@ export function indexFinding(dir: string): Finding | null {
         : finding('index-missing', `No index.html in ${dir}.`);
 }
 
-/** Empty (or create) a scratch directory. */
-export function freshDir(dir: string): string {
-    fs.rmSync(dir, { recursive: true, force: true });
-    fs.mkdirSync(dir, { recursive: true });
-    return dir;
+/** unsafe-output when .flipbook/ or out/ hold links. The command then writes nothing. */
+export function outputLinksFinding(ws: Workspace): Finding | null {
+    const links = ws.links();
+    if (links.length === 0) return null;
+    return finding(
+        'unsafe-output',
+        `${links.join(', ')} ${links.length === 1 ? 'is a symbolic link' : 'are symbolic links'} in the composition. flipbook does not write through links.`,
+        { element: links[0], detail: { paths: links.map((link) => path.join(ws.dir, link)) } },
+    );
+}
+
+/** unsafe-output for a write the workspace refused. */
+export function workspaceFinding(error: WorkspaceError): Finding {
+    return finding('unsafe-output', error.message, { detail: { paths: [error.path] } });
 }

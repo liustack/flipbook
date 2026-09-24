@@ -1,6 +1,6 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import type { AttemptsSummary } from '../cli/report.ts';
+import { Workspace } from './workspace.ts';
 
 export const LIMITS = {
     /** check rounds for one composition before stopping. */
@@ -23,18 +23,20 @@ function file(dir: string): string {
 }
 
 function load(dir: string): AttemptsFile {
-    try {
-        const parsed = JSON.parse(fs.readFileSync(file(dir), 'utf-8')) as AttemptsFile;
-        if (parsed.version === 1) return parsed;
-    } catch {
-        // fresh start
+    const text = Workspace.open(dir).readText(file(dir));
+    if (text !== null) {
+        try {
+            const parsed = JSON.parse(text) as AttemptsFile;
+            if (parsed.version === 1) return parsed;
+        } catch {
+            // A damaged counter file starts the count again.
+        }
     }
     return { version: 1, checkRounds: 0, renderFailures: 0, streaks: {} };
 }
 
 function save(dir: string, data: AttemptsFile): void {
-    fs.mkdirSync(path.dirname(file(dir)), { recursive: true });
-    fs.writeFileSync(file(dir), `${JSON.stringify(data, null, 2)}\n`);
+    Workspace.open(dir).writeFile(file(dir), `${JSON.stringify(data, null, 2)}\n`);
 }
 
 function updateStreaks(data: AttemptsFile, codes: string[]): void {

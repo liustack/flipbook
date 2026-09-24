@@ -1,11 +1,10 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
 import type { RegisteredText } from './host.ts';
 import type { CompositionPage, DomText, Rect } from './page.ts';
 import { decodeRgb, writeSequence } from './pixels.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
-import { sha256 } from './workspace.ts';
+import { sha256, type Workspace } from './workspace.ts';
 
 /** Safe area inset on each side, as a share of width and height. */
 export const SAFE_MARGIN = 0.05;
@@ -134,6 +133,7 @@ export async function auditContrast(
     dom: DomText[],
     shown: Buffer,
     ffmpeg: string,
+    ws: Workspace,
     workDir: string,
     evidenceDir: string,
 ): Promise<Finding[]> {
@@ -143,7 +143,7 @@ export async function auditContrast(
     await page.setTextVisible(true);
     if (sha256(hidden) === sha256(shown)) return [];
     const { width: W, height: H } = page.timeline;
-    const pattern = writeSequence(path.join(workDir, `contrast-f${frame}`), [shown, hidden]);
+    const pattern = writeSequence(ws, path.join(workDir, `contrast-f${frame}`), [shown, hidden]);
     const [a, b] = await decodeRgb(ffmpeg, ['-i', pattern], W, H);
     const out: Finding[] = [];
     const time = frame / page.timeline.fps;
@@ -189,7 +189,7 @@ export async function auditContrast(
         const ratio = contrastRatio(text, background);
         if (ratio < MIN_CONTRAST) {
             const evidence = path.join(evidenceDir, `low-contrast-f${frame}.png`);
-            fs.writeFileSync(evidence, shown);
+            ws.writeFile(evidence, shown);
             out.push(
                 finding(
                     'low-contrast',

@@ -1,6 +1,4 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
 import { run, tail, terminate } from './proc.ts';
 
 export interface EncoderOptions {
@@ -79,8 +77,8 @@ export class Encoder {
         });
     }
 
+    /** `options.output` must sit in a directory the caller made with Workspace.fresh. */
     static start(ffmpeg: string, options: EncoderOptions): Encoder {
-        fs.mkdirSync(path.dirname(options.output), { recursive: true });
         const child = spawn(ffmpeg, encoderArgs(options), { stdio: ['pipe', 'ignore', 'pipe'] });
         return new Encoder(child as unknown as ChildProcessWithoutNullStreams);
     }

@@ -7,6 +7,7 @@ import {
     TIMELINE_VERSION,
     type TimelineV1,
 } from './timelineResolve.ts';
+import { Workspace } from './workspace.ts';
 
 export const MAX_DURATION_SEC = 180;
 
@@ -331,10 +332,9 @@ export function loadTimeline(dir: string, write = true): LoadedTimeline {
     }
     const resolved = resolveTimeline(timeline);
     if (write) {
-        const outDir = path.join(dir, '.flipbook');
-        fs.mkdirSync(outDir, { recursive: true });
-        fs.writeFileSync(
-            path.join(outDir, 'timeline.resolved.json'),
+        const ws = Workspace.open(dir);
+        ws.writeFile(
+            ws.path('.flipbook', 'timeline.resolved.json'),
             `${JSON.stringify(resolved, null, 2)}\n`,
         );
     }

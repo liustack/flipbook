@@ -1,9 +1,9 @@
 // Pixel analysis without an image library: ffmpeg decodes and scales to raw
 // gray or RGB bytes, the math happens here.
 import { spawn } from 'child_process';
-import * as fs from 'fs';
 import * as path from 'path';
 import { run, tail, terminate } from './proc.ts';
+import type { Workspace } from './workspace.ts';
 
 /** Analysis size for blank, paper-only and freeze checks. */
 export const GRAY_W = 320;
@@ -17,11 +17,11 @@ export const DIFF_LEVEL = 16;
 /** A frame is "unchanged" when fewer than this share of pixels differ. */
 export const CHANGED_SHARE = 0.0005;
 
-/** Write PNG buffers as f_00000.png ... into `dir` and return the ffmpeg input pattern. */
-export function writeSequence(dir: string, frames: Buffer[]): string {
-    fs.mkdirSync(dir, { recursive: true });
+/** Empty `dir`, write PNG buffers as f_00000.png ... into it, return the ffmpeg input pattern. */
+export function writeSequence(ws: Workspace, dir: string, frames: Buffer[]): string {
+    ws.fresh(dir);
     frames.forEach((png, i) => {
-        fs.writeFileSync(path.join(dir, `f_${String(i).padStart(5, '0')}.png`), png);
+        ws.writeFile(path.join(dir, `f_${String(i).padStart(5, '0')}.png`), png);
     });
     return path.join(dir, 'f_%05d.png');
 }
@@ -224,7 +224,6 @@ export async function extractFrame(
     frame: number,
     out: string,
 ): Promise<void> {
-    fs.mkdirSync(path.dirname(out), { recursive: true });
     const result = await run(
         ffmpeg,
         [
@@ -298,7 +297,6 @@ export async function contactSheet(
     out: string,
     filterPrefix = '',
 ): Promise<void> {
-    fs.mkdirSync(path.dirname(out), { recursive: true });
     const vf =
         `${filterPrefix}scale=${layout.tileWidth}:${layout.tileHeight}:flags=lanczos,` +
         `tile=${layout.cols}x${layout.rows}:margin=8:padding=8:color=0x303030`;

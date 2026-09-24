@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { recordRender } from '../engine/attempts.ts';
 import { captureFrames, evenFrames } from '../engine/capture.ts';
@@ -6,16 +5,16 @@ import { Encoder, muxSoundtrack } from '../engine/encode.ts';
 import { contactSheet, selectExpr, sheetLayout } from '../engine/pixels.ts';
 import {
     compositionDir,
-    freshDir,
     indexFinding,
     openPage,
     openSession,
+    outputLinksFinding,
     type Session,
 } from '../engine/session.ts';
 import { dedupe } from '../engine/textAudit.ts';
 import { loadTimeline } from '../engine/timeline.ts';
 import { verifySoundtrack, verifyVideo } from '../engine/verify.ts';
-import { acquireLock, compositionHash, workDir } from '../engine/workspace.ts';
+import { acquireLock, compositionHash, Workspace } from '../engine/workspace.ts';
 import { appVersion } from '../paths.ts';
 import { finding, platformId, progress, type Report, ReportBuilder } from './report.ts';
 
@@ -38,15 +37,16 @@ function baselineFrames(frameCount: number, fps: number): number[] {
     return frames;
 }
 
-function moveInto(source: string, target: string): void {
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.renameSync(source, target);
-}
-
 /** Render every frame to MP4, verify the result, and publish it to out/ only when it passes. */
 export async function runRender(options: RenderOptions): Promise<Report> {
     const dir = compositionDir(options.dir);
     const rb = new ReportBuilder('render', dir);
+    const ws = Workspace.open(dir);
+    const unsafe = outputLinksFinding(ws);
+    if (unsafe) {
+        rb.add(unsafe);
+        return rb.finish();
+    }
     const started = Date.now();
     let counted = true;
     const finish = () => {
@@ -95,8 +95,8 @@ export async function runRender(options: RenderOptions): Promise<Report> {
         }));
     rb.report.environment.chromium = session.chromium;
     rb.report.environment.ffmpeg = session.ffmpeg.version ?? undefined;
-    const tmp = freshDir(path.join(workDir(dir), 'tmp', `render-${process.pid}-${Date.now()}`));
-    const evidenceDir = freshDir(path.join(workDir(dir), 'evidence', 'render'));
+    const tmp = ws.fresh(ws.path('.flipbook', 'tmp', `render-${process.pid}-${Date.now()}`));
+    const evidenceDir = ws.fresh(ws.path('.flipbook', 'evidence', 'render'));
     try {
         const { page, findings } = await openPage(session, {
             dir,
@@ -141,6 +141,7 @@ export async function runRender(options: RenderOptions): Promise<Report> {
                 sampleFrames: evenFrames(timeline.frameCount, 8),
                 baselineFrames: baselineFrames(timeline.frameCount, timeline.fps),
                 textFrames,
+                workspace: ws,
                 workDir: tmp,
                 seekTimeoutMs: options.seekTimeoutMs,
                 dropFrames: options.dropFrames,
@@ -183,8 +184,8 @@ export async function runRender(options: RenderOptions): Promise<Report> {
             return finish();
         }
         const encodeMs = Date.now() - encodeStart;
-        fs.writeFileSync(
-            path.join(workDir(dir), 'frame-hashes.json'),
+        ws.writeFile(
+            ws.path('.flipbook', 'frame-hashes.json'),
             `${JSON.stringify({ digest: captured.digest, hashes: captured.hashes }, null, 2)}\n`,
         );
         progress('render: verifying the video');
@@ -258,21 +259,22 @@ export async function runRender(options: RenderOptions): Promise<Report> {
             })),
         };
         if (rb.hasErrors()) {
-            const rejected = freshDir(path.join(workDir(dir), 'rejected'));
-            moveInto(delivered, path.join(rejected, 'video.mp4'));
-            moveInto(sheet, path.join(rejected, 'contact-sheet.png'));
-            rb.report.artifacts.rejectedVideo = path.join(rejected, 'video.mp4');
-            rb.report.artifacts.contactSheet = path.join(rejected, 'contact-sheet.png');
+            const rejected = ws.fresh(ws.path('.flipbook', 'rejected'));
+            rb.report.artifacts.rejectedVideo = ws.move(
+                delivered,
+                path.join(rejected, 'video.mp4'),
+            );
+            rb.report.artifacts.contactSheet = ws.move(
+                sheet,
+                path.join(rejected, 'contact-sheet.png'),
+            );
         } else {
-            const out = path.join(dir, 'out');
-            moveInto(delivered, path.join(out, 'video.mp4'));
-            moveInto(sheet, path.join(out, 'contact-sheet.png'));
-            rb.report.artifacts.video = path.join(out, 'video.mp4');
-            rb.report.artifacts.contactSheet = path.join(out, 'contact-sheet.png');
+            rb.report.artifacts.video = ws.move(delivered, ws.path('out', 'video.mp4'));
+            rb.report.artifacts.contactSheet = ws.move(sheet, ws.path('out', 'contact-sheet.png'));
         }
         return finish();
     } finally {
-        fs.rmSync(tmp, { recursive: true, force: true });
+        ws.remove(tmp);
         release();
         if (!options.session) await session.close();
     }

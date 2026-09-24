@@ -1,18 +1,17 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { evenFrames } from '../engine/capture.ts';
 import { contactSheet, sheetLayout, writeSequence } from '../engine/pixels.ts';
 import {
     compositionDir,
-    freshDir,
     indexFinding,
     openPage,
     openSession,
+    outputLinksFinding,
     type Session,
 } from '../engine/session.ts';
 import { loadTimeline } from '../engine/timeline.ts';
 import { type ResolvedTimeline, sceneAtFrame } from '../engine/timelineResolve.ts';
-import { compositionHash, workDir } from '../engine/workspace.ts';
+import { compositionHash, Workspace } from '../engine/workspace.ts';
 import { progress, type Report, ReportBuilder, UsageError } from './report.ts';
 
 export interface Region {
@@ -65,6 +64,12 @@ export function parseRegion(raw: string): Region {
 export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
     const dir = compositionDir(options.dir);
     const rb = new ReportBuilder('snapshot', dir);
+    const ws = Workspace.open(dir);
+    const unsafe = outputLinksFinding(ws);
+    if (unsafe) {
+        rb.add(unsafe);
+        return rb.finish();
+    }
     const missingIndex = indexFinding(dir);
     if (missingIndex) rb.add(missingIndex);
     const loaded = loadTimeline(dir);
@@ -93,8 +98,8 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
         rb.addAll(findings);
         const frames = snapshotFrames(timeline, options.count ?? 12);
         const shots: Buffer[] = [];
-        const zooms: string[] = [];
-        const outDir = path.join(dir, 'out', 'snapshot');
+        const zoomFrames: number[] = [];
+        const stage = ws.fresh(ws.path('.flipbook', 'snapshot'));
         try {
             if (!page.broken && findings.length === 0) {
                 for (const frame of frames) {
@@ -106,7 +111,6 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
                     shots.push(await page.capture());
                 }
                 if (options.zoom && !rb.hasErrors()) {
-                    fs.mkdirSync(outDir, { recursive: true });
                     const times =
                         options.at && options.at.length > 0
                             ? options.at.map((t) =>
@@ -127,12 +131,11 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
                             rb.add(failed);
                             break;
                         }
-                        const file = path.join(outDir, `zoom-f${frame}.png`);
-                        fs.writeFileSync(
-                            file,
+                        ws.writeFile(
+                            path.join(stage, `zoom-f${frame}.png`),
                             await page.capture({ ...options.zoom, scale: options.scale ?? 2 }),
                         );
-                        zooms.push(file);
+                        zoomFrames.push(frame);
                     }
                 }
             }
@@ -140,12 +143,20 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
             rb.addAll(page.issues);
             await page.close();
         }
+        const outDir = ws.path('out', 'snapshot');
+        const zooms = zoomFrames.map((frame) =>
+            ws.move(
+                path.join(stage, `zoom-f${frame}.png`),
+                path.join(outDir, `zoom-f${frame}.png`),
+            ),
+        );
         if (shots.length > 0) {
             const layout = sheetLayout(shots.length, timeline.width, timeline.height);
-            const pattern = writeSequence(freshDir(path.join(workDir(dir), 'snapshot')), shots);
-            const sheet = path.join(outDir, 'contact-sheet.png');
+            const pattern = writeSequence(ws, path.join(stage, 'frames'), shots);
+            const staged = path.join(stage, 'contact-sheet.png');
             progress(`snapshot: tiling ${shots.length} frames ${layout.cols}x${layout.rows}`);
-            await contactSheet(session.ffmpeg.ffmpeg, ['-i', pattern], layout, sheet);
+            await contactSheet(session.ffmpeg.ffmpeg, ['-i', pattern], layout, staged);
+            const sheet = ws.move(staged, path.join(outDir, 'contact-sheet.png'));
             rb.report.artifacts.contactSheet = sheet;
             rb.report.snapshot = {
                 layout,

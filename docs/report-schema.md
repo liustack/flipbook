@@ -43,7 +43,7 @@ read_when:
 
 ## 输出目录
 
-合成目录里只有两处是 flipbook 写的：
+合成目录里只有 `out/` 和 `.flipbook/` 两处是 flipbook 写的。写入前逐级核对路径：这两处或它们下面任何一级是软链，命令一开始就报 `unsafe-output` 退 1，什么都不写、不删。文件先写到同目录的新文件名再改名替换，不会顺着已有的软链或硬链写到外面：
 
 | 路径 | 谁写 | 内容 |
 |---|---|---|
@@ -90,6 +90,7 @@ read_when:
 | `resource-failed` | 全部 | 请求的文件在合成目录里不存在 | 补文件或改路径，图片放 assets/ |
 | `external-request` | 全部 | 页面想联网，已拦下 | 文件拷进 assets/ 用相对路径 |
 | `path-escape` | 全部 | 请求的路径解析后落在合成目录外，已拒绝 | 所有文件放合成目录内 |
+| `unsafe-output` | check、snapshot、render | `.flipbook/` 或 `out/` 里有软链，或该是目录的地方是文件，这次什么都没写。`detail.paths` 列出这些路径 | 删掉这些路径（软链只删链接本身），再跑一次 |
 | `static-forbidden` | check | 源码里有禁用写法，只报 warning | 换成 t 的纯函数写法 |
 | `seek-order-dependent` | check | 同一个 t 换个 seek 顺序画面就变，有跨帧状态 | 去掉帧间累积的状态，全部由 t 算出 |
 | `clock-dependent` | check | 换虚拟时钟起点画面就变，读了 Date 或 performance.now | 只用 seek 传进来的 t |
