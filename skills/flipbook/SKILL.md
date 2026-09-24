@@ -74,7 +74,7 @@ Defaults:
 - `seek(t)` must not await frames, timers or events.
 - check samples a few frames under a moved clock and seed and counts clock and random calls. It catches most slips, not all of them: keep these rules even when check passes.
 - Size `html` and `body` to the timeline width and height with `overflow: hidden`. Mark paper and grain layers `data-flipbook-layer="paper"`. Draw static layers once in `setup()`.
-- Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"` only. Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1 (check measures DOM text only: judge canvas text on the contact sheet). Mark deliberate bleeds `data-flipbook-allow-overflow`.
+- Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"` only. Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1 (check measures DOM text only: judge canvas text on the contact sheet). Mark deliberate bleeds `data-flipbook-allow-overflow`. Never animate `transform: scale()` on DOM text (two renders of it differ): text that grows or shrinks goes through `fillText()` on a canvas.
 - Scenes where the picture stands still for more than 1.5 s need `"hold": true`.
 - Images go in `assets/` with their source and license in `assets/SOURCES.json`.
 - Never edit `.flipbook/` or `out/`.
