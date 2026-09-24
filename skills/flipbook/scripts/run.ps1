@@ -49,7 +49,8 @@ function Get-CliVersion {
     if ($m.Success) { return $m.Value } else { return '' }
 }
 
-# Compatible = same major version as $Pinned AND not older than $Pinned.
+# Compatible = not older than $Pinned, with the same major.minor while $Pinned is
+# 0.x and the same major from 1.0 on.
 function Test-Compatible {
     param([string] $Ver)
     $f = $Ver -split '\.'
@@ -58,6 +59,7 @@ function Test-Compatible {
     $fMaj = [int]$f[0]; $fMin = [int]$f[1]; $fPat = [int]$f[2]
     $pMaj = [int]$p[0]; $pMin = [int]$p[1]; $pPat = [int]$p[2]
     if ($fMaj -ne $pMaj) { return $false }
+    if ($pMaj -eq 0 -and $fMin -ne $pMin) { return $false }
     if ($fMin -gt $pMin) { return $true }
     if ($fMin -lt $pMin) { return $false }
     return ($fPat -ge $pPat)
@@ -151,14 +153,15 @@ function Build-DiagnosisJson {
     }
     $steps = @()
     if ($script:Selected -eq 'none') {
-        $major = $Pinned.Split('.')[0]
+        $parts = $Pinned.Split('.')
+        $range = if ($parts[0] -eq '0') { "$($parts[0]).$($parts[1]).x, at or above $Pinned" } else { "major $($parts[0]), at or above $Pinned" }
         $first = "Install Node 22.19+ from https://nodejs.org so npx can run $Package@$Pinned, then re-run this launcher."
         if ($script:NpxPresent -and (-not $script:NodeFloorOk)) {
             $first = "npx is present but node $(if ($script:NodeVer) { $script:NodeVer } else { 'missing' }) is below the $NodeFloor floor this CLI needs. Upgrade Node at https://nodejs.org, then re-run this launcher."
         }
         $steps = @(
             $first,
-            "No JavaScript runtime? Install Bun from https://bun.sh to use bunx, or put a compatible $Bin (major $major, at or above $Pinned) on PATH."
+            "No JavaScript runtime? Install Bun from https://bun.sh to use bunx, or put a compatible $Bin ($range) on PATH."
         )
     }
     $obj = [ordered]@{

@@ -41,7 +41,8 @@ parse_semver() {
   case "$_PAT" in '' | *[!0-9]*) _PAT=0 ;; esac
 }
 
-# Compatible = same major version as PINNED AND not older than PINNED.
+# Compatible = not older than PINNED, with the same major.minor while PINNED is
+# 0.x and the same major from 1.0 on.
 compatible() {
   parse_semver "$1"
   _f_maj=$_MAJ
@@ -49,9 +50,20 @@ compatible() {
   _f_pat=$_PAT
   parse_semver "$PINNED"
   [ "$_f_maj" = "$_MAJ" ] || return 1
+  if [ "$_MAJ" = "0" ] && [ "$_f_min" != "$_MIN" ]; then return 1; fi
   if [ "$_f_min" -gt "$_MIN" ]; then return 0; fi
   if [ "$_f_min" -lt "$_MIN" ]; then return 1; fi
   [ "$_f_pat" -ge "$_PAT" ]
+}
+
+# Human wording of the compatible range, e.g. "0.1.x, at or above 0.1.0".
+compat_range() {
+  parse_semver "$PINNED"
+  if [ "$_MAJ" = "0" ]; then
+    printf '%s.%s.x, at or above %s' "$_MAJ" "$_MIN" "$PINNED"
+  else
+    printf 'major %s, at or above %s' "$_MAJ" "$PINNED"
+  fi
 }
 
 # First "X.Y.Z" token printed by `$BIN --version`.
@@ -177,7 +189,7 @@ compute_next_steps() {
     else
       _s1="Install Node 22.19+ from https://nodejs.org so npx can run $PKG@$PINNED, then re-run this launcher."
     fi
-    _s2="No JavaScript runtime? Install Bun from https://bun.sh to use bunx, or put a compatible $BIN (major ${PINNED%%.*}, at or above $PINNED) on PATH."
+    _s2="No JavaScript runtime? Install Bun from https://bun.sh to use bunx, or put a compatible $BIN ($(compat_range)) on PATH."
     G_NEXTSTEPS="$(printf '"%s", "%s"' "$(json_escape "$_s1")" "$(json_escape "$_s2")")"
   else
     G_NEXTSTEPS=""
