@@ -65,8 +65,26 @@ export {
 } from './materials.ts';
 export type { GrainOptions, GridOptions, PaperOptions } from './paper.ts';
 export { drawGrain, drawPaper, grainLayer, PAPER, paperLayer } from './paper.ts';
-export type { TextBox, TextEntry } from './text.ts';
-export { fillText, registerText } from './text.ts';
+export type {
+    PathTextOptions,
+    PlacedWord,
+    TextBox,
+    TextEntry,
+    TextLayout,
+    TypesetOptions,
+    WriteOptions,
+} from './text.ts';
+export {
+    fillText,
+    graphemes,
+    handText,
+    registerText,
+    textOnPath,
+    typeset,
+    wordReveal,
+    words,
+    writeText,
+} from './text.ts';
 
 /** Font families served from /__flipbook/fonts/. */
 export const FONTS = {
