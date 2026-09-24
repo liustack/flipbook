@@ -6,15 +6,16 @@
 //   pnpm release patch        bump from the current one
 //
 // Runs every refusal check first, then the gates (lint, typecheck, test,
-// build), regenerates docs/samples, then bumps, stamps, commits, tags and
-// pushes main and the tag
-// atomically. It does not publish: the pushed tag triggers
+// build), regenerates docs/samples, then bumps, stamps the launchers and
+// today's date on the version's CHANGELOG heading, commits, tags and pushes
+// main and the tag atomically. It does not publish: the pushed tag triggers
 // .github/workflows/release.yml, which publishes to npm and creates the
 // GitHub Release.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { localDate, stampChangelogDate } from './changelog.mjs';
 import { stampLaunchers } from './stamp.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -81,7 +82,8 @@ try {
     fail(`cannot reach origin to verify tags: ${error.message ?? error}`);
 }
 
-const changelog = readFileSync(join(root, 'CHANGELOG.md'), 'utf-8');
+const changelogPath = join(root, 'CHANGELOG.md');
+const changelog = readFileSync(changelogPath, 'utf-8');
 const section = changelog.match(
     new RegExp(`^## ${next.replace(/\./g, '\\.')}[^\\n]*\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm'),
 );
@@ -110,6 +112,10 @@ if (next !== pkg.version) {
     writeFileSync(pkgPath, pkgRaw.replace(`"version": "${pkg.version}"`, `"version": "${next}"`));
 }
 stampLaunchers(root);
+writeFileSync(
+    changelogPath,
+    stampChangelogDate(readFileSync(changelogPath, 'utf-8'), next, localDate()),
+);
 if (run('git', ['status', '--porcelain'])) {
     run('git', ['commit', '-am', `chore(release): v${next}`]);
 }
