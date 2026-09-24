@@ -67,7 +67,7 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `beat` | 是 | 0 到该场拍数（不含） | 从场景开头算的拍数，可以是小数 |
 | `kind` | 是 | `text`、`sfx`、`mark` | |
 | `text` | kind 为 text 时必填 | 非空字符串 | 上屏文字，check 用它核对字形覆盖 |
-| `settleBeats` | 否 | 0 到 64 | 文字完全出来要几拍，check 和 render 在这个时刻做文字检查，缺省 0 |
+| `settleBeats` | 否 | 0 到 64 | 文字完全出来要几拍，check 和 render 在这个时刻做文字检查，缺省 0（在 cue 时刻就完全出来）。文字 cue 必须在本场结束前出完 |
 | `sfx` | kind 为 sfx 时必填 | 音效名 | v0.3 起用于音效峰值对帧 |
 
 ## audio
@@ -93,7 +93,7 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 - 第 i 帧的时间 t = i / `fps`，seek 收到的就是这个 t。
 - 场景起止帧 = round(起止秒数 乘 `fps`)。
 - cue 的绝对拍数 = 场景起点拍数 + `beat`，时间和帧号同上换算。
-- 文字的取样时刻 = cue 时间 + `settleBeats` 拍，不超过场景结尾。
+- 文字的取样帧 = cue 时间加 `settleBeats` 拍之后的第一帧，也就是 `cueProgress` 到 1 的第一帧，存在 `settleFrame`。它必须落在 cue 所在场景之内（小于该场的 `endFrame`），否则报 `timeline-invalid`，路径指向 `settleBeats`（`settleBeats` 为 0 时指向 `beat`）。不再把取样时刻截到场景结尾。
 
 用户说「30 秒」时由 agent 选 bpm 和小节数凑近，不在 timeline 里写秒数。
 

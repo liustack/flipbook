@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
 import {
+    type ResolvedScene,
     type ResolvedTimeline,
     resolveTimeline,
     TIMELINE_VERSION,
@@ -266,6 +267,21 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
         if (Math.round(duration * (input.fps as number)) < 1) {
             c.fail('$.scenes', 'add up to less than one frame');
         }
+    }
+
+    if (c.errors.length === 0) {
+        // Text must be fully in while its scene is on screen: check samples that frame.
+        const resolved = resolveTimeline(input as unknown as TimelineV1);
+        resolved.cues.forEach((cue, i) => {
+            if (cue.kind !== 'text') return;
+            const scene = resolved.scenes.find((s) => s.id === cue.scene) as ResolvedScene;
+            if (cue.settleFrame < scene.endFrame) return;
+            const field = cue.settleBeats > 0 ? 'settleBeats' : 'beat';
+            c.fail(
+                `$.cues[${i}].${field}`,
+                `puts the moment text cue "${cue.id}" is fully in at frame ${cue.settleFrame}, but scene "${scene.id}" ends before frame ${scene.endFrame}. Lower settleBeats or move the cue earlier so it settles while its scene is on screen`,
+            );
+        });
     }
 
     if (c.errors.length > 0) return { errors: c.errors };

@@ -97,6 +97,17 @@ export function frameAt(time: number, fps: number): number {
 }
 
 /**
+ * First frame whose time is at or after `settleTime`: the first frame where a
+ * cue's cueProgress is 1. It is not clipped to the scene; validation requires
+ * it to fall inside the cue's scene.
+ */
+export function settleFrameAt(settleTime: number, fps: number): number {
+    let frame = Math.max(0, Math.ceil(settleTime * fps - 1e-6));
+    while (frame / fps < settleTime) frame += 1;
+    return frame;
+}
+
+/**
  * Seconds and frames for every scene and cue. Expects a timeline that passed
  * validation: scene references resolve and numbers are in range.
  */
@@ -136,7 +147,7 @@ export function resolveTimeline(timeline: TimelineV1): ResolvedTimeline {
         const absBeat = scene.startBeat + cue.beat;
         const time = absBeat * secondsPerBeat;
         const settleBeats = cue.settleBeats ?? 0;
-        const settleTime = Math.min((absBeat + settleBeats) * secondsPerBeat, scene.end);
+        const settleTime = time + settleBeats * secondsPerBeat;
         const resolved: ResolvedCue = {
             id: cue.id,
             scene: cue.scene,
@@ -147,7 +158,7 @@ export function resolveTimeline(timeline: TimelineV1): ResolvedTimeline {
             frame: Math.min(frameAt(time, fps), lastFrame),
             settleBeats,
             settleTime,
-            settleFrame: Math.min(frameAt(settleTime, fps), lastFrame),
+            settleFrame: settleFrameAt(settleTime, fps),
         };
         if (cue.text !== undefined) resolved.text = cue.text;
         if (cue.sfx !== undefined) resolved.sfx = cue.sfx;

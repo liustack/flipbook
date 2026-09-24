@@ -149,3 +149,40 @@ describe('settle contract between the resolver and cueProgress', () => {
         });
     }
 });
+
+describe('text cues settle inside their scene', () => {
+    const twoScenes = (cue: Record<string, unknown>): Record<string, unknown> => ({
+        version: 1,
+        width: 640,
+        height: 360,
+        fps: 24,
+        seed: 1,
+        bpm: 120,
+        beatsPerBar: 4,
+        scenes: [
+            { id: 'a', bars: 1 },
+            { id: 'b', bars: 1 },
+        ],
+        cues: [{ id: 'x', scene: 'a', kind: 'text', text: '字', ...cue }],
+    });
+
+    it('rejects a cue that settles when the next scene is already on screen', () => {
+        const errors = validateTimeline(twoScenes({ beat: 3, settleBeats: 1 })).errors;
+        expect(errors.map((e) => e.path)).toEqual(['$.cues[0].settleBeats']);
+        expect(errors[0].message).toContain('scene "a"');
+    });
+
+    it('rejects a cue too close to the cut to show even without settling', () => {
+        const errors = validateTimeline(twoScenes({ beat: 3.99 })).errors;
+        expect(errors.map((e) => e.path)).toEqual(['$.cues[0].beat']);
+    });
+
+    it('samples a frame of the cue scene, where cueProgress is 1', () => {
+        const t = twoScenes({ beat: 2, settleBeats: 1.5 });
+        expect(validateTimeline(t).errors).toEqual([]);
+        const r = resolveTimeline(t as unknown as TimelineV1);
+        const c = r.cues[0];
+        expect(sceneAtFrame(r, c.settleFrame).id).toBe('a');
+        expect(cueProgress(r, c.settleFrame / r.fps, 'x')).toBe(1);
+    });
+});

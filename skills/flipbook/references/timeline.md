@@ -78,7 +78,7 @@ Any other field is an error, so a typo never passes silently.
 - total frames = round(total beats × seconds per beat × `fps`), duration = frames / `fps`
 - frame `i` is drawn at t = i / `fps`
 - a cue's time = (scene start beat + `beat`) × seconds per beat
-- a text cue settles at its time + `settleBeats` beats, clipped to the scene end
+- a text cue settles at its time + `settleBeats` beats, and that moment must fall inside its own scene: a text cue that would settle at or after the cut fails with `timeline-invalid`
 
 ## Hitting a requested duration
 
