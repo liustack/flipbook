@@ -130,7 +130,7 @@ export function streamGray(
                 'gray',
                 '-',
             ],
-            { stdio: ['ignore', 'pipe', 'pipe'] },
+            { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
         );
         let pending: Buffer = Buffer.alloc(0);
         let index = 0;

@@ -22,11 +22,23 @@ const DRAIN_MS = 200;
 /** Time between SIGTERM and SIGKILL. */
 const KILL_GRACE_MS = 2000;
 
-/** First executable named `bin` on PATH, or null. Nothing is spawned. */
-export function findOnPath(bin: string, env: NodeJS.ProcessEnv = process.env): string | null {
-    const dirs = (env.PATH ?? '').split(path.delimiter).filter(Boolean);
+/**
+ * First executable named `bin` on PATH, or null. Nothing is spawned. On win32
+ * the name gets `.exe` and the PATH key matches in any case (a copied env
+ * often spells it Path).
+ */
+export function findOnPath(
+    bin: string,
+    env: NodeJS.ProcessEnv = process.env,
+    platform: NodeJS.Platform = process.platform,
+): string | null {
+    const windows = platform === 'win32';
+    const key = windows ? Object.keys(env).find((k) => k.toUpperCase() === 'PATH') : 'PATH';
+    const value = key === undefined ? '' : (env[key] ?? '');
+    const name = windows && !bin.toLowerCase().endsWith('.exe') ? `${bin}.exe` : bin;
+    const dirs = value.split(windows ? ';' : ':').filter(Boolean);
     for (const dir of dirs) {
-        const candidate = path.join(dir, bin);
+        const candidate = path.join(dir, name);
         try {
             fs.accessSync(candidate, fs.constants.X_OK);
             if (fs.statSync(candidate).isFile()) return candidate;
@@ -57,6 +69,7 @@ export function run(cmd: string, args: string[], options: RunOptions = {}): Prom
             env: options.env ?? process.env,
             cwd: options.cwd,
             stdio: ['pipe', 'pipe', 'pipe'],
+            windowsHide: true,
         });
         const out: Buffer[] = [];
         const err: Buffer[] = [];

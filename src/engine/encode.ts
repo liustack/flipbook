@@ -101,7 +101,10 @@ export class Encoder {
 
     /** `options.output` must sit in a directory the caller made with Workspace.fresh. */
     static start(ffmpeg: string, options: EncoderOptions): Encoder {
-        const child = spawn(ffmpeg, encoderArgs(options), { stdio: ['pipe', 'ignore', 'pipe'] });
+        const child = spawn(ffmpeg, encoderArgs(options), {
+            stdio: ['pipe', 'ignore', 'pipe'],
+            windowsHide: true,
+        });
         return new Encoder(
             child as unknown as ChildProcessWithoutNullStreams,
             options.writeTimeoutMs ?? WRITE_TIMEOUT_MS,

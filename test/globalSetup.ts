@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import { execSync } from 'child_process';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -6,5 +6,6 @@ import { fileURLToPath } from 'url';
 export default function setup(): void {
     if (process.env.FLIPBOOK_TEST_SKIP_BUILD === '1') return;
     const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-    execFileSync('pnpm', ['build'], { cwd: root, stdio: 'ignore' });
+    // Through a shell: on Windows pnpm is a .cmd shim, which execFile cannot start.
+    execSync('pnpm build', { cwd: root, stdio: 'ignore', windowsHide: true });
 }

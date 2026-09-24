@@ -6,6 +6,7 @@ import { ENV_CODES, FINDING_CODES } from '../src/cli/codes.ts';
 import { LIMITS, recordCheck, recordRender } from '../src/engine/attempts.ts';
 import { covered, uncoveredChars } from '../src/engine/fonts.ts';
 import { psnr, sheetLayout } from '../src/engine/pixels.ts';
+import { findOnPath } from '../src/engine/proc.ts';
 import { auditCanvasText } from '../src/engine/textAudit.ts';
 import { acquireLock } from '../src/engine/workspace.ts';
 import { repoRoot, tempDir } from './helpers.ts';
@@ -163,6 +164,32 @@ describe('render lock', () => {
         ).toHaveLength(1);
         expect(outcomes.filter((o) => o === 'busy')).toHaveLength(7);
         expect(fs.existsSync(lockFile(dir))).toBe(false);
+    });
+});
+
+describe('finding programs on PATH', () => {
+    /** A directory holding one executable file called `name`. */
+    function binDir(name: string): string {
+        const dir = tempDir('path-bin');
+        fs.writeFileSync(path.join(dir, name), '', { mode: 0o755 });
+        return dir;
+    }
+
+    it('adds .exe on win32 and reads the PATH key in any case', () => {
+        const dir = binDir('ffmpeg.exe');
+        const env = { Path: `C:\\nowhere;${dir}` };
+        expect(findOnPath('ffmpeg', env, 'win32')).toBe(path.join(dir, 'ffmpeg.exe'));
+        expect(findOnPath('ffmpeg.exe', env, 'win32')).toBe(path.join(dir, 'ffmpeg.exe'));
+        expect(findOnPath('ffprobe', env, 'win32')).toBeNull();
+    });
+
+    it('keeps the exact name and the PATH key on other platforms', () => {
+        const dir = binDir('ffmpeg');
+        expect(findOnPath('ffmpeg', { PATH: `/nowhere:${dir}` }, 'linux')).toBe(
+            path.join(dir, 'ffmpeg'),
+        );
+        expect(findOnPath('ffmpeg', { Path: dir }, 'linux')).toBeNull();
+        expect(findOnPath('ffmpeg', { PATH: binDir('ffmpeg.exe') }, 'darwin')).toBeNull();
     });
 });
 

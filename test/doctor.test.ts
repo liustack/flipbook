@@ -8,9 +8,24 @@ import { cleanTemps, copyFixture, runCli, tempDir } from './helpers.ts';
 /** PATH with node on it and nothing else. */
 const nodeOnly = path.dirname(process.execPath);
 
+/** process.env with `dir` as the only PATH entry, whatever case the key had (Windows spells it Path). */
+function onlyOnPath(dir: string): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = {};
+    for (const [key, value] of Object.entries(process.env)) {
+        if (key.toUpperCase() !== 'PATH') env[key] = value;
+    }
+    env.PATH = dir;
+    return env;
+}
+
+/** The install command doctor prints: PowerShell syntax on Windows, sh elsewhere. */
+const installPattern = new RegExp(
+    `^${process.platform === 'win32' ? '\\$env:PLAYWRIGHT_BROWSERS_PATH=".*browsers"; ' : 'PLAYWRIGHT_BROWSERS_PATH=".*browsers" '}npx --yes playwright-core@\\d+\\.\\d+\\.\\d+ install chromium-headless-shell$`,
+);
+
 describe('doctor exits 78 with a fix when something is missing', () => {
     it('reports missing ffmpeg', () => {
-        const result = runCli(['doctor', '--json'], { ...process.env, PATH: nodeOnly });
+        const result = runCli(['doctor', '--json'], onlyOnPath(nodeOnly));
         expect(result.status).toBe(78);
         const report = result.json as {
             problems: { code: string; fix: string[] }[];
@@ -27,9 +42,7 @@ describe('doctor exits 78 with a fix when something is missing', () => {
         expect(result.status).toBe(78);
         const report = result.json as { problems: { code: string; fix: string[] }[] };
         const problem = report.problems.find((p) => p.code === 'chromium-missing');
-        expect(problem?.fix[0]).toMatch(
-            /^PLAYWRIGHT_BROWSERS_PATH=".*browsers" npx --yes playwright-core@\d+\.\d+\.\d+ install chromium-headless-shell$/,
-        );
+        expect(problem?.fix[0]).toMatch(installPattern);
         cleanTemps();
     });
 
@@ -120,30 +133,31 @@ describe('doctor checks that the cache can be written', () => {
         expect(report.problems.map((p) => p.code)).not.toContain('cache-unwritable');
     });
 
-    it.skipIf(process.getuid?.() === 0)('exits 78 when the cache cannot be written', async () => {
-        const cache = tempDir('cache-readonly');
-        fs.chmodSync(cache, 0o500);
-        try {
-            resetLaunchMode();
-            const report = await healthy(cache);
-            resetLaunchMode();
-            expect(report.cache.writable).toBe(false);
-            expect(report.exitCode).toBe(78);
-            const problem = report.problems.find((p) => p.code === 'cache-unwritable');
-            expect(problem?.message).toContain(cache);
-            expect(report.fix.join('\n')).toContain('FLIPBOOK_CACHE_DIR');
-        } finally {
-            fs.chmodSync(cache, 0o700);
-        }
-    });
+    // Windows ignores the write bit on directories, and root ignores it everywhere.
+    it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+        'exits 78 when the cache cannot be written',
+        async () => {
+            const cache = tempDir('cache-readonly');
+            fs.chmodSync(cache, 0o500);
+            try {
+                resetLaunchMode();
+                const report = await healthy(cache);
+                resetLaunchMode();
+                expect(report.cache.writable).toBe(false);
+                expect(report.exitCode).toBe(78);
+                const problem = report.problems.find((p) => p.code === 'cache-unwritable');
+                expect(problem?.message).toContain(cache);
+                expect(report.fix.join('\n')).toContain('FLIPBOOK_CACHE_DIR');
+            } finally {
+                fs.chmodSync(cache, 0o700);
+            }
+        },
+    );
 });
 
 describe('commands exit 78 or 2 before touching the composition', () => {
     it('check exits 78 without ffmpeg and prints a diagnosis on stderr', () => {
-        const result = runCli(['check', copyFixture('hello', 'examples')], {
-            ...process.env,
-            PATH: nodeOnly,
-        });
+        const result = runCli(['check', copyFixture('hello', 'examples')], onlyOnPath(nodeOnly));
         expect(result.status).toBe(78);
         expect((result.json as { exitCode: number }).exitCode).toBe(78);
         expect(JSON.parse(result.stderr).error).toBe('ffmpeg-missing');
@@ -151,7 +165,7 @@ describe('commands exit 78 or 2 before touching the composition', () => {
 
     it('saves the report of a run that ended in an environment error', () => {
         const dir = copyFixture('hello', 'examples');
-        const result = runCli(['check', dir], { ...process.env, PATH: nodeOnly });
+        const result = runCli(['check', dir], onlyOnPath(nodeOnly));
         expect(result.status).toBe(78);
         const report = result.json as { artifacts: { report?: string } };
         const saved = path.join(fs.realpathSync(dir), '.flipbook', 'reports', 'check.json');
