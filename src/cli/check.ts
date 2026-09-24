@@ -1,0 +1,404 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { recordCheck } from '../engine/attempts.ts';
+import { type ClockConfig, defaultClock } from '../engine/page.ts';
+import { decodeGray, isFlat, matchesBaseline, writeSequence } from '../engine/pixels.ts';
+import { scanComposition } from '../engine/scan.ts';
+import {
+    compositionDir,
+    freshDir,
+    indexFinding,
+    openPage,
+    openSession,
+    type Session,
+} from '../engine/session.ts';
+import { auditCueText, auditFrameText, dedupe } from '../engine/textAudit.ts';
+import { loadTimeline } from '../engine/timeline.ts';
+import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
+import { compositionHash, sha256, workDir } from '../engine/workspace.ts';
+import { type Finding, finding, progress, type Report, ReportBuilder } from './report.ts';
+
+export interface CheckOptions {
+    dir: string;
+    /** Seed for picking and ordering sample frames. */
+    seed?: number;
+    /** How many frames to sample. */
+    samples?: number;
+    seekTimeoutMs?: number;
+    readyTimeoutMs?: number;
+    env?: NodeJS.ProcessEnv;
+    /** Reuse an open session instead of launching one. */
+    session?: Session;
+    recordAttempts?: boolean;
+}
+
+/** Clock origin and random seed shifts for the perturbation pages. */
+export const CLOCK_SHIFT = { epochMs: 123_456_789.125, perfOriginMs: 7_777.5 };
+export const RANDOM_SHIFT = 0x5bd1e995;
+
+function mulberry(seed: number): () => number {
+    let a = seed >>> 0;
+    return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let x = a;
+        x = Math.imul(x ^ (x >>> 15), x | 1);
+        x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function shuffle<T>(items: T[], seed: number): T[] {
+    const next = mulberry(seed);
+    const out = [...items];
+    for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(next() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+}
+
+/** `count` distinct frames chosen with a fixed seed, always including the first and last. */
+export function sampleFrames(frameCount: number, count: number, seed: number): number[] {
+    if (frameCount <= count) return Array.from({ length: frameCount }, (_, i) => i);
+    const picked = new Set<number>([0, frameCount - 1]);
+    const next = mulberry(seed ^ 0x51ed270b);
+    while (picked.size < count) picked.add(Math.floor(next() * frameCount));
+    return [...picked].sort((a, b) => a - b);
+}
+
+function different<T>(a: T[], b: T[]): boolean {
+    return a.some((value, i) => value !== b[i]);
+}
+
+async function perturbed(
+    session: Session,
+    dir: string,
+    timeline: ResolvedTimeline,
+    clock: ClockConfig,
+    frames: number[],
+    readyTimeoutMs: number | undefined,
+    seekTimeoutMs: number | undefined,
+    env: NodeJS.ProcessEnv | undefined,
+): Promise<Map<number, Buffer> | null> {
+    const { page, findings } = await openPage(session, {
+        dir,
+        timeline,
+        clock,
+        readyTimeoutMs,
+        env,
+    });
+    try {
+        if (findings.length > 0 || page.broken) return null;
+        const shots = new Map<number, Buffer>();
+        for (const frame of frames) {
+            if (await page.seek(frame, seekTimeoutMs)) return null;
+            shots.set(frame, await page.capture());
+        }
+        return shots;
+    } finally {
+        await page.close();
+    }
+}
+
+/** Validate the timeline, scan the source, and exercise the page for determinism and text problems. */
+export async function runCheck(options: CheckOptions): Promise<Report> {
+    const dir = compositionDir(options.dir);
+    const rb = new ReportBuilder('check', dir);
+    const seed = options.seed ?? 1;
+    const evidenceDir = freshDir(path.join(workDir(dir), 'evidence', 'check'));
+    const finish = () => {
+        if (options.recordAttempts !== false) {
+            const verdict = recordCheck(dir, [...new Set(rb.report.failures.map((f) => f.code))]);
+            rb.report.attempts = verdict.summary;
+            rb.report.stop = verdict.stop;
+            if (verdict.reason) rb.report.stopReason = verdict.reason;
+        }
+        return rb.finish();
+    };
+
+    const missingIndex = indexFinding(dir);
+    if (missingIndex) rb.add(missingIndex);
+    const loaded = loadTimeline(dir);
+    rb.addAll(loaded.findings);
+    rb.addAll(scanComposition(dir));
+    const timeline = loaded.resolved;
+    if (!timeline || missingIndex) return finish();
+    rb.report.composition = {
+        dir,
+        hash: compositionHash(dir),
+        width: timeline.width,
+        height: timeline.height,
+        fps: timeline.fps,
+        frames: timeline.frameCount,
+        durationSec: timeline.durationSec,
+    };
+    rb.addAll(auditCueText(timeline));
+
+    const session = options.session ?? (await openSession(options.env));
+    rb.report.environment.chromium = session.chromium;
+    rb.report.environment.ffmpeg = session.ffmpeg.version ?? undefined;
+    try {
+        progress(`check: loading ${path.join(dir, 'index.html')}`);
+        const { page, findings: loadFindings } = await openPage(session, {
+            dir,
+            timeline,
+            readyTimeoutMs: options.readyTimeoutMs,
+            env: options.env,
+        });
+        rb.addAll(loadFindings);
+        const frames = sampleFrames(timeline.frameCount, options.samples ?? 8, seed);
+        const first = shuffle(frames, seed);
+        let second = shuffle(frames, seed + 1);
+        if (!different(first, second)) second = [...first].reverse();
+        const shots = new Map<number, Buffer>();
+        const baselines = new Map<number, Buffer>();
+        const dynamic: Finding[] = [];
+        let usable = !page.broken && loadFindings.length === 0;
+        try {
+            if (usable) {
+                const size = await page.stageSize();
+                if (size.width > timeline.width + 1 || size.height > timeline.height + 1) {
+                    rb.add(
+                        finding(
+                            'stage-size',
+                            `The page is ${size.width}x${size.height}; the stage is ${timeline.width}x${timeline.height}.`,
+                            {
+                                severity: 'warning',
+                                detail: {
+                                    page: size,
+                                    stage: { width: timeline.width, height: timeline.height },
+                                },
+                            },
+                        ),
+                    );
+                }
+            }
+            // Pass 1: shuffled order; a second capture of the same state catches late painting.
+            for (const frame of usable ? first : []) {
+                const failed = await page.seek(frame, options.seekTimeoutMs);
+                if (failed) {
+                    dynamic.push(failed);
+                    usable = false;
+                    break;
+                }
+                const a = await page.capture();
+                const b = await page.capture();
+                shots.set(frame, a);
+                if (sha256(a) !== sha256(b)) {
+                    const files = [
+                        path.join(evidenceDir, `late-paint-f${frame}-a.png`),
+                        path.join(evidenceDir, `late-paint-f${frame}-b.png`),
+                    ];
+                    fs.writeFileSync(files[0], a);
+                    fs.writeFileSync(files[1], b);
+                    dynamic.push(
+                        finding(
+                            'late-paint',
+                            `Frame ${frame} changed between two captures with no seek in between.`,
+                            {
+                                time: frame / timeline.fps,
+                                frame,
+                                evidence: files,
+                            },
+                        ),
+                    );
+                }
+                await page.setContent(false);
+                baselines.set(frame, await page.capture());
+                await page.setContent(true);
+            }
+            // Pass 2: another order must give the same pixels.
+            const orderMismatch: number[] = [];
+            for (const frame of usable ? second : []) {
+                const failed = await page.seek(frame, options.seekTimeoutMs);
+                if (failed) {
+                    dynamic.push(failed);
+                    usable = false;
+                    break;
+                }
+                const shot = await page.capture();
+                const before = shots.get(frame) as Buffer;
+                if (sha256(shot) !== sha256(before)) {
+                    orderMismatch.push(frame);
+                    if (orderMismatch.length === 1) {
+                        fs.writeFileSync(
+                            path.join(evidenceDir, `seek-order-f${frame}-first.png`),
+                            before,
+                        );
+                        fs.writeFileSync(
+                            path.join(evidenceDir, `seek-order-f${frame}-second.png`),
+                            shot,
+                        );
+                    }
+                }
+            }
+            if (orderMismatch.length > 0) {
+                const frame = orderMismatch[0];
+                dynamic.push(
+                    finding(
+                        'seek-order-dependent',
+                        `${orderMismatch.length} of ${frames.length} sampled frames changed when seeked in a different order.`,
+                        {
+                            time: frame / timeline.fps,
+                            frame,
+                            evidence: [
+                                path.join(evidenceDir, `seek-order-f${frame}-first.png`),
+                                path.join(evidenceDir, `seek-order-f${frame}-second.png`),
+                            ],
+                            detail: {
+                                frames: orderMismatch,
+                                firstOrder: first,
+                                secondOrder: second,
+                            },
+                        },
+                    ),
+                );
+            }
+            // Glyphs and fonts at the moments text cues settle (or at sampled frames).
+            const textFrames = [
+                ...new Set(
+                    timeline.cues.filter((c) => c.kind === 'text').map((c) => c.settleFrame),
+                ),
+            ];
+            for (const frame of usable
+                ? textFrames.length > 0
+                    ? textFrames
+                    : frames.slice(0, 3)
+                : []) {
+                const failed = await page.seek(frame, options.seekTimeoutMs);
+                if (failed) {
+                    dynamic.push(failed);
+                    usable = false;
+                    break;
+                }
+                dynamic.push(...(await auditFrameText(page, frame)));
+            }
+        } finally {
+            rb.addAll(page.issues);
+            await page.close();
+        }
+
+        // Perturbation: same frames from a fresh page with a shifted clock, then a shifted random seed.
+        const probe = first.slice(0, Math.min(3, first.length));
+        if (usable && probe.length > 0) {
+            const base = defaultClock(timeline);
+            const variants: { code: 'clock-dependent' | 'random-dependent'; clock: ClockConfig }[] =
+                [
+                    {
+                        code: 'clock-dependent',
+                        clock: {
+                            ...base,
+                            epochMs: base.epochMs + CLOCK_SHIFT.epochMs,
+                            perfOriginMs: base.perfOriginMs + CLOCK_SHIFT.perfOriginMs,
+                        },
+                    },
+                    {
+                        code: 'random-dependent',
+                        clock: { ...base, randomSeed: (base.randomSeed ^ RANDOM_SHIFT) >>> 0 },
+                    },
+                ];
+            for (const variant of variants) {
+                progress(
+                    `check: ${variant.code === 'clock-dependent' ? 'shifted clock' : 'shifted random seed'}`,
+                );
+                const result = await perturbed(
+                    session,
+                    dir,
+                    timeline,
+                    variant.clock,
+                    probe,
+                    options.readyTimeoutMs,
+                    options.seekTimeoutMs,
+                    options.env,
+                );
+                if (!result) continue;
+                const changed = probe.filter(
+                    (frame) =>
+                        sha256(result.get(frame) as Buffer) !== sha256(shots.get(frame) as Buffer),
+                );
+                if (changed.length > 0) {
+                    const frame = changed[0];
+                    const files = [
+                        path.join(evidenceDir, `${variant.code}-f${frame}-base.png`),
+                        path.join(evidenceDir, `${variant.code}-f${frame}-shifted.png`),
+                    ];
+                    fs.writeFileSync(files[0], shots.get(frame) as Buffer);
+                    fs.writeFileSync(files[1], result.get(frame) as Buffer);
+                    dynamic.push(
+                        finding(
+                            variant.code,
+                            variant.code === 'clock-dependent'
+                                ? `Frame ${frame} changed when the clock origin moved: the page reads Date or performance.now.`
+                                : `Frame ${frame} changed when the random seed changed: the page uses Math.random or crypto.`,
+                            {
+                                time: frame / timeline.fps,
+                                frame,
+                                evidence: files,
+                                detail: { frames: changed },
+                            },
+                        ),
+                    );
+                }
+            }
+        }
+
+        // Blank and paper-only samples.
+        if (shots.size > 0) {
+            const order = [...shots.keys()].sort((a, b) => a - b);
+            const content = await decodeGray(session.ffmpeg.ffmpeg, [
+                '-i',
+                writeSequence(
+                    freshDir(path.join(workDir(dir), 'check', 'frames')),
+                    order.map((f) => shots.get(f) as Buffer),
+                ),
+            ]);
+            const paper = await decodeGray(session.ffmpeg.ffmpeg, [
+                '-i',
+                writeSequence(
+                    freshDir(path.join(workDir(dir), 'check', 'baseline')),
+                    order.map((f) => baselines.get(f) as Buffer),
+                ),
+            ]);
+            const blank: number[] = [];
+            const paperOnly: number[] = [];
+            order.forEach((frame, i) => {
+                if (isFlat(content[i])) blank.push(frame);
+                else if (matchesBaseline(content[i], paper[i])) paperOnly.push(frame);
+            });
+            const empty = blank.length + paperOnly.length;
+            if (empty > 0) {
+                const all = empty === order.length;
+                const code = blank.length >= paperOnly.length ? 'blank-frame' : 'paper-only';
+                const frame = (code === 'blank-frame' ? blank : paperOnly)[0];
+                const evidence = path.join(evidenceDir, `${code}-f${frame}.png`);
+                fs.writeFileSync(evidence, shots.get(frame) as Buffer);
+                dynamic.push(
+                    finding(
+                        code,
+                        all
+                            ? `All ${order.length} sampled frames are ${code === 'blank-frame' ? 'flat and empty' : 'paper only'}.`
+                            : `${empty} of ${order.length} sampled frames show no content (at ${[
+                                  ...blank,
+                                  ...paperOnly,
+                              ]
+                                  .sort((a, b) => a - b)
+                                  .map((f) => (f / timeline.fps).toFixed(2))
+                                  .join(', ')} s).`,
+                        {
+                            severity: all ? 'error' : 'warning',
+                            time: frame / timeline.fps,
+                            frame,
+                            evidence: [evidence],
+                            detail: { blank, paperOnly },
+                        },
+                    ),
+                );
+            }
+        }
+        rb.addAll(dedupe(dynamic));
+        rb.report.check = { seed, frames, firstOrder: first, secondOrder: second, evidenceDir };
+    } finally {
+        if (!options.session) await session.close();
+    }
+    return finish();
+}
