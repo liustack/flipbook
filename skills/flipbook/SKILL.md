@@ -59,7 +59,7 @@ Defaults:
 | size | 1920×1080 (16:9) |
 | frame rate | 24 fps |
 | duration | about 30 s, within 5% of what the user asked, at most 180 s |
-| look | warm paper background, dark ink, one or two accent colors, serif type |
+| look | the paper skin: `paperLayer()` and `grainLayer()` from `references/paper.md`, dark ink, one or two accent colors, serif type |
 | music | none (`"audio": { "mode": "none" }`) |
 | the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
 | characters, photos | none unless asked |
@@ -88,3 +88,7 @@ Defaults:
 | `references/rules.md` | before the first index.html, and when a determinism, text or layer code is unclear |
 | `references/timeline.md` | before the first timeline.json, and when matching a requested duration |
 | `references/troubleshooting.md` | whenever check or render exits non-zero |
+| `references/paper.md` | before the first index.html, for the paper and grain layers of the default look |
+| `references/materials.md` | when a picture needs pencil lines, hatching, halftone, stipple or torn paper |
+| `references/text.md` | when text goes on a canvas: handwriting, words appearing one by one, text along a curve |
+| `references/templates.md` | when objects should assemble a digit, a letter or a Chinese character |
