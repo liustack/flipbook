@@ -1,0 +1,67 @@
+{
+    "name": "@liustack/flipbook",
+    "version": "0.1.0",
+    "description": "Deterministic HTML-to-MP4 rendering with built-in acceptance checks, for coding agents",
+    "type": "module",
+    "bin": {
+        "flipbook": "./dist/main.js"
+    },
+    "scripts": {
+        "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "lint": "biome check",
+        "format": "biome check --write",
+        "release": "node scripts/release.mjs",
+        "fonts:codepoints": "node scripts/build-codepoints.mjs"
+    },
+    "files": [
+        "dist",
+        "docs",
+        "skills/flipbook",
+        "CHANGELOG.md",
+        "SECURITY.md"
+    ],
+    "keywords": [
+        "cli",
+        "video",
+        "animation",
+        "html-to-video",
+        "mp4",
+        "playwright",
+        "agent-skill",
+        "claude-code",
+        "skill",
+        "flipbook"
+    ],
+    "author": "Leon Liu",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/liustack/flipbook.git"
+    },
+    "bugs": {
+        "url": "https://github.com/liustack/flipbook/issues"
+    },
+    "homepage": "https://github.com/liustack/flipbook#readme",
+    "engines": {
+        "node": ">=22.19"
+    },
+    "packageManager": "pnpm@10.33.0",
+    "dependencies": {
+        "commander": "^15.0.0",
+        "playwright-core": "1.63.0"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.5.14",
+        "@types/node": "^22.20.4",
+        "tsup": "^8.5.1",
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.11"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "esbuild"
+        ]
+    }
+}

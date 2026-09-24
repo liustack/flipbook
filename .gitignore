@@ -1,0 +1,31 @@
+# build output
+dist/
+coverage/
+
+# dependencies
+node_modules/
+
+# composition outputs and scratch
+out/
+.flipbook/
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
+package-lock.json
+bun.lock
+bun.lockb
+
+# environment
+.env
+.env.*
+
+# editors and systems
+.DS_Store
+.idea/
+.vscode/
+
+# local notes
+.issues/
+.claude/settings.local.json
+.playwright-cli/
