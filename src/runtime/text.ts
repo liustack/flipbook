@@ -45,20 +45,36 @@ export function fillText(
 ): TextBox {
     ctx.fillText(text, x, y, options.maxWidth);
     const m = ctx.measureText(text);
-    const width = options.maxWidth !== undefined ? Math.min(m.width, options.maxWidth) : m.width;
-    const transform = ctx.getTransform();
-    const dpr = window.devicePixelRatio || 1;
-    const left = x - m.actualBoundingBoxLeft;
+    // maxWidth squeezes the line around its alignment point.
+    const squeeze =
+        options.maxWidth !== undefined && m.width > options.maxWidth
+            ? options.maxWidth / m.width
+            : 1;
+    const left = x - m.actualBoundingBoxLeft * squeeze;
+    const right = x + m.actualBoundingBoxRight * squeeze;
     const top = y - m.actualBoundingBoxAscent;
-    const height = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
-    const point = new DOMPoint(left, top).matrixTransform(transform);
-    const canvasRect =
-        ctx.canvas instanceof HTMLCanvasElement ? ctx.canvas.getBoundingClientRect() : null;
+    const bottom = y + m.actualBoundingBoxDescent;
+    // All four corners through the full transform (rotation, skew, mirroring), then their bounds.
+    const transform = ctx.getTransform();
+    const corners = [
+        [left, top],
+        [right, top],
+        [left, bottom],
+        [right, bottom],
+    ].map(([px, py]) => new DOMPoint(px, py).matrixTransform(transform));
+    const xs = corners.map((p) => p.x);
+    const ys = corners.map((p) => p.y);
+    // Canvas pixels to page CSS pixels, from the canvas's laid-out size.
+    const canvas = ctx.canvas;
+    const rect = canvas instanceof HTMLCanvasElement ? canvas.getBoundingClientRect() : null;
+    const dpr = window.devicePixelRatio || 1;
+    const sx = rect && canvas.width > 0 ? rect.width / canvas.width : 1 / dpr;
+    const sy = rect && canvas.height > 0 ? rect.height / canvas.height : 1 / dpr;
     const box: TextBox = {
-        x: (canvasRect?.left ?? 0) + point.x / dpr,
-        y: (canvasRect?.top ?? 0) + point.y / dpr,
-        width: (width * transform.a) / dpr,
-        height: (height * transform.d) / dpr,
+        x: (rect?.left ?? 0) + Math.min(...xs) * sx,
+        y: (rect?.top ?? 0) + Math.min(...ys) * sy,
+        width: (Math.max(...xs) - Math.min(...xs)) * sx,
+        height: (Math.max(...ys) - Math.min(...ys)) * sy,
     };
     registerText({
         id: options.id,

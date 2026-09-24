@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="ink"></canvas>
+<script type="module">
+import { composition, setupCanvas, fillText } from '/__flipbook/runtime.js';
+const ink = setupCanvas(document.getElementById('ink'), 640, 360);
+composition({
+  seek(t) {
+    ink.clearRect(0, 0, 640, 360);
+    ink.fillStyle = '#2a6f97';
+    ink.fillRect(200 + t * 40, 300, 40, 40);
+    ink.font = '30px "Noto Serif SC"';
+    ink.fillStyle = '#222';
+
+    // Turned a quarter: the line runs down past the bottom edge.
+    ink.save();
+    ink.translate(560, 200);
+    ink.rotate(Math.PI / 2);
+    fillText(ink, 'Rotated line of text', 0, 0, { id: 'rot' });
+    ink.restore();
+
+    // Mirrored: the line runs left past the left edge.
+    ink.save();
+    ink.translate(120, 120);
+    ink.scale(-1, 1);
+    fillText(ink, 'Mirrored words here', 0, 0, { id: 'flip' });
+    ink.restore();
+
+    // Centered and squeezed to 100 px: it sits in the middle of the frame.
+    ink.save();
+    ink.textAlign = 'center';
+    fillText(ink, 'A long line squeezed into one hundred pixels', 320, 200, {
+      id: 'squeezed',
+      maxWidth: 100,
+    });
+    ink.restore();
+  },
+});
+</script>
+</body>
+</html>

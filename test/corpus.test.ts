@@ -155,6 +155,19 @@ describe('bad composition corpus', () => {
         expect(margin).toEqual(['#edge']);
     });
 
+    it('canvas text boxes follow rotation, mirroring and maxWidth', async () => {
+        const checked = await check('canvas-offstage');
+        const cut = checked.failures
+            .filter((f) => f.code === 'text-offstage')
+            .map((f) => f.element)
+            .sort();
+        expect(cut).toEqual(['canvas text "flip"', 'canvas text "rot"']);
+        const squeezed = [...checked.failures, ...checked.warnings].filter(
+            (f) => f.element === 'canvas text "squeezed"',
+        );
+        expect(squeezed).toEqual([]);
+    });
+
     it('low contrast text is measured in pixels', async () => {
         const checked = await check('low-contrast');
         const low = checked.warnings.filter((f) => f.code === 'low-contrast');
