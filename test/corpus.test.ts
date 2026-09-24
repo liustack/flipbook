@@ -1,4 +1,5 @@
 // Broken compositions, one per failure class. Every one must be caught.
+import * as fs from 'fs';
 import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../src/cli/check.ts';
 import { runRender } from '../src/cli/render.ts';
@@ -19,13 +20,20 @@ async function check(name: string, seekTimeoutMs?: number) {
     });
 }
 
+/** Render a bad fixture; every evidence image the report names must still exist. */
 async function render(name: string, dropFrames?: number[]) {
-    return runRender({
+    const report = await runRender({
         dir: copyFixture(`bad/${name}`),
         session: await session(),
         dropFrames,
         recordAttempts: false,
     });
+    for (const item of [...report.failures, ...report.warnings]) {
+        for (const file of item.evidence ?? []) {
+            expect(fs.existsSync(file), `${item.code} evidence ${file}`).toBe(true);
+        }
+    }
+    return report;
 }
 
 describe('bad composition corpus', () => {
@@ -55,6 +63,8 @@ describe('bad composition corpus', () => {
     it('glitch: a frame lost in the pipe to ffmpeg', async () => {
         const rendered = await render('glitch', [3]);
         expect(codes(rendered)).toContain('glitch');
+        const glitch = rendered.failures.find((f) => f.code === 'glitch');
+        expect(glitch?.evidence).toHaveLength(2);
         expect(codes(rendered)).toContain('frame-count');
     });
 

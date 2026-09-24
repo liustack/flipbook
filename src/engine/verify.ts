@@ -15,6 +15,7 @@ import {
 } from './pixels.ts';
 import { run, tail } from './proc.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
+import type { Workspace } from './workspace.ts';
 
 /** Seconds of blank, paper-only or frozen picture allowed in a row. */
 export const STILL_LIMIT_SEC = 1.5;
@@ -77,7 +78,9 @@ export interface VerifyOptions {
     timeline: ResolvedTimeline;
     samples: Map<number, string>;
     baselines: Map<number, string>;
+    /** Where evidence images are kept; inside the workspace, outliving the render's tmp. */
     evidenceDir: string;
+    workspace: Workspace;
 }
 
 /**
@@ -314,6 +317,15 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
         });
         if (worst.length > 0) {
             const first = worst[0];
+            const captured = options.workspace.copyFile(
+                options.samples.get(first.frame) as string,
+                path.join(options.evidenceDir, `glitch-f${first.frame}-captured.png`),
+            );
+            const decodedFile = path.join(
+                options.evidenceDir,
+                `glitch-f${first.frame}-decoded.png`,
+            );
+            await extractFrame(ffmpeg.ffmpeg, video, first.frame, decodedFile);
             findings.push(
                 finding(
                     'glitch',
@@ -321,7 +333,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
                     {
                         time: first.frame / fps,
                         frame: first.frame,
-                        evidence: [options.samples.get(first.frame) as string],
+                        evidence: [captured, decodedFile],
                         detail: {
                             frames: worst.map((w) => ({
                                 frame: w.frame,

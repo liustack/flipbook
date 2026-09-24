@@ -249,6 +249,7 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
         samples: captured.samples,
         baselines: captured.baselines,
         evidenceDir,
+        workspace: ws,
     });
     rb.addAll(verified.findings);
     const sheetFrames = evenFrames(
