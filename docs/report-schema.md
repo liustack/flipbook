@@ -20,7 +20,7 @@ read_when:
 
 退出码 78 时 stderr 另打一份 JSON 诊断：`error`（环境类型码）、`message`、`meaning`、`fix`（能直接复制的命令或设置）、`detail`、`platform`、`node`。stdout 仍是报告，`environmentError` 字段放同一份诊断。
 
-`sandbox-blocked` 的 `detail.signature` 是命中沙箱识别表的哪一行（`temp-dir`、`linux-socket-filter`、`mach-port`、`operation-not-permitted`，见 [platform.md](platform.md)），下载被拒的 `chromium-install-failed` 带 `detail.signature: "network-blocked"`。两者和 `cache-unwritable` 都带 `detail.host`：`claude-code`、`codex` 或 `null`，按宿主设的环境变量认。
+`sandbox-blocked` 和 `tmp-unwritable` 的 `detail.signature` 是命中沙箱识别表的哪一行（`tmp-unwritable` 对应 `temp-dir`，`sandbox-blocked` 对应 `linux-socket-filter`、`mach-port`、`operation-not-permitted`，见 [platform.md](platform.md)），下载被拒的 `chromium-install-failed` 带 `detail.signature: "network-blocked"`。这几个和 `cache-unwritable` 都带 `detail.host`：`claude-code`、`codex` 或 `null`，按宿主设的环境变量认。
 
 ## 顶层字段
 
@@ -173,6 +173,7 @@ read_when:
 | `chromium-install-failed` | 安装 Chromium 失败 |
 | `browser-launch-failed` | Chromium 起不来 |
 | `sandbox-blocked` | 宿主沙箱挡住了 Chromium，正常和单进程两种方式都起不来 |
+| `tmp-unwritable` | Chromium 建不了临时目录：TMPDIR 不存在或只读（常见于只读沙箱），单进程也没用，不重试 |
 | `linux-deps-missing` | Linux 缺 Chromium 需要的系统库 |
 | `font-download-failed` | 字体下载失败或校验不过 |
 | `cache-unwritable` | 缓存目录写不进（常见于沙箱内首次运行） |

@@ -37,6 +37,8 @@ export function sandboxHost(env: NodeJS.ProcessEnv = process.env): SandboxHost {
 export interface SandboxSignature {
     /** Reported as `detail.signature`. */
     id: string;
+    /** The exit-78 code flipbook reports when this row stops the launch. */
+    code: 'sandbox-blocked' | 'tmp-unwritable';
     /** Where this text was measured. */
     seenIn: string;
     pattern: RegExp;
@@ -60,6 +62,7 @@ const HOST_ESCAPE = [
 export const SANDBOX_SIGNATURES: readonly SandboxSignature[] = [
     {
         id: 'temp-dir',
+        code: 'tmp-unwritable',
         seenIn: 'Codex read-only sandbox (EPERM on macOS, EROFS on Linux), a read-only Linux root file system (EROFS), the Claude Code sandbox runtime before its TMPDIR exists (ENOENT)',
         pattern: /\b(?:EPERM|EACCES|EROFS|ENOENT)\b[^\n]*\bmkdtemp\b/,
         singleProcessHelps: false,
@@ -75,6 +78,7 @@ export const SANDBOX_SIGNATURES: readonly SandboxSignature[] = [
     },
     {
         id: 'linux-socket-filter',
+        code: 'sandbox-blocked',
         seenIn: 'Codex sandbox on Linux with network access off (its seccomp filter refuses shutdown() on sockets), in both launch modes',
         pattern: /sandbox_host_linux\.cc[^\n]*shutdown: Operation not permitted/,
         singleProcessHelps: false,
@@ -87,6 +91,7 @@ export const SANDBOX_SIGNATURES: readonly SandboxSignature[] = [
     },
     {
         id: 'mach-port',
+        code: 'sandbox-blocked',
         seenIn: 'macOS Seatbelt: the Claude Code sandbox and the Codex workspace-write sandbox. Single-process mode starts in both',
         pattern: /mach_port_rendezvous|bootstrap_check_in|Permission denied \(1100\)/,
         singleProcessHelps: true,
@@ -95,6 +100,7 @@ export const SANDBOX_SIGNATURES: readonly SandboxSignature[] = [
     },
     {
         id: 'operation-not-permitted',
+        code: 'sandbox-blocked',
         seenIn: 'not measured in a known host: any other EPERM, tried once in single-process mode like the mach port row',
         pattern: /\bEPERM\b|Operation not permitted/,
         singleProcessHelps: true,
@@ -345,7 +351,7 @@ export function launchError(
     }
     const row = matchSandboxSignature(message);
     if (row && (bothModes || !row.singleProcessHelps)) {
-        return new EnvError('sandbox-blocked', row.message(message), [...row.fix], {
+        return new EnvError(row.code, row.message(message), [...row.fix], {
             log,
             signature: row.id,
             host: sandboxHost(env),

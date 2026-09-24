@@ -306,6 +306,12 @@ The host sandbox stopped Chromium from starting, even in single-process mode.
 
 Fix: Allow Chromium in the sandbox: set sandbox.network.allowMachLookup, or add the flipbook launcher to sandbox.excludedCommands.
 
+### `tmp-unwritable`
+
+Chromium could not create its temporary directory: TMPDIR is missing or read-only, as in a read-only sandbox.
+
+Fix: Point TMPDIR at an existing writable directory and run the command again, or ask the user for a sandbox that can write (Codex: workspace-write).
+
 ### `linux-deps-missing`
 
 Chromium is missing Linux system libraries.

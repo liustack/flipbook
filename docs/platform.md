@@ -38,7 +38,7 @@ read_when:
 
 | 行 | 报错原文 | 在哪见到 | 处理 |
 |---|---|---|---|
-| `temp-dir` | `browserType.launch: EPERM: operation not permitted, mkdtemp '/var/folders/.../T/playwright-artifacts-XXXXXX'` | Codex `read-only`（macOS） | 不重试，退 78 `sandbox-blocked`，提示把 TMPDIR 指到能写的目录，Codex 换 `workspace-write` |
+| `temp-dir` | `browserType.launch: EPERM: operation not permitted, mkdtemp '/var/folders/.../T/playwright-artifacts-XXXXXX'` | Codex `read-only`（macOS） | 不重试，退 78 `tmp-unwritable`，提示把 TMPDIR 指到能写的目录，Codex 换 `workspace-write` |
 | | `browserType.launch: EROFS: read-only file system, mkdtemp '/tmp/playwright-artifacts-XXXXXX'` | Codex `read-only`（Linux），只读根文件系统又没挂可写 /tmp 的容器 | 同上 |
 | | `browserType.launch: ENOENT: no such file or directory, mkdtemp '/tmp/claude/playwright-artifacts-XXXXXX'` | Claude Code 沙箱运行时，TMPDIR 指的目录还没建 | 同上 |
 | `linux-socket-filter` | `FATAL:content/browser/sandbox_host_linux.cc:41] Check failed: . shutdown: Operation not permitted (1)` | Codex Linux 沙箱，没开网络时它的 seccomp 过滤器拒绝 socket 上的 `shutdown`。正常和单进程两种方式都一样 | 不重试，退 78 `sandbox-blocked`，提示开 `network_access = true` 或在沙箱外跑 |
@@ -90,7 +90,7 @@ ubuntu:24.04 arm64，除第一行外都用非 root 用户（uid 1000），缓存
 | 没有 /dev/shm（`--ipc=none`） | 退 0，Playwright 默认带 `--disable-dev-shm-usage` |
 | /dev/shm 只有 1 MB | 退 0 |
 | `--cap-drop ALL`，`no-new-privileges` | 退 0 |
-| 根文件系统只读，只有工作目录可写 | 退 78，命中 `temp-dir`（EROFS） |
+| 根文件系统只读，只有工作目录可写 | 退 78 `tmp-unwritable`，命中 `temp-dir`（EROFS） |
 | 根文件系统只读，另挂可写 /tmp | 退 0 |
 | 断网，空缓存 | 退 78 `chromium-install-failed` |
 | 进程数上限 48、64、96 | 不稳定：Playwright 抛 `Assertion error` 退 1，或 Node 退 13，或 Chromium 收到 SIGABRT 退 78 `browser-launch-failed` |

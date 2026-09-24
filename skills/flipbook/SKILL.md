@@ -45,7 +45,7 @@ If scripts cannot run, use the first line that works (the pinned version is 0.1.
   - Claude Code, `~/.claude/settings.json`: the cache directory in `sandbox.filesystem.allowWrite` plus `cdn.playwright.dev`, `storage.googleapis.com`, `github.com` and `*.githubusercontent.com` in `sandbox.network.allowedDomains`. Or the launcher command in `sandbox.excludedCommands`.
   - Codex, `~/.codex/config.toml` under `[sandbox_workspace_write]`: the cache directory in `writable_roots` and `network_access = true`. Codex on Linux needs `network_access = true` for every run.
 - Codex `read-only` cannot run flipbook: ask the user for `workspace-write`.
-- Exit 78 with `sandbox-blocked`: relay its `fix` lines.
+- Exit 78 with `sandbox-blocked` or `tmp-unwritable`: relay its `fix` lines.
 
 ## The six steps
 

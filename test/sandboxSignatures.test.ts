@@ -114,12 +114,12 @@ describe('sandbox signature table', () => {
         expect(error.fix.join('\n')).toContain('network_access = true');
     });
 
-    it('does not retry an unwritable temp directory and names it', async () => {
+    it('does not retry an unwritable temp directory and reports tmp-unwritable', async () => {
         for (const text of [TEMP_EPERM, TEMP_EROFS, TEMP_ENOENT]) {
             resetLaunchMode();
             const { error, attempts } = await launchFailure([text]);
             expect(attempts).toBe(1);
-            expect(error.code).toBe('sandbox-blocked');
+            expect(error.code).toBe('tmp-unwritable');
             expect(error.detail.signature).toBe('temp-dir');
             expect(error.message).toContain(/mkdtemp '([^']+)\//.exec(text)?.[1]);
             expect(error.fix.join('\n')).toContain('TMPDIR');
