@@ -1,7 +1,8 @@
 ---
 name: flipbook
 description: "Make short animated videos as MP4: motion graphics, explainers, animated titles, data stories, kinetic text, beat-synced clips. You write one HTML composition plus timeline.json, flipbook renders it frame by frame and checks the result before delivery. Use when the user asks for a video, an animation exported to MP4, or a clip built with HTML, CSS, canvas or SVG. Hard rules: the picture is a pure function of t (no CSS animation or transition, timers, requestAnimationFrame, Date.now, performance.now, unseeded Math.random, network), text uses only the fonts \"Noto Serif SC\" and \"LXGW WenKai\", every command runs through this skill's scripts/run.sh, and a video is delivered only after flipbook render exits 0."
-compatibility: "Node 22.19+ (or Bun) and ffmpeg with libx264. macOS arm64 or Linux x64, Windows through WSL2. The first check or render downloads Chromium (about 95 MB) and two fonts (about 50 MB)."
+metadata:
+  compatibility: "Node 22.19+ (or Bun) and ffmpeg with libx264. macOS arm64 or Linux x64, Windows through WSL2. The first check or render downloads Chromium (about 95 MB) and two fonts (about 50 MB)."
 ---
 
 # flipbook
