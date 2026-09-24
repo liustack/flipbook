@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="ink"></canvas>
+<script type="module">
+import { composition, setupCanvas, timeline } from '/__flipbook/runtime.js';
+const tl = await timeline();
+const ink = setupCanvas(document.getElementById('ink'), 640, 360);
+composition({
+  seek(t) {
+    const frame = Math.round(t * tl.fps);
+    ink.fillStyle = `hsl(${(frame * 67) % 360}, 70%, 45%)`;
+    ink.fillRect(0, 0, 640, 360);
+    ink.fillStyle = '#ffffff';
+    ink.fillRect((frame * 97) % 560, 0, 80, 360);
+    ink.fillRect(0, (frame * 53) % 300, 640, 60);
+  },
+});
+</script>
+</body>
+</html>

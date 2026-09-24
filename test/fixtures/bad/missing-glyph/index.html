@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+  p { position: absolute; left: 40px; margin: 0; font-size: 40px; color: #222; }
+  #rare { top: 60px; font-family: "Noto Serif SC"; }
+  #system { top: 160px; font-family: Helvetica, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<p id="rare">罕见字：𠀀</p>
+<p id="system">System font text</p>
+<canvas id="ink"></canvas>
+<script type="module">
+import { composition, setupCanvas } from '/__flipbook/runtime.js';
+const ink = setupCanvas(document.getElementById('ink'), 640, 360);
+composition({
+  seek(t) {
+    ink.clearRect(0, 0, 640, 360);
+    ink.fillStyle = '#c8452d';
+    ink.fillRect(40 + t * 100, 280, 60, 60);
+  },
+});
+</script>
+</body>
+</html>
