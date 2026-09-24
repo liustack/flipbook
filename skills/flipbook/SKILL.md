@@ -20,7 +20,7 @@ bash <skill-dir>/scripts/run.sh snapshot <dir> --zoom x,y,w,h --at 3.5
 bash <skill-dir>/scripts/run.sh render <dir>                    # MP4 plus acceptance checks
 ```
 
-`<dir>` is the composition directory. stdout carries one JSON report, progress goes to stderr, and each report is also saved to `<dir>/.flipbook/reports/<command>.json`.
+`<dir>` is the composition directory. stdout carries one JSON report, progress goes to stderr. Each report is also saved to `<dir>/.flipbook/reports/<command>.json`, whose path is in `artifacts.report`. When the report has `reportSaveError` instead, nothing was saved: the stdout JSON is the report to hand over.
 
 | Exit | Meaning | Do |
 |---|---|---|

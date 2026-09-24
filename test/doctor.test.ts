@@ -149,6 +149,44 @@ describe('commands exit 78 or 2 before touching the composition', () => {
         expect(JSON.parse(result.stderr).error).toBe('ffmpeg-missing');
     });
 
+    it('saves the report of a run that ended in an environment error', () => {
+        const dir = copyFixture('hello', 'examples');
+        const result = runCli(['check', dir], { ...process.env, PATH: nodeOnly });
+        expect(result.status).toBe(78);
+        const report = result.json as { artifacts: { report?: string } };
+        const saved = path.join(fs.realpathSync(dir), '.flipbook', 'reports', 'check.json');
+        expect(fs.realpathSync(report.artifacts.report as string)).toBe(saved);
+        expect(JSON.parse(fs.readFileSync(saved, 'utf-8')).exitCode).toBe(78);
+    });
+
+    it('saves the report of a run stopped by a refused write', () => {
+        const dir = copyFixture('hello', 'examples');
+        fs.mkdirSync(path.join(dir, '.flipbook'));
+        fs.writeFileSync(path.join(dir, '.flipbook', 'tmp'), 'not a directory');
+        const result = runCli(['render', dir]);
+        expect(result.status).toBe(1);
+        const report = result.json as { failures: { code: string }[] };
+        expect(report.failures.map((f) => f.code)).toContain('unsafe-output');
+        const saved = path.join(dir, '.flipbook', 'reports', 'render.json');
+        expect(JSON.parse(fs.readFileSync(saved, 'utf-8')).exitCode).toBe(1);
+    });
+
+    it('says so when the report cannot be saved, and writes nothing through the link', () => {
+        const dir = copyFixture('hello', 'examples');
+        const outside = tempDir('reports-outside');
+        fs.mkdirSync(path.join(dir, '.flipbook'));
+        fs.symlinkSync(outside, path.join(dir, '.flipbook', 'reports'));
+        const result = runCli(['check', dir]);
+        expect(result.status).toBe(1);
+        const report = result.json as {
+            artifacts: Record<string, string>;
+            reportSaveError?: string;
+        };
+        expect(report.artifacts.report).toBeUndefined();
+        expect(report.reportSaveError).toContain('symbolic link');
+        expect(fs.readdirSync(outside)).toEqual([]);
+    });
+
     it('usage errors exit 2 with a JSON report', () => {
         const unknown = runCli(['render']);
         expect(unknown.status).toBe(2);

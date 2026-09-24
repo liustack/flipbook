@@ -11,13 +11,14 @@ import {
     finding,
     type Report,
     ReportBuilder,
+    saveReport,
     UsageError,
     writeJson,
 } from './cli/report.ts';
 import { parseRegion, runSnapshot } from './cli/snapshot.ts';
 import { pruneCache } from './engine/prune.ts';
 import { workspaceFinding } from './engine/session.ts';
-import { Workspace, WorkspaceError } from './engine/workspace.ts';
+import { WorkspaceError } from './engine/workspace.ts';
 import { COMMAND_NAME } from './names.ts';
 import { appVersion } from './paths.ts';
 
@@ -59,28 +60,20 @@ function preflight(): void {
     }
 }
 
-/** Keep the latest report of each command at .flipbook/reports/<command>.json. */
-function saveReport(report: Report): void {
-    const dir = report.composition?.dir;
-    if (!dir) return;
-    try {
-        const ws = Workspace.open(dir);
-        ws.writeFile(
-            ws.path('.flipbook', 'reports', `${report.command}.json`),
-            `${JSON.stringify(report, null, 2)}\n`,
-        );
-    } catch (error) {
-        process.stderr.write(`[flipbook] could not save the report: ${(error as Error).message}\n`);
-    }
-}
-
 function usageReport(message: string): Report {
     const rb = new ReportBuilder('usage');
     rb.report.usageError = message;
     return rb.finish(EXIT.usage);
 }
 
-/** Run one command: JSON report on stdout, exit code from the report. */
+/** Save the report, print it on stdout, and exit with its code. */
+function emit(report: Report): void {
+    saveReport(report);
+    writeJson(process.stdout, report);
+    process.exitCode = report.exitCode;
+}
+
+/** Run one command: JSON report on stdout, exit code from the report, on every path. */
 async function execute(
     command: CommandName,
     dir: string | undefined,
@@ -88,34 +81,27 @@ async function execute(
 ): Promise<void> {
     try {
         preflight();
-        const report = await fn();
-        writeJson(process.stdout, report);
-        saveReport(report);
-        process.exitCode = report.exitCode;
+        emit(await fn());
     } catch (error) {
         if (error instanceof EnvError) {
             const diagnosis = envDiagnosis(error);
             const rb = new ReportBuilder(command, dir);
             rb.report.environmentError = diagnosis;
-            writeJson(process.stdout, rb.finish(EXIT.env));
+            emit(rb.finish(EXIT.env));
             writeJson(process.stderr, diagnosis);
-            process.exitCode = EXIT.env;
         } else if (error instanceof WorkspaceError) {
             const rb = new ReportBuilder(command, dir);
             rb.add(workspaceFinding(error));
-            writeJson(process.stdout, rb.finish());
-            process.exitCode = EXIT.failed;
+            emit(rb.finish());
         } else if (error instanceof UsageError) {
             process.stderr.write(`Error: ${error.message}\n`);
-            writeJson(process.stdout, usageReport(error.message));
-            process.exitCode = EXIT.usage;
+            emit(usageReport(error.message));
         } else {
             const message = error instanceof Error ? error.message : String(error);
             process.stderr.write(`${error instanceof Error ? error.stack : message}\n`);
             const rb = new ReportBuilder(command, dir);
             rb.add(finding('internal-error', message.split('\n')[0], { detail: { message } }));
-            writeJson(process.stdout, rb.finish(EXIT.failed));
-            process.exitCode = EXIT.failed;
+            emit(rb.finish(EXIT.failed));
         }
     }
 }

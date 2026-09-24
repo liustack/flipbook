@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { Workspace } from '../engine/workspace.ts';
 import { appVersion } from '../paths.ts';
 import { ENV_CODES, type EnvCode, FINDING_CODES, type FindingCode } from './codes.ts';
 
@@ -127,7 +130,7 @@ export class ReportBuilder {
             exitCode: EXIT.ok,
             flipbook: { version: appVersion() },
             environment: { platform: platformId(), node: process.version },
-            composition: dir ? { dir } : undefined,
+            composition: dir ? { dir: path.resolve(dir) } : undefined,
             failures: [],
             warnings: [],
             artifacts: {},
@@ -169,6 +172,33 @@ export function envDiagnosis(error: EnvError): Record<string, unknown> {
         platform: platformId(),
         node: process.version,
     };
+}
+
+/**
+ * Keep the report at <dir>/.flipbook/reports/<command>.json and record the path
+ * in artifacts.report. When it cannot be saved (no composition directory, a
+ * refused or failed write), artifacts.report is left out and reportSaveError
+ * says why: the report on stdout is then the only copy.
+ */
+export function saveReport(report: Report): void {
+    const dir = report.composition?.dir;
+    if (!dir || report.command === 'usage' || report.command === 'doctor') return;
+    let ws: Workspace;
+    try {
+        if (!fs.statSync(dir).isDirectory()) throw new Error(`${dir} is not a directory`);
+        ws = Workspace.open(dir);
+    } catch (error) {
+        report.reportSaveError = `The report was not saved: ${(error as Error).message}`;
+        return;
+    }
+    const target = ws.path('.flipbook', 'reports', `${report.command}.json`);
+    report.artifacts.report = target;
+    try {
+        ws.writeFile(target, `${JSON.stringify(report, null, 2)}\n`);
+    } catch (error) {
+        delete report.artifacts.report;
+        report.reportSaveError = `The report was not saved: ${(error as Error).message}`;
+    }
 }
 
 export function writeJson(stream: NodeJS.WritableStream, value: unknown): void {

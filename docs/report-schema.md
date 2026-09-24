@@ -33,7 +33,8 @@ read_when:
 | `composition` | object | `dir`、`hash`（合成目录哈希，`sha256:` 开头，不含 `out/` 和 `.flipbook/`）、`width`、`height`、`fps`、`frames`、`durationSec` |
 | `failures` | Finding[] | 错误，任何一条都让退出码变 1 |
 | `warnings` | Finding[] | 提示，不影响退出码 |
-| `artifacts` | object | 产物路径：`video`、`contactSheet`、`rejectedVideo`、`zoom1` 等 |
+| `artifacts` | object | 产物路径：`video`、`contactSheet`、`rejectedVideo`、`zoom1` 等，`report` 是这份报告存盘的路径 |
+| `reportSaveError` | string | 报告没能存盘时才有，写明原因（没有合成目录、写入被拒或失败），这时 stdout 上的就是唯一一份 |
 | `attempts` | object | 重试计数，见下文 |
 | `stop` | boolean | 到重试上限时为 true，agent 应停下向用户报告 |
 | `stopReason` | string | `stop` 为 true 时说明卡在哪 |
@@ -54,7 +55,7 @@ read_when:
 | `.flipbook/timeline.resolved.json` | 全部 | 换算后的 timeline |
 | `.flipbook/frame-hashes.json` | render | 每帧原始截图的 sha256 和汇总 |
 | `.flipbook/attempts.json` | check、render | 重试计数 |
-| `.flipbook/reports/<命令>.json` | check、snapshot、render | 这条命令最近一次的报告，和 stdout 上的相同 |
+| `.flipbook/reports/<命令>.json` | check、snapshot、render | 这条命令最近一次的报告，和 stdout 上的相同。退 78、`unsafe-output`、`internal-error` 的运行也存，路径在 `artifacts.report` |
 | `.flipbook/tmp/` | render | 渲染中间件，结束后删掉 |
 | `.flipbook/render.lock` | render | 同一目录同时只跑一个 render（同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。锁用 O_EXCL 建，内容是 pid 和随机令牌。持有进程已退出，或锁里没有可读的持有者且建了超过 10 秒，才算过期被接管。释放时只删令牌仍是自己的锁 |
 
