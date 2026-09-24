@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="ink"></canvas>
+<script type="module">
+import { composition, setupCanvas } from '/__flipbook/runtime.js';
+const ink = setupCanvas(document.getElementById('ink'), 640, 360);
+const start = Date.now();
+composition({
+  seek() {
+    // Elapsed clock time instead of t: same pixels under any clock origin.
+    const x = ((Date.now() - start) / 10) % 560;
+    ink.clearRect(0, 0, 640, 360);
+    ink.fillStyle = '#2a6f97';
+    ink.fillRect(x, 140, 80, 80);
+  },
+});
+</script>
+</body>
+</html>

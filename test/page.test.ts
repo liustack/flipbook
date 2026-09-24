@@ -84,6 +84,50 @@ composition({ seek(t) { document.body.firstElementChild.style.left = 20 + t * 40
     });
 });
 
+describe('virtual clock', () => {
+    it('gives the virtual time through every native clock entry point', async () => {
+        const s = await session();
+        const { browser } = await s.browserForPage();
+        const dir = copyFixture('hello', 'examples');
+        const timeline = loadTimeline(dir, false).resolved;
+        if (!timeline) throw new Error('hello timeline did not load');
+        const { page } = await CompositionPage.open({ browser, dir, timeline });
+        try {
+            const seen = await page.page.evaluate(() => {
+                const T = (
+                    globalThis as {
+                        Temporal?: { Now: { instant(): { epochMilliseconds: number } } };
+                    }
+                ).Temporal;
+                return {
+                    now: Date.now(),
+                    viaPrototype: (Date.prototype.constructor as DateConstructor).now(),
+                    sameConstructor: new Date().constructor === Date,
+                    temporal: T ? T.Now.instant().epochMilliseconds : null,
+                    intlMonth: new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'UTC',
+                        month: 'numeric',
+                    }).format(),
+                    originPlusNow: performance.timeOrigin + performance.now(),
+                    documentTimeline: document.timeline.currentTime,
+                };
+            });
+            const epoch = Date.UTC(2026, 0, 1);
+            expect(seen).toEqual({
+                now: epoch,
+                viaPrototype: epoch,
+                sameConstructor: true,
+                temporal: seen.temporal === null ? null : epoch,
+                intlMonth: '1',
+                originPlusNow: epoch,
+                documentTimeline: 0,
+            });
+        } finally {
+            await page.close();
+        }
+    });
+});
+
 /** `browser`, except that every new context fails to open a page. */
 function failingNewPage(browser: Browser): Browser {
     return new Proxy(browser, {

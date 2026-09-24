@@ -153,7 +153,7 @@ composition({
 
 ## Forbidden
 
-check catches each of these by rendering the same frame under a changed clock, a changed random seed, or a different seek order. The source scan also warns about them.
+check looks for these by sampling: it draws a few frames again under a moved clock, a changed random seed and a different seek order, and it counts every call to the clock and random functions while the page runs (`forbidden-api-call`). The source scan warns about them too. Sampling can miss a case, and code in a Worker or an iframe is not counted, so follow this table even when check passes.
 
 | Do not | Do instead |
 |---|---|

@@ -4,7 +4,13 @@ import type { Browser, BrowserContext, CDPSession, Page, Route } from 'playwrigh
 import { type Finding, finding } from '../cli/report.ts';
 import { runtimeFile } from '../paths.ts';
 import { FONT_URL_PREFIX, fontFaces, fontFileFor } from './fonts.ts';
-import { type HostApi, type HostConfig, installHost, type RegisteredText } from './host.ts';
+import {
+    type ForbiddenCalls,
+    type HostApi,
+    type HostConfig,
+    installHost,
+    type RegisteredText,
+} from './host.ts';
 import { PROTOCOL_VERSION, type ResolvedTimeline } from './timelineResolve.ts';
 
 export const ORIGIN = 'http://flipbook.local';
@@ -438,6 +444,13 @@ export class CompositionPage {
     async registeredTexts(): Promise<RegisteredText[]> {
         return this.page.evaluate(() =>
             (window as unknown as { __flipbookHost: HostApi }).__flipbookHost.texts.slice(),
+        );
+    }
+
+    /** Forbidden clock and random calls the page has made since it opened. */
+    async forbiddenCalls(): Promise<ForbiddenCalls> {
+        return this.page.evaluate(() =>
+            (window as unknown as { __flipbookHost: HostApi }).__flipbookHost.forbiddenCalls(),
         );
     }
 

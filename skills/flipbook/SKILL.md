@@ -68,6 +68,7 @@ Defaults:
 
 - `seek(t)` draws the frame for `t` from `t` alone. No CSS animation or transition, timers, `requestAnimationFrame`, `Date.now()`, `new Date()`, `performance.now()`, `Math.random()`, `crypto` random, state carried between frames, or network. Use `rng(seed)`, `rand(seed, ...)`, `ease`, `cueProgress` and the other runtime helpers.
 - `seek(t)` must not await frames, timers or events.
+- check samples a few frames under a moved clock and seed and counts clock and random calls. It catches most slips, not all of them: keep these rules even when check passes.
 - Size `html` and `body` to the timeline width and height with `overflow: hidden`. Mark paper and grain layers `data-flipbook-layer="paper"`. Draw static layers once in `setup()`.
 - Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"` only. Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1. Mark deliberate bleeds `data-flipbook-allow-overflow`.
 - Scenes where the picture stands still for more than 1.5 s need `"hold": true`.

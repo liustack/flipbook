@@ -101,6 +101,15 @@ describe('bad composition corpus', () => {
         expect(codes(await check('clock'))).toContain('clock-dependent');
     });
 
+    it('clock delta: Date.now() - start draws the same under any origin, and is still caught', async () => {
+        const checked = await check('clock-delta');
+        const calls = checked.failures.filter((f) => f.code === 'forbidden-api-call');
+        expect(calls.map((f) => f.detail?.api)).toEqual(['Date.now()']);
+        expect(calls[0].element).toBe('index.html:15');
+        expect(calls[0].detail?.count as number).toBeGreaterThan(8);
+        expect(codes(checked)).not.toContain('clock-dependent');
+    });
+
     it('fails only under the shifted clock: every perturbed failure counts', async () => {
         const checked = await check('clock-crash');
         const seek = checked.failures.find((f) => f.code === 'seek-failed');
@@ -114,6 +123,8 @@ describe('bad composition corpus', () => {
     it('random: drawing from Math.random', async () => {
         const checked = await check('random');
         expect(codes(checked)).toContain('random-dependent');
+        const calls = checked.failures.filter((f) => f.code === 'forbidden-api-call');
+        expect(calls.map((f) => f.detail?.api)).toEqual(['Math.random()']);
         expect(codes(checked)).not.toContain('clock-dependent');
     });
 

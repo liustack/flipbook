@@ -93,8 +93,9 @@ read_when:
 | `unsafe-output` | check、snapshot、render | `.flipbook/` 或 `out/` 里有软链，或该是目录的地方是文件，这次什么都没写。`detail.paths` 列出这些路径 | 删掉这些路径（软链只删链接本身），再跑一次 |
 | `static-forbidden` | check | 源码里有禁用写法，只报 warning | 换成 t 的纯函数写法 |
 | `seek-order-dependent` | check | 同一个 t 换个 seek 顺序画面就变，有跨帧状态 | 去掉帧间累积的状态，全部由 t 算出 |
-| `clock-dependent` | check | 换虚拟时钟起点画面就变，读了 Date 或 performance.now | 只用 seek 传进来的 t |
+| `clock-dependent` | check | 换虚拟时钟起点画面就变，读了 Date 或 performance.now。只抽三帧比，没变不代表没读时钟 | 只用 seek 传进来的 t |
 | `random-dependent` | check | 换随机底层种子画面就变，用了 Math.random 或 crypto | 用运行时库的 `rng` 或 `rand` |
+| `forbidden-api-call` | check | 页面调用了规矩禁用的时钟或随机函数，按函数各报一条，`detail.api` 是函数名，`detail.count` 是次数，`element` 是第一次调用的 `文件:行号`。计数覆盖基准页从加载到最后一次 seek 的全过程，被数的有 `Date.now()`、`new Date()`、`Date()`、`performance.now()`、`performance.timeOrigin`、`document.timeline.currentTime`、不带日期的 `Intl.DateTimeFormat`、`Temporal.Now.*`、`Math.random()`、`crypto.getRandomValues()`、`crypto.randomUUID()`。这些调用拿到的仍是虚拟时钟和固定种子的值，所以画面不一定变，但一律报错。Worker 和 iframe 里的调用数不到 | 换成 seek 传进来的 t，随机数用 `rng` 或 `rand` |
 | `late-paint` | check | 同一个 t 不重新 seek 连截两张不一样，有迟到的绘制 | seek 里画完，图片解码放 ready |
 | `blank-frame` | check、render | 画面是一整块纯色：缩到 320×180 灰度后，偏离中位灰度超过 16 灰阶的像素不到 0.05%。check 里全部抽样帧都空才是 error，部分空报 warning。render 里连续 1.5 秒以上才是 error | 查 seek 在这些时刻有没有画 |
 | `paper-only` | check、render | 画面和只开纸底层的基线一样：缩到 320×180 灰度后，和最近一张基线相差超过 16 灰阶的像素不到 0.05%。check 和 render 的判定规则同 `blank-frame`。render 每秒截一张基线。render 里空白帧和只剩纸底的帧合起来按「没有内容」连续计时，两类交替出现也不会被切断，类型码取两类里帧数多的那个，`detail` 里有 `blankFrames` 和 `paperFrames` | 查内容层是否因报错没画 |

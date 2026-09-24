@@ -27,6 +27,9 @@ export interface RegisteredText {
     allowOverflow?: boolean;
 }
 
+/** Calls the page made to clock and random APIs flipbook forbids: count and first call site. */
+export type ForbiddenCalls = Record<string, { count: number; at?: string }>;
+
 export interface HostApi {
     render: true;
     timeline: ResolvedTimeline;
@@ -37,6 +40,7 @@ export interface HostApi {
     setTextVisible(visible: boolean): void;
     texts: RegisteredText[];
     registerText(entry: RegisteredText): void;
+    forbiddenCalls(): ForbiddenCalls;
 }
 
 export function installHost(config: HostConfig): void {
@@ -54,24 +58,138 @@ export function installHost(config: HostConfig): void {
         };
     };
 
+    // Every call below is one the rules forbid. It still gets the virtual
+    // value, and it is counted with its first call site for check to report.
+    const RealError = Error;
+    const calls: ForbiddenCalls = {};
+    const callSite = (): string | undefined => {
+        const stack = new RealError().stack ?? '';
+        const match = /https?:\/\/flipbook\.local\/([^\s:)]+):(\d+):\d+/.exec(stack);
+        return match ? `${match[1]}:${match[2]}` : undefined;
+    };
+    const note = (api: string) => {
+        const entry = calls[api];
+        if (entry) entry.count += 1;
+        else calls[api] = { count: 1, at: callSite() };
+    };
+    const wallNow = () => config.epochMs + now;
+
     const RealDate = Date;
     function FakeDate(this: unknown, ...args: unknown[]): unknown {
-        if (!new.target) return new RealDate(config.epochMs + now).toString();
-        if (args.length === 0) return new RealDate(config.epochMs + now);
+        if (!new.target) {
+            note('Date()');
+            return new RealDate(wallNow()).toString();
+        }
+        if (args.length === 0) {
+            note('new Date()');
+            return new RealDate(wallNow());
+        }
         return new (RealDate as unknown as new (...a: unknown[]) => Date)(...args);
     }
     FakeDate.prototype = RealDate.prototype;
-    FakeDate.now = () => config.epochMs + now;
+    // Without this, Date.prototype.constructor and new Date().constructor reach the real clock.
+    Object.defineProperty(RealDate.prototype, 'constructor', {
+        value: FakeDate,
+        writable: true,
+        configurable: true,
+        enumerable: false,
+    });
+    FakeDate.now = () => {
+        note('Date.now()');
+        return wallNow();
+    };
     FakeDate.parse = RealDate.parse;
     FakeDate.UTC = RealDate.UTC;
     w.Date = FakeDate;
-    const perfNow = () => config.perfOriginMs + now;
+    const perfNow = () => {
+        note('performance.now()');
+        return config.perfOriginMs + now;
+    };
     Object.defineProperty(performance, 'now', { value: perfNow, configurable: true });
+    Object.defineProperty(performance, 'timeOrigin', {
+        get: () => {
+            note('performance.timeOrigin');
+            return config.epochMs - config.perfOriginMs;
+        },
+        configurable: true,
+    });
+    const timelineTime = Object.getOwnPropertyDescriptor(
+        AnimationTimeline.prototype,
+        'currentTime',
+    );
+    if (timelineTime?.get) {
+        Object.defineProperty(document.timeline, 'currentTime', {
+            get: () => {
+                note('document.timeline.currentTime');
+                return now;
+            },
+            configurable: true,
+        });
+    }
+
+    // Intl formats the real current time when it gets no date.
+    const Dtf = Intl.DateTimeFormat.prototype;
+    const formatGetter = Object.getOwnPropertyDescriptor(Dtf, 'format')?.get;
+    if (formatGetter) {
+        Object.defineProperty(Dtf, 'format', {
+            get(this: Intl.DateTimeFormat) {
+                const format = formatGetter.call(this) as (date?: Date | number) => string;
+                return (date?: Date | number) => {
+                    if (date !== undefined) return format(date);
+                    note('Intl.DateTimeFormat without a date');
+                    return format(wallNow());
+                };
+            },
+            configurable: true,
+        });
+    }
+    const formatToParts = Dtf.formatToParts;
+    Dtf.formatToParts = function (this: Intl.DateTimeFormat, date?: Date | number) {
+        if (date !== undefined) return formatToParts.call(this, date);
+        note('Intl.DateTimeFormat without a date');
+        return formatToParts.call(this, wallNow());
+    };
+
+    // Temporal.Now reads the real clock too.
+    type TemporalNow = Record<string, (...a: unknown[]) => unknown>;
+    const temporal = (w.Temporal ?? null) as {
+        Now: TemporalNow;
+        Instant: {
+            fromEpochMilliseconds(ms: number): {
+                toZonedDateTimeISO(tz: unknown): Record<string, () => unknown>;
+            };
+        };
+    } | null;
+    if (temporal?.Now) {
+        const Now = temporal.Now;
+        const zoneOf = (tz: unknown) => (tz === undefined ? Now.timeZoneId() : tz);
+        const zoned = (tz: unknown) =>
+            temporal.Instant.fromEpochMilliseconds(wallNow()).toZonedDateTimeISO(zoneOf(tz));
+        const replace = (name: string, value: (tz?: unknown) => unknown) => {
+            if (typeof Now[name] !== 'function') return;
+            Object.defineProperty(Now, name, {
+                value: (tz?: unknown) => {
+                    note(`Temporal.Now.${name}()`);
+                    return value(tz);
+                },
+                writable: true,
+                configurable: true,
+            });
+        };
+        replace('instant', () => temporal.Instant.fromEpochMilliseconds(wallNow()));
+        replace('zonedDateTimeISO', (tz) => zoned(tz));
+        replace('plainDateTimeISO', (tz) => zoned(tz).toPlainDateTime());
+        replace('plainDateISO', (tz) => zoned(tz).toPlainDate());
+        replace('plainTimeISO', (tz) => zoned(tz).toPlainTime());
+    }
 
     const random = mulberry(config.randomSeed);
-    Math.random = random;
+    Math.random = () => {
+        note('Math.random()');
+        return random();
+    };
     const cryptoRandom = mulberry(config.randomSeed ^ 0x9e3779b9);
-    const getRandomValues = <T extends ArrayBufferView | null>(array: T): T => {
+    const fill = <T extends ArrayBufferView | null>(array: T): T => {
         if (array) {
             const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
             for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(cryptoRandom() * 256);
@@ -79,12 +197,16 @@ export function installHost(config: HostConfig): void {
         return array;
     };
     Object.defineProperty(crypto, 'getRandomValues', {
-        value: getRandomValues,
+        value: <T extends ArrayBufferView | null>(array: T): T => {
+            note('crypto.getRandomValues()');
+            return fill(array);
+        },
         configurable: true,
     });
     Object.defineProperty(crypto, 'randomUUID', {
         value: () => {
-            const b = getRandomValues(new Uint8Array(16));
+            note('crypto.randomUUID()');
+            const b = fill(new Uint8Array(16));
             b[6] = (b[6] & 0x0f) | 0x40;
             b[8] = (b[8] & 0x3f) | 0x80;
             const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
@@ -236,6 +358,9 @@ export function installHost(config: HostConfig): void {
         },
         registerText(entry: RegisteredText) {
             api.texts.push(entry);
+        },
+        forbiddenCalls() {
+            return JSON.parse(JSON.stringify(calls)) as ForbiddenCalls;
         },
     };
     Object.defineProperty(window, '__flipbookHost', {

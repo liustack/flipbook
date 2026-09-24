@@ -124,6 +124,12 @@ The frame changes when the random seed changes: the page uses Math.random or cry
 
 Fix: Use rng(seed) or rand(seed, ...keys) from the runtime with a fixed seed.
 
+### `forbidden-api-call`
+
+The page called a clock or random function the rules forbid (Date.now, new Date(), performance.now, Math.random, crypto random, Temporal.Now and the like), even if this sample of frames did not change because of it.
+
+Fix: Remove every call named in `detail.api`, starting at `element`: take time from the t passed to seek, randomness from rng(seed) or rand(seed, ...keys).
+
 ### `late-paint`
 
 Two captures of the same t without a seek in between differ: something paints after seek returns.

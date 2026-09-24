@@ -308,6 +308,18 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     )),
                 );
             }
+            // Calls to forbidden clock and random functions over the whole run so far.
+            if (!page.broken) {
+                for (const [api, call] of Object.entries(await page.forbiddenCalls())) {
+                    dynamic.push(
+                        finding(
+                            'forbidden-api-call',
+                            `The page called ${api} ${call.count} time${call.count === 1 ? '' : 's'}${call.at ? `, first at ${call.at}` : ''}.`,
+                            { element: call.at, detail: { api, count: call.count } },
+                        ),
+                    );
+                }
+            }
         } finally {
             dynamic.push(...page.issues);
             await page.close();
