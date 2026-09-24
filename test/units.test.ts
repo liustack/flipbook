@@ -1,3 +1,4 @@
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { describe, expect, it } from 'vitest';
@@ -46,16 +47,92 @@ describe('attempt limits', () => {
 });
 
 describe('render lock', () => {
+    const lockFile = (dir: string) => path.join(dir, '.flipbook', 'render.lock');
+
     it('refuses a second holder and takes over a dead one', () => {
         const dir = tempDir('lock');
         const release = acquireLock(dir);
         expect(release).not.toBeNull();
-        fs.writeFileSync(path.join(dir, '.flipbook', 'render.lock'), String(process.ppid));
+        fs.writeFileSync(lockFile(dir), String(process.ppid));
         expect(acquireLock(dir)).toBeNull();
-        fs.writeFileSync(path.join(dir, '.flipbook', 'render.lock'), '999999');
+        fs.writeFileSync(lockFile(dir), '999999');
         const again = acquireLock(dir);
         expect(again).not.toBeNull();
         again?.();
+    });
+
+    it('refuses a second acquire from the same process', () => {
+        const dir = tempDir('lock-same');
+        const release = acquireLock(dir);
+        expect(release).not.toBeNull();
+        expect(acquireLock(dir)).toBeNull();
+        release?.();
+        expect(fs.existsSync(lockFile(dir))).toBe(false);
+    });
+
+    it('treats a just-created empty lock as held and an old one as stale', () => {
+        const dir = tempDir('lock-empty');
+        fs.mkdirSync(path.join(dir, '.flipbook'));
+        fs.writeFileSync(lockFile(dir), '');
+        expect(acquireLock(dir)).toBeNull();
+        const old = new Date(Date.now() - 60_000);
+        fs.utimesSync(lockFile(dir), old, old);
+        const release = acquireLock(dir);
+        expect(release).not.toBeNull();
+        release?.();
+    });
+
+    it('releases only its own lock', () => {
+        const dir = tempDir('lock-owner');
+        const release = acquireLock(dir);
+        expect(release).not.toBeNull();
+        const other = JSON.stringify({ pid: process.ppid, token: 'someone-else' });
+        fs.writeFileSync(lockFile(dir), other);
+        release?.();
+        expect(fs.readFileSync(lockFile(dir), 'utf-8')).toBe(other);
+    });
+
+    it('lets exactly one of several processes in', async () => {
+        const dir = tempDir('lock-race');
+        fs.mkdirSync(path.join(dir, '.flipbook'));
+        const go = path.join(dir, 'go');
+        const script = [
+            `import { existsSync } from 'node:fs';`,
+            `import { acquireLock } from ${JSON.stringify(path.join(repoRoot, 'src/engine/workspace.ts'))};`,
+            `while (!existsSync(${JSON.stringify(go)})) await new Promise((r) => setTimeout(r, 2));`,
+            `const release = acquireLock(${JSON.stringify(dir)});`,
+            `process.stdout.write(release ? 'got' : 'busy');`,
+            `await new Promise((r) => setTimeout(r, 400));`,
+            'release?.();',
+        ].join('\n');
+        const children = Array.from({ length: 8 }, () =>
+            spawn(process.execPath, ['--input-type=module', '-e', script], {
+                stdio: ['ignore', 'pipe', 'pipe'],
+            }),
+        );
+        const results = children.map(
+            (child) =>
+                new Promise<string>((resolve) => {
+                    let out = '';
+                    let err = '';
+                    child.stdout.on('data', (chunk) => {
+                        out += chunk;
+                    });
+                    child.stderr.on('data', (chunk) => {
+                        err += chunk;
+                    });
+                    child.on('close', () => resolve(out || `error: ${err}`));
+                }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        fs.writeFileSync(go, '');
+        const outcomes = await Promise.all(results);
+        expect(
+            outcomes.filter((o) => o === 'got'),
+            outcomes.join(', '),
+        ).toHaveLength(1);
+        expect(outcomes.filter((o) => o === 'busy')).toHaveLength(7);
+        expect(fs.existsSync(lockFile(dir))).toBe(false);
     });
 });
 

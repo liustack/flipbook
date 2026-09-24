@@ -56,7 +56,7 @@ read_when:
 | `.flipbook/attempts.json` | check、render | 重试计数 |
 | `.flipbook/reports/<命令>.json` | check、snapshot、render | 这条命令最近一次的报告，和 stdout 上的相同 |
 | `.flipbook/tmp/` | render | 渲染中间件，结束后删掉 |
-| `.flipbook/render.lock` | render | 同一目录同时只跑一个 render，另一个报 `render-busy` 退 1，不计入重试次数 |
+| `.flipbook/render.lock` | render | 同一目录同时只跑一个 render（同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。锁用 O_EXCL 建，内容是 pid 和随机令牌。持有进程已退出，或锁里没有可读的持有者且建了超过 10 秒，才算过期被接管。释放时只删令牌仍是自己的锁 |
 
 ## Finding
 

@@ -268,29 +268,123 @@ function pidAlive(pid: number): boolean {
         process.kill(pid, 0);
         return true;
     } catch (error) {
-        return (error as NodeJS.ErrnoException).code === 'EPERM';
+        return errno(error) === 'EPERM';
+    }
+}
+
+/** A lock without a readable holder younger than this is still being written. */
+export const LOCK_WRITE_GRACE_MS = 10_000;
+
+interface LockHolder {
+    pid: number;
+    token: string;
+}
+
+/** `{ pid, token }`, or a bare pid from flipbook 0.1.0. Null while the file is incomplete. */
+function parseHolder(text: string): LockHolder | null {
+    if (/^\d+$/.test(text.trim())) return { pid: Number(text.trim()), token: '' };
+    let value: unknown;
+    try {
+        value = JSON.parse(text);
+    } catch {
+        return null;
+    }
+    const holder = value as Partial<LockHolder> | null;
+    return holder && Number.isInteger(holder.pid) && typeof holder.token === 'string'
+        ? (holder as LockHolder)
+        : null;
+}
+
+/** Contents of a lock file, or null when it is gone. Never follows a link. */
+function readLock(file: string): string | null {
+    let fd: number;
+    try {
+        fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    } catch (error) {
+        if (errno(error) === 'ENOENT') return null;
+        if (errno(error) === 'ELOOP') throw new WorkspaceError(file, `${file} is a symbolic link.`);
+        throw error;
+    }
+    try {
+        return fs.readFileSync(fd, 'utf-8');
+    } finally {
+        fs.closeSync(fd);
     }
 }
 
 /**
- * Take .flipbook/render.lock. Returns a release function, or null when a live
- * process holds it. A lock left by a dead process is taken over.
+ * Remove the lock when its holder is gone. Returns false when it is held: its
+ * process is alive (this one included), or it has no readable holder yet and
+ * was created within LOCK_WRITE_GRACE_MS. A stale lock is first renamed to a
+ * name of its own, then checked to be the same file with the same contents, so
+ * a lock another process created in between is put back instead of removed.
+ */
+function clearStaleLock(file: string): boolean {
+    let stat: fs.Stats;
+    try {
+        stat = fs.lstatSync(file);
+    } catch (error) {
+        if (errno(error) === 'ENOENT') return true;
+        throw error;
+    }
+    if (!stat.isFile()) throw new WorkspaceError(file, `${file} is not a regular file.`);
+    const text = readLock(file);
+    if (text === null) return true;
+    const holder = parseHolder(text);
+    if (holder ? pidAlive(holder.pid) : Date.now() - stat.mtimeMs < LOCK_WRITE_GRACE_MS) {
+        return false;
+    }
+    const aside = `${file}.stale.${process.pid}.${randomBytes(4).toString('hex')}`;
+    try {
+        fs.renameSync(file, aside);
+    } catch (error) {
+        if (errno(error) === 'ENOENT') return true;
+        throw error;
+    }
+    const moved = fs.lstatSync(aside);
+    if (moved.ino !== stat.ino || moved.dev !== stat.dev || readLock(aside) !== text) {
+        try {
+            fs.linkSync(aside, file);
+        } catch (error) {
+            if (errno(error) !== 'EEXIST') throw error;
+        }
+        fs.rmSync(aside, { force: true });
+        return false;
+    }
+    fs.rmSync(aside, { force: true });
+    return true;
+}
+
+/**
+ * Take .flipbook/render.lock, created with O_EXCL and holding this process's
+ * pid and a random token. Returns a release function that removes the lock
+ * only while it still holds that token, or null when the lock is held.
  */
 export function acquireLock(dir: string): (() => void) | null {
     const ws = Workspace.open(dir);
-    const lock = path.join(ws.ensureDir(ws.path('.flipbook')), 'render.lock');
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const file = path.join(ws.ensureDir(ws.path('.flipbook')), 'render.lock');
+    const token = randomBytes(8).toString('hex');
+    for (let attempt = 0; attempt < 3; attempt++) {
+        let fd: number;
         try {
-            const fd = fs.openSync(lock, 'wx');
-            fs.writeSync(fd, String(process.pid));
-            fs.closeSync(fd);
-            return () => fs.rmSync(lock, { force: true });
+            fd = fs.openSync(file, CREATE_EXCLUSIVE, 0o644);
         } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-            const holder = Number.parseInt(fs.readFileSync(lock, 'utf-8'), 10);
-            if (Number.isFinite(holder) && holder !== process.pid && pidAlive(holder)) return null;
-            fs.rmSync(lock, { force: true });
+            if (errno(error) !== 'EEXIST') throw error;
+            if (!clearStaleLock(file)) return null;
+            continue;
         }
+        try {
+            fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, token }));
+        } catch (error) {
+            fs.closeSync(fd);
+            fs.rmSync(file, { force: true });
+            throw error;
+        }
+        fs.closeSync(fd);
+        return () => {
+            const text = readLock(file);
+            if (text !== null && parseHolder(text)?.token === token) fs.rmSync(file);
+        };
     }
     return null;
 }
