@@ -6,7 +6,12 @@ export interface EncoderOptions {
     output: string;
     /** Written into the mp4 comment tag as JSON. */
     metadata: Record<string, unknown>;
+    /** Longest wait for ffmpeg to take one frame from a full pipe. */
+    writeTimeoutMs?: number;
 }
+
+/** Default limit for one frame to leave the pipe. */
+export const WRITE_TIMEOUT_MS = 60_000;
 
 /** ffmpeg arguments: PNG frames on stdin to H.264 yuv420p with bt709 matrix and tags. */
 export function encoderArgs(options: EncoderOptions): string[] {
@@ -53,25 +58,34 @@ export function encoderArgs(options: EncoderOptions): string[] {
     ];
 }
 
-/** A running ffmpeg that takes PNG frames on stdin. */
+/**
+ * A running ffmpeg that takes PNG frames on stdin. Every wait on it has a
+ * limit. When a limit runs out, or render gives up, ffmpeg is stopped
+ * (SIGTERM, then SIGKILL) and the call returns only after it has exited.
+ */
 export class Encoder {
     private readonly stderr: Buffer[] = [];
-    private exitCode: number | null = null;
-    private exited: Promise<number | null>;
+    private readonly child: ChildProcessWithoutNullStreams;
+    private readonly writeTimeoutMs: number;
+    private readonly exited: Promise<number | null>;
+    private done = false;
     private failure: Error | null = null;
 
-    private constructor(private readonly child: ChildProcessWithoutNullStreams) {
+    private constructor(child: ChildProcessWithoutNullStreams, writeTimeoutMs: number) {
+        this.child = child;
+        this.writeTimeoutMs = writeTimeoutMs;
         child.stderr.on('data', (chunk: Buffer) => this.stderr.push(chunk));
         child.stdin.on('error', (error) => {
-            this.failure = error;
+            this.failure ??= error;
         });
         this.exited = new Promise((resolve) => {
             child.on('error', (error) => {
-                this.failure = error;
+                this.failure ??= error;
+                this.done = true;
                 resolve(null);
             });
             child.on('exit', (code) => {
-                this.exitCode = code;
+                this.done = true;
                 resolve(code);
             });
         });
@@ -80,7 +94,15 @@ export class Encoder {
     /** `options.output` must sit in a directory the caller made with Workspace.fresh. */
     static start(ffmpeg: string, options: EncoderOptions): Encoder {
         const child = spawn(ffmpeg, encoderArgs(options), { stdio: ['pipe', 'ignore', 'pipe'] });
-        return new Encoder(child as unknown as ChildProcessWithoutNullStreams);
+        return new Encoder(
+            child as unknown as ChildProcessWithoutNullStreams,
+            options.writeTimeoutMs ?? WRITE_TIMEOUT_MS,
+        );
+    }
+
+    /** Process id of ffmpeg, for diagnostics and tests. */
+    get pid(): number | undefined {
+        return this.child.pid;
     }
 
     private error(prefix: string): Error {
@@ -90,36 +112,64 @@ export class Encoder {
         );
     }
 
-    /** Queue one PNG frame, waiting when the pipe is full. */
-    async write(png: Buffer): Promise<void> {
-        if (this.failure || this.exitCode !== null)
-            throw this.error('ffmpeg stopped accepting frames');
-        if (!this.child.stdin.write(png)) {
-            await new Promise<void>((resolve) => {
-                const done = () => {
-                    this.child.stdin.off('drain', done);
-                    this.child.off('exit', done);
-                    resolve();
-                };
-                this.child.stdin.once('drain', done);
-                this.child.once('exit', done);
-            });
-            if (this.failure || this.exitCode !== null)
-                throw this.error('ffmpeg stopped accepting frames');
-        }
+    /** Resolve on the first of `events`, or after `ms` with false. */
+    private waitFor(ms: number, events: (() => Promise<unknown>)[]): Promise<boolean> {
+        let timer: NodeJS.Timeout | undefined;
+        const timeout = new Promise<boolean>((resolve) => {
+            timer = setTimeout(() => resolve(false), ms);
+        });
+        return Promise.race([...events.map((event) => event().then(() => true)), timeout]).finally(
+            () => clearTimeout(timer),
+        );
     }
 
-    /** Close stdin and wait for ffmpeg to finish writing the file. */
+    /** Stop ffmpeg and wait until it has exited. */
+    private async stop(): Promise<void> {
+        if (!this.done) terminate(this.child);
+        await this.exited;
+    }
+
+    /** Queue one PNG frame, waiting (within the write limit) when the pipe is full. */
+    async write(png: Buffer): Promise<void> {
+        if (this.failure || this.done) throw this.error('ffmpeg stopped accepting frames');
+        if (this.child.stdin.write(png)) return;
+        const stdin = this.child.stdin;
+        const listeners: [string, () => void][] = [];
+        const on = (event: string) => () =>
+            new Promise<void>((resolve) => {
+                listeners.push([event, resolve]);
+                stdin.once(event, resolve);
+            });
+        const drained = await this.waitFor(this.writeTimeoutMs, [
+            on('drain'),
+            on('error'),
+            on('close'),
+            () => this.exited,
+        ]);
+        for (const [event, listener] of listeners) stdin.off(event, listener);
+        if (!drained) {
+            await this.stop();
+            throw this.error(`ffmpeg did not take a frame within ${this.writeTimeoutMs} ms`);
+        }
+        if (this.failure || this.done) throw this.error('ffmpeg stopped accepting frames');
+    }
+
+    /** Close stdin and wait (within `timeoutMs`) for ffmpeg to finish writing the file. */
     async finish(timeoutMs = 600_000): Promise<void> {
         this.child.stdin.end();
-        const timer = setTimeout(() => terminate(this.child), timeoutMs);
+        const finished = await this.waitFor(timeoutMs, [() => this.exited]);
+        if (!finished) {
+            await this.stop();
+            throw this.error(`ffmpeg did not finish within ${timeoutMs} ms`);
+        }
         const code = await this.exited;
-        clearTimeout(timer);
         if (code !== 0) throw this.error(`ffmpeg exited with ${code}`);
     }
 
-    abort(): void {
-        terminate(this.child);
+    /** Give up on the video: stop ffmpeg and wait until it has exited. */
+    async abort(): Promise<void> {
+        this.child.stdin.destroy();
+        await this.stop();
     }
 }
 

@@ -147,7 +147,7 @@ export async function runRender(options: RenderOptions): Promise<Report> {
                 dropFrames: options.dropFrames,
             });
         } catch (error) {
-            encoder.abort();
+            await encoder.abort();
             rb.addAll(page.issues);
             await page.close();
             rb.add(
@@ -165,7 +165,7 @@ export async function runRender(options: RenderOptions): Promise<Report> {
         await page.close();
         rb.addAll(dedupe(captured.findings));
         if (!captured.completed) {
-            encoder.abort();
+            await encoder.abort();
             return finish();
         }
         const encodeStart = Date.now();
