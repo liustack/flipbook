@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 640px; height: 360px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+  div { position: absolute; top: 0; width: 320px; height: 360px; }
+  #blue { left: 0; background: #3366cc; }
+  #red { left: 320px; background: #ff0000; }
+</style>
+</head>
+<body>
+<div id="blue"></div>
+<div id="red"></div>
+<script type="module">
+import { composition } from '/__flipbook/runtime.js';
+composition({ seek() {} });
+</script>
+</body>
+</html>
