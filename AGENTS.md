@@ -36,10 +36,11 @@ src/
   engine/          浏览器、页面、时钟、timeline、截帧、编码、验收、字体、缓存、扫描
   runtime/         浏览器端运行时库（core、text、audio）
   fonts/           字体清单、码位表、OFL 全文
-scripts/           发版、版本号改写、码位表生成
-skills/flipbook/   SKILL.md、references/、scripts/run.sh 和 run.ps1
-docs/              report-schema.md、timeline-schema.md
+scripts/           发版、版本号改写、码位表生成、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）
+skills/flipbook/   SKILL.md（英文）、references/（rules、timeline、troubleshooting）、scripts/run.sh 和 run.ps1
+docs/              report-schema.md、timeline-schema.md、eval.md
 examples/          每个例子一份源码加 expected.json，不提交 mp4
+eval/              评测用例、models.json、run.mjs，证据写到 eval/results/（不入库）
 test/              vitest，坏片语料在 test/fixtures/bad/
 ```
 
@@ -48,6 +49,9 @@ test/              vitest，坏片语料在 test/fixtures/bad/
 - `pnpm lint && pnpm typecheck && pnpm test && pnpm build`，全部通过才算完成。`pnpm test` 会先构建。
 - 用到浏览器的测试把 fixture 复制到临时目录再跑。首次运行需要联网装 Chromium 和字体，写的是用户缓存目录。
 - 坏片语料每类至少一条，新增检查时先加一条会被拦下的坏片。
+- `skills/flipbook/references/` 里标了 `<!-- check: ... -->` 的代码片段由 `test/references.test.ts` 真跑 check。`troubleshooting.md` 从 `src/cli/codes.ts` 生成，改了类型码跑 `UPDATE_REFERENCES=1 pnpm test test/references.test.ts`。
+- 评测花真实额度，按 docs/eval.md 本地跑，CI 只跑 `--dry-run`。
+- 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。
 - 确定性只在同机同版本比原始帧哈希，跨机器不比。
 
 ## 文档
@@ -60,3 +64,4 @@ test/              vitest，坏片语料在 test/fixtures/bad/
 
 - `node_modules/`、`dist/`、`coverage/`
 - `out/`、`.flipbook/`
+- `rebaseline/`、`eval/results/`
