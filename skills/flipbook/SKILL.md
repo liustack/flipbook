@@ -60,7 +60,7 @@ Defaults:
 | frame rate | 24 fps |
 | duration | about 30 s, within 5% of what the user asked, at most 180 s |
 | look | the paper skin: `paperLayer()` and `grainLayer()` from `references/paper.md`, dark ink, one or two accent colors, serif type |
-| music | none (`"audio": { "mode": "none" }`) |
+| music | preset `pluck` (`"audio": { "mode": "preset", "preset": "pluck" }`), silent only when the user asks |
 | the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
 | characters, photos | none unless asked |
 
@@ -87,6 +87,7 @@ Defaults:
 |---|---|
 | `references/rules.md` | before the first index.html, and when a determinism, text or layer code is unclear |
 | `references/timeline.md` | before the first timeline.json, and when matching a requested duration |
+| `references/audio.md` | before choosing the music or placing sound effects, and when an `audio-*` code appears |
 | `references/troubleshooting.md` | whenever check or render exits non-zero |
 | `references/paper.md` | before the first index.html, for the paper and grain layers of the default look |
 | `references/materials.md` | when a picture needs pencil lines, hatching, halftone, stipple or torn paper |

@@ -61,15 +61,21 @@ Any other field is an error, so a typo never passes silently.
 | `kind` | yes | `text`, `sfx`, `mark` | |
 | `text` | for `text` | the on-screen text | check verifies every character has a glyph |
 | `settleBeats` | no | 0 to 64 | beats until the text is fully in, default 0 |
-| `sfx` | for `sfx` | effect name | sound effects arrive in v0.3 |
+| `sfx` | for `sfx` | `paper`, `drop`, `ding`, `sweep` | the effect; its loudest moment lands on the cue's frame |
 
 `audio`:
 
-| Mode | What render does |
-|---|---|
-| `none` | a silent video |
-| `file` | the user's music at `file` (a regular file inside the composition: wav, mp3, flac, ogg, aac, m4a, aiff or webm, not a playlist), cut so the first beat at `bpmOffset` seconds lands on t = 0, padded or trimmed to the video length, faded out over the last second, encoded as AAC |
-| `preset` | reserved for v0.3, v0.1 renders silent and warns `audio-skipped` |
+| Field | Used with | Values | Meaning |
+|---|---|---|---|
+| `mode` | always, required | `preset`, `file`, `none` | where the music comes from |
+| `preset` | `preset`, required | `pluck`, `marimba`, `pad` | the synthesized music |
+| `key` | any mode | `A` to `G`, optional `#` or `b`, `m` for minor, default `C` | key of the music, also tunes `ding` |
+| `progression` | `preset` | integer 0 to 5, default 0 | chord progression, one chord per bar |
+| `dynamics` | `preset` | scene id to `rest`, `soft`, `medium`, `full` | level per scene, default `medium` |
+| `file` | `file`, required | a regular file inside the composition: wav, mp3, flac, ogg, aac, m4a, aiff or webm, not a playlist | the user's music |
+| `bpmOffset` | `file` | 0 to 60, default 0 | the second in the file where beat 1 falls |
+
+A field written under a mode that does not use it is an error. `none` renders only the `sfx` cues, or a silent video when there are none. Read `references/audio.md` before choosing music or placing effects.
 
 ## From beats to seconds and frames
 
@@ -127,7 +133,12 @@ A 30-second film at 96 bpm with an intro, three points and an ending:
         { "id": "three", "scene": "point-3", "beat": 0, "kind": "text", "text": "第三，交付前先验收", "settleBeats": 2 },
         { "id": "bye", "scene": "ending", "beat": 0, "kind": "text", "text": "谢谢观看", "settleBeats": 1 }
     ],
-    "audio": { "mode": "none" }
+    "audio": {
+        "mode": "preset",
+        "preset": "pluck",
+        "key": "D",
+        "dynamics": { "intro": "soft", "point-3": "full", "ending": "soft" }
+    }
 }
 ```
 
