@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 20260925,
+    "bpm": 96,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "intro", "bars": 1 },
+        { "id": "title", "bars": 1 }
+    ],
+    "cues": [
+        { "id": "zh", "scene": "intro", "beat": 1, "kind": "text", "text": "你好，翻页书", "settleBeats": 1 },
+        { "id": "en", "scene": "title", "beat": 0, "kind": "text", "text": "Hello, flipbook", "settleBeats": 1 },
+        { "id": "cut", "scene": "title", "beat": 0, "kind": "mark" }
+    ],
+    "audio": { "mode": "none" }
+}

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>hello</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #f4efe4; }
+  canvas { position: absolute; left: 0; top: 0; }
+  .line { position: absolute; left: 0; width: 1920px; margin: 0; text-align: center; color: #2b2622; }
+  #zh { top: 360px; font: 400 128px/1.2 "LXGW WenKai"; }
+  #en { top: 560px; font: 600 88px/1.2 "Noto Serif SC"; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<canvas id="paper" data-flipbook-layer="paper"></canvas>
+<canvas id="ink"></canvas>
+<h1 id="zh" class="line">你好，翻页书</h1>
+<p id="en" class="line">Hello, flipbook</p>
+<script type="module">
+import {
+  composition, timeline, setupCanvas, staticLayer, rng, rand,
+  ease, lerp, progress, cueProgress, onTwos,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const ink = setupCanvas(document.getElementById('ink'), W, H);
+const zh = document.getElementById('zh');
+const en = document.getElementById('en');
+let paper;
+
+composition({
+  setup() {
+    paper = staticLayer(W, H, (ctx) => {
+      ctx.fillStyle = '#f4efe4';
+      ctx.fillRect(0, 0, W, H);
+      const r = rng(tl.seed);
+      for (let i = 0; i < 9000; i++) {
+        ctx.fillStyle = `rgba(90, 70, 40, ${r.range(0.02, 0.08)})`;
+        ctx.fillRect(r.range(0, W), r.range(0, H), r.range(1, 3), r.range(1, 3));
+      }
+    });
+    const ctx = setupCanvas(document.getElementById('paper'), W, H);
+    paper.blit(ctx);
+  },
+  seek(t) {
+    const drawn = onTwos(t, tl.fps);
+    const p = ease.inOutCubic(progress(drawn, 0, tl.durationSec));
+    ink.clearRect(0, 0, W, H);
+    ink.save();
+    ink.translate(lerp(260, W - 260, p), 860 + Math.sin(p * Math.PI * 2) * 60);
+    ink.rotate(p * Math.PI);
+    const wobble = (rand(tl.seed, Math.round(drawn * tl.fps)) - 0.5) * 6;
+    ink.fillStyle = '#c8452d';
+    ink.fillRect(-90 + wobble, -90, 180, 180);
+    ink.restore();
+
+    const a = ease.outCubic(cueProgress(tl, t, 'zh'));
+    zh.style.opacity = String(a);
+    zh.style.transform = `translateY(${(1 - a) * 40}px)`;
+    const b = ease.outCubic(cueProgress(tl, t, 'en'));
+    en.style.opacity = String(b);
+    en.style.transform = `translateY(${(1 - b) * 40}px)`;
+  },
+});
+</script>
+</body>
+</html>
