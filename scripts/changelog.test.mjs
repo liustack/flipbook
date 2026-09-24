@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, stampChangelogDate } from './changelog.mjs';
+import { localDate, releaseChangelog, releaseNotes, stampChangelogDate } from './changelog.mjs';
 
 const changelog = [
     '# Changelog',
@@ -35,6 +35,51 @@ describe('stampChangelogDate', () => {
         const text = changelog.replace('## 0.2.0', '## 0.2.01');
         expect(() => stampChangelogDate(text, '0.2.0', '2026-10-02')).toThrow(/no "## 0.2.0"/);
         expect(stampChangelogDate(changelog, '0.1.0', '2026-10-02')).toContain('\n## 0.2.0\n');
+    });
+});
+
+const pending = [
+    '# Changelog',
+    '',
+    '## Unreleased',
+    '',
+    '### Paper',
+    '',
+    '- paper things',
+    '',
+    '## 0.1.0 - 2026-09-25',
+    '',
+    '- first',
+    '',
+].join('\n');
+
+describe('releaseChangelog', () => {
+    it('turns "## Unreleased" into the version and today, keeping its subsections', () => {
+        const out = releaseChangelog(pending, '0.2.0', '2026-10-02');
+        expect(out).toContain('\n## 0.2.0 - 2026-10-02\n\n### Paper\n\n- paper things\n');
+        expect(out).not.toContain('Unreleased');
+        expect(out).toContain('\n## 0.1.0 - 2026-09-25\n');
+    });
+
+    it('dates the version heading when there is no "## Unreleased"', () => {
+        expect(releaseChangelog(changelog, '0.2.0', '2026-10-02')).toContain(
+            '\n## 0.2.0 - 2026-10-02\n',
+        );
+    });
+
+    it('refuses both, or neither', () => {
+        const both = pending.replace('## 0.1.0 - 2026-09-25', '## 0.2.0');
+        expect(() => releaseChangelog(both, '0.2.0', '2026-10-02')).toThrow(/both/);
+        expect(() => releaseChangelog(changelog, '0.3.0', '2026-10-02')).toThrow(
+            /no "## Unreleased" or "## 0.3.0"/,
+        );
+    });
+});
+
+describe('releaseNotes', () => {
+    it('reads the Unreleased section up to the next version, subsections included', () => {
+        expect(releaseNotes(pending, '0.2.0').trim()).toBe('### Paper\n\n- paper things');
+        expect(releaseNotes(changelog, '0.1.0').trim()).toBe('- first');
     });
 });
 

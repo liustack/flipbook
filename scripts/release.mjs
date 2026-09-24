@@ -6,16 +6,17 @@
 //   pnpm release patch        bump from the current one
 //
 // Runs every refusal check first, then the gates (lint, typecheck, test,
-// build), regenerates docs/samples, then bumps, stamps the launchers and
-// today's date on the version's CHANGELOG heading, commits, tags and pushes
-// main and the tag atomically. It does not publish: the pushed tag triggers
+// build), regenerates docs/samples, then bumps, stamps the launchers, turns
+// "## Unreleased" in CHANGELOG.md into "## <version> - <today>" (or dates the
+// version's own heading), commits, tags and pushes main and the tag
+// atomically. It does not publish: the pushed tag triggers
 // .github/workflows/release.yml, which publishes to npm and creates the
 // GitHub Release.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { localDate, stampChangelogDate } from './changelog.mjs';
+import { localDate, releaseChangelog, releaseNotes } from './changelog.mjs';
 import { stampLaunchers } from './stamp.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -84,13 +85,13 @@ try {
 
 const changelogPath = join(root, 'CHANGELOG.md');
 const changelog = readFileSync(changelogPath, 'utf-8');
-const section = changelog.match(
-    new RegExp(`^## ${next.replace(/\./g, '\\.')}[^\\n]*\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm'),
-);
-if (!section) {
-    fail(`CHANGELOG.md has no "## ${next}" section. Write what changed before releasing it.`);
+let notes;
+try {
+    notes = releaseNotes(changelog, next);
+} catch (error) {
+    fail(error.message);
 }
-if (section[1].trim().length < 20) {
+if (notes.trim().length < 20) {
     fail(`the CHANGELOG entry for ${next} is empty. Say what changed.`);
 }
 
@@ -114,7 +115,7 @@ if (next !== pkg.version) {
 stampLaunchers(root);
 writeFileSync(
     changelogPath,
-    stampChangelogDate(readFileSync(changelogPath, 'utf-8'), next, localDate()),
+    releaseChangelog(readFileSync(changelogPath, 'utf-8'), next, localDate()),
 );
 if (run('git', ['status', '--porcelain'])) {
     run('git', ['commit', '-am', `chore(release): v${next}`]);
