@@ -1,5 +1,22 @@
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
+import {
+    ANALYSIS_RATE,
+    type CueMeasure,
+    decodeMono,
+    hasEffects,
+    hasMusic,
+    LUFS_TOLERANCE,
+    locateCues,
+    type MixOptions,
+    measureLoudness,
+    musicReference,
+    needsSoundtrack,
+    removeMusic,
+    type StemCue,
+    TARGET_LUFS,
+    TRUE_PEAK_MAX_DBTP,
+} from './audio.ts';
 import { sequencePattern } from './capture.ts';
 import type { Ffmpeg } from './ffmpeg.ts';
 import {
@@ -80,25 +97,6 @@ export interface VerifyOptions {
     /** Where evidence images are kept; inside the workspace, outliving the render's tmp. */
     evidenceDir: string;
     workspace: Workspace;
-}
-
-/**
- * Audio acceptance: sfx peaks against cue frames and loudness. The audio
- * track arrives with the audio command (v0.3); until then the video is
- * silent, and a timeline that asks for sound gets a warning.
- */
-export function verifyAudio(timeline: ResolvedTimeline): Finding[] {
-    if (timeline.audio.mode !== 'preset') return [];
-    return [
-        finding(
-            'audio-skipped',
-            `audio mode "${timeline.audio.mode}" is not rendered in this version, so the video is silent.`,
-            {
-                severity: 'warning',
-                detail: { audio: timeline.audio },
-            },
-        ),
-    ];
 }
 
 export interface VerifyOutput {
@@ -398,7 +396,6 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
             );
         }
     }
-    findings.push(...verifyAudio(timeline));
     return { findings, probe };
 }
 
@@ -440,47 +437,141 @@ export async function probeAudio(ffprobe: string, file: string): Promise<AudioPr
     };
 }
 
+export interface AudioCheck extends AudioProbe {
+    mode: string;
+    /** Integrated loudness in LUFS, null when the track is silent or shorter than 0.4 s. */
+    integratedLufs: number | null;
+    /** True peak in dBTP. */
+    truePeakDbtp: number | null;
+    /** Whether the loudness target applied (music present). */
+    loudnessChecked: boolean;
+    /** Where the effects track sits in the delivered track, in ms (positive is late). */
+    effectsLagMs: number | null;
+    cues: CueMeasure[];
+}
+
+export interface AudioVerifyOptions {
+    ffmpeg: Ffmpeg;
+    video: string;
+    timeline: ResolvedTimeline;
+    /** The effects stem and its cues, when the timeline has sfx cues. */
+    effects: { file: string; cues: StemCue[] } | null;
+    /** How the soundtrack was mixed, to rebuild the music on its own. */
+    mix: MixOptions | null;
+}
+
 /**
- * The muxed soundtrack against the picture: an audio stream must exist and
- * its length must match the video within one frame or one AAC packet,
- * whichever is longer.
+ * Audio acceptance on the delivered video. Only runs when the timeline asks
+ * for sound (music or sfx cues):
+ * - an audio stream exists and its length matches the picture within one
+ *   frame or one AAC packet, whichever is longer;
+ * - with music, integrated loudness is TARGET_LUFS within LUFS_TOLERANCE;
+ * - the true peak stays at or under TRUE_PEAK_MAX_DBTP;
+ * - every effect peaks within one frame of its cue frame.
  */
-export async function verifySoundtrack(
-    ffprobe: string,
-    video: string,
-    timeline: ResolvedTimeline,
-): Promise<{ findings: Finding[]; audio: AudioProbe | null }> {
-    const audio = await probeAudio(ffprobe, video);
-    const expected = timeline.frameCount / timeline.fps;
-    if (!audio) {
-        return {
-            audio,
-            findings: [
-                finding(
-                    'duration-mismatch',
-                    'The video has no audio stream although timeline.json sets audio.mode "file".',
-                    {
-                        detail: { audio: timeline.audio },
-                    },
-                ),
-            ],
-        };
+export async function verifyAudio(
+    options: AudioVerifyOptions,
+): Promise<{ findings: Finding[]; audio: AudioCheck | null }> {
+    const { ffmpeg, video, timeline } = options;
+    if (!needsSoundtrack(timeline)) return { findings: [], audio: null };
+    const findings: Finding[] = [];
+    const probe = await probeAudio(ffmpeg.ffprobe, video);
+    if (!probe) {
+        findings.push(
+            finding(
+                'audio-missing',
+                `The video has no audio stream although timeline.json asks for sound (audio.mode "${timeline.audio.mode}"${hasEffects(timeline) ? ', sfx cues' : ''}).`,
+                { detail: { audio: timeline.audio } },
+            ),
+        );
+        return { findings, audio: null };
     }
-    const tolerance = Math.max(1 / timeline.fps, 1024 / (audio.sampleRate || 48000));
-    const drift = Math.abs(audio.durationSec - expected);
+    const expected = timeline.frameCount / timeline.fps;
+    const tolerance = Math.max(1 / timeline.fps, 1024 / (probe.sampleRate || 48000));
+    const drift = Math.abs(probe.durationSec - expected);
+    if (drift > tolerance + 1e-6) {
+        findings.push(
+            finding(
+                'duration-mismatch',
+                `The audio lasts ${probe.durationSec.toFixed(3)} s, the picture lasts ${expected.toFixed(3)} s.`,
+                { detail: { audio: probe.durationSec, video: expected, tolerance } },
+            ),
+        );
+    }
+    const loudness = await measureLoudness(ffmpeg.ffmpeg, video);
+    const loudnessChecked = hasMusic(timeline) && loudness.integrated !== null;
+    if (
+        loudnessChecked &&
+        Math.abs((loudness.integrated as number) - TARGET_LUFS) > LUFS_TOLERANCE + 1e-9
+    ) {
+        findings.push(
+            finding(
+                'audio-loudness',
+                `The soundtrack measures ${loudness.integrated?.toFixed(1)} LUFS, the target is ${TARGET_LUFS} ± ${LUFS_TOLERANCE}.`,
+                {
+                    detail: {
+                        integratedLufs: loudness.integrated,
+                        target: TARGET_LUFS,
+                        tolerance: LUFS_TOLERANCE,
+                    },
+                },
+            ),
+        );
+    }
+    if (loudness.truePeak !== null && loudness.truePeak > TRUE_PEAK_MAX_DBTP + 1e-9) {
+        findings.push(
+            finding(
+                'audio-peak',
+                `The soundtrack peaks at ${loudness.truePeak.toFixed(1)} dBTP, above ${TRUE_PEAK_MAX_DBTP} dBTP.`,
+                { detail: { truePeakDbtp: loudness.truePeak, limit: TRUE_PEAK_MAX_DBTP } },
+            ),
+        );
+    }
+    let cues: CueMeasure[] = [];
+    let effectsLagMs: number | null = null;
+    if (options.effects && options.effects.cues.length > 0) {
+        const [stem, delivered, music] = await Promise.all([
+            decodeMono(ffmpeg.ffmpeg, options.effects.file, ANALYSIS_RATE),
+            decodeMono(ffmpeg.ffmpeg, video, ANALYSIS_RATE),
+            options.mix ? musicReference(options.mix, ANALYSIS_RATE) : Promise.resolve(null),
+        ]);
+        const effectsOnly = music ? removeMusic(delivered, music, ANALYSIS_RATE) : delivered;
+        const located = locateCues(
+            stem,
+            effectsOnly,
+            ANALYSIS_RATE,
+            options.effects.cues,
+            timeline.fps,
+        );
+        cues = located.cues;
+        effectsLagMs = located.lagMs;
+        const frameMs = 1000 / timeline.fps;
+        for (const cue of cues) {
+            if (cue.offsetMs !== null && Math.abs(cue.offsetMs) <= frameMs + 1e-6) continue;
+            const message =
+                cue.offsetMs === null
+                    ? `The "${cue.sfx}" effect of cue "${cue.id}" cannot be found in the soundtrack near frame ${cue.frame}.`
+                    : `The "${cue.sfx}" effect of cue "${cue.id}" peaks ${cue.offsetMs.toFixed(1)} ms ${cue.offsetMs > 0 ? 'after' : 'before'} its frame ${cue.frame} (limit one frame, ${frameMs.toFixed(1)} ms).`;
+            findings.push(
+                finding('audio-cue-offset', message, {
+                    time: cue.expectedSec,
+                    frame: cue.frame,
+                    element: `cue ${cue.id}`,
+                    detail: { ...cue, frameMs },
+                }),
+            );
+        }
+    }
     return {
-        audio,
-        findings:
-            drift > tolerance + 1e-6
-                ? [
-                      finding(
-                          'duration-mismatch',
-                          `The audio lasts ${audio.durationSec.toFixed(3)} s, the picture lasts ${expected.toFixed(3)} s.`,
-                          {
-                              detail: { audio: audio.durationSec, video: expected, tolerance },
-                          },
-                      ),
-                  ]
-                : [],
+        findings,
+        audio: {
+            ...probe,
+            mode: timeline.audio.mode,
+            integratedLufs: loudness.integrated,
+            truePeakDbtp: loudness.truePeak,
+            loudnessChecked,
+            effectsLagMs,
+            cues,
+        },
     };
 }

@@ -179,19 +179,41 @@ export class Workspace {
         return real;
     }
 
-    /** Write `data` to `target`, creating its directories, replacing an existing file. */
-    writeFile(target: string, data: string | Buffer): string {
+    /** A new temporary file next to `target`, and the real path it will be renamed to. */
+    private openTemp(target: string): { real: string; temp: string; fd: number } {
         const parts = this.parts(target);
         if (parts.length === 0) throw new WorkspaceError(target, 'Cannot write the root.');
         const real = this.replaceable(parts);
         const temp = `${real}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
-        const fd = fs.openSync(temp, CREATE_EXCLUSIVE, 0o644);
+        return { real, temp, fd: fs.openSync(temp, CREATE_EXCLUSIVE, 0o644) };
+    }
+
+    /** Write `data` to `target`, creating its directories, replacing an existing file. */
+    writeFile(target: string, data: string | Buffer): string {
+        const { real, temp, fd } = this.openTemp(target);
         try {
             fs.writeFileSync(fd, data);
         } finally {
             fs.closeSync(fd);
         }
         try {
+            fs.renameSync(temp, real);
+        } catch (error) {
+            fs.rmSync(temp, { force: true });
+            throw error;
+        }
+        return path.resolve(target);
+    }
+
+    /** writeFile for data that arrives in pieces, such as a long WAV. */
+    async writeFileFrom(target: string, chunks: AsyncIterable<Buffer>): Promise<string> {
+        const { real, temp, fd } = this.openTemp(target);
+        try {
+            try {
+                for await (const chunk of chunks) fs.writeFileSync(fd, chunk);
+            } finally {
+                fs.closeSync(fd);
+            }
             fs.renameSync(temp, real);
         } catch (error) {
             fs.rmSync(temp, { force: true });

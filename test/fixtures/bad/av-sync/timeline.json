@@ -1,0 +1,15 @@
+{
+    "version": 1,
+    "width": 320,
+    "height": 180,
+    "fps": 12,
+    "seed": 5,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [{ "id": "main", "bars": 2 }],
+    "cues": [
+        { "id": "one", "scene": "main", "beat": 1, "kind": "sfx", "sfx": "drop" },
+        { "id": "two", "scene": "main", "beat": 5, "kind": "sfx", "sfx": "ding" }
+    ],
+    "audio": { "mode": "preset", "preset": "marimba" }
+}

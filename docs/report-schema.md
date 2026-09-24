@@ -7,7 +7,7 @@ read_when:
 
 # 报告格式 flipbook.report/1
 
-`check`、`snapshot`、`render` 无论成败都往 stdout 打一份 JSON 报告。进度和日志走 stderr。`doctor --json` 用自己的格式 `flipbook.doctor/1`（见文末）。
+`check`、`snapshot`、`render`、`audio` 无论成败都往 stdout 打一份 JSON 报告。进度和日志走 stderr。`doctor --json` 用自己的格式 `flipbook.doctor/1`（见文末）。
 
 ## 退出码
 
@@ -25,7 +25,7 @@ read_when:
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `schema` | string | 固定 `flipbook.report/1` |
-| `command` | string | `check`、`snapshot`、`render`，用法错时是 `usage` |
+| `command` | string | `check`、`snapshot`、`render`、`audio`，用法错时是 `usage` |
 | `ok` | boolean | 退出码为 0 时为 true |
 | `exitCode` | 0、1、2、78 | 和进程退出码一致 |
 | `flipbook.version` | string | CLI 版本 |
@@ -40,7 +40,7 @@ read_when:
 | `stopReason` | string | `stop` 为 true 时说明卡在哪 |
 | `timing` | object | `startedAt`、`durationMs` |
 
-各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`contactSheetTiles`）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同。
+各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同。
 
 ## 输出目录
 
@@ -55,9 +55,10 @@ read_when:
 | `.flipbook/timeline.resolved.json` | 全部 | 换算后的 timeline |
 | `.flipbook/frame-hashes.json` | render | 每帧原始截图的 sha256 和汇总 |
 | `.flipbook/attempts.json` | check、render | 重试计数 |
-| `.flipbook/reports/<命令>.json` | check、snapshot、render | 这条命令最近一次的报告，和 stdout 上的相同。退 78、`unsafe-output`、`internal-error` 的运行也存，路径在 `artifacts.report` |
+| `.flipbook/reports/<命令>.json` | check、snapshot、audio、render | 这条命令最近一次的报告，和 stdout 上的相同。退 78、`unsafe-output`、`internal-error` 的运行也存，路径在 `artifacts.report` |
 | `.flipbook/tmp/` | render | 渲染中间件，结束后删掉 |
 | `.flipbook/render.lock` | render | 同一目录同时只跑一个 render（同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。锁用 O_EXCL 建，内容是 pid 和随机令牌。持有进程已退出，或锁里没有可读的持有者且建了超过 10 秒，才算过期被接管。释放时只删令牌仍是自己的锁 |
+| `.flipbook/audio/` | audio、render | 合成的 `music.wav`、`sfx.wav`，`score.json`（和弦、强弱、音效位置），`audio.json`（各轨哈希、峰值、音效实际峰值位置）。audio 命令也拿 `render.lock` |
 
 ## Finding
 
@@ -91,7 +92,7 @@ read_when:
 | `resource-failed` | 全部 | 请求的文件在合成目录里不存在 | 补文件或改路径，图片放 assets/ |
 | `external-request` | 全部 | 页面想联网，已拦下。HTTP 请求和 WebSocket 在 Playwright 这层拦，`detail.url` 是目标地址。WebRTC 和 WebTransport 在页面里直接报错，`detail.url` 是 `webrtc:<构造函数名>` 或 `webtransport:<地址>` | 文件拷进 assets/ 用相对路径 |
 | `path-escape` | 全部 | 请求的路径解析后落在合成目录外，已拒绝 | 所有文件放合成目录内 |
-| `unsafe-output` | check、snapshot、render | `.flipbook/` 或 `out/` 里有软链，或该是目录的地方是文件，这次什么都没写。`detail.paths` 列出这些路径 | 删掉这些路径（软链只删链接本身），再跑一次 |
+| `unsafe-output` | check、snapshot、audio、render | `.flipbook/` 或 `out/` 里有软链，或该是目录的地方是文件，这次什么都没写。`detail.paths` 列出这些路径 | 删掉这些路径（软链只删链接本身），再跑一次 |
 | `static-forbidden` | check | 源码里有禁用写法，只报 warning | 换成 t 的纯函数写法 |
 | `seek-order-dependent` | check | 同一个 t 换个 seek 顺序画面就变，有跨帧状态 | 去掉帧间累积的状态，全部由 t 算出 |
 | `clock-dependent` | check | 换虚拟时钟起点画面就变，读了 Date 或 performance.now。只抽三帧比，没变不代表没读时钟 | 只用 seek 传进来的 t |
@@ -109,9 +110,13 @@ read_when:
 | `freeze` | render | 没声明 hold 的场景里画面 1.5 秒以上不动：成片缩到 320×180、高斯模糊（sigma 1.5）后用 ffmpeg freezedetect（`n=-60dB`）判定，只算落在没声明 hold 的场景里的部分。相邻的非 hold 场景连起来算，场景边界不切断定格，跨了几场时 `element` 是 `scenes <id>, <id>` | 让画面动起来，或给场景加 `"hold": true` |
 | `glitch` | render | 成片均匀抽 8 帧解码，和截图原帧在 480×270 上比 PSNR，低于 30 dB 就报，证据是最差那一帧的截图原帧和成片解码帧（`glitch-f<帧号>-captured.png`、`-decoded.png`）。送帧管道断了也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
 | `frame-count` | render | 成片帧数和 timeline 不符 | 重渲一次，还出现就带 JSON 报 issue |
-| `duration-mismatch` | render | 成片时长和 timeline 不符（容差一帧）。用了自带音乐时，音轨时长和画面差超过一帧和一个 AAC 包（1024 个采样）中较大者也报这个码，没有音轨也报 | 重渲一次，还出现就带 JSON 报 issue |
+| `duration-mismatch` | render | 成片时长和 timeline 不符（容差一帧）。有音轨时，音轨时长和画面差超过一帧和一个 AAC 包（1024 个采样）中较大者也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
 | `color-tags` | render | 成片不是 yuv420p 或缺 bt709 色彩标记 | 带 JSON 报 issue |
-| `audio-skipped` | render | timeline 用了 `audio.mode: "preset"`，预设配乐 v0.3 才有，成片无声，只报 warning | 改成 `{ "mode": "none" }`，或用 `"file"` 放自带音乐 |
+| `audio-skipped` | audio | `audio` 命令没东西可合成：`audio.mode` 不是 `preset`，也没有 sfx cue，只报 warning | 片子本来就不要合成的声音时不用改，要配乐就写 `"mode": "preset"` |
+| `audio-missing` | render | timeline 要声音（`preset`、`file` 或有 sfx cue），成片却没有音轨 | 重渲一次，还出现就带 JSON 报 issue |
+| `audio-loudness` | render | 有配乐的音轨整合响度不在 -14 LUFS 上下 1 LU 内 | 重渲一次，还出现就带 JSON 报 issue。自带音乐先确认 `bpmOffset` 之后不是静音 |
+| `audio-peak` | render | 音轨真峰值高于 -1 dBTP | 重渲一次，还出现就带 JSON 报 issue |
+| `audio-cue-offset` | render | 某个音效的峰值离它的 cue 帧超过一帧，或在音轨里找不到，`element` 是 `cue <id>` | sfx cue 之间至少隔 1/8 拍。隔开了还报就重渲一次，再出现带 JSON 报 issue |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 
@@ -121,7 +126,38 @@ read_when:
 
 `blank-frame` 和 `paper-only` 在 check 里只看抽样帧：全部抽样帧都空才是 error，部分为空报 warning。在 render 里逐帧看，没有内容的画面（两类合起来）连续超过 1.5 秒才报 error。
 
-音画错位（`av-sync`）和响度检查随 v0.3 的 `audio` 命令一起加，接口在 `src/engine/verify.ts` 的 `verifyAudio`。
+音频类检查（`audio-missing`、`audio-loudness`、`audio-peak`、`audio-cue-offset`）只在 timeline 要声音时跑，量法见下面的「音频」一节。
+
+## 音频
+
+### audio 命令
+
+`flipbook audio <dir>` 按 timeline 合成配乐和音效，写到 `.flipbook/audio/`，报告的 `command` 是 `audio`。render 会自己调用它，单独跑是为了先听。每次都重新合成，不用缓存。
+
+- `artifacts`：`music`（有预设配乐时）、`sfx`（有 sfx cue 时），都是 WAV 路径。
+- `audio`：`mode`、`preset`、`key`、`progression`、`sampleRate`（48000）、`samples`、`durationSec`、`synthMs`，`music` 和 `sfx` 各有 `file`、`sha256`、`peakDb`，`sfx.cues[]` 每项有 `id`、`sfx`、`frame`、`target`（cue 帧在 48 kHz 上的采样位置）、`peakSample`（合成后音效轨在 cue 附近实际最大的采样位置）。
+- 没东西可合成时报 `audio-skipped` warning，退 0。
+
+### render 报告里的 audio
+
+`render.audio` 在 timeline 不要声音时是 `null`，否则有：
+
+| 字段 | 说明 |
+|---|---|
+| `codec`、`sampleRate`、`channels`、`durationSec` | 成片音轨，ffprobe 读 |
+| `mode`、`preset`、`key` | 照 timeline |
+| `integratedLufs`、`truePeakDbtp` | 成片音轨用 ffmpeg `ebur128`（`peak=true`）量的整合响度和真峰值。短于 0.4 秒或静音时整合响度为 `null` |
+| `loudnessChecked` | 有配乐且量得出整合响度时为 true，这时才查 -14 LUFS |
+| `effectsLagMs` | 音效轨在成片里整体晚了多少毫秒，找不到时为 `null` |
+| `cues[]` | 每个音效：`id`、`sfx`、`frame`、`expectedSec`（帧号除以 fps）、`measuredSec`、`offsetMs`、`match` |
+| `mix` | 混音参数：`musicLufs`（配乐自己的响度）、`mixLufs`（混好未增益的响度）、`sfxGainDb`、`gainDb`、`limitDb` |
+| `synthMs`、`stemsReused` | 合成耗时，是否用了已有的轨 |
+
+### 量法
+
+- 音轨时长：和画面差的容差取一帧和一个 AAC 包（1024 / 48000 秒）中较大者，超过报 `duration-mismatch`。
+- 响度：有配乐（`preset` 或 `file`）时整合响度要在 -14 LUFS 上下 1 LU 内，否则 `audio-loudness`。只有音效时不查整合响度。凡有音轨都查真峰值，高于 -1 dBTP 报 `audio-peak`。
+- 音效对帧：音效轨和成片都降到 8 kHz 单声道。有配乐时先用同一条混音链单独渲一遍配乐，在成片里找它的位置和增益，减掉，剩下的基本只有音效。每个音效取峰值前 0.35 秒到峰值后 30 毫秒、再裁到九成能量的一段，一阶差分后在 ±0.25 秒内找和成片最相关的偏移，所有音效合起来找一个偏移。每个音效的实际峰值 = `peakSample` 加这个偏移，和 cue 帧的时刻差超过一帧报 `audio-cue-offset`。相关系数低于 0.12 算找不到，也报这个码。
 
 ## 类型码：环境缺件（退出码 78）
 

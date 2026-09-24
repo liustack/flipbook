@@ -153,8 +153,26 @@ export const FINDING_CODES = {
         fix: 'Report it with this JSON and the output of ffmpeg -version.',
     },
     'audio-skipped': {
-        meaning: 'timeline.json asks for audio, which this version does not render yet.',
-        fix: 'Set "audio": { "mode": "none" } to silence this, or add the soundtrack after rendering.',
+        meaning:
+            'flipbook audio found nothing to synthesize: audio.mode is not "preset" and there are no sfx cues.',
+        fix: 'Nothing to fix when the video should have no synthesized sound. For music, set "audio": { "mode": "preset", "preset": "pluck" }, see references/audio.md.',
+    },
+    'audio-missing': {
+        meaning: 'timeline.json asks for sound, but the video has no audio stream.',
+        fix: 'Render again. If it repeats, report it with this JSON.',
+    },
+    'audio-loudness': {
+        meaning: 'The soundtrack with music is not within 1 LU of -14 LUFS integrated loudness.',
+        fix: 'Render again. If it repeats, report it with this JSON. With your own music, check that the file is not silent or clipped at the first beat you gave.',
+    },
+    'audio-peak': {
+        meaning: 'The soundtrack true peak is above -1 dBTP.',
+        fix: 'Render again. If it repeats, report it with this JSON.',
+    },
+    'audio-cue-offset': {
+        meaning:
+            'A sound effect peaks more than one frame away from its sfx cue frame, or cannot be found.',
+        fix: 'Keep sfx cues at least 1/8 beat apart and inside the scene they belong to. If the cues are clean, render again and report it with this JSON if it repeats.',
     },
     'render-busy': {
         meaning: 'Another render of this composition is running.',

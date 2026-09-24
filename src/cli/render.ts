@@ -1,7 +1,17 @@
 import * as path from 'path';
 import { recordRender } from '../engine/attempts.ts';
+import {
+    type MixOptions,
+    type MixResult,
+    mixSoundtrack,
+    needsSoundtrack,
+    needsSynthesis,
+    requireAudioFfmpeg,
+    type StemSet,
+    synthesize,
+} from '../engine/audio.ts';
 import { type CaptureOutput, captureFrames, evenFrames } from '../engine/capture.ts';
-import { Encoder, EncoderError, muxSoundtrack } from '../engine/encode.ts';
+import { Encoder, EncoderError } from '../engine/encode.ts';
 import { contactSheet, selectExpr, sheetLayout } from '../engine/pixels.ts';
 import {
     compositionDir,
@@ -14,7 +24,7 @@ import {
 import { dedupe } from '../engine/textAudit.ts';
 import { audioSource, loadTimeline } from '../engine/timeline.ts';
 import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
-import { verifySoundtrack, verifyVideo } from '../engine/verify.ts';
+import { verifyAudio, verifyVideo } from '../engine/verify.ts';
 import { acquireLock, compositionHash, Workspace } from '../engine/workspace.ts';
 import { appVersion } from '../paths.ts';
 import { finding, platformId, progress, type Report, ReportBuilder } from './report.ts';
@@ -28,6 +38,8 @@ export interface RenderOptions {
     recordAttempts?: boolean;
     /** Test hook: frames captured but never handed to the encoder. */
     dropFrames?: number[];
+    /** Test hook: seconds the effects are moved later in the mix. */
+    audioShiftSec?: number;
 }
 
 /** Every second of frames, plus the last one. */
@@ -231,7 +243,13 @@ async function encodeFrames(
 
 /** Render, verify, and move the video to out/ (passed) or .flipbook/rejected/ (failed). */
 async function renderVideo(ctx: RenderContext): Promise<void> {
-    const { rb, ws, dir, timeline, session, tmp, evidenceDir } = ctx;
+    const { options, rb, ws, dir, timeline, session, tmp, evidenceDir } = ctx;
+    const audioFfmpeg = needsSoundtrack(timeline) ? await requireAudioFfmpeg(options.env) : null;
+    let stems: StemSet | null = null;
+    if (needsSynthesis(timeline)) {
+        progress('render: synthesizing audio');
+        stems = await synthesize(session, timeline, ws);
+    }
     const video = path.join(tmp, 'video.mp4');
     const encoded = await encodeFrames(ctx, video);
     if (!encoded) return;
@@ -266,34 +284,66 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
         selectExpr(sheetFrames),
     );
     let delivered = video;
-    let soundtrack: Awaited<ReturnType<typeof verifySoundtrack>>['audio'] = null;
-    if (timeline.audio.mode === 'file' && timeline.audio.file) {
-        progress('render: adding the soundtrack');
-        delivered = path.join(tmp, 'video-with-audio.mp4');
-        try {
-            const source = audioSource(dir, timeline.audio.file);
-            if ('problem' in source) throw new Error(source.problem);
-            await muxSoundtrack(session.ffmpeg.ffmpeg, {
-                video,
-                audio: source.file,
-                offsetSec: timeline.audio.bpmOffset ?? 0,
-                durationSec: timeline.frameCount / timeline.fps,
-                output: delivered,
-            });
-            const checked = await verifySoundtrack(session.ffmpeg.ffprobe, delivered, timeline);
-            rb.addAll(checked.findings);
-            soundtrack = checked.audio;
-        } catch (error) {
-            delivered = video;
+    let soundtrack: Record<string, unknown> | null = null;
+    if (audioFfmpeg) {
+        progress('render: mixing the soundtrack');
+        const withAudio = path.join(tmp, 'video-with-audio.mp4');
+        const userFile = timeline.audio.mode === 'file' ? timeline.audio.file : undefined;
+        const userProblem = (message: string) =>
             rb.add(
                 finding(
                     'timeline-invalid',
-                    `$.audio.file could not be used as a soundtrack: ${(error as Error).message.split('\n')[0]}`,
-                    {
-                        detail: { path: '$.audio.file', log: (error as Error).message },
-                    },
+                    `$.audio.file could not be used as a soundtrack: ${message.split('\n')[0]}`,
+                    { detail: { path: '$.audio.file', log: message } },
                 ),
             );
+        let music: MixOptions['music'];
+        if (userFile) {
+            const source = audioSource(dir, userFile);
+            if ('problem' in source) {
+                userProblem(source.problem);
+            } else {
+                music = { file: source.file, offsetSec: timeline.audio.bpmOffset ?? 0, user: true };
+            }
+        } else if (stems?.music) {
+            music = { file: stems.music.file, offsetSec: 0, user: false };
+        }
+        const mixOptions: MixOptions = {
+            ffmpeg: audioFfmpeg.ffmpeg,
+            video,
+            output: withAudio,
+            durationSec: timeline.frameCount / timeline.fps,
+            music,
+            sfx: stems?.sfx ? { file: stems.sfx.file, peakDb: stems.sfx.peakDb } : undefined,
+            shiftSfxSec: options.audioShiftSec,
+        };
+        let mixed: MixResult | null = null;
+        if (mixOptions.music || mixOptions.sfx) {
+            try {
+                mixed = await mixSoundtrack(mixOptions);
+                delivered = withAudio;
+            } catch (error) {
+                if (!userFile) throw error;
+                userProblem((error as Error).message);
+            }
+        }
+        if (mixed) {
+            const checked = await verifyAudio({
+                ffmpeg: audioFfmpeg,
+                video: delivered,
+                timeline,
+                effects: stems?.sfx ? { file: stems.sfx.file, cues: stems.sfx.cues } : null,
+                mix: mixOptions,
+            });
+            rb.addAll(checked.findings);
+            soundtrack = {
+                ...checked.audio,
+                preset: stems?.preset ?? null,
+                key: stems?.keyName ?? null,
+                synthMs: stems?.synthMs ?? null,
+                stemsReused: stems?.reused ?? null,
+                mix: mixed,
+            };
         }
     }
     const verifyMs = Date.now() - verifyStart;

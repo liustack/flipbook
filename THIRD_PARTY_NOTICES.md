@@ -47,10 +47,45 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### buildwithhanif/claude-animation-skill
+
+- 来源：https://github.com/buildwithhanif/claude-animation-skill（提交 4ddb8c8）
+- 许可证：MIT，Copyright (c) 2026 Hanif (@hanifproduktif)
+- 借用并改写：
+  - `src/runtime/audio/voices.ts` 的 `pluck`：Karplus-Strong 拨弦来自 `scripts/music.mjs` 的 `pluck`，加了全通滤波微调音高、拨弦位置陷波、按 T60 算每周期衰减，激励噪声改成按均方根缩放再软削波。
+  - `src/engine/audio.ts` 的 `mixSoundtrack`：先测响度再加增益、4 倍过采样限幅后编 AAC 的链路来自 `scripts/sound.mjs`，测量改用 ebur128，第二遍用线性增益，并按限幅后的响度再补一次。
+
+MIT 许可证全文：
+
+```
+MIT License
+
+Copyright (c) 2026 Hanif (@hanifproduktif)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### 算法
 
 - mulberry32 伪随机数（`src/engine/host.ts`、`src/runtime/core/random.ts`、`src/cli/check.ts`）：Tommy Ettinger 发布到公有领域。
 - FNV-1a 哈希和 MurmurHash3 的 fmix32 收尾常数（`src/runtime/core/random.ts`）：公有领域。
+- 双二阶滤波器系数（`src/runtime/audio/dsp.ts`）：按 Robert Bristow-Johnson 公开发布的 Audio EQ Cookbook 公式重写。
 - 缓动公式（`src/runtime/core/ease.ts`）：按 Robert Penner 的缓动方程重写，原方程以 BSD 许可发布。
 
 ## 运行时依赖（npm 安装，不打进 dist）
@@ -69,10 +104,6 @@ SOFTWARE.
 | 霞鹜文楷 LXGW WenKai Regular v1.522 | lxgw/LxgwWenKai 发布页 | SIL Open Font License 1.1，Copyright 2021-2026 LXGW，Copyright 2020 The Klee Project Authors |
 
 两款字体的 OFL 全文随包提供（打进 `dist/main.js`），下载字体时写到缓存里字体文件旁边的 `OFL.txt`。字体按原文件使用，不改名、不子集化、不再分发。
-
-## 尚未借用
-
-design 里列出的 alesha、hanif（MIT）和 HyperFrames（Apache-2.0）的代码在 M0 还没有搬进来。搬进来时在这里登记来源、许可证和改动。
 
 ## 纸感通道借用的做法
 
@@ -141,3 +172,7 @@ SOFTWARE.
 ### 算法
 
 - 欧氏距离变换（`src/runtime/templates/assemble.ts` 的 `distanceField`）：按 Felzenszwalb 和 Huttenlocher 的论文《Distance Transforms of Sampled Functions》自行实现。
+
+## 尚未借用
+
+design 里列出的 HyperFrames（Apache-2.0）的代码还没有搬进来。搬进来时在这里登记来源、许可证和改动。

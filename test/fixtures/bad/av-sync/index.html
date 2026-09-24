@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 320px; height: 180px; overflow: hidden; background: #f4efe4; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script type="module">
+import { composition, timeline, setupCanvas, progress } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const ctx = setupCanvas(document.getElementById('stage'), W, H);
+const hits = tl.cues.filter((c) => c.kind === 'sfx');
+
+composition({
+  seek(t) {
+    ctx.clearRect(0, 0, W, H);
+    const p = progress(t, 0, tl.durationSec);
+    ctx.fillStyle = '#2b2622';
+    ctx.beginPath();
+    ctx.arc(W * 0.1 + p * W * 0.8, H * 0.5 + Math.sin(t * 3) * H * 0.2, H * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    for (const cue of hits) {
+      const at = cue.frame / tl.fps;
+      const k = progress(t, at, at + 0.4);
+      if (t < at || k >= 1) continue;
+      ctx.strokeStyle = `rgba(200, 69, 45, ${1 - k})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, H * 0.1 + k * H * 0.4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  },
+});
+</script>
+</body>
+</html>

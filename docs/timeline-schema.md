@@ -123,6 +123,14 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 
 每个音效单独合成，找到自己的最大采样，再把这个采样放到 cue 帧在 48 kHz 上的位置（帧号乘 48000 除以 fps 取整）。峰值前的部分落到 t = 0 之前的截掉。
 
+### 合成、混音和响度
+
+- `audio` 命令开一个空白页面加载 `/__flipbook/audio.js`，用 `OfflineAudioContext` 合成，PCM 分块 base64 传回 Node，写到 `.flipbook/audio/`：`music.wav`（preset）、`sfx.wav`（有 sfx cue），48 kHz 立体声 32 位浮点，长度等于画面。另写 `score.json`（和弦、强弱、音效位置）和 `audio.json`（各轨哈希、峰值、每个音效实际峰值的位置）。
+- 同机同版本合成两次，两个 WAV 逐字节一致。timeline、audio.js 和 Chromium 版本都没变时，render 直接用已有的轨。
+- render 把配乐（preset 合成的轨或用户文件）和音效用 `amix`（`normalize=0`）混在一起。有配乐时先量配乐自己的整合响度，把音效峰值放在它上方 12 dB。再量整体，线性增益到 -14 LUFS，4 倍过采样限幅到 -3 dBFS，然后量一遍限幅后的响度，把差值补进增益。只有音效时按峰值放到 -4 dBFS 再限幅。最后编 AAC 48 kHz 立体声 192 kbps。
+- 用户文件从 `bpmOffset` 秒处截起，让第一拍落在 t = 0，不够长补静音，超长截掉，最后一秒（片长不足 4 秒时取片长四分之一）淡出，然后和上面一样归一。
+- 响度一律用 ffmpeg `ebur128` 量，和验收同一个表。旁白的 sidechain 压低留了接口（`MixOptions.voice`），没实现。
+
 ## 换算规则
 
 - 每拍秒数 = 60 / `bpm`。

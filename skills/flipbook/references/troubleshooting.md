@@ -216,9 +216,33 @@ Fix: Report it with this JSON and the output of ffmpeg -version.
 
 ### `audio-skipped`
 
-timeline.json asks for audio, which this version does not render yet.
+flipbook audio found nothing to synthesize: audio.mode is not "preset" and there are no sfx cues.
 
-Fix: Set "audio": { "mode": "none" } to silence this, or add the soundtrack after rendering.
+Fix: Nothing to fix when the video should have no synthesized sound. For music, set "audio": { "mode": "preset", "preset": "pluck" }, see references/audio.md.
+
+### `audio-missing`
+
+timeline.json asks for sound, but the video has no audio stream.
+
+Fix: Render again. If it repeats, report it with this JSON.
+
+### `audio-loudness`
+
+The soundtrack with music is not within 1 LU of -14 LUFS integrated loudness.
+
+Fix: Render again. If it repeats, report it with this JSON. With your own music, check that the file is not silent or clipped at the first beat you gave.
+
+### `audio-peak`
+
+The soundtrack true peak is above -1 dBTP.
+
+Fix: Render again. If it repeats, report it with this JSON.
+
+### `audio-cue-offset`
+
+A sound effect peaks more than one frame away from its sfx cue frame, or cannot be found.
+
+Fix: Keep sfx cues at least 1/8 beat apart and inside the scene they belong to. If the cues are clean, render again and report it with this JSON if it repeats.
 
 ### `render-busy`
 

@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "width": 320,
+    "height": 180,
+    "fps": 12,
+    "seed": 11,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "a", "bars": 2 },
+        { "id": "b", "bars": 2 }
+    ],
+    "cues": [
+        { "id": "flip", "scene": "a", "beat": 1, "kind": "sfx", "sfx": "paper" },
+        { "id": "land", "scene": "a", "beat": 4.5, "kind": "sfx", "sfx": "drop" },
+        { "id": "whoosh", "scene": "b", "beat": 0, "kind": "sfx", "sfx": "sweep" },
+        { "id": "bell", "scene": "b", "beat": 4, "kind": "sfx", "sfx": "ding" }
+    ],
+    "audio": { "mode": "preset", "preset": "pluck", "dynamics": { "a": "soft", "b": "full" } }
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command, CommanderError } from 'commander';
+import { runAudio } from './cli/audio.ts';
 import { runCheck } from './cli/check.ts';
 import { buildDoctorReport, MIN_NODE, renderDoctorReport } from './cli/doctor.ts';
 import { runRender } from './cli/render.ts';
@@ -207,6 +208,14 @@ program
             );
         },
     );
+
+program
+    .command('audio')
+    .description('Synthesize the preset music and sfx cues to WAV files in .flipbook/audio/')
+    .argument('<dir>', 'composition directory')
+    .action(async (dir: string) => {
+        await execute('audio', dir, () => runAudio({ dir }));
+    });
 
 program
     .command('render')

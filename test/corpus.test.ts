@@ -180,5 +180,16 @@ describe('bad composition corpus', () => {
         expect(checked.failures).toEqual([]);
     });
 
-    it.todo('audio out of sync with its sfx cue (v0.3, needs the audio command)');
+    it('audio out of sync: the effects land 0.2 s after their cue frames', async () => {
+        const rendered = await runRender({
+            dir: copyFixture('bad/av-sync'),
+            session: await session(),
+            audioShiftSec: 0.2,
+            recordAttempts: false,
+        });
+        const offsets = rendered.failures.filter((f) => f.code === 'audio-cue-offset');
+        expect(offsets.map((f) => f.element)).toEqual(['cue one', 'cue two']);
+        expect(offsets[0].detail?.offsetMs as number).toBeCloseTo(200, 0);
+        expect(rendered.artifacts.video).toBeUndefined();
+    });
 });
