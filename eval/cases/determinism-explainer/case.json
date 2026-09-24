@@ -1,0 +1,18 @@
+{
+    "id": "determinism-explainer",
+    "title": "确定性渲染科普",
+    "prompt": "用 30 秒的动画给普通人解释什么是「确定性渲染」：同一个时间点，不管先画哪一帧，画出来都一样。要有图示，不要只有文字。",
+    "expect": {
+        "durationSec": [
+            28.5,
+            31.5
+        ],
+        "width": 1920,
+        "height": 1080,
+        "textInSource": [
+            "确定性渲染"
+        ],
+        "audio": "none",
+        "notes": "看是否只有文字加方块（会动的 PPT 第一条），图示是否真的在解释概念。"
+    }
+}

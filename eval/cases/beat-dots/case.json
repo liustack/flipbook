@@ -1,0 +1,26 @@
+{
+    "id": "beat-dots",
+    "title": "跟着用户音乐打点",
+    "prompt": "用我放在 assets/music.wav 的音乐（100 BPM，第一拍在 0.5 秒）做一条 16 秒左右的节拍动画：每一拍弹出一个圆点，画面中央写「跟着节拍」。",
+    "workspace": {
+        "assets/music.wav": {
+            "generator": "clicks",
+            "bpm": 100,
+            "offsetSec": 0.5,
+            "seconds": 24
+        }
+    },
+    "expect": {
+        "durationSec": [
+            15.2,
+            16.8
+        ],
+        "width": 1920,
+        "height": 1080,
+        "textInSource": [
+            "跟着节拍"
+        ],
+        "audio": "file",
+        "notes": "timeline 的 bpm 要是 100、bpmOffset 0.5，圆点要落在拍上。成片要有音轨。"
+    }
+}

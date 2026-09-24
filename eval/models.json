@@ -1,0 +1,8 @@
+{
+    "default": ["flagship"],
+    "targets": {
+        "flagship": { "host": "claude-code", "model": "claude-opus-5-5", "label": "Claude Opus 5.5" },
+        "floor": { "host": "claude-code", "model": "claude-opus-5", "label": "Claude Opus 5" },
+        "astra": { "host": "codex", "model": "gpt-6-astra", "label": "GPT-6 Astra (community)" }
+    }
+}
