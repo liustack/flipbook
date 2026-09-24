@@ -1,0 +1,88 @@
+name: release
+
+# Publishes to npm and creates the GitHub Release when a v* tag is pushed. The
+# tag comes from scripts/release.mjs, which runs the same gates locally and
+# pushes the tag without publishing.
+#
+# Needs npm trusted publishing: on npmjs.com, @liustack/flipbook settings,
+# "Trusted publishers", add liustack/flipbook with .github/workflows/release.yml.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      # OIDC trusted publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@11.20.0
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pnpm install --frozen-lockfile
+      - name: Install the pinned Chromium headless shell
+        run: PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/liustack/flipbook/browsers" pnpm exec playwright-core install --with-deps chromium-headless-shell
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: Tag must equal package.json version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$PKG_VERSION" ]; then
+            echo "tag v$VERSION does not match package.json version $PKG_VERSION" >&2
+            exit 1
+          fi
+      - run: pnpm test
+      - run: pnpm build
+      - name: Extract release notes from CHANGELOG
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            $0 == "## " ver || index($0, "## " ver " ") == 1 { grab=1; next }
+            grab && /^## / { exit }
+            grab { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No CHANGELOG section for $version" >&2
+            exit 1
+          fi
+      - name: Render the examples
+        run: |
+          mkdir -p release-assets
+          for dir in examples/*/; do
+            name="$(basename "$dir")"
+            node dist/main.js render "$dir" > "release-assets/$name-render.json"
+            cp "$dir/out/video.mp4" "release-assets/$name.mp4"
+            cp "$dir/out/contact-sheet.png" "release-assets/$name-contact-sheet.png"
+          done
+      - name: Publish to npm (skipped when the version is already live)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').name")"
+          if npm view "$PKG@$VERSION" version >/dev/null 2>&1; then
+            echo "$PKG@$VERSION is already on the registry; skipping publish."
+          else
+            npm publish --provenance --access public
+          fi
+      - name: Create the GitHub Release with the rendered examples
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; skipping."
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md release-assets/*
+          fi

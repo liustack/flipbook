@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        # 22.19 is the engines floor, run as that exact version.
+        node-version: ['22.19', 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+      - name: Install ffmpeg
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y ffmpeg
+          else
+            brew install ffmpeg
+          fi
+      - run: pnpm install --frozen-lockfile
+      - name: Locate the flipbook cache
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            echo "FLIPBOOK_CACHE=$HOME/.cache/liustack/flipbook" >> "$GITHUB_ENV"
+          else
+            echo "FLIPBOOK_CACHE=$HOME/Library/Caches/liustack/flipbook" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.FLIPBOOK_CACHE }}
+          key: flipbook-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'src/fonts/manifest.json') }}
+      - name: Install the pinned Chromium headless shell
+        run: PLAYWRIGHT_BROWSERS_PATH="$FLIPBOOK_CACHE/browsers" pnpm exec playwright-core install --with-deps chromium-headless-shell
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
