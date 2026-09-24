@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>sample: paper</title>
+<style>
+  html, body { margin: 0; width: 960px; height: 540px; overflow: hidden; background: #efe5d0; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="stock" data-flipbook-layer="paper"></canvas>
+<canvas id="stage"></canvas>
+<script type="module">
+import { composition, timeline, setupCanvas, drawPaper, grainLayer, PAPER, writeText } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
+const panels = [
+  { x: 0, y: 0, label: 'PAPER.cream', ink: '#2b2622', options: { color: PAPER.cream } },
+  { x: 480, y: 0, label: 'PAPER.beige', ink: '#2b2622', options: { color: PAPER.beige } },
+  { x: 0, y: 270, label: 'PAPER.clay, grid', ink: '#fbf4e8', options: { color: PAPER.clay, grid: { color: '#f6ead8', opacity: 0.35, major: 4 } } },
+  { x: 480, y: 270, label: 'PAPER.sage, vignette', ink: '#2b2622', options: { color: PAPER.sage, vignette: 0.8 } },
+];
+
+composition({
+  setup() {
+    const stock = setupCanvas(document.getElementById('stock'), tl.width, tl.height);
+    panels.forEach((panel, i) => {
+      stock.save();
+      stock.translate(panel.x, panel.y);
+      drawPaper(stock, 480, 270, { seed: i + 1, ...panel.options });
+      stock.restore();
+    });
+    grainLayer(tl.width, tl.height, { seed: 9 });
+  },
+  seek() {
+    ctx.clearRect(0, 0, tl.width, tl.height);
+    for (const panel of panels) {
+      writeText(ctx, panel.label, panel.x + 60, panel.y + 40, { font: '400 26px "LXGW WenKai"', color: panel.ink });
+    }
+  },
+});
+</script>
+</body>
+</html>

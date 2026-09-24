@@ -1,0 +1,10 @@
+{
+    "version": 1,
+    "width": 960,
+    "height": 540,
+    "fps": 12,
+    "seed": 3,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [{ "id": "main", "bars": 2 }]
+}

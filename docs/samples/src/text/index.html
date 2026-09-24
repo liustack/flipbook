@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>sample: text</title>
+<style>
+  html, body { margin: 0; width: 960px; height: 540px; overflow: hidden; background: #efe5d0; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script type="module">
+import {
+  composition, timeline, setupCanvas, paperLayer, grainLayer, PAPER,
+  handText, writeText, textOnPath, arcPoints, pencil,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
+const arc = arcPoints(700, 560, 250, -2.55, -0.6);
+
+composition({
+  setup() {
+    paperLayer(tl.width, tl.height, { seed: 6, color: PAPER.cream });
+    grainLayer(tl.width, tl.height, { seed: 6 });
+  },
+  seek(t) {
+    ctx.clearRect(0, 0, tl.width, tl.height);
+    ctx.fillStyle = '#2b2622';
+    writeText(ctx, 'writeText, word by word', 60, 50, { font: '600 34px "Noto Serif SC"', progress: t / 2 });
+    handText(ctx, '纸上的字会抖一点，像手写的一样。Latin words wrap too.', 60, 130, {
+      font: '400 32px "LXGW WenKai"', maxWidth: 380, lineHeight: 1.5,
+    });
+    pencil(ctx, [[60, 330], [420, 322]], { seed: 4, width: 2 });
+    textOnPath(ctx, 'There is more to discover', arc, {
+      font: '500 30px "Noto Serif SC"', align: 'center', offset: 250 * 0.975, color: '#8a3b22',
+    });
+    pencil(ctx, arc, { seed: 5, width: 1.2, opacity: 0.5 });
+  },
+});
+</script>
+</body>
+</html>
