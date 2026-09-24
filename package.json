@@ -20,7 +20,8 @@
         "docs",
         "skills/flipbook",
         "CHANGELOG.md",
-        "SECURITY.md"
+        "SECURITY.md",
+        "THIRD_PARTY_NOTICES.md"
     ],
     "keywords": [
         "cli",
