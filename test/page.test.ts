@@ -1,9 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import type { Browser } from 'playwright-core';
 import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../src/cli/check.ts';
+import { runRender } from '../src/cli/render.ts';
+import { runSnapshot } from '../src/cli/snapshot.ts';
+import { CompositionPage } from '../src/engine/page.ts';
+import { loadTimeline } from '../src/engine/timeline.ts';
 import { closeSession, session } from './browser.ts';
-import { cleanTemps, codes, tempDir } from './helpers.ts';
+import { cleanTemps, codes, copyFixture, tempDir } from './helpers.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -77,4 +82,93 @@ composition({ seek(t) { document.body.firstElementChild.style.left = 20 + t * 40
         const report = await runCheck({ dir, session: await session(), recordAttempts: false });
         expect(report.warnings.map((w) => w.code)).toContain('stage-size');
     });
+});
+
+/** `browser`, except that every new context fails to open a page. */
+function failingNewPage(browser: Browser): Browser {
+    return new Proxy(browser, {
+        get(target, prop) {
+            if (prop === 'newContext') {
+                return async (...args: Parameters<Browser['newContext']>) => {
+                    const context = await target.newContext(...args);
+                    return new Proxy(context, {
+                        get(ctx, key) {
+                            if (key === 'newPage') {
+                                return async () => {
+                                    throw new Error('injected: newPage failed');
+                                };
+                            }
+                            const value = Reflect.get(ctx, key);
+                            return typeof value === 'function' ? value.bind(ctx) : value;
+                        },
+                    });
+                };
+            }
+            const value = Reflect.get(target, prop);
+            return typeof value === 'function' ? value.bind(target) : value;
+        },
+    });
+}
+
+/** A directory whose contents cannot be deleted. Undo with the returned function. */
+function undeletable(dir: string): () => void {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'stuck'), '');
+    fs.chmodSync(dir, 0o500);
+    return () => fs.chmodSync(dir, 0o700);
+}
+
+const asRoot = process.getuid?.() === 0;
+
+describe('cleanup when something fails half way', () => {
+    it('closes the context when the page cannot be set up', async () => {
+        const s = await session();
+        const { browser } = await s.browserForPage();
+        const dir = copyFixture('hello', 'examples');
+        const timeline = loadTimeline(dir, false).resolved;
+        if (!timeline) throw new Error('hello timeline did not load');
+        const before = browser.contexts().length;
+        await expect(
+            CompositionPage.open({ browser: failingNewPage(browser), dir, timeline }),
+        ).rejects.toThrow(/injected/);
+        expect(browser.contexts().length).toBe(before);
+    });
+
+    it.skipIf(asRoot)(
+        'render releases the lock and removes tmp when a directory cannot be emptied',
+        async () => {
+            const s = await session();
+            const { browser } = await s.browserForPage();
+            const dir = copyFixture('hello', 'examples');
+            const restore = undeletable(path.join(dir, '.flipbook', 'evidence', 'render'));
+            const before = browser.contexts().length;
+            try {
+                await expect(
+                    runRender({ dir, session: s, recordAttempts: false }),
+                ).rejects.toThrow();
+            } finally {
+                restore();
+            }
+            expect(fs.existsSync(path.join(dir, '.flipbook', 'render.lock'))).toBe(false);
+            expect(fs.readdirSync(path.join(dir, '.flipbook', 'tmp'))).toEqual([]);
+            expect(browser.contexts().length).toBe(before);
+        },
+    );
+
+    it.skipIf(asRoot)(
+        'snapshot closes its page when its scratch directory cannot be emptied',
+        async () => {
+            const s = await session();
+            const { browser } = await s.browserForPage();
+            const dir = copyFixture('hello', 'examples');
+            const restore = undeletable(path.join(dir, '.flipbook', 'snapshot', 'frames'));
+            const before = browser.contexts().length;
+            try {
+                await expect(runSnapshot({ dir, session: s })).rejects.toThrow();
+            } finally {
+                restore();
+            }
+            expect(browser.contexts().length).toBe(before);
+        },
+    );
 });

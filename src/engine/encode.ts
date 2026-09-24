@@ -58,6 +58,14 @@ export function encoderArgs(options: EncoderOptions): string[] {
     ];
 }
 
+/** ffmpeg failed or stalled while taking frames or writing the video. */
+export class EncoderError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'EncoderError';
+    }
+}
+
 /**
  * A running ffmpeg that takes PNG frames on stdin. Every wait on it has a
  * limit. When a limit runs out, or render gives up, ffmpeg is stopped
@@ -105,9 +113,9 @@ export class Encoder {
         return this.child.pid;
     }
 
-    private error(prefix: string): Error {
+    private error(prefix: string): EncoderError {
         const log = tail(Buffer.concat(this.stderr).toString('utf-8'));
-        return new Error(
+        return new EncoderError(
             `${prefix}${this.failure ? `: ${this.failure.message}` : ''}${log ? `\n${log}` : ''}`,
         );
     }

@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { recordRender } from '../engine/attempts.ts';
-import { captureFrames, evenFrames } from '../engine/capture.ts';
-import { Encoder, muxSoundtrack } from '../engine/encode.ts';
+import { type CaptureOutput, captureFrames, evenFrames } from '../engine/capture.ts';
+import { Encoder, EncoderError, muxSoundtrack } from '../engine/encode.ts';
 import { contactSheet, selectExpr, sheetLayout } from '../engine/pixels.ts';
 import {
     compositionDir,
@@ -13,6 +13,7 @@ import {
 } from '../engine/session.ts';
 import { dedupe } from '../engine/textAudit.ts';
 import { audioSource, loadTimeline } from '../engine/timeline.ts';
+import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
 import { verifySoundtrack, verifyVideo } from '../engine/verify.ts';
 import { acquireLock, compositionHash, Workspace } from '../engine/workspace.ts';
 import { appVersion } from '../paths.ts';
@@ -87,197 +88,236 @@ export async function runRender(options: RenderOptions): Promise<Report> {
         );
         return finish();
     }
-    const session =
-        options.session ??
-        (await openSession(options.env).catch((error) => {
-            release();
-            throw error;
-        }));
-    rb.report.environment.chromium = session.chromium;
-    rb.report.environment.ffmpeg = session.ffmpeg.version ?? undefined;
-    const tmp = ws.fresh(ws.path('.flipbook', 'tmp', `render-${process.pid}-${Date.now()}`));
-    const evidenceDir = ws.fresh(ws.path('.flipbook', 'evidence', 'render'));
+    // Each resource is released in its own finally, so one failing cleanup never skips the rest.
+    try {
+        const tmp = ws.fresh(ws.path('.flipbook', 'tmp', `render-${process.pid}-${Date.now()}`));
+        try {
+            const evidenceDir = ws.fresh(ws.path('.flipbook', 'evidence', 'render'));
+            const session = options.session ?? (await openSession(options.env));
+            try {
+                rb.report.environment.chromium = session.chromium;
+                rb.report.environment.ffmpeg = session.ffmpeg.version ?? undefined;
+                await renderVideo({
+                    options,
+                    rb,
+                    ws,
+                    dir,
+                    timeline,
+                    hash,
+                    session,
+                    tmp,
+                    evidenceDir,
+                    started,
+                });
+            } finally {
+                if (!options.session) await session.close();
+            }
+        } finally {
+            ws.remove(tmp);
+        }
+    } finally {
+        release();
+    }
+    return finish();
+}
+
+interface RenderContext {
+    options: RenderOptions;
+    rb: ReportBuilder;
+    ws: Workspace;
+    dir: string;
+    timeline: ResolvedTimeline;
+    hash: string;
+    session: Session;
+    tmp: string;
+    evidenceDir: string;
+    started: number;
+}
+
+/**
+ * Open the page, feed every frame to ffmpeg and wait for the video. Null when
+ * the page or the encoder failed; the reason is in the report.
+ */
+async function encodeFrames(
+    ctx: RenderContext,
+    video: string,
+): Promise<{ captured: CaptureOutput; encodeMs: number } | null> {
+    const { options, rb, session, timeline } = ctx;
+    let encoder: Encoder | null = null;
+    let finishing = false;
     try {
         const { page, findings } = await openPage(session, {
-            dir,
+            dir: ctx.dir,
             timeline,
             readyTimeoutMs: options.readyTimeoutMs,
             env: options.env,
         });
-        rb.addAll(findings);
-        if (page.broken || findings.length > 0) {
-            rb.addAll(page.issues);
-            await page.close();
-            return finish();
-        }
-        const video = path.join(tmp, 'video.mp4');
-        const metadata = {
-            flipbook: appVersion(),
-            chromium: session.chromium.version,
-            chromiumRevision: session.chromium.revision,
-            launchMode: session.mode,
-            platform: platformId(),
-            composition: hash,
-        };
-        rb.report.metadata = metadata;
-        const encoder = Encoder.start(session.ffmpeg.ffmpeg, {
-            fps: timeline.fps,
-            output: video,
-            metadata,
-        });
-        const textFrames = [
-            ...new Set([
-                ...timeline.cues.filter((c) => c.kind === 'text').map((c) => c.settleFrame),
-                ...evenFrames(timeline.frameCount, 3),
-            ]),
-        ];
-        progress(`render: ${timeline.frameCount} frames at ${timeline.fps} fps`);
-        let captured: Awaited<ReturnType<typeof captureFrames>>;
+        let captured: CaptureOutput;
         try {
-            captured = await captureFrames({
-                page,
-                encoder,
-                frameCount: timeline.frameCount,
-                sampleFrames: evenFrames(timeline.frameCount, 8),
-                baselineFrames: baselineFrames(timeline.frameCount, timeline.fps),
-                textFrames,
-                workspace: ws,
-                workDir: tmp,
-                seekTimeoutMs: options.seekTimeoutMs,
-                dropFrames: options.dropFrames,
+            rb.addAll(findings);
+            if (page.broken || findings.length > 0) return null;
+            const metadata = {
+                flipbook: appVersion(),
+                chromium: session.chromium.version,
+                chromiumRevision: session.chromium.revision,
+                launchMode: session.mode,
+                platform: platformId(),
+                composition: ctx.hash,
+            };
+            rb.report.metadata = metadata;
+            encoder = Encoder.start(session.ffmpeg.ffmpeg, {
+                fps: timeline.fps,
+                output: video,
+                metadata,
             });
-        } catch (error) {
-            await encoder.abort();
+            const textFrames = [
+                ...new Set([
+                    ...timeline.cues.filter((c) => c.kind === 'text').map((c) => c.settleFrame),
+                    ...evenFrames(timeline.frameCount, 3),
+                ]),
+            ];
+            progress(`render: ${timeline.frameCount} frames at ${timeline.fps} fps`);
+            try {
+                captured = await captureFrames({
+                    page,
+                    encoder,
+                    frameCount: timeline.frameCount,
+                    sampleFrames: evenFrames(timeline.frameCount, 8),
+                    baselineFrames: baselineFrames(timeline.frameCount, timeline.fps),
+                    textFrames,
+                    workspace: ctx.ws,
+                    workDir: ctx.tmp,
+                    seekTimeoutMs: options.seekTimeoutMs,
+                    dropFrames: options.dropFrames,
+                });
+            } catch (error) {
+                // A crashed page is already in page.issues as page-error.
+                if (page.broken) return null;
+                if (!(error instanceof EncoderError)) throw error;
+                rb.add(
+                    finding(
+                        'glitch',
+                        `The frame pipeline to ffmpeg broke: ${error.message.split('\n')[0]}`,
+                        { detail: { log: error.message } },
+                    ),
+                );
+                return null;
+            }
+        } finally {
             rb.addAll(page.issues);
             await page.close();
-            rb.add(
-                finding(
-                    'glitch',
-                    `The frame pipeline to ffmpeg broke: ${(error as Error).message.split('\n')[0]}`,
-                    {
-                        detail: { log: (error as Error).message },
-                    },
-                ),
-            );
-            return finish();
         }
-        rb.addAll(page.issues);
-        await page.close();
         rb.addAll(dedupe(captured.findings));
-        if (!captured.completed) {
-            await encoder.abort();
-            return finish();
-        }
+        if (!captured.completed) return null;
         const encodeStart = Date.now();
+        finishing = true;
         try {
             await encoder.finish();
         } catch (error) {
+            if (!(error instanceof EncoderError)) throw error;
+            rb.add(
+                finding('glitch', `ffmpeg failed while encoding: ${error.message.split('\n')[0]}`, {
+                    detail: { log: error.message },
+                }),
+            );
+            return null;
+        }
+        return { captured, encodeMs: Date.now() - encodeStart };
+    } finally {
+        // finish() stops ffmpeg itself when it fails; before that, stop it here.
+        if (encoder && !finishing) await encoder.abort();
+    }
+}
+
+/** Render, verify, and move the video to out/ (passed) or .flipbook/rejected/ (failed). */
+async function renderVideo(ctx: RenderContext): Promise<void> {
+    const { rb, ws, dir, timeline, session, tmp, evidenceDir } = ctx;
+    const video = path.join(tmp, 'video.mp4');
+    const encoded = await encodeFrames(ctx, video);
+    if (!encoded) return;
+    const { captured, encodeMs } = encoded;
+    ws.writeFile(
+        ws.path('.flipbook', 'frame-hashes.json'),
+        `${JSON.stringify({ digest: captured.digest, hashes: captured.hashes }, null, 2)}\n`,
+    );
+    progress('render: verifying the video');
+    const verifyStart = Date.now();
+    const verified = await verifyVideo({
+        ffmpeg: session.ffmpeg,
+        video,
+        timeline,
+        samples: captured.samples,
+        baselines: captured.baselines,
+        evidenceDir,
+    });
+    rb.addAll(verified.findings);
+    const sheetFrames = evenFrames(
+        Math.min(timeline.frameCount, verified.probe.frames || timeline.frameCount),
+        12,
+    );
+    const layout = sheetLayout(sheetFrames.length, timeline.width, timeline.height);
+    const sheet = path.join(tmp, 'contact-sheet.png');
+    await contactSheet(
+        session.ffmpeg.ffmpeg,
+        ['-i', video],
+        layout,
+        sheet,
+        selectExpr(sheetFrames),
+    );
+    let delivered = video;
+    let soundtrack: Awaited<ReturnType<typeof verifySoundtrack>>['audio'] = null;
+    if (timeline.audio.mode === 'file' && timeline.audio.file) {
+        progress('render: adding the soundtrack');
+        delivered = path.join(tmp, 'video-with-audio.mp4');
+        try {
+            const source = audioSource(dir, timeline.audio.file);
+            if ('problem' in source) throw new Error(source.problem);
+            await muxSoundtrack(session.ffmpeg.ffmpeg, {
+                video,
+                audio: source.file,
+                offsetSec: timeline.audio.bpmOffset ?? 0,
+                durationSec: timeline.frameCount / timeline.fps,
+                output: delivered,
+            });
+            const checked = await verifySoundtrack(session.ffmpeg.ffprobe, delivered, timeline);
+            rb.addAll(checked.findings);
+            soundtrack = checked.audio;
+        } catch (error) {
+            delivered = video;
             rb.add(
                 finding(
-                    'glitch',
-                    `ffmpeg failed while encoding: ${(error as Error).message.split('\n')[0]}`,
+                    'timeline-invalid',
+                    `$.audio.file could not be used as a soundtrack: ${(error as Error).message.split('\n')[0]}`,
                     {
-                        detail: { log: (error as Error).message },
+                        detail: { path: '$.audio.file', log: (error as Error).message },
                     },
                 ),
             );
-            return finish();
         }
-        const encodeMs = Date.now() - encodeStart;
-        ws.writeFile(
-            ws.path('.flipbook', 'frame-hashes.json'),
-            `${JSON.stringify({ digest: captured.digest, hashes: captured.hashes }, null, 2)}\n`,
-        );
-        progress('render: verifying the video');
-        const verifyStart = Date.now();
-        const verified = await verifyVideo({
-            ffmpeg: session.ffmpeg,
-            video,
-            timeline,
-            samples: captured.samples,
-            baselines: captured.baselines,
-            evidenceDir,
-        });
-        rb.addAll(verified.findings);
-        const sheetFrames = evenFrames(
-            Math.min(timeline.frameCount, verified.probe.frames || timeline.frameCount),
-            12,
-        );
-        const layout = sheetLayout(sheetFrames.length, timeline.width, timeline.height);
-        const sheet = path.join(tmp, 'contact-sheet.png');
-        await contactSheet(
-            session.ffmpeg.ffmpeg,
-            ['-i', video],
-            layout,
-            sheet,
-            selectExpr(sheetFrames),
-        );
-        let delivered = video;
-        let soundtrack: Awaited<ReturnType<typeof verifySoundtrack>>['audio'] = null;
-        if (timeline.audio.mode === 'file' && timeline.audio.file) {
-            progress('render: adding the soundtrack');
-            delivered = path.join(tmp, 'video-with-audio.mp4');
-            try {
-                const source = audioSource(dir, timeline.audio.file);
-                if ('problem' in source) throw new Error(source.problem);
-                await muxSoundtrack(session.ffmpeg.ffmpeg, {
-                    video,
-                    audio: source.file,
-                    offsetSec: timeline.audio.bpmOffset ?? 0,
-                    durationSec: timeline.frameCount / timeline.fps,
-                    output: delivered,
-                });
-                const checked = await verifySoundtrack(session.ffmpeg.ffprobe, delivered, timeline);
-                rb.addAll(checked.findings);
-                soundtrack = checked.audio;
-            } catch (error) {
-                delivered = video;
-                rb.add(
-                    finding(
-                        'timeline-invalid',
-                        `$.audio.file could not be used as a soundtrack: ${(error as Error).message.split('\n')[0]}`,
-                        {
-                            detail: { path: '$.audio.file', log: (error as Error).message },
-                        },
-                    ),
-                );
-            }
-        }
-        const verifyMs = Date.now() - verifyStart;
-        rb.report.render = {
-            frames: timeline.frameCount,
-            fps: timeline.fps,
-            digest: captured.digest,
-            captureMs: captured.captureMs,
-            encodeMs,
-            verifyMs,
-            totalMs: Date.now() - started,
-            captureFps: Number((timeline.frameCount / (captured.captureMs / 1000)).toFixed(1)),
-            probe: verified.probe,
-            audio: soundtrack,
-            contactSheetTiles: sheetFrames.map((frame) => ({
-                frame,
-                time: Number((frame / timeline.fps).toFixed(3)),
-            })),
-        };
-        if (rb.hasErrors()) {
-            const rejected = ws.fresh(ws.path('.flipbook', 'rejected'));
-            rb.report.artifacts.rejectedVideo = ws.move(
-                delivered,
-                path.join(rejected, 'video.mp4'),
-            );
-            rb.report.artifacts.contactSheet = ws.move(
-                sheet,
-                path.join(rejected, 'contact-sheet.png'),
-            );
-        } else {
-            rb.report.artifacts.video = ws.move(delivered, ws.path('out', 'video.mp4'));
-            rb.report.artifacts.contactSheet = ws.move(sheet, ws.path('out', 'contact-sheet.png'));
-        }
-        return finish();
-    } finally {
-        ws.remove(tmp);
-        release();
-        if (!options.session) await session.close();
+    }
+    const verifyMs = Date.now() - verifyStart;
+    rb.report.render = {
+        frames: timeline.frameCount,
+        fps: timeline.fps,
+        digest: captured.digest,
+        captureMs: captured.captureMs,
+        encodeMs,
+        verifyMs,
+        totalMs: Date.now() - ctx.started,
+        captureFps: Number((timeline.frameCount / (captured.captureMs / 1000)).toFixed(1)),
+        probe: verified.probe,
+        audio: soundtrack,
+        contactSheetTiles: sheetFrames.map((frame) => ({
+            frame,
+            time: Number((frame / timeline.fps).toFixed(3)),
+        })),
+    };
+    if (rb.hasErrors()) {
+        const rejected = ws.fresh(ws.path('.flipbook', 'rejected'));
+        rb.report.artifacts.rejectedVideo = ws.move(delivered, path.join(rejected, 'video.mp4'));
+        rb.report.artifacts.contactSheet = ws.move(sheet, path.join(rejected, 'contact-sheet.png'));
+    } else {
+        rb.report.artifacts.video = ws.move(delivered, ws.path('out', 'video.mp4'));
+        rb.report.artifacts.contactSheet = ws.move(sheet, ws.path('out', 'contact-sheet.png'));
     }
 }

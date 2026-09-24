@@ -145,16 +145,22 @@ export class CompositionPage {
             serviceWorkers: 'block',
             acceptDownloads: false,
         });
-        const clock = options.clock ?? defaultClock(timeline);
-        const config: HostConfig = { ...clock, timeline, fonts: fontFaces() };
-        await context.addInitScript(installHost, config);
-        const page = await context.newPage();
-        const cdp = await context.newCDPSession(page);
-        const cp = new CompositionPage(context, page, cdp, timeline, realDir, options.onClose);
-        await context.route('**/*', (route) => cp.handle(route, options.env ?? process.env));
-        cp.listen();
-        const findings = await cp.load(options.readyTimeoutMs ?? READY_TIMEOUT_MS);
-        return { page: cp, findings };
+        // Until the page is handed over, this function owns the context.
+        try {
+            const clock = options.clock ?? defaultClock(timeline);
+            const config: HostConfig = { ...clock, timeline, fonts: fontFaces() };
+            await context.addInitScript(installHost, config);
+            const page = await context.newPage();
+            const cdp = await context.newCDPSession(page);
+            const cp = new CompositionPage(context, page, cdp, timeline, realDir, options.onClose);
+            await context.route('**/*', (route) => cp.handle(route, options.env ?? process.env));
+            cp.listen();
+            const findings = await cp.load(options.readyTimeoutMs ?? READY_TIMEOUT_MS);
+            return { page: cp, findings };
+        } catch (error) {
+            await context.close();
+            throw error;
+        }
     }
 
     private note(item: Finding): void {

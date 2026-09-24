@@ -85,6 +85,7 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
         frames: timeline.frameCount,
         durationSec: timeline.durationSec,
     };
+    const stage = ws.fresh(ws.path('.flipbook', 'snapshot'));
     const session = options.session ?? (await openSession(options.env));
     rb.report.environment.chromium = session.chromium;
     rb.report.environment.ffmpeg = session.ffmpeg.version ?? undefined;
@@ -99,7 +100,6 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
         const frames = snapshotFrames(timeline, options.count ?? 12);
         const shots: Buffer[] = [];
         const zoomFrames: number[] = [];
-        const stage = ws.fresh(ws.path('.flipbook', 'snapshot'));
         try {
             if (!page.broken && findings.length === 0) {
                 for (const frame of frames) {
