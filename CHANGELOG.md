@@ -29,6 +29,7 @@
 - **长片样例**：新增 `examples/long-scroll`，三分钟纸面一直往上滚，测试里整条过 check 和成片验收。
 - **DOM 文字可以逐帧缩放**：两次渲染有十来帧不一致，根因是 60 Hz 限帧下截图抢在合成器按新缩放重画之前，不是字形缓存。上面的启动参数一并修好，rules.md 和 SKILL.md 里那条硬规矩删掉，`dom-scale-drift` 语料钉住。
 - **报告**：`check` 多了 `determinism`，`render` 多了 `output`、`parallel`、`pages`、`recycle`，mp4 标签多了 `stage` 和 `scale`。
+- **待办**：成片验收把视频解码三遍（空白和纸底一遍、定格一遍、花屏抽帧一遍），三分钟长片上要合成一遍。beat-title 还没改成按舞台宽高排版。
 
 ### 修复
 
