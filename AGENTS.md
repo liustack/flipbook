@@ -40,7 +40,7 @@ scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码�
 skills/flipbook/   SKILL.md（英文）、references/（rules、timeline、audio、paper、materials、text、templates、brand、troubleshooting）、scripts/run.sh 和 run.ps1
 docs/              report-schema.md、timeline-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
 docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
-examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro，每个例子一份源码加 expected.json，不提交 mp4
+examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro、long-scroll（三分钟长片），每个例子一份源码加 expected.json，不提交 mp4
 eval/              评测用例、models.json、run.mjs，证据写到 eval/results/（不入库）
 test/              vitest 快档，坏片语料在 test/fixtures/bad/
 test/e2e/          vitest 端到端档：样例、坏片语料、reference 片段过 check 和 render，两次渲染比哈希
