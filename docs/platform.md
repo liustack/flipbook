@@ -180,7 +180,7 @@ Capture only, no encoding, eggs-five/five, 192 frames, one browser per page, wit
 |---|---|---|---|---|---|---|---|
 | Frames/s | 13.6 | 26.2 | 35.5 | 43.2 | 50.8 | 49.4 | 54.9 |
 
-For every page count the frame hashes match the single-page run.
+For every page count the frame hashes match the single-page run. Beyond 6 pages the frame rate barely rises, so the automatic count was later capped at 6. The "auto, 9 pages" results in the tables below were measured before that cap.
 
 ### Whole renders
 

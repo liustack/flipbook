@@ -64,8 +64,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 |---|---|
 | `render.parallel.jobs` | 实际用了几页 |
 | `render.parallel.requested` | `--jobs` 的值，没给是 `auto` |
-| `render.parallel.planned` | 按下面三个上限算出的页数，或 `--jobs` 的值 |
-| `render.parallel.limits` | `cpu` 是 CPU 核数减一，`memory` 是机器内存的一半除以每页的估算（300 MB 加 24 份输出帧大小），`frames` 是每 48 帧一页 |
+| `render.parallel.planned` | 取下一行四个上限里最小的那个，或 `--jobs` 的值（`--jobs` 不受 `max` 限制） |
+| `render.parallel.limits` | `cpu` 是 CPU 核数减一，`memory` 是机器内存的一半除以每页的估算（300 MB 加 24 份输出帧大小），`frames` 是每 48 帧一页，`max` 是自动页数的封顶 6 |
 | `render.parallel.reason` | 本该多页却只用了一页时的原因 |
 | `render.pages.opened` | 整个渲染开过几个页面，每页的第一个也算 |
 | `render.pages.recycled` | 重开了几次，按原因分：`frames` 到了帧数，`heap` JS 堆涨多了，`nodes` DOM 节点涨多了 |

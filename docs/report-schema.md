@@ -64,8 +64,8 @@ render opens several browsers with one page each. Whichever page is free takes t
 |---|---|
 | `render.parallel.jobs` | How many pages were used |
 | `render.parallel.requested` | The value of `--jobs`, `auto` when not given |
-| `render.parallel.planned` | The page count worked out from the limits in the next row, or the value of `--jobs` |
-| `render.parallel.limits` | `cpu` is the CPU core count minus one, `memory` is half the machine's memory divided by the estimate per page (300 MB plus 24 output frames), `frames` is one page per 48 frames |
+| `render.parallel.planned` | The smallest of the four limits in the next row, or the value of `--jobs` (which `max` does not cap) |
+| `render.parallel.limits` | `cpu` is the CPU core count minus one, `memory` is half the machine's memory divided by the estimate per page (300 MB plus 24 output frames), `frames` is one page per 48 frames, `max` is the ceiling of 6 on the automatic count |
 | `render.parallel.reason` | Why only one page was used when more were planned |
 | `render.pages.opened` | How many pages the whole render opened, counting each page's first one |
 | `render.pages.recycled` | How many times a page was reopened, by reason: `frames` hit the frame count, `heap` the JS heap grew too much, `nodes` the DOM node count grew too much |

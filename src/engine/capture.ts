@@ -68,6 +68,8 @@ export const WORKER_BASE_BYTES = 300 * 1024 * 1024;
 export const WORKER_FRAME_COPIES = 24;
 /** Share of the machine's memory parallel workers may take. */
 export const MEMORY_SHARE = 0.5;
+/** Most workers the automatic plan opens, however many cores and memory the machine has. */
+export const MAX_AUTO_JOBS = 6;
 
 export interface JobsPlan {
     jobs: number;
@@ -77,9 +79,11 @@ export interface JobsPlan {
     memory: number;
     /** Limit from length: one worker per MIN_FRAMES_PER_JOB frames. */
     frames: number;
+    /** Fixed ceiling on the automatic plan (MAX_AUTO_JOBS). */
+    max: number;
 }
 
-/** How many workers render in parallel: `requested`, or the smallest of the three limits. */
+/** How many workers render in parallel: `requested`, or the smallest of the four limits. */
 export function planJobs(
     frameCount: number,
     outputPixels: number,
@@ -93,8 +97,14 @@ export function planJobs(
     const perWorker = WORKER_BASE_BYTES + WORKER_FRAME_COPIES * outputPixels * 4;
     const memory = Math.max(1, Math.floor((machine.memoryBytes * MEMORY_SHARE) / perWorker));
     const frames = Math.max(1, Math.floor(frameCount / MIN_FRAMES_PER_JOB));
-    const jobs = requested ?? Math.min(cpu, memory, frames);
-    return { jobs: Math.max(1, Math.min(jobs, frameCount)), cpu, memory, frames };
+    const jobs = requested ?? Math.min(cpu, memory, frames, MAX_AUTO_JOBS);
+    return {
+        jobs: Math.max(1, Math.min(jobs, frameCount)),
+        cpu,
+        memory,
+        frames,
+        max: MAX_AUTO_JOBS,
+    };
 }
 
 export interface CaptureOptions {

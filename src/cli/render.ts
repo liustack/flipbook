@@ -246,7 +246,7 @@ async function encodeFrames(
             jobs: plan.jobs,
             requested: options.jobs ?? 'auto',
             planned: requested,
-            limits: { cpu: plan.cpu, memory: plan.memory, frames: plan.frames },
+            limits: { cpu: plan.cpu, memory: plan.memory, frames: plan.frames, max: plan.max },
             ...(gate.reason ? { reason: gate.reason } : {}),
         },
         recycle: {

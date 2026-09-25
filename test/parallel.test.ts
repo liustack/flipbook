@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
     autoRecycle,
     HEAP_GROWTH_BUDGET,
+    MAX_AUTO_JOBS,
     MIN_PAGE_FRAMES,
     MIN_PAGE_HEAP_GROWTH,
     PAGE_FRAMES_1080P,
@@ -15,20 +16,30 @@ import {
 describe('planJobs', () => {
     const machine = { cores: 10, memoryBytes: 16 * 1024 ** 3 };
 
-    it('takes CPU cores minus one for a long 1080p film', () => {
+    it('takes at most 6 pages for a long 1080p film, even with more cores to spare', () => {
         const plan = planJobs(720, 1920 * 1080, undefined, machine);
-        expect(plan).toMatchObject({ jobs: 9, cpu: 9, frames: 15 });
+        expect(plan).toMatchObject({ jobs: 6, cpu: 9, frames: 15, max: MAX_AUTO_JOBS });
+        expect(MAX_AUTO_JOBS).toBe(6);
+    });
+
+    it('takes CPU cores minus one when that is fewer than 6', () => {
+        const small = { cores: 4, memoryBytes: 16 * 1024 ** 3 };
+        expect(planJobs(720, 1920 * 1080, undefined, small)).toMatchObject({ jobs: 3, cpu: 3 });
     });
 
     it('gives short films fewer pages and big frames less memory', () => {
         expect(planJobs(120, 1920 * 1080, undefined, machine).jobs).toBe(2);
-        const uhd = planJobs(4320, 3840 * 2160, undefined, machine);
-        expect(uhd.memory).toBeLessThan(9);
+        const uhd = planJobs(4320, 3840 * 2160, undefined, {
+            ...machine,
+            memoryBytes: 8 * 1024 ** 3,
+        });
+        expect(uhd.memory).toBeLessThan(MAX_AUTO_JOBS);
         expect(uhd.jobs).toBe(uhd.memory);
     });
 
     it('keeps an explicit --jobs, never above the frame count', () => {
         expect(planJobs(720, 1920 * 1080, 3, machine).jobs).toBe(3);
+        expect(planJobs(720, 1920 * 1080, 8, machine).jobs).toBe(8);
         expect(planJobs(4, 1920 * 1080, 16, machine).jobs).toBe(4);
     });
 });
