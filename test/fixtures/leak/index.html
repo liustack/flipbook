@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #f4efe4; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script type="module">
+// Draws from t alone, but keeps everything each seek allocates: the JS heap
+// and the DOM node count grow with every frame the page renders.
+import { composition, timeline, setupCanvas } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
+const kept = [];
+
+composition({
+  seek(t) {
+    kept.push(new Array(50000).fill(t + 0.5));
+    for (let i = 0; i < 100; i++) kept.push(document.createElement('div'));
+    ctx.fillStyle = '#f4efe4';
+    ctx.fillRect(0, 0, tl.width, tl.height);
+    ctx.fillStyle = '#c8452d';
+    ctx.fillRect(20 + (t / tl.durationSec) * (tl.width - 80), tl.height / 2 - 20, 40, 40);
+  },
+});
+</script>
+</body>
+</html>

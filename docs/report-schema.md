@@ -57,7 +57,11 @@ render opens several browsers with one page each. Whichever page is free takes t
 | `render.parallel.planned` | The page count worked out from the limits in the next row, or the value of `--jobs` |
 | `render.parallel.limits` | `cpu` is the CPU core count minus one, `memory` is half the machine's memory divided by the estimate per page (300 MB plus 24 output frames), `frames` is one page per 48 frames |
 | `render.parallel.reason` | Why only one page was used when more were planned |
-| `render.pages.opened` | How many pages the whole render opened |
+| `render.pages.opened` | How many pages the whole render opened, counting each page's first one |
+| `render.pages.recycled` | How many times a page was reopened, by reason: `frames` hit the frame count, `heap` the JS heap grew too much, `nodes` the DOM node count grew too much |
+| `render.recycle` | The reopening rule for this render: `everyFrames` is the most frames one page draws (`null` means no reopening by frame count), `watchMemory` whether memory is watched |
+
+Each page is closed and reopened after a certain number of frames, so a long video's memory does not grow with its length. The default count depends on the output size: 2400 frames per page at 1920×1080, sooner with more pixels, and never fewer than 600. Every 48 frames the page's JS heap and DOM node count are also read. The first reading is the baseline, and 256 MB of heap or 20,000 nodes above it (confirmed after a full garbage collection) reopens the page early. `--recycle <frames>` switches to a fixed frame count without watching memory, and `--recycle 0` keeps one page throughout. Reopening does not change the pixels, for the same reason as running in parallel.
 
 More than one page requires that this composition's last check exited 0: render reads `.flipbook/reports/check.json`, whose composition hash, flipbook version and Chromium build must all match this render. Otherwise render uses one page, with `reason` set to `no check report for this composition`, `the saved check report is not valid JSON`, `the last check ran on other files`, `the last check ran on another flipbook version`, `the last check ran on another Chromium` or `the last check did not pass`. Calling `runCheck` directly saves no report: call `saveReport` yourself to render in parallel.
 

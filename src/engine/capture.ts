@@ -6,10 +6,49 @@ import type { CompositionPage } from './page.ts';
 import { auditFrameText } from './textAudit.ts';
 import { sha256, type Workspace } from './workspace.ts';
 
-/** Opens a page for render worker `worker`. */
+/** Opens a page for render worker `worker`; called again each time the worker reopens its page. */
 export type PageOpener = (
     worker: number,
 ) => Promise<{ page: CompositionPage; findings: Finding[] }>;
+
+/** When a worker closes its page and opens a fresh one before the next frame. */
+export interface RecyclePolicy {
+    /** Frames on one page before it is reopened. Infinity keeps the page to the end. */
+    everyFrames: number;
+    /** Also reopen a page whose JS heap or DOM keeps growing. */
+    watchMemory: boolean;
+    /** JS heap growth that reopens the page. Default HEAP_GROWTH_LIMIT. */
+    heapGrowthBytes?: number;
+    /** DOM node growth that reopens the page. Default NODE_GROWTH_LIMIT. */
+    nodeGrowth?: number;
+}
+
+export const NO_RECYCLE: RecyclePolicy = {
+    everyFrames: Number.POSITIVE_INFINITY,
+    watchMemory: false,
+};
+
+/** Frames between two memory readings of a page; the first reading is the baseline. */
+export const MEMORY_CHECK_FRAMES = 48;
+/** JS heap growth over the baseline, after a garbage collection, that reopens the page. */
+export const HEAP_GROWTH_LIMIT = 256 * 1024 * 1024;
+/** DOM node growth over the baseline, after a garbage collection, that reopens the page. */
+export const NODE_GROWTH_LIMIT = 20_000;
+/** Frames a page renders at 1920x1080 before it is reopened; larger frames reopen sooner. */
+export const PAGE_FRAMES_1080P = 2400;
+export const MIN_PAGE_FRAMES = 600;
+
+/**
+ * The default recycling: a frame budget per page that shrinks with the
+ * output size, plus the memory watch for pages that grow faster.
+ */
+export function autoRecycle(outputPixels: number): RecyclePolicy {
+    const scaled = Math.round((PAGE_FRAMES_1080P * 1920 * 1080) / outputPixels);
+    return {
+        everyFrames: Math.min(PAGE_FRAMES_1080P, Math.max(MIN_PAGE_FRAMES, scaled)),
+        watchMemory: true,
+    };
+}
 
 /** Fewest frames worth a worker of its own: opening a page costs about a second. */
 export const MIN_FRAMES_PER_JOB = 48;
@@ -55,6 +94,7 @@ export interface CaptureOptions {
     release?: (worker: number) => Promise<void>;
     /** Workers rendering at once. Default 1. */
     jobs?: number;
+    recycle?: RecyclePolicy;
     encoder: Encoder;
     frameCount: number;
     /** Frames kept as PNG for the PSNR check. */
@@ -72,8 +112,10 @@ export interface CaptureOptions {
 }
 
 export interface PageStats {
-    /** Pages opened over the whole render. */
+    /** Pages opened over the whole render, the first page of every worker included. */
     opened: number;
+    /** Pages reopened, by reason. */
+    recycled: { frames: number; heap: number; nodes: number };
 }
 
 export interface CaptureOutput {
@@ -116,12 +158,14 @@ function ordinals(frames: number[]): Map<number, number> {
  * of t, which check verifies, so which page draws which frame does not
  * change the pixels.
  *
- * Nothing thrown by one worker leaves another page open: all pages are closed before this returns
+ * Each worker reopens its page by the recycle policy. Nothing thrown by one
+ * worker leaves another page open: all pages are closed before this returns
  * or throws.
  */
 export async function captureFrames(options: CaptureOptions): Promise<CaptureOutput> {
     const { encoder, frameCount, workspace: ws } = options;
     const jobs = Math.max(1, Math.min(options.jobs ?? 1, Math.max(1, frameCount)));
+    const recycle = options.recycle ?? NO_RECYCLE;
     const samplesDir = ws.fresh(path.join(options.workDir, 'samples'));
     const baselineDir = ws.fresh(path.join(options.workDir, 'baseline'));
     const sampleSet = ordinals(options.sampleFrames);
@@ -133,7 +177,7 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
     const baselines = new Map<number, string>();
     const findings: Finding[] = [];
     const issues: Finding[] = [];
-    const pages: PageStats = { opened: 0 };
+    const pages: PageStats = { opened: 0, recycled: { frames: 0, heap: 0, nodes: 0 } };
     // Frames finished ahead of the writer. Workers stop taking frames this far ahead.
     const maxAhead = Math.max(4, jobs * 2);
     const ready = new Map<number, Buffer>();
@@ -196,8 +240,36 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
         writing = writing.then(drain);
     };
 
+    /** Reason to reopen `page` now, reading its memory every MEMORY_CHECK_FRAMES frames. */
+    const memoryVerdict = async (
+        page: CompositionPage,
+        state: { onPage: number; base: { heapBytes: number; nodes: number } | null },
+    ): Promise<'heap' | 'nodes' | null> => {
+        if (!recycle.watchMemory || state.onPage % MEMORY_CHECK_FRAMES !== 0) return null;
+        if (!state.base) {
+            state.base = await page.memory(true);
+            return null;
+        }
+        const base = state.base;
+        const heapLimit = recycle.heapGrowthBytes ?? HEAP_GROWTH_LIMIT;
+        const nodeLimit = recycle.nodeGrowth ?? NODE_GROWTH_LIMIT;
+        const grown = (m: { heapBytes: number; nodes: number }) =>
+            m.heapBytes - base.heapBytes >= heapLimit
+                ? 'heap'
+                : m.nodes - base.nodes >= nodeLimit
+                  ? 'nodes'
+                  : null;
+        if (!grown(await page.memory())) return null;
+        // Garbage not yet collected is not growth: decide after a full collection.
+        return grown(await page.memory(true));
+    };
+
     const work = async (worker: number) => {
         let page: CompositionPage | null = null;
+        const state: { onPage: number; base: { heapBytes: number; nodes: number } | null } = {
+            onPage: 0,
+            base: null,
+        };
         const closePage = async () => {
             const current = page;
             page = null;
@@ -213,11 +285,22 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
             for (;;) {
                 const frame = await claim();
                 if (frame === null) break;
+                if (page && state.onPage > 0) {
+                    let reason: 'frames' | 'heap' | 'nodes' | null =
+                        state.onPage >= recycle.everyFrames ? 'frames' : null;
+                    reason ??= await memoryVerdict(page, state);
+                    if (reason) {
+                        pages.recycled[reason] += 1;
+                        await closePage();
+                    }
+                }
                 if (!page) {
                     if (stopped) break;
                     const opened = await options.open(worker);
                     pages.opened += 1;
                     page = opened.page;
+                    state.onPage = 0;
+                    state.base = null;
                     if (opened.findings.length > 0 || page.broken) {
                         findings.push(...opened.findings);
                         halt();
@@ -248,6 +331,7 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
                     ws.writeFile(file, base);
                     baselines.set(frame, file);
                 }
+                state.onPage += 1;
                 deliver(frame, png);
             }
         } catch (error) {

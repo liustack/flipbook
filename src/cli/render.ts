@@ -11,11 +11,14 @@ import {
     synthesize,
 } from '../engine/audio.ts';
 import {
+    autoRecycle,
     type CaptureOutput,
     captureFrames,
     evenFrames,
     type JobsPlan,
+    NO_RECYCLE,
     planJobs,
+    type RecyclePolicy,
 } from '../engine/capture.ts';
 import { Encoder, EncoderError } from '../engine/encode.ts';
 import { contactSheet, selectExpr, sheetLayout } from '../engine/pixels.ts';
@@ -40,6 +43,10 @@ export interface RenderOptions {
     dir: string;
     /** Pages rendering at once. Default: planJobs. More than 1 needs a passing check. */
     jobs?: number;
+    /** Frames per page before it is reopened; 0 never reopens. Default: autoRecycle. */
+    recycleFrames?: number;
+    /** Test hook: the whole recycle policy, in place of recycleFrames. */
+    recycle?: RecyclePolicy;
     seekTimeoutMs?: number;
     readyTimeoutMs?: number;
     env?: NodeJS.ProcessEnv;
@@ -213,6 +220,13 @@ async function encodeFrames(
             progress(`render: one page, ${gate.reason}. Run check first for parallel pages.`);
         }
     }
+    const recycle: RecyclePolicy =
+        options.recycle ??
+        (options.recycleFrames === undefined
+            ? autoRecycle(pixels)
+            : options.recycleFrames === 0
+              ? NO_RECYCLE
+              : { everyFrames: options.recycleFrames, watchMemory: false });
     // Filled in again with the rest of the render section once the video passes through.
     rb.report.render = {
         parallel: {
@@ -221,6 +235,10 @@ async function encodeFrames(
             planned: requested,
             limits: { cpu: plan.cpu, memory: plan.memory, frames: plan.frames },
             ...(gate.reason ? { reason: gate.reason } : {}),
+        },
+        recycle: {
+            everyFrames: Number.isFinite(recycle.everyFrames) ? recycle.everyFrames : null,
+            watchMemory: recycle.watchMemory,
         },
     };
     const metadata = {
@@ -267,6 +285,7 @@ async function encodeFrames(
                 await slots.get(worker)?.close();
             },
             jobs: plan.jobs,
+            recycle,
             encoder,
             frameCount: timeline.frameCount,
             sampleFrames: evenFrames(timeline.frameCount, 8),

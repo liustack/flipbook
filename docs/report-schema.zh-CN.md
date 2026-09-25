@@ -57,7 +57,11 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `render.parallel.planned` | 按下面三个上限算出的页数，或 `--jobs` 的值 |
 | `render.parallel.limits` | `cpu` 是 CPU 核数减一，`memory` 是机器内存的一半除以每页的估算（300 MB 加 24 份输出帧大小），`frames` 是每 48 帧一页 |
 | `render.parallel.reason` | 本该多页却只用了一页时的原因 |
-| `render.pages.opened` | 整个渲染开过几个页面 |
+| `render.pages.opened` | 整个渲染开过几个页面，每页的第一个也算 |
+| `render.pages.recycled` | 重开了几次，按原因分：`frames` 到了帧数，`heap` JS 堆涨多了，`nodes` DOM 节点涨多了 |
+| `render.recycle` | 这次的重开规则：`everyFrames` 一页最多画几帧（`null` 是不按帧数重开），`watchMemory` 是否看内存 |
+
+每一页画到一定帧数就关掉重开，长片的内存不跟着帧数涨。默认帧数按输出大小定：1920×1080 一页 2400 帧，像素越多越早重开，最少 600 帧。另外每 48 帧读一次这一页的 JS 堆和 DOM 节点数，第一次读数当基线，比基线多出 256 MB 堆或 2 万个节点（先做一次完整垃圾回收再确认）就提前重开。`--recycle <帧数>` 改成固定帧数且不看内存，`--recycle 0` 一直用同一页。重开不改变像素，理由和并行相同。
 
 多页的前提是这个合成最近一次 check 退 0：读 `.flipbook/reports/check.json`，合成文件哈希、flipbook 版本、Chromium 构建号都要和这次 render 相同。否则只用一页，`reason` 是 `no check report for this composition`、`the saved check report is not valid JSON`、`the last check ran on other files`、`the last check ran on another flipbook version`、`the last check ran on another Chromium` 或 `the last check did not pass`。直接调 `runCheck` 不存报告，要并行得自己 `saveReport`。
 

@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "width": 320,
+    "height": 180,
+    "fps": 24,
+    "seed": 11,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [{ "id": "run", "bars": 3 }],
+    "audio": { "mode": "none" }
+}

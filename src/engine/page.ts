@@ -503,6 +503,18 @@ export class CompositionPage {
         return Buffer.from(data, 'base64');
     }
 
+    /**
+     * What the page holds that can grow while it renders: the JS heap and the
+     * DOM node count (detached nodes included). With `collect`, a full garbage
+     * collection runs first, so garbage waiting to be freed is not counted.
+     */
+    async memory(collect = false): Promise<{ heapBytes: number; nodes: number }> {
+        if (collect) await this.cdp.send('HeapProfiler.collectGarbage');
+        const heap = await this.cdp.send('Runtime.getHeapUsage');
+        const dom = await this.cdp.send('Memory.getDOMCounters');
+        return { heapBytes: heap.usedSize, nodes: dom.nodes };
+    }
+
     /** Make DOM text transparent (false) or restore it (true); backgrounds stay. */
     async setTextVisible(visible: boolean): Promise<void> {
         await this.page.evaluate((on) => {

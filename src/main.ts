@@ -224,12 +224,14 @@ program
     .argument('<dir>', 'composition directory')
     .option('--seek-timeout <ms>', 'time limit for one seek', '10000')
     .option('--jobs <n>', 'pages rendering at once (default: CPU cores - 1, within memory)')
+    .option('--recycle <frames>', 'frames per page before it is reopened, 0 for never')
     .action(
         async (
             dir: string,
             options: {
                 seekTimeout: string;
                 jobs?: string;
+                recycle?: string;
             },
         ) => {
             await execute('render', dir, () =>
@@ -242,6 +244,9 @@ program
                         600_000,
                     ),
                     jobs: options.jobs ? parseInteger(options.jobs, '--jobs', 1, 64) : undefined,
+                    recycleFrames: options.recycle
+                        ? parseInteger(options.recycle, '--recycle', 0, 1_000_000)
+                        : undefined,
                 }),
             );
         },
