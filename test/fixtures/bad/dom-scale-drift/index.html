@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #f3ede1; }
+  canvas { position: absolute; left: 0; top: 0; }
+  .word { position: absolute; top: 400px; margin: 0; text-align: center;
+          font: 400 176px/1.2 "LXGW WenKai"; color: #2b2622; opacity: 0;
+          transform-origin: 50% 100%; }
+  #w1 { left: 204px; width: 352px; }
+  #w2 { left: 696px; width: 352px; }
+  #w3 { left: 1188px; width: 528px; }
+</style>
+</head>
+<body>
+<canvas id="paper" data-flipbook-layer="paper"></canvas>
+<canvas id="ink"></canvas>
+<p id="w1" class="word">一拍</p>
+<p id="w2" class="word">一帧</p>
+<p id="w3" class="word">一个字</p>
+<script type="module">
+// DOM words that land with a squash: rotate() and a non-uniform scale()
+// change on every frame. Under the 60 Hz frame rate limit the first
+// screenshot after a seek could show the words before their new raster
+// scale was painted, so two separate renders differed on a dozen frames.
+import {
+  composition, timeline, setupCanvas, staticLayer, rng, ease, progress, cue,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const beat = tl.secondsPerBeat;
+const ink = setupCanvas(document.getElementById('ink'), W, H);
+const at = (id) => cue(tl, id).frame / tl.fps;
+const words = [
+  { id: 'w1', x: 380 },
+  { id: 'w2', x: 872 },
+  { id: 'w3', x: 1452 },
+].map((w) => ({ ...w, el: document.getElementById(w.id), land: at(w.id) }));
+
+composition({
+  setup() {
+    const paper = staticLayer(W, H, (ctx) => {
+      ctx.fillStyle = '#f3ede1';
+      ctx.fillRect(0, 0, W, H);
+      const r = rng(tl.seed);
+      for (let i = 0; i < 12000; i++) {
+        ctx.fillStyle = `rgba(90, 70, 40, ${r.range(0.02, 0.07)})`;
+        ctx.fillRect(r.range(0, W), r.range(0, H), r.range(1, 3), r.range(1, 3));
+      }
+    });
+    paper.blit(setupCanvas(document.getElementById('paper'), W, H));
+  },
+  seek(t) {
+    ink.clearRect(0, 0, W, H);
+    ink.fillStyle = '#fbf7ef';
+    ink.fillRect(160 + Math.sin(t * 1.3) * 6, 260, 1600, 600);
+    words.forEach((w, i) => {
+      const start = w.land - beat * 0.5;
+      if (t < start) {
+        w.el.style.opacity = '0';
+        return;
+      }
+      let y = 0;
+      let sx = 1;
+      let sy = 1;
+      if (t < w.land) {
+        const u = progress(t, start, w.land);
+        y = -(1 - u * u) * 520;
+        sx = 0.94;
+        sy = 1.08;
+      } else {
+        const k = t - w.land;
+        const wobble = Math.exp(-k * 7) * Math.cos(k * 26);
+        sy = 1 - 0.2 * wobble;
+        sx = 1 + 0.16 * wobble;
+        y = Math.sin((t - w.land) * 2.2 + i) * 6;
+      }
+      const tilt = Math.sin(t * 1.7 + i * 2) * 1.5;
+      w.el.style.opacity = '1';
+      w.el.style.transform = `translateY(${y}px) rotate(${tilt}deg) scale(${sx}, ${sy})`;
+      const near = t < w.land ? progress(t, start, w.land) : 1;
+      ink.fillStyle = `rgba(43, 38, 34, ${0.12 * near})`;
+      ink.beginPath();
+      ink.ellipse(w.x, 640, (w.id === 'w3' ? 250 : 170) * (0.5 + near * 0.5) * sx, 16, 0, 0, Math.PI * 2);
+      ink.fill();
+    });
+  },
+});
+</script>
+</body>
+</html>

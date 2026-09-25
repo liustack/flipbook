@@ -129,6 +129,24 @@ Speed: six stress renders took 11.6 to 23.3 seconds each with software raster an
 
 Conclusion: 2D compositions stay on software raster. Under Metal, canvas content with shadows, blur and blending does not render frame-identical twice on the same machine, so it cannot pass the A-level raw frame hash gate. Turning on the GPU for 2D later would mean switching the determinism check from hashes to PSNR (for example at least 90 dB). 3D compositions are accepted by PSNR by design and are not affected. Whether single-process mode inside a sandbox can use Metal is untested. Codex's denial log contains `iokit-open-user-client AGXDeviceUserClient`, so most likely it cannot.
 
+## DOM text scaled frame by frame
+
+The problem: the first version of beat-title changed `rotate()` and a non-uniform `scale()` on DOM text every frame, and two renders on the same machine had 9 to 14 of 288 frames with different hashes, which check did not catch. At the time it was blamed on the glyph cache, and rules.md got a rule forbidding per-frame `scale` changes on DOM text.
+
+Reproduction: `test/fixtures/bad/dom-scale-drift` is a trimmed version of that passage (1920×1080, 115 frames, three characters squashing and bouncing back as they land). With the launch arguments before `--disable-frame-rate-limit` (2026-09-25, Apple M4, load 3 to 8):
+
+| Method | Result |
+|---|---|
+| Two captures in a row after each seek on the same page | In three runs, 7, 14 and 8 frames differed between the two. A third capture (50 milliseconds later) matched the second |
+| The combined hash of each run's first captures | Three runs, three values |
+| The combined hash of each run's second captures | The same in all three runs |
+| Single-process mode | The same happens |
+| With `--disable-frame-rate-limit` | Eight processes running at once (load 21): first and second captures identical on every frame, all eight combined hashes identical, and equal to the "second captures" above |
+
+Root cause: the screenshot races the compositor's repaint, and the glyph cache has nothing to do with it. By default Chromium produces frames at 60 Hz, and `Page.captureScreenshot` takes the next frame the compositor produces after the seek. When the text's transform changes, the compositor has to rasterize that text layer again at the new scale. On the 60 Hz tick, the frame a screenshot gets sometimes does not have the layer redrawn yet, and only the frame after it is right. Which frames get caught depends on the timing of the moment, so the same frame can differ between two renders. The finished pixels themselves are deterministic, as the three identical "second captures" in the table show. check's two captures in a row (`late-paint`) only look at the 8 sampled frames, and that run did not sample the frames that went wrong.
+
+The fix: the launch flag `--disable-frame-rate-limit`. The compositor no longer waits for the 60 Hz tick, and the first frame a screenshot gets is already finished. `test/domScale.test.ts` pins two things: two captures in a row match on every frame, and two independent renders match on every frame. Without the flag both tests fail. The rule in rules.md and SKILL.md is gone, and DOM text may scale and rotate frame by frame.
+
 ## Windows
 
 Native Windows is not supported: `win32` exits 78 and points to WSL2. Setting `FLIPBOOK_ALLOW_WIN32=1` bypasses that, for CI.

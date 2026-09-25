@@ -1,0 +1,16 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 20260925,
+    "bpm": 100,
+    "beatsPerBar": 4,
+    "scenes": [{ "id": "words", "bars": 2 }],
+    "cues": [
+        { "id": "w1", "scene": "words", "beat": 1, "kind": "text", "text": "一拍", "settleBeats": 1 },
+        { "id": "w2", "scene": "words", "beat": 3, "kind": "text", "text": "一帧", "settleBeats": 1 },
+        { "id": "w3", "scene": "words", "beat": 5, "kind": "text", "text": "一个字", "settleBeats": 1 }
+    ],
+    "audio": { "mode": "none" }
+}
