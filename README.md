@@ -36,15 +36,15 @@ https://github.com/user-attachments/assets/4720fa7b-ec6e-4c25-b361-1ca15e2cc42e
 <tr>
 <td colspan="2" valign="top">
 
-https://github.com/user-attachments/assets/9016d9cb-d2dc-4fa3-84aa-f36801ead9e9
+https://github.com/user-attachments/assets/5ee87eff-1436-473b-b31a-81c74769659d
 
-<sub>Bird eggs land one by one and build a 5. 8 s, silent.</sub>
+<sub>Also from one prompt: a butterfly's life on paper, egg, caterpillar, chrysalis and butterfly, each stage with its title. First try, 13.5 minutes, $2.78. 30 s, preset music.</sub>
 
 </td>
 </tr>
 </table>
 
-<p align="center"><sub>Every video plays in place. All of them are flipbook renders: the paper boat comes from an eval run, the others from the examples in this repository.</sub></p>
+<p align="center"><sub>Every video plays in place. All three are flipbook renders: the paper boat and the butterfly come from eval runs where the model worked alone from one prompt.</sub></p>
 
 flipbook is an agent skill. Your agent writes one HTML composition and a timeline counted in beats, the skill renders it frame by frame into an MP4 with music, and checks the video before you get it.
 

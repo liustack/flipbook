@@ -36,15 +36,15 @@ https://github.com/user-attachments/assets/4720fa7b-ec6e-4c25-b361-1ca15e2cc42e
 <tr>
 <td colspan="2" valign="top">
 
-https://github.com/user-attachments/assets/9016d9cb-d2dc-4fa3-84aa-f36801ead9e9
+https://github.com/user-attachments/assets/5ee87eff-1436-473b-b31a-81c74769659d
 
-<sub>鸟蛋一颗颗落下，拼成「5」。8 秒，无声。</sub>
+<sub>也是一句话做出来的：纸感插画讲一只蝴蝶的一生，卵、毛毛虫、蛹、破茧成蝶，每个阶段配一个小标题。一次跑通，13.5 分钟，2.78 美元。30 秒，预设配乐。</sub>
 
 </td>
 </tr>
 </table>
 
-<p align="center"><sub>每条视频都能直接播放，全部由 flipbook 渲染：纸船来自一次评测，其余是本仓库里的样例。</sub></p>
+<p align="center"><sub>每条视频都能直接播放，全部由 flipbook 渲染：纸船和蝴蝶来自评测，模型只拿到一句话，独自做完。</sub></p>
 
 flipbook 是一个 agent skill。agent 写一个 HTML 合成文件和一份按拍写的时间轴，skill 逐帧渲染成带配乐的 mp4，交付前先自己验收一遍。
 
