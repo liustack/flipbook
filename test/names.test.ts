@@ -17,7 +17,7 @@ describe('public names', () => {
     it('match package.json', () => {
         const pkg = JSON.parse(read('package.json'));
         expect(pkg.name).toBe(PACKAGE_NAME);
-        expect(pkg.bin).toEqual({ [COMMAND_NAME]: './dist/main.js' });
+        expect(pkg.bin).toEqual({ [COMMAND_NAME]: 'dist/main.js' });
         expect(pkg.repository.url).toBe(`git+https://github.com/${REPO}.git`);
         expect(pkg.bugs.url).toBe(`https://github.com/${REPO}/issues`);
         expect(pkg.homepage).toBe(`https://github.com/${REPO}#readme`);
