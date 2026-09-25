@@ -59,6 +59,7 @@ jobs:
             exit 1
           fi
       - run: pnpm test
+      - run: pnpm test:e2e
       - run: pnpm build
       - name: Extract release notes from CHANGELOG
         run: |

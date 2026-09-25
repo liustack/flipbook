@@ -58,6 +58,7 @@ jobs:
       - run: pnpm typecheck
       # Windows too. A case that cannot run there skips itself and says why.
       - run: pnpm test
+      - run: pnpm test:e2e
       - run: pnpm build
 
   install:

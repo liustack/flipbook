@@ -21,7 +21,8 @@ flipbook 只做一件事：把模型写的 HTML 合成逐帧确定性地渲染�
 pnpm install
 pnpm lint        # Biome
 pnpm typecheck   # tsc --noEmit
-pnpm test        # vitest，会先 build
+pnpm test        # 单元和快的引擎测试，会先 build，一分钟内
+pnpm test:e2e    # 整条合成过 CLI：坏片语料、reference 片段、样例渲染、两次渲染比哈希
 pnpm build       # tsup，产出 dist/main.js 和 dist/runtime/
 ```
 
@@ -29,7 +30,7 @@ pnpm build       # tsup，产出 dist/main.js 和 dist/runtime/
 
 ## 测试
 
-- 测试放 `test/`，坏片语料放 `test/fixtures/bad/<类型>/`。每类坏法至少一条，必须被拦下。
+- 测试放 `test/`，要把整个合成目录送进 check、snapshot 或 render 的放 `test/e2e/`。坏片语料放 `test/fixtures/bad/<类型>/`，每类坏法至少一条，必须被拦下。
 - 新行为或修 bug 的提交带上测试。
 - 单元测试不联网。用到浏览器的测试把 fixture 复制到临时目录再跑，不往仓库里写 `.flipbook/` 和 `out/`。
 

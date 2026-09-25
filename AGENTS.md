@@ -42,15 +42,18 @@ docs/              report-schema.md、timeline-schema.md、platform.md（支持�
 docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
 examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro，每个例子一份源码加 expected.json，不提交 mp4
 eval/              评测用例、models.json、run.mjs，证据写到 eval/results/（不入库）
-test/              vitest，坏片语料在 test/fixtures/bad/
+test/              vitest 快档，坏片语料在 test/fixtures/bad/
+test/e2e/          vitest 端到端档：整条合成过 check 和 render（坏片语料、reference 片段、样例、两次渲染比哈希）
 ```
 
 ## 验证
 
 - `pnpm lint && pnpm typecheck && pnpm test && pnpm build`，全部通过才算完成。`pnpm test` 会先构建。
+- 测试分两档。`pnpm test` 是单元测试和快的引擎测试，本机一分钟内跑完，改代码时随手跑。`pnpm test:e2e` 跑 `test/e2e/`：坏片语料过 check 和 render、reference 片段过 check、样例 check 加渲染、两次渲染比原始帧哈希，本机约 8 分钟，CI（main 和 PR）和 `scripts/release.mjs` 的门禁两档都跑。本地改了引擎、运行时库、类型码或样例，推送前自己跑一遍 `pnpm test:e2e`。
+- 新测试按有没有渲染整条合成分档：要把一个合成目录送进 check、snapshot 或 render 看结果的放 `test/e2e/`，其余放 `test/`。快档里用到浏览器的测试只开小页面、用短期限，别等满 60 秒的 ready 期限。
 - 用到浏览器的测试把 fixture 复制到临时目录再跑。首次运行需要联网装 Chromium 和字体，写的是用户缓存目录。
 - 坏片语料每类至少一条，新增检查时先加一条会被拦下的坏片。
-- `skills/flipbook/references/` 里标了 `<!-- check: ... -->` 的代码片段由 `test/references.test.ts` 真跑 check。`troubleshooting.md` 从 `src/cli/codes.ts` 生成，改了类型码跑 `UPDATE_REFERENCES=1 pnpm test test/references.test.ts`。
+- `skills/flipbook/references/` 里标了 `<!-- check: ... -->` 的代码片段由 `test/e2e/references.test.ts` 真跑 check。`troubleshooting.md` 从 `src/cli/codes.ts` 生成，改了类型码跑 `UPDATE_REFERENCES=1 pnpm test test/skillText.test.ts`。
 - 评测花真实额度，按 docs/eval.md 本地跑，CI 只跑 `--dry-run`。
 - 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。
 - 确定性只在同机同版本比原始帧哈希，跨机器不比。

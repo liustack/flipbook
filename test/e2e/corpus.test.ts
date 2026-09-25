@@ -1,10 +1,10 @@
 // Broken compositions, one per failure class. Every one must be caught.
 import * as fs from 'fs';
 import { afterAll, describe, expect, it } from 'vitest';
-import { runCheck } from '../src/cli/check.ts';
-import { runRender } from '../src/cli/render.ts';
-import { closeSession, session } from './browser.ts';
-import { cleanTemps, codes, copyFixture } from './helpers.ts';
+import { runCheck } from '../../src/cli/check.ts';
+import { runRender } from '../../src/cli/render.ts';
+import { closeSession, session } from '../browser.ts';
+import { cleanTemps, codes, copyFixture } from '../helpers.ts';
 
 afterAll(async () => {
     await closeSession();

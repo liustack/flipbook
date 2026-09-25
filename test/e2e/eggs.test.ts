@@ -3,11 +3,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { runCheck } from '../src/cli/check.ts';
-import { runRender } from '../src/cli/render.ts';
-import { probeVideo } from '../src/engine/verify.ts';
-import { closeSession, session } from './browser.ts';
-import { cleanTemps, copyFixture, repoRoot } from './helpers.ts';
+import { runCheck } from '../../src/cli/check.ts';
+import { runRender } from '../../src/cli/render.ts';
+import { probeVideo } from '../../src/engine/verify.ts';
+import { closeSession, session } from '../browser.ts';
+import { cleanTemps, copyFixture, repoRoot } from '../helpers.ts';
 
 afterAll(async () => {
     await closeSession();
