@@ -22,27 +22,27 @@
 <table>
   <tr>
     <td colspan="2" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.1/paper-boat.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.1/paper-boat-contact-sheet.png" width="100%" alt="联系表 12 帧：纸折的小船在纸剪的太阳下出发，穿过大雨和闪电，驶过大雪，最后在暖色黄昏里出现「纸船」两个字"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.2/paper-boat.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.2/paper-boat-contact-sheet.png" width="100%" alt="联系表 12 帧：纸折的小船在纸剪的太阳下出发，穿过大雨和闪电，驶过大雪，最后在暖色黄昏里出现「纸船」两个字"></a>
       <br><sub>Claude Opus 5.5 从一句话做出来：一只纸船依次驶过晴天、大雨和大雪。一次跑通，6.7 分钟，1.48 美元。25 秒，预设配乐。</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.1/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.1/eggs-five-five-contact-sheet.png" width="100%" alt="联系表 12 帧：米褐纸上鸟蛋一颗颗落下拼成数字 5，最后换成 flipbook 字样"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.2/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.2/eggs-five-five-contact-sheet.png" width="100%" alt="联系表 12 帧：米褐纸上鸟蛋一颗颗落下拼成数字 5，最后换成 flipbook 字样"></a>
       <br><sub>鸟蛋一颗颗落下，拼成「5」。8 秒，无声。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.1/eggs-five-shu.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.1/eggs-five-shu-contact-sheet.png" width="100%" alt="联系表 12 帧：鸟蛋一颗颗落下拼成汉字书，最后换成手翻书字样"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.2/eggs-five-shu.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.2/eggs-five-shu-contact-sheet.png" width="100%" alt="联系表 12 帧：鸟蛋一颗颗落下拼成汉字书，最后换成手翻书字样"></a>
       <br><sub>同一个模板拼出「书」。8 秒，无声。</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.1/beat-title.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.1/beat-title-contact-sheet.png" width="100%" alt="联系表 12 帧：一张卡片钉上纸面，一小节落一个词，最后出现翻页书标题和红色印章"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.2/beat-title.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.2/beat-title-contact-sheet.png" width="100%" alt="联系表 12 帧：一张卡片钉上纸面，一小节落一个词，最后出现翻页书标题和红色印章"></a>
       <br><sub>三个词踩着拍子落上卡片，最后盖章出标题。12 秒，马林巴预设配乐加音效。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.1/hello.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.1/hello-contact-sheet.png" width="100%" alt="联系表 12 帧：红方块在「你好，翻页书」和「Hello, flipbook」下面移动"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.2/hello.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.2/hello-contact-sheet.png" width="100%" alt="联系表 12 帧：红方块在「你好，翻页书」和「Hello, flipbook」下面移动"></a>
       <br><sub>安装指南里的试渲那一条。5 秒。</sub>
     </td>
   </tr>
@@ -63,22 +63,22 @@ flipbook 是一个 agent skill。agent 写一个 HTML 合成文件和一份按�
 把这句话交给你的 agent：
 
 ```text
-按 https://github.com/liustack/flipbook/blob/v0.5.1/INSTALL.zh-CN.md 安装 flipbook，装完渲一遍 hello 例子，告诉我结果。
+按 https://github.com/liustack/flipbook/blob/v0.5.2/INSTALL.zh-CN.md 安装 flipbook，装完渲一遍 hello 例子，告诉我结果。
 ```
 
 或者自己装 skill。Claude Code：
 
 ```bash
-npx -y skills add liustack/flipbook#v0.5.1 --skill flipbook --global --agent claude-code -y
+npx -y skills add liustack/flipbook#v0.5.2 --skill flipbook --global --agent claude-code -y
 ```
 
 Codex：
 
 ```bash
-npx -y skills add liustack/flipbook#v0.5.1 --skill flipbook --global --agent codex -y
+npx -y skills add liustack/flipbook#v0.5.2 --skill flipbook --global --agent codex -y
 ```
 
-需要 Node 22.19 起和带 libx264 的 ffmpeg（macOS `brew install ffmpeg`，Debian 和 Ubuntu `sudo apt-get install -y ffmpeg`）。第一次 check 或 render 会下载钉死版本的 Chromium（约 95 MB）和两款中文字体（约 50 MB）到用户缓存目录。想省掉每次 npx 的下载，可以全局装 skill 的渲染器：`npm install -g @liustack/flipbook@0.5.1`。
+需要 Node 22.19 起和带 libx264 的 ffmpeg（macOS `brew install ffmpeg`，Debian 和 Ubuntu `sudo apt-get install -y ffmpeg`）。第一次 check 或 render 会下载钉死版本的 Chromium（约 95 MB）和两款中文字体（约 50 MB）到用户缓存目录。想省掉每次 npx 的下载，可以全局装 skill 的渲染器：`npm install -g @liustack/flipbook@0.5.2`。
 
 ## 一句话出片
 
