@@ -58,7 +58,8 @@ test/              vitest，坏片语料在 test/fixtures/bad/
 ## 文档
 
 - `docs/` 下的文档带 `summary` 和 `read_when` 前言。
-- 报告格式、类型码、timeline 字段改了，同一个提交里改 `docs/report-schema.md` 或 `docs/timeline-schema.md`，`test/units.test.ts` 会核对类型码。
+- README、INSTALL 和 `docs/` 下的文档英文为主，中文版是同名 `.zh-CN.md`，两边章节一一对应，标题下有一行语言切换。改一边就在同一个提交里改另一边。SKILL.md 和 references 只有英文。
+- 报告格式、类型码、timeline 字段改了，同一个提交里改 `docs/report-schema.md` 或 `docs/timeline-schema.md` 和对应的 `.zh-CN.md`，`test/units.test.ts` 会核对两份报告格式里的类型码。
 - 文档里的安装命令一律带精确版本，`scripts/stamp.test.mjs` 扫所有入库文件。
 
 ## .gitignore 必须包含
