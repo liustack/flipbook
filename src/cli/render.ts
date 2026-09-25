@@ -10,15 +10,22 @@ import {
     type StemSet,
     synthesize,
 } from '../engine/audio.ts';
-import { type CaptureOutput, captureFrames, evenFrames } from '../engine/capture.ts';
+import {
+    type CaptureOutput,
+    captureFrames,
+    evenFrames,
+    type JobsPlan,
+    planJobs,
+} from '../engine/capture.ts';
 import { Encoder, EncoderError } from '../engine/encode.ts';
 import { contactSheet, selectExpr, sheetLayout } from '../engine/pixels.ts';
 import {
     compositionDir,
     indexFinding,
-    openPage,
     openSession,
     outputLinksFinding,
+    type PageSlot,
+    pageSlot,
     type Session,
 } from '../engine/session.ts';
 import { dedupe } from '../engine/textAudit.ts';
@@ -31,6 +38,8 @@ import { finding, platformId, progress, type Report, ReportBuilder } from './rep
 
 export interface RenderOptions {
     dir: string;
+    /** Pages rendering at once. Default: planJobs. More than 1 needs a passing check. */
+    jobs?: number;
     seekTimeoutMs?: number;
     readyTimeoutMs?: number;
     env?: NodeJS.ProcessEnv;
@@ -146,81 +155,140 @@ interface RenderContext {
     started: number;
 }
 
+/** Why the last check lets render run pages in parallel, or why it does not. */
+export interface ParallelGate {
+    allowed: boolean;
+    reason?: string;
+}
+
 /**
- * Open the page, feed every frame to ffmpeg and wait for the video. Null when
- * the page or the encoder failed; the reason is in the report.
+ * Parallel pages only for a composition whose determinism check passed: the
+ * saved report of the last check must be for these exact files, this
+ * flipbook and this Chromium, and must have exited 0.
+ */
+export function parallelGate(ws: Workspace, hash: string, session: Session): ParallelGate {
+    let text: string | null;
+    try {
+        text = ws.readText(ws.path('.flipbook', 'reports', 'check.json'));
+    } catch {
+        text = null;
+    }
+    if (text === null) return { allowed: false, reason: 'no check report for this composition' };
+    let report: Partial<Report>;
+    try {
+        report = JSON.parse(text) as Partial<Report>;
+    } catch {
+        return { allowed: false, reason: 'the saved check report is not valid JSON' };
+    }
+    if (report.command !== 'check' || report.composition?.hash !== hash) {
+        return { allowed: false, reason: 'the last check ran on other files' };
+    }
+    if (report.flipbook?.version !== appVersion()) {
+        return { allowed: false, reason: 'the last check ran on another flipbook version' };
+    }
+    if (report.environment?.chromium?.revision !== session.chromium.revision) {
+        return { allowed: false, reason: 'the last check ran on another Chromium' };
+    }
+    if (report.ok !== true) return { allowed: false, reason: 'the last check did not pass' };
+    return { allowed: true };
+}
+
+/**
+ * Open the pages, feed every frame to ffmpeg and wait for the video. Null when
+ * a page or the encoder failed; the reason is in the report.
  */
 async function encodeFrames(
     ctx: RenderContext,
     video: string,
 ): Promise<{ captured: CaptureOutput; encodeMs: number } | null> {
     const { options, rb, session, timeline } = ctx;
-    let encoder: Encoder | null = null;
-    let finishing = false;
-    try {
-        const { page, findings } = await openPage(session, {
-            dir: ctx.dir,
-            timeline,
-            readyTimeoutMs: options.readyTimeoutMs,
-            env: options.env,
-        });
-        let captured: CaptureOutput;
-        try {
-            rb.addAll(findings);
-            if (page.broken || findings.length > 0) return null;
-            const metadata = {
-                flipbook: appVersion(),
-                chromium: session.chromium.version,
-                chromiumRevision: session.chromium.revision,
-                launchMode: session.mode,
-                platform: platformId(),
-                composition: ctx.hash,
-            };
-            rb.report.metadata = metadata;
-            encoder = Encoder.start(session.ffmpeg.ffmpeg, {
-                fps: timeline.fps,
-                output: video,
-                metadata,
-            });
-            const textFrames = [
-                ...new Set([
-                    ...timeline.cues.filter((c) => c.kind === 'text').map((c) => c.settleFrame),
-                    ...evenFrames(timeline.frameCount, 3),
-                ]),
-            ];
-            progress(`render: ${timeline.frameCount} frames at ${timeline.fps} fps`);
-            try {
-                captured = await captureFrames({
-                    page,
-                    encoder,
-                    frameCount: timeline.frameCount,
-                    sampleFrames: evenFrames(timeline.frameCount, 8),
-                    baselineFrames: baselineFrames(timeline.frameCount, timeline.fps),
-                    textFrames,
-                    workspace: ctx.ws,
-                    workDir: ctx.tmp,
-                    seekTimeoutMs: options.seekTimeoutMs,
-                    dropFrames: options.dropFrames,
-                });
-            } catch (error) {
-                // A crashed page is in page.issues as page-error, or page.close() below
-                // throws resource-exhausted when the system killed it.
-                if (page.broken) return null;
-                if (!(error instanceof EncoderError)) throw error;
-                rb.add(
-                    finding(
-                        'glitch',
-                        `The frame pipeline to ffmpeg broke: ${error.message.split('\n')[0]}`,
-                        { detail: { log: error.message } },
-                    ),
-                );
-                return null;
-            }
-        } finally {
-            rb.addAll(page.issues);
-            await page.close();
+    const pixels = timeline.width * timeline.height;
+    const plan: JobsPlan = planJobs(timeline.frameCount, pixels, options.jobs);
+    const requested = plan.jobs;
+    let gate: ParallelGate = { allowed: true };
+    if (plan.jobs > 1) {
+        gate = parallelGate(ctx.ws, ctx.hash, session);
+        if (!gate.allowed) {
+            plan.jobs = 1;
+            progress(`render: one page, ${gate.reason}. Run check first for parallel pages.`);
         }
+    }
+    // Filled in again with the rest of the render section once the video passes through.
+    rb.report.render = {
+        parallel: {
+            jobs: plan.jobs,
+            requested: options.jobs ?? 'auto',
+            planned: requested,
+            limits: { cpu: plan.cpu, memory: plan.memory, frames: plan.frames },
+            ...(gate.reason ? { reason: gate.reason } : {}),
+        },
+    };
+    const metadata = {
+        flipbook: appVersion(),
+        chromium: session.chromium.version,
+        chromiumRevision: session.chromium.revision,
+        launchMode: session.mode,
+        platform: platformId(),
+        composition: ctx.hash,
+    };
+    rb.report.metadata = metadata;
+    const encoder = Encoder.start(session.ffmpeg.ffmpeg, {
+        fps: timeline.fps,
+        output: video,
+        metadata,
+    });
+    let finishing = false;
+    const slots = new Map<number, PageSlot>();
+    try {
+        const textFrames = [
+            ...new Set([
+                ...timeline.cues.filter((c) => c.kind === 'text').map((c) => c.settleFrame),
+                ...evenFrames(timeline.frameCount, 3),
+            ]),
+        ];
+        progress(
+            `render: ${timeline.frameCount} frames at ${timeline.fps} fps, ${plan.jobs} page${plan.jobs === 1 ? '' : 's'}`,
+        );
+        const captured = await captureFrames({
+            open: (worker) => {
+                let slot = slots.get(worker);
+                if (!slot) {
+                    slot = pageSlot(session, worker);
+                    slots.set(worker, slot);
+                }
+                return slot.open({
+                    dir: ctx.dir,
+                    timeline,
+                    readyTimeoutMs: options.readyTimeoutMs,
+                    env: options.env,
+                });
+            },
+            release: async (worker) => {
+                await slots.get(worker)?.close();
+            },
+            jobs: plan.jobs,
+            encoder,
+            frameCount: timeline.frameCount,
+            sampleFrames: evenFrames(timeline.frameCount, 8),
+            baselineFrames: baselineFrames(timeline.frameCount, timeline.fps),
+            textFrames,
+            workspace: ctx.ws,
+            workDir: ctx.tmp,
+            seekTimeoutMs: options.seekTimeoutMs,
+            dropFrames: options.dropFrames,
+        });
+        rb.addAll(dedupe(captured.issues));
         rb.addAll(dedupe(captured.findings));
+        if (captured.pipeError) {
+            rb.add(
+                finding(
+                    'glitch',
+                    `The frame pipeline to ffmpeg broke: ${captured.pipeError.message.split('\n')[0]}`,
+                    { detail: { log: captured.pipeError.message } },
+                ),
+            );
+            return null;
+        }
         if (!captured.completed) return null;
         const encodeStart = Date.now();
         finishing = true;
@@ -238,7 +306,7 @@ async function encodeFrames(
         return { captured, encodeMs: Date.now() - encodeStart };
     } finally {
         // finish() stops ffmpeg itself when it fails; before that, stop it here.
-        if (encoder && !finishing) await encoder.abort();
+        if (!finishing) await encoder.abort();
     }
 }
 
@@ -255,6 +323,7 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
     const encoded = await encodeFrames(ctx, video);
     if (!encoded) return;
     const { captured, encodeMs } = encoded;
+    const early = rb.report.render as Record<string, unknown>;
     ws.writeFile(
         ws.path('.flipbook', 'frame-hashes.json'),
         `${JSON.stringify({ digest: captured.digest, hashes: captured.hashes }, null, 2)}\n`,
@@ -349,8 +418,10 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
     }
     const verifyMs = Date.now() - verifyStart;
     rb.report.render = {
+        ...early,
         frames: timeline.frameCount,
         fps: timeline.fps,
+        pages: captured.pages,
         digest: captured.digest,
         captureMs: captured.captureMs,
         encodeMs,

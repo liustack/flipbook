@@ -81,6 +81,38 @@ export async function openPage(
     }
 }
 
+/**
+ * Where one render worker opens its pages, one after another. Pages in one
+ * browser share its screenshot pipeline, so parallel workers each get their
+ * own browser: worker 0 uses the session's browser, the others launch one on
+ * first use and close it with the slot. In single-process mode every page
+ * already gets a browser of its own.
+ */
+export interface PageSlot {
+    open(
+        options: Omit<OpenOptions, 'browser' | 'onClose'>,
+    ): ReturnType<typeof CompositionPage.open>;
+    close(): Promise<void>;
+}
+
+export function pageSlot(session: Session, worker: number): PageSlot {
+    if (session.mode === 'single-process' || worker === 0) {
+        return { open: (options) => openPage(session, options), close: async () => undefined };
+    }
+    let own: Browser | null = null;
+    return {
+        async open(options) {
+            own ??= (await launchBrowser(session.shell)).browser;
+            return CompositionPage.open({ ...options, browser: own });
+        },
+        async close() {
+            const browser = own;
+            own = null;
+            await browser?.close().catch(() => undefined);
+        },
+    };
+}
+
 /** Resolve and validate the composition directory argument. */
 export function compositionDir(input: string): string {
     const dir = path.resolve(input);

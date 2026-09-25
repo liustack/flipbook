@@ -44,7 +44,22 @@ read_when:
 | `stopReason` | string | `stop` 为 true 时说明卡在哪 |
 | `timing` | object | `startedAt`、`durationMs` |
 
-各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同。
+各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`、`parallel`、`pages`，见「并行渲染」一节），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同。
+
+### 并行渲染
+
+render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，帧按顺序送进同一个 ffmpeg。每帧只由 t 决定，所以哪一页画哪一帧不改变像素，逐帧哈希和单页一致。
+
+| 字段 | 含义 |
+|---|---|
+| `render.parallel.jobs` | 实际用了几页 |
+| `render.parallel.requested` | `--jobs` 的值，没给是 `auto` |
+| `render.parallel.planned` | 按下面三个上限算出的页数，或 `--jobs` 的值 |
+| `render.parallel.limits` | `cpu` 是 CPU 核数减一，`memory` 是机器内存的一半除以每页的估算（300 MB 加 24 份输出帧大小），`frames` 是每 48 帧一页 |
+| `render.parallel.reason` | 本该多页却只用了一页时的原因 |
+| `render.pages.opened` | 整个渲染开过几个页面 |
+
+多页的前提是这个合成最近一次 check 退 0：读 `.flipbook/reports/check.json`，合成文件哈希、flipbook 版本、Chromium 构建号都要和这次 render 相同。否则只用一页，`reason` 是 `no check report for this composition`、`the saved check report is not valid JSON`、`the last check ran on other files`、`the last check ran on another flipbook version`、`the last check ran on another Chromium` 或 `the last check did not pass`。直接调 `runCheck` 不存报告，要并行得自己 `saveReport`。
 
 ## 输出目录
 

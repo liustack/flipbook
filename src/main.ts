@@ -223,14 +223,29 @@ program
     .description('Render the composition to out/video.mp4 and verify it')
     .argument('<dir>', 'composition directory')
     .option('--seek-timeout <ms>', 'time limit for one seek', '10000')
-    .action(async (dir: string, options: { seekTimeout: string }) => {
-        await execute('render', dir, () =>
-            runRender({
-                dir,
-                seekTimeoutMs: parseInteger(options.seekTimeout, '--seek-timeout', 100, 600_000),
-            }),
-        );
-    });
+    .option('--jobs <n>', 'pages rendering at once (default: CPU cores - 1, within memory)')
+    .action(
+        async (
+            dir: string,
+            options: {
+                seekTimeout: string;
+                jobs?: string;
+            },
+        ) => {
+            await execute('render', dir, () =>
+                runRender({
+                    dir,
+                    seekTimeoutMs: parseInteger(
+                        options.seekTimeout,
+                        '--seek-timeout',
+                        100,
+                        600_000,
+                    ),
+                    jobs: options.jobs ? parseInteger(options.jobs, '--jobs', 1, 64) : undefined,
+                }),
+            );
+        },
+    );
 
 try {
     await program.parseAsync(process.argv, { from: 'node' });

@@ -44,7 +44,22 @@ For `sandbox-blocked` and `tmp-unwritable`, `detail.signature` names the row of 
 | `stopReason` | string | When `stop` is true, where it is stuck |
 | `timing` | object | `startedAt`, `durationMs` |
 
-Each command adds a field named after itself: `check` (`seed`, the sampled frames, the order of the two seek passes, the evidence directory, `contrastSkipped` for canvas text whose contrast was not measured), `snapshot` (`layout`, `tiles` with each tile's frame, time and scene, `zooms`), `render` (`frames`, `fps`, `digest` summarizing the raw frame hashes, `captureMs`, `encodeMs`, `verifyMs`, `totalMs`, `captureFps`, `probe`, `audio`, `contactSheetTiles`), `audio` (see [Audio](#audio)). `render` also has `metadata`, the same content written into the mp4 comment tag.
+Each command adds a field named after itself: `check` (`seed`, the sampled frames, the order of the two seek passes, the evidence directory, `contrastSkipped` for canvas text whose contrast was not measured), `snapshot` (`layout`, `tiles` with each tile's frame, time and scene, `zooms`), `render` (`frames`, `fps`, `digest` summarizing the raw frame hashes, `captureMs`, `encodeMs`, `verifyMs`, `totalMs`, `captureFps`, `probe`, `audio`, `contactSheetTiles`, `parallel`, `pages`, see [Parallel rendering](#parallel-rendering)), `audio` (see [Audio](#audio)). `render` also has `metadata`, the same content written into the mp4 comment tag.
+
+### Parallel rendering
+
+render opens several browsers with one page each. Whichever page is free takes the next frame, and frames go into one ffmpeg in order. Every frame depends only on t, so which page draws which frame does not change the pixels, and the frame hashes match a single-page render.
+
+| Field | Meaning |
+|---|---|
+| `render.parallel.jobs` | How many pages were used |
+| `render.parallel.requested` | The value of `--jobs`, `auto` when not given |
+| `render.parallel.planned` | The page count worked out from the limits in the next row, or the value of `--jobs` |
+| `render.parallel.limits` | `cpu` is the CPU core count minus one, `memory` is half the machine's memory divided by the estimate per page (300 MB plus 24 output frames), `frames` is one page per 48 frames |
+| `render.parallel.reason` | Why only one page was used when more were planned |
+| `render.pages.opened` | How many pages the whole render opened |
+
+More than one page requires that this composition's last check exited 0: render reads `.flipbook/reports/check.json`, whose composition hash, flipbook version and Chromium build must all match this render. Otherwise render uses one page, with `reason` set to `no check report for this composition`, `the saved check report is not valid JSON`, `the last check ran on other files`, `the last check ran on another flipbook version`, `the last check ran on another Chromium` or `the last check did not pass`. Calling `runCheck` directly saves no report: call `saveReport` yourself to render in parallel.
 
 ## Output directory
 
