@@ -1,66 +1,17 @@
+// Render output on small fixtures: color tags and values through yuv420p bt709,
+// and the user's own music lined up with the picture.
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { runCheck } from '../../src/cli/check.ts';
-import { runRender } from '../../src/cli/render.ts';
-import { runSnapshot } from '../../src/cli/snapshot.ts';
-import { run } from '../../src/engine/proc.ts';
-import { probeVideo } from '../../src/engine/verify.ts';
-import { closeSession, session } from '../browser.ts';
-import { cleanTemps, copyFixture, repoRoot } from '../helpers.ts';
+import { runRender } from '../src/cli/render.ts';
+import { run } from '../src/engine/proc.ts';
+import { probeVideo } from '../src/engine/verify.ts';
+import { closeSession, session } from './browser.ts';
+import { cleanTemps, copyFixture } from './helpers.ts';
 
 afterAll(async () => {
     await closeSession();
     cleanTemps();
-});
-
-describe('examples/hello', () => {
-    it('passes check, snapshot and render and matches expected.json', async () => {
-        const expected = JSON.parse(
-            fs.readFileSync(path.join(repoRoot, 'examples/hello/expected.json'), 'utf-8'),
-        );
-        const dir = copyFixture('hello', 'examples');
-        const s = await session();
-        const checked = await runCheck({ dir, session: s, recordAttempts: false });
-        expect(checked.failures).toEqual([]);
-        expect(checked.warnings).toEqual([]);
-        const snap = await runSnapshot({ dir, session: s });
-        expect(snap.failures).toEqual([]);
-        expect(fs.existsSync(snap.artifacts.contactSheet)).toBe(true);
-        const rendered = await runRender({ dir, session: s, recordAttempts: false });
-        expect(rendered.failures).toEqual([]);
-        const video = rendered.artifacts.video;
-        expect(fs.existsSync(video)).toBe(true);
-        const probe = await probeVideo(s.ffmpeg.ffprobe, video);
-        expect(probe.frames).toBe(expected.frames);
-        expect(probe.durationSec).toBeCloseTo(expected.durationSec, 2);
-        expect([probe.width, probe.height]).toEqual([expected.width, expected.height]);
-        const comment = JSON.parse(probe.comment ?? '{}');
-        expect(comment.flipbook).toBe(rendered.flipbook.version);
-        expect(comment.chromiumRevision).toBe(rendered.environment.chromium?.revision);
-        expect(comment.composition).toBe(rendered.composition?.hash);
-    });
-});
-
-describe('determinism', () => {
-    it('two independent renders give identical raw frames', async () => {
-        const dir = copyFixture('hello', 'examples');
-        const first = await runRender({ dir, recordAttempts: false });
-        const firstHashes = JSON.parse(
-            fs.readFileSync(path.join(dir, '.flipbook', 'frame-hashes.json'), 'utf-8'),
-        );
-        const second = await runRender({ dir, recordAttempts: false });
-        const secondHashes = JSON.parse(
-            fs.readFileSync(path.join(dir, '.flipbook', 'frame-hashes.json'), 'utf-8'),
-        );
-        expect(first.failures).toEqual([]);
-        expect(second.failures).toEqual([]);
-        expect(firstHashes.hashes).toHaveLength(120);
-        expect(secondHashes.hashes).toEqual(firstHashes.hashes);
-        expect((second.render as { digest: string }).digest).toBe(
-            (first.render as { digest: string }).digest,
-        );
-    });
 });
 
 describe('color', () => {

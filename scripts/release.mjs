@@ -4,8 +4,8 @@
 //   pnpm release 0.1.0        explicit version
 //   pnpm release patch        bump from the current one
 //
-// Runs every refusal check first, then the gates (lint, typecheck, both test
-// tiers, build), regenerates docs/samples, then bumps, stamps the launchers, turns
+// Runs every refusal check first, then the gates (lint, typecheck, the unit,
+// e2e and release test tiers, build), regenerates docs/samples, then bumps, stamps the launchers, turns
 // "## Unreleased" in CHANGELOG.md into "## <version> - <today>" (or dates the
 // version's own heading), commits, tags and pushes main and the tag
 // atomically. It does not publish: the pushed tag triggers
@@ -104,6 +104,7 @@ runLoud('pnpm', ['lint']);
 runLoud('pnpm', ['typecheck']);
 runLoud('pnpm', ['test']);
 runLoud('pnpm', ['test:e2e']);
+runLoud('pnpm', ['test:release']);
 runLoud('pnpm', ['build']);
 runLoud('node', ['scripts/samples.mjs']);
 

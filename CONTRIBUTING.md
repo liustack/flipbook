@@ -24,7 +24,8 @@ pnpm install
 pnpm lint        # Biome
 pnpm typecheck   # tsc --noEmit
 pnpm test        # unit and quick engine tests, builds first, under a minute
-pnpm test:e2e    # whole compositions through the CLI: bad-film corpus, reference snippets, example renders, two-render hash comparisons
+pnpm test:e2e    # bad-film corpus, reference snippets, every example's check and frame digest, no example videos
+pnpm test:release  # release gate: full renders of a few examples, two renders compared frame by frame
 pnpm build       # tsup, writes dist/main.js and dist/runtime/
 ```
 
@@ -32,7 +33,7 @@ Needs Node 22.19 or newer and ffmpeg with libx264. The first check or render ins
 
 ## Tests
 
-- Tests live in `test/`. Tests that run the examples, the bad-film corpus or the reference snippets, or that render one composition twice to compare hashes, live in `test/e2e/`. The bad-film corpus lives in `test/fixtures/bad/<kind>/`, with at least one film for every kind of breakage, and every one must be caught.
+- Tests live in `test/`. The bad-film corpus, the reference snippets and each example's check and frame digest live in `test/e2e/`, full renders of examples in `test/release/`. When an example's picture changes on purpose, run `pnpm examples:baseline` on macOS arm64 to record its digest again. The bad-film corpus lives in `test/fixtures/bad/<kind>/`, with at least one film for every kind of breakage, and every one must be caught.
 - A commit with new behavior or a bug fix comes with a test.
 - Unit tests do not go online. Tests that use the browser copy their fixture into a temp directory first, and never write `.flipbook/` or `out/` into the repository.
 

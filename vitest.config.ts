@@ -2,11 +2,14 @@ import { availableParallelism } from 'os';
 import { defineConfig } from 'vitest/config';
 import pkg from './package.json' with { type: 'json' };
 
-// Two tiers. `unit` (pnpm test) is unit tests and the quick engine tests, under
-// a minute on a laptop. `e2e` (pnpm test:e2e) is test/e2e/: whole compositions
-// through check and render, the bad-film corpus, the reference snippets, the
-// examples and the two-render hash comparisons. CI and the release gate run both.
+// Three tiers. `unit` (pnpm test): unit tests and quick engine tests on small
+// fixtures, under a minute. `e2e` (pnpm test:e2e, test/e2e/): the bad-film
+// corpus, the reference snippets, and every example through check plus its
+// snapshot digest, with no video encoded. CI runs both. `release`
+// (pnpm test:release, test/release/): full renders of a few examples, compared
+// frame by frame across two renders. Only scripts/release.mjs runs it.
 const E2E = 'test/e2e/**/*.test.ts';
+const RELEASE = 'test/release/**/*.test.ts';
 
 export default defineConfig({
     define: { __APP_VERSION__: JSON.stringify(pkg.version) },
@@ -35,12 +38,16 @@ export default defineConfig({
                 test: {
                     name: 'unit',
                     include: ['test/**/*.test.ts', 'scripts/**/*.test.mjs'],
-                    exclude: [E2E],
+                    exclude: [E2E, RELEASE],
                 },
             },
             {
                 extends: true,
                 test: { name: 'e2e', include: [E2E] },
+            },
+            {
+                extends: true,
+                test: { name: 'release', include: [RELEASE] },
             },
         ],
     },

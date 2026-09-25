@@ -24,7 +24,8 @@ pnpm install
 pnpm lint        # Biome
 pnpm typecheck   # tsc --noEmit
 pnpm test        # 单元和快的引擎测试，会先 build，一分钟内
-pnpm test:e2e    # 整条合成过 CLI：坏片语料、reference 片段、样例渲染、两次渲染比哈希
+pnpm test:e2e    # 坏片语料、reference 片段、每个样例的 check 和帧摘要，不渲样例成片
+pnpm test:release  # 发版门禁：几条样例完整渲染，两次渲染逐帧比哈希
 pnpm build       # tsup，产出 dist/main.js 和 dist/runtime/
 ```
 
@@ -32,7 +33,7 @@ pnpm build       # tsup，产出 dist/main.js 和 dist/runtime/
 
 ## 测试
 
-- 测试放 `test/`。跑样例、坏片语料、reference 片段，或者同一个合成渲两次比哈希的，放 `test/e2e/`。坏片语料放 `test/fixtures/bad/<类型>/`，每类坏法至少一条，必须被拦下。
+- 测试放 `test/`。坏片语料、reference 片段、样例的 check 和帧摘要放 `test/e2e/`，样例的完整渲染放 `test/release/`。样例画面有意改了，在 macOS arm64 上跑 `pnpm examples:baseline` 重出摘要。坏片语料放 `test/fixtures/bad/<类型>/`，每类坏法至少一条，必须被拦下。
 - 新行为或修 bug 的提交带上测试。
 - 单元测试不联网。用到浏览器的测试把 fixture 复制到临时目录再跑，不往仓库里写 `.flipbook/` 和 `out/`。
 

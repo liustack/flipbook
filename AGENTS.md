@@ -43,20 +43,25 @@ docs/samples/      reference 引用的样张和它们的源码，只在仓库里
 examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro、long-scroll（三分钟长片），每个例子一份源码加 expected.json，不提交 mp4
 eval/              评测用例、models.json、run.mjs，证据写到 eval/results/（不入库）
 test/              vitest 快档，坏片语料在 test/fixtures/bad/
-test/e2e/          vitest 端到端档：样例、坏片语料、reference 片段过 check 和 render，两次渲染比哈希
+test/e2e/          vitest 端到端档：坏片语料、reference 片段、每个样例的 check 和帧摘要
+test/release/      vitest 发版档：hello、eggs-five/five、long-scroll 的完整渲染
 ```
 
 ## 验证
 
 - `pnpm lint && pnpm typecheck && pnpm test && pnpm build`，全部通过才算完成。`pnpm test` 会先构建。
-- 测试分两档。`pnpm test` 是单元测试和快的引擎测试，本机一分钟内跑完，改代码时随手跑。`pnpm test:e2e` 跑 `test/e2e/`：坏片语料过 check 和 render、reference 片段过 check、样例 check 加渲染、两次渲染比原始帧哈希，本机约 8 分钟，CI（main 和 PR）和 `scripts/release.mjs` 的门禁两档都跑。本地改了引擎、运行时库、类型码或样例，推送前自己跑一遍 `pnpm test:e2e`。
-- 新测试按跑的内容分档：跑 `examples/` 的样例、`test/fixtures/bad/` 的坏片语料、references 的片段，或者同一个合成渲两次比哈希的，放 `test/e2e/`。其余放 `test/`，包括拿小 fixture 过一次 check 或 render 的引擎测试，这类单条要几秒内跑完：画面小、帧数少、期限短，别等满 60 秒的 ready 期限。
+- 测试分三档。CI（main 和 PR）跑前两档，`scripts/release.mjs` 的门禁三档都跑。
+  - `pnpm test`（`test/`）：单元测试和拿小 fixture 跑的引擎测试，本机一分钟内，改代码时随手跑。
+  - `pnpm test:e2e`（`test/e2e/`）：坏片语料过 check 和 render，reference 片段过 check，每个样例过 check 再比 snapshot 帧摘要，不渲样例成片，本机约一分钟。本地改了引擎、运行时库、类型码或样例，推送前跑一遍。
+  - `pnpm test:release`（`test/release/`）：hello（纯纸底）和 eggs-five/five（纹理纸底）完整渲染、对 expected.json、另开浏览器再渲一遍逐帧比哈希，long-scroll 渲一遍核帧数和时长，本机约三分半。其他样例的成片由 release.yml 渲成 Release 附件，不在门禁里比。
+- 样例帧摘要只在 macOS arm64 上比（本机和 CI 的两列 macOS），Linux 和 Windows 列只跑样例的 check。摘要记在各样例 `expected.json` 的 `snapshot` 里，是 snapshot 那组帧（每场中间一帧加 12 个等距帧）的截图哈希汇总，由 `pnpm examples:baseline` 在 macOS arm64 上生成。摘要对不上时先看画面是不是有意改的，是就重出，不是就查引擎。
+- 新测试按跑的内容分档：样例的完整渲染放 `test/release/`。坏片语料、reference 片段、样例的 check 和摘要放 `test/e2e/`。其余放 `test/`，包括拿小 fixture 过一次 check 或 render 的引擎测试，这类单条要几秒内跑完：画面小、帧数少、期限短，别等满 60 秒的 ready 期限。
 - 用到浏览器的测试把 fixture 复制到临时目录再跑。首次运行需要联网装 Chromium 和字体，写的是用户缓存目录。
 - 坏片语料每类至少一条，新增检查时先加一条会被拦下的坏片。
 - `skills/flipbook/references/` 里标了 `<!-- check: ... -->` 的代码片段由 `test/e2e/references.test.ts` 真跑 check。`troubleshooting.md` 从 `src/cli/codes.ts` 生成，改了类型码跑 `UPDATE_REFERENCES=1 pnpm test test/skillText.test.ts`。
 - 评测花真实额度，按 docs/eval.md 本地跑，CI 只跑 `--dry-run`。
 - 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。然后在 macOS arm64 上跑 `pnpm examples:baseline` 重出样例的帧摘要（写进各样例的 `expected.json`），和升级放同一个提交。改了样例的画面也跑它。
-- 确定性只在同机同版本比原始帧哈希，跨机器不比。
+- 两次渲染比原始帧哈希只在同机同版本做。样例帧摘要按平台记，只在 macOS arm64 上比。
 
 ## 文档
 
