@@ -9,6 +9,7 @@ import { runStockFetch, runStockSearch, type StockDeps } from '../src/cli/stock.
 import { download, type HttpGet } from '../src/stock/download.ts';
 import { imageInfo } from '../src/stock/image.ts';
 import { redactSecrets } from '../src/stock/net.ts';
+import { servedLongEdge } from '../src/stock/providers.ts';
 import { audioFormat } from '../src/stock/sound.ts';
 import { cleanTemps, codes, runCli, tempDir, warningCodes } from './helpers.ts';
 
@@ -65,7 +66,7 @@ const OPENVERSE_RESULTS = {
         {
             id: 'ov-1',
             title: 'Eggs of British birds',
-            url: 'https://img.example.org/ov-1.png',
+            url: 'https://live.staticflickr.com/6013/6012000493_ced35d5e50_b.jpg',
             foreign_landing_url: 'https://www.flickr.com/photos/bhl/1',
             creator: 'BioDivLibrary',
             license: 'pdm',
@@ -161,6 +162,25 @@ const openverseOnly = () =>
         },
     );
 
+describe('servedLongEdge', () => {
+    it('knows the previews some collections hand out in place of the original', () => {
+        expect(
+            servedLongEdge('https://live.staticflickr.com/6013/6012000493_ced35d5e50_b.jpg'),
+        ).toBe(1024);
+        expect(servedLongEdge('https://live.staticflickr.com/1/2_abc_z.jpg')).toBe(640);
+        expect(servedLongEdge('https://live.staticflickr.com/1/2_abc_c.jpg')).toBe(800);
+        expect(
+            servedLongEdge('https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXM.jpg'),
+        ).toBe(1024);
+        expect(
+            servedLongEdge('https://upload.wikimedia.org/wikipedia/commons/6/60/Horse.jpg'),
+        ).toBeNull();
+        expect(
+            servedLongEdge('https://images.metmuseum.org/CRDImages/eg/original/x.jpg'),
+        ).toBeNull();
+    });
+});
+
 describe('stock search', () => {
     it('asks Openverse for cc0 and pdm only when no key is set, and drops other licenses', async () => {
         const { deps, calls } = openverseOnly();
@@ -179,6 +199,15 @@ describe('stock search', () => {
         expect(stock.results.map((r) => [r.id, r.license, r.tile])).toEqual([
             ['openverse:ov-1', 'pdm', 1],
             ['openverse:ov-3', 'cc0', 2],
+        ]);
+        // The listed size is the original; a Flickr hit only downloads as its preview.
+        expect(
+            (stock.results as unknown as { width: number; servedEdge: number | null }[]).map(
+                (r) => [r.width, r.servedEdge],
+            ),
+        ).toEqual([
+            [1200, 1024],
+            [600, null],
         ]);
         expect(stock.providers).toEqual([
             { provider: 'pexels', status: 'no-key' },
@@ -393,7 +422,7 @@ describe('stock fetch', () => {
             id: 'openverse:ov-1',
             title: 'Eggs of British birds',
             creator: 'BioDivLibrary',
-            url: 'https://img.example.org/ov-1.png',
+            url: 'https://live.staticflickr.com/6013/6012000493_ced35d5e50_b.jpg',
         });
     });
 

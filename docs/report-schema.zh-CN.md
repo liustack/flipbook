@@ -221,7 +221,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `stock.kind` | `image` |
 | `stock.query`、`stock.provider`、`stock.source` | 查询词和两个选项，没给是 `null` |
 | `stock.providers[]` | 按顺序每家的情况：`provider`、`status`（`ok` 带 `count`，`no-key`，或 `failed` 带 `message`） |
-| `stock.results[]` | `id`（`stock fetch` 收的写法，如 `openverse:<id>`）、`provider`、`title`、`width`、`height`、`license`、`licenseUrl`、`creator`、`source`（Openverse 的馆藏）、`pageUrl`、`thumbnail`，以及 `tile`：它在联系表上的位置，从 1 起，从左到右、从上到下，缩略图下不来时是 `null` |
+| `stock.results[]` | `id`（`stock fetch` 收的写法，如 `openverse:<id>`）、`provider`、`title`、`width`、`height`、`license`、`licenseUrl`、`creator`、`source`（Openverse 的馆藏）、`pageUrl`、`thumbnail`、`servedEdge`（馆藏只给预览图时 `stock fetch` 实际拿到的长边：Flickr（生物多样性遗产图书馆也在上面）和 rawpixel 是 1024，Pixabay 是 1280。`width`、`height` 仍是原图尺寸。下到的就是原图时为 `null`），以及 `tile`：它在联系表上的位置，从 1 起，从左到右、从上到下，缩略图下不来时是 `null` |
 | `stock.thumbnailFailures[]` | 有缩略图没下来时才有：`id`、`message` |
 | `artifacts.contactSheet` | `out/stock/contact-sheet.png`：所有缩略图按结果顺序各放进一个方格。没有结果时不给 |
 

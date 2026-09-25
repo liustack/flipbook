@@ -53,6 +53,37 @@ export interface StockHit {
     /** The page about the image on the service or museum site. */
     pageUrl: string;
     thumbnail: string | null;
+    /**
+     * Long edge of the file stock fetch will get, when the collection hands
+     * out a preview in place of the original (Flickr, rawpixel): width and
+     * height describe the original. Null when the download is the original.
+     */
+    servedEdge: number | null;
+}
+
+/** Flickr size suffixes a download URL can carry, and their long edge. */
+const FLICKR_SIZES: Record<string, number> = {
+    s: 75,
+    q: 150,
+    t: 100,
+    m: 240,
+    n: 320,
+    w: 400,
+    z: 640,
+    c: 800,
+    b: 1024,
+};
+
+/**
+ * The long edge of the image behind `url` when it is a known preview size
+ * rather than the original, from the address alone. Null otherwise.
+ */
+export function servedLongEdge(url: string): number | null {
+    const flickr = /staticflickr\.com\/.+_([a-z])\.(?:jpe?g|png|gif)$/i.exec(url);
+    if (flickr) return FLICKR_SIZES[flickr[1].toLowerCase()] ?? null;
+    const rawpixel = /images\.rawpixel\.com\/editor_(\d+)\//.exec(url);
+    if (rawpixel) return Number(rawpixel[1]);
+    return null;
 }
 
 /** A hit with the address of the full image. */
@@ -114,6 +145,7 @@ function pexelsHit(raw: unknown): StockImage | null {
         source: null,
         pageUrl: asString(photo.url) ?? `https://www.pexels.com/photo/${photoId}/`,
         thumbnail: asString(src.medium) ?? asString(src.small) ?? asString(src.tiny) ?? null,
+        servedEdge: null,
         url,
         fallbackUrl: asString(src.original) ? asString(src.large2x) : undefined,
     };
@@ -145,6 +177,9 @@ async function pexelsImage(photoId: string, key: string, net: Net): Promise<Stoc
 
 // ---------------------------------------------------------------- Pixabay
 
+/** Long edge of Pixabay's largeImageURL. */
+const PIXABAY_LARGE = 1280;
+
 function pixabayHit(raw: unknown): StockImage | null {
     const photo = asRecord(raw);
     if (!photo) return null;
@@ -163,6 +198,12 @@ function pixabayHit(raw: unknown): StockImage | null {
         source: null,
         pageUrl: asString(photo.pageURL) ?? `https://pixabay.com/photos/${photoId}/`,
         thumbnail: asString(photo.webformatURL) ?? asString(photo.previewURL) ?? null,
+        // largeImageURL is scaled to 1280 on the long edge; the original needs full API access.
+        servedEdge:
+            Math.max(asNumber(photo.imageWidth) ?? 0, asNumber(photo.imageHeight) ?? 0) >
+            PIXABAY_LARGE
+                ? PIXABAY_LARGE
+                : null,
         url,
     };
 }
@@ -277,6 +318,7 @@ function openverseHit(raw: unknown): StockImage | null {
         source: asString(image.source) ?? asString(image.provider) ?? null,
         pageUrl: asString(image.foreign_landing_url) ?? url,
         thumbnail: asString(image.thumbnail) ?? null,
+        servedEdge: servedLongEdge(url),
         url,
     };
 }

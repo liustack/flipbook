@@ -221,7 +221,7 @@ Images and sounds are downloaded only over HTTPS, from hosts that resolve to pub
 | `stock.kind` | `image` |
 | `stock.query`, `stock.provider`, `stock.source` | The query and the two options as given, `null` when not given |
 | `stock.providers[]` | Each service in order: `provider`, `status` (`ok` with `count`, `no-key`, or `failed` with `message`) |
-| `stock.results[]` | `id` (what `stock fetch` takes, such as `openverse:<id>`), `provider`, `title`, `width`, `height`, `license`, `licenseUrl`, `creator`, `source` (the Openverse collection), `pageUrl`, `thumbnail`, and `tile`: the result's place on the contact sheet, from 1, left to right and top to bottom, `null` when its thumbnail could not be downloaded |
+| `stock.results[]` | `id` (what `stock fetch` takes, such as `openverse:<id>`), `provider`, `title`, `width`, `height`, `license`, `licenseUrl`, `creator`, `source` (the Openverse collection), `pageUrl`, `thumbnail`, `servedEdge` (the long edge of the file `stock fetch` will get when the collection only hands out a preview: 1024 for Flickr, the Biodiversity Heritage Library among them, and rawpixel, 1280 for Pixabay; `width` and `height` still describe the original; `null` when the download is the original), and `tile`: the result's place on the contact sheet, from 1, left to right and top to bottom, `null` when its thumbnail could not be downloaded |
 | `stock.thumbnailFailures[]` | Present when some thumbnails failed: `id`, `message` |
 | `artifacts.contactSheet` | `out/stock/contact-sheet.png`: every thumbnail fitted into a square tile, in result order. Absent when there are no results |
 
