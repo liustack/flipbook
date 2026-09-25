@@ -1,0 +1,5 @@
+# Resolve only versions published at least 3 days (4320 minutes) ago.
+# Dependabot passes its cooldown to pnpm as minimumReleaseAge and pnpm then
+# checks every lockfile entry, so both use the same window: a version a local
+# install locks is never too young for a Dependabot update.
+minimumReleaseAge: 4320
