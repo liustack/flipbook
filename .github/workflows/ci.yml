@@ -22,7 +22,7 @@ jobs:
       # win32 exits 78 unless this is set. Only read on Windows.
       FLIPBOOK_ALLOW_WIN32: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -103,7 +103,7 @@ jobs:
     # installed globally and the skill is copied from the checkout.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 10
