@@ -32,7 +32,7 @@ Needs Node 22.19 or newer and ffmpeg with libx264. The first check or render ins
 
 ## Tests
 
-- Tests live in `test/`. Tests that send a whole composition directory through check, snapshot or render live in `test/e2e/`. The bad-film corpus lives in `test/fixtures/bad/<kind>/`, with at least one film for every kind of breakage, and every one must be caught.
+- Tests live in `test/`. Tests that run the examples, the bad-film corpus or the reference snippets, or that render one composition twice to compare hashes, live in `test/e2e/`. The bad-film corpus lives in `test/fixtures/bad/<kind>/`, with at least one film for every kind of breakage, and every one must be caught.
 - A commit with new behavior or a bug fix comes with a test.
 - Unit tests do not go online. Tests that use the browser copy their fixture into a temp directory first, and never write `.flipbook/` or `out/` into the repository.
 
