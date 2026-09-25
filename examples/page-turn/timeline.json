@@ -12,16 +12,10 @@
         { "id": "title", "bars": 2 }
     ],
     "cues": [
-        { "id": "cover", "scene": "open", "beat": 3, "kind": "sfx", "sfx": "paper" },
-        { "id": "turn", "scene": "title", "beat": 1.5, "kind": "sfx", "sfx": "paper" },
+        { "id": "cover", "scene": "open", "beat": 3, "kind": "sfx", "file": "assets/page-turn.mp3" },
+        { "id": "turn", "scene": "title", "beat": 1.5, "kind": "sfx", "file": "assets/page-turn.mp3" },
         { "id": "title", "scene": "title", "beat": 2, "kind": "text", "text": "月有阴晴圆缺", "settleBeats": 1.5 },
         { "id": "credit", "scene": "title", "beat": 3, "kind": "text", "text": "苏轼《水调歌头》", "settleBeats": 1 }
     ],
-    "audio": {
-        "mode": "preset",
-        "preset": "pluck",
-        "key": "D",
-        "progression": 1,
-        "dynamics": { "open": "soft", "flip": "medium", "title": "soft" }
-    }
+    "audio": { "mode": "file", "file": "assets/music-box.mp3", "fadeOut": 2.5 }
 }
