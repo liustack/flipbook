@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### 以图为底和找图
+
+公有领域的博物图鉴、标本照、古地图能当画面底子：agent 自己搜图、看缩略图挑、下到合成目录，运行时把图抠出来做成纸贴纸。
+
+- **`stock search`**：按 Pexels、Pixabay、Openverse 的顺序找，前两家配了 `PEXELS_API_KEY`、`PIXABAY_API_KEY` 才问，Openverse 不要 key，只要 cc0 和 pdm。`--source` 限定 Openverse 的一个馆藏（`bio_diversity`、`wikimedia`、`met` 等），`--provider` 只问一家。缩略图拼成 `out/stock/contact-sheet.png`，每条结果带 `tile` 序号，让模型看图挑，不自动取第一条。
+- **`stock fetch`**：选中的图存成 `assets/<name>.<ext>`，来源、许可、作者写进 `assets/SOURCES.json`，和品牌字体用同一个文件，原有条目保留。同名同图再下直接跳过，长边超过 3200 像素的图和 TIFF 用 ffmpeg 缩小或转换。
+- **下载防护**：只走 HTTPS，逐跳核对重定向，拒回环、内网、链路本地等地址，连接钉在核对过的地址上。代理工具 fake-IP 模式用的 198.18.0.0/15 放行。key 不进报告、消息和 SOURCES.json。
+- **`photo()`**：透明图直接用，浅色纸底图按和纸色的距离抠，只去掉连到画面边缘的纸，主体里的浅色保留，碎点和图注按面积丢掉。默认做成贴纸：按透明度外扩的纸色粗边、带种子的微倾、柔和投影、纸纹。`crop` 从一整张图版里取一个标本，`size` 是抠出主体的长边，`draw()` 的 `lift` 让影子随抬起变远变淡。全部在 setup 里算一次，同一张图每次像素一样，不加依赖。
+- **类型码**：`stock-no-results`（警告）、`stock-rejected`、`asset-conflict`，环境类 `stock-key-missing`、`stock-unreachable`。
+- **样片**：`examples/specimen-board/`，四张 Openverse 上的公有领域图版（生物多样性遗产图书馆的甲虫和鸟翼蝶、一张西班牙图书馆的贝壳图版）抠成贴纸，一拍落一张到格子纸上，最后出「博物笔记」。check 无警告，成片验收通过。
+- **skill**：新增 `references/photo.md`（查询用两到四个具体英文词、看联系表挑、找不到就不用图并告诉用户、不从别处下图、`photo()` 的选项），片段真跑 check。SKILL.md 加 stock 命令，图片只经 `stock fetch` 或用户提供。
+
 ## 0.5.0 - 2026-09-25
 
 ### 构图模板和品牌
