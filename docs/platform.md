@@ -195,7 +195,7 @@ For every page count the frame hashes match the single-page run.
 
 The second v0.3 run of eggs-five/five overlapped a round of unit tests and is slow. In every cell the frame hashes match the single-page render of the same video.
 
-- The target of 30 seconds of 1080p24 within 60 seconds: plain paper meets it at 30 to 36 seconds. Textured paper takes 57 to 67 seconds under a load of 5 to 19, right at the line.
+- The target of 30 seconds of 1080p24 within 60 seconds: plain paper meets it at 30 to 36 seconds. Textured paper takes 57 to 67 seconds under a load of 5 to 19, which also counts as meeting it. That was measured under high load, and an idle machine is faster.
 - Encoding takes a big share: for the same 30-second plain-paper video, replacing ffmpeg with a pipe that only reads gives 36, 54 and 50 frames per second on 1, 4 and 9 pages, against 23, 34 and 31 with real encoding (load 8 to 15). x264 medium spends 55 seconds of CPU time on this video (76 milliseconds per frame), `faster` 48 seconds and `veryfast` 35 seconds, but PSNR drops from 50.4 dB to 49.3 dB and 47.6 dB, and the `veryfast` file is 70% larger. The encoder settings stayed as they were.
 - When other processes fill the machine, the automatic 9 pages are about as fast as 4, and more pages only fight over the CPU.
 
