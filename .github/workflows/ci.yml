@@ -90,7 +90,7 @@ jobs:
           --outputFile.junit=vitest-windows.xml
       - name: Keep the Windows test report
         if: always() && runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-tests-node-${{ matrix.node-version }}
           path: vitest-windows.xml
@@ -147,7 +147,7 @@ jobs:
           bash ~/.claude/skills/flipbook/scripts/run.sh render "$HELLO" > render.json
           bash ~/.claude/skills/flipbook/scripts/run.sh doctor
           ffprobe -v error -show_entries stream=width,height,pix_fmt,nb_frames:format=duration -of compact "$HELLO/out/video.mp4"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: install-smoke
