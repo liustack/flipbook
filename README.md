@@ -56,7 +56,7 @@ It is for anyone who wants short animations from AI: intros, data animations, co
 
 It fixes three things that go wrong with AI-written web animation: every recording comes out different, Chinese characters drop out, and a blank video gets reported as a success.
 
-> 0.x, so interfaces may change. The default look is paper: a paper ground with grain, handmade materials such as pencil hatching and halftone, handwriting drawn on canvas, and templates that build a glyph out of objects. The default sound is preset music: three sets (pluck, marimba, soft pad) and four sound effects, normalized to -14 LUFS. You can go silent or bring your own music. Chinese text renders with no missing glyphs.
+> 0.x, so interfaces may change. The default look is paper: a paper ground with grain, handmade materials such as pencil hatching and halftone, handwriting drawn on canvas, and templates that build a glyph out of objects. The default sound is a score the agent writes for each film, played by synthesized instruments (piano, strings, flute, music box and more), plus four sound effects, normalized to -14 LUFS. Three quick presets (pluck, marimba, soft pad) are there for plain clips. You can go silent or bring your own music. Chinese text renders with no missing glyphs.
 
 ## Install
 

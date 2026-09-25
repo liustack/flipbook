@@ -62,19 +62,24 @@ Any other field is an error, so a typo never passes silently.
 | `kind` | yes | `text`, `sfx`, `mark` | |
 | `text` | for `text` | the on-screen text | check verifies every character has a glyph |
 | `settleBeats` | no | 0 to 64 | beats until the text is fully in, default 0 |
-| `sfx` | for `sfx` | `paper`, `drop`, `ding`, `sweep` | the effect; its loudest moment lands on the cue's frame |
+| `sfx` | for `sfx`, unless `file` | `paper`, `drop`, `ding`, `sweep` | the effect; its loudest moment lands on the cue's frame |
+| `file` | for `sfx`, instead of `sfx` | a short audio file inside the composition, listed in `assets/SOURCES.json` | a found effect; its loudest moment lands on the cue's frame |
 
 `audio`:
 
 | Field | Used with | Values | Meaning |
 |---|---|---|---|
-| `mode` | always, required | `preset`, `file`, `none` | where the music comes from |
+| `mode` | always, required | `preset`, `score`, `file`, `none` | where the music comes from |
 | `preset` | `preset`, required | `pluck`, `marimba`, `pad` | the synthesized music |
 | `key` | any mode | `A` to `G`, optional `#` or `b`, `m` for minor, default `C` | key of the music, also tunes `ding` |
 | `progression` | `preset` | integer 0 to 5, default 0 | chord progression, one chord per bar |
 | `dynamics` | `preset` | scene id to `rest`, `soft`, `medium`, `full` | level per scene, default `medium` |
-| `file` | `file`, required | a regular file inside the composition: wav, mp3, flac, ogg, aac, m4a, aiff or webm, not a playlist | the user's music |
+| `score` | `score`, required | parts, and per scene the chords, patterns, notes and drum steps | music written for this video, see `references/audio.md` |
+| `file` | `file`, required | a regular file inside the composition: wav, mp3, flac, ogg, aac, m4a, aiff or webm, not a playlist | the music file: the user's own or one `stock fetch` saved |
 | `bpmOffset` | `file` | 0 to 60, default 0 | the second in the file where beat 1 falls |
+| `offset` | `file` | 0 to 3600 | the second of the file the video starts at, for music whose beat the timeline does not follow. Not together with `bpmOffset` |
+| `fadeIn` | `file` | 0 to 30, default 0 | seconds of fade in |
+| `fadeOut` | `file` | 0 to 30, default 1 | seconds of fade out |
 
 A field written under a mode that does not use it is an error. `none` renders only the `sfx` cues, or a silent video when there are none. Read `references/audio.md` before choosing music or placing effects.
 

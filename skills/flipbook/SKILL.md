@@ -73,8 +73,8 @@ Defaults:
 | frame rate | 24 fps |
 | duration | about 30 s, within 5% of what the user asked, at most 180 s |
 | look | the paper skin: `paperLayer()` and `grainLayer()` from `references/paper.md`, dark ink, one or two accent colors, serif type |
-| music | preset `pluck` (`"audio": { "mode": "preset", "preset": "pluck" }`), silent only when the user asks |
-| found music or effects | when the user names an instrument or a piece the presets lack, or a real sound matters (a page turn, a pencil): `stock search --audio`, see `references/audio.md` |
+| music | a score written for this story (`"audio": { "mode": "score", ... }`, see `references/audio.md`) so each film gets its own tune. A preset such as `pluck` for a short, plain clip. Silent only when the user asks |
+| found music or effects | when the user names a recorded piece or an instrument the score lacks, or a real sound matters (a page turn, a pencil): `stock search --audio`, see `references/audio.md` |
 | the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
 | characters | none unless asked |
 | photos | none unless asked, or the film calls for real specimens, plates, micrographs or maps: `references/photo.md` |
@@ -103,7 +103,7 @@ Defaults:
 |---|---|
 | `references/rules.md` | before the first index.html, and when a determinism, text or layer code is unclear |
 | `references/timeline.md` | before the first timeline.json, and when matching a requested duration |
-| `references/audio.md` | before choosing the music, finding sounds or placing sound effects, and when an `audio-*` code appears |
+| `references/audio.md` | before choosing or writing the music, finding sounds or placing sound effects, and when an `audio-*` code appears |
 | `references/troubleshooting.md` | whenever check or render exits non-zero |
 | `references/paper.md` | before the first index.html, for the paper and grain layers of the default look |
 | `references/materials.md` | when a picture needs pencil lines, hatching, halftone, stipple or torn paper |

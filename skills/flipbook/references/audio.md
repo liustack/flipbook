@@ -1,6 +1,6 @@
 # Music and sound effects
 
-flipbook synthesizes the music and the sound effects from `timeline.json`, or plays recordings found with `stock search --audio`, mixes them under the picture and checks the result. You choose parameters and files. You never write audio code.
+flipbook synthesizes the music (a score you write or a preset) and the sound effects from `timeline.json`, or plays recordings found with `stock search --audio`, mixes them under the picture and checks the result. You choose parameters and files. You never write audio code.
 
 The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">`, a page turn fetched as `assets/page-turn.wav`, this `assets/SOURCES.json`:
 
@@ -46,42 +46,207 @@ and this timeline:
 
 | The user wants | Write |
 |---|---|
-| music (the default) | `"audio": { "mode": "preset", "preset": "pluck" }` |
-| a real recording: a music box, a cello, a named piece | `"audio": { "mode": "file", "file": "assets/minuet.ogg", "offset": 4, "fadeIn": 1, "fadeOut": 3 }` |
+| music (the default) | a score written for this story: `"audio": { "mode": "score", "score": { ... } }`, see [Write your own score](#write-your-own-score) |
+| quick, plain background music | `"audio": { "mode": "preset", "preset": "pluck" }` |
+| a real recording: a cello, a choir, a named piece | `"audio": { "mode": "file", "file": "assets/minuet.ogg", "offset": 4, "fadeIn": 1, "fadeOut": 3 }` |
 | their own track | `"audio": { "mode": "file", "file": "assets/song.mp3", "bpmOffset": 0.42 }` |
 | no music | `"audio": { "mode": "none" }` |
 
 `sfx` cues play in every mode. With `"mode": "none"` and no `sfx` cues the video is silent.
 
-## Presets or found sounds
+## Score, preset or found sound
 
-Use the presets unless something below applies. They follow the timeline's bpm, fit any length, change with each scene's dynamics and need no license.
+Write a score unless something below applies. A score follows the timeline's bpm and scenes, so every film gets its own tune and its phrases land on the cuts. It needs no license.
+
+Use a preset when the clip is short and plain, or the user just wants some background music: presets need no writing and fit any length.
 
 Find a recording with `stock search --audio` when:
 
-- the user names an instrument, a piece or a period the presets do not have: a music box, a minuet, a Satie piano piece, a Bach prelude
+- the user names a recorded piece or performance, or an instrument the score does not have: a Bach prelude as played, a Satie piano piece, a cello, a choir, an organ
 - the picture shows an action whose real sound matters: a page turning, a pencil scribbling, a typewriter, a stamp, rain on a window
-- the film runs past a minute or two and one preset would sound the same throughout
 
-Mixing is fine: preset music with found effects, or found music with the built-in effects. Found music does not follow the timeline's bpm, so cuts do not land on its beats. Pick the bpm for the picture as usual.
+Mixing is fine: a score or a preset with found effects, or found music with the built-in effects. Found music does not follow the timeline's bpm, so cuts do not land on its beats. Pick the bpm for the picture as usual.
+
+## Write your own score
+
+With `"mode": "score"` you write the music and flipbook plays it note for note with synthesized instruments. Every note sits on the timeline's beat grid, so a phrase that ends on beat 0 of a scene ends exactly when that scene cuts in.
+
+### Choose the mood first
+
+| Mood | Key | bpm | Instruments and patterns |
+|---|---|---|---|
+| warm, hopeful | major: `C`, `F`, `G` | 84 to 100 | `piano` `arpeggio`, `strings` `hold`, `flute` melody, `bass` `root` |
+| playful, light | major: `F`, `D`, `Bb` | 108 to 128 | `marimba` `broken`, `pluck` `offbeat`, `bass` `root-fifth`, `drums` kick, clap, shaker, a few `celesta` notes on top |
+| sad, nostalgic | minor: `Dm`, `Am`, `Em` | 60 to 76 | two `piano` parts (`root` and `arpeggio`), `strings` `hold`, `clarinet` melody, room `hall` |
+| mysterious, night | minor: `Em`, `Bm`, `F#m` | 64 to 80 | `musicbox` or `celesta` melody, `pad` `hold`, `harp` `arpeggio`, `sub` `root` |
+| ancient, poetic | minor or major | 60 to 84 | `harp` or `pluck` `broken`, `flute` melody on the five notes 1 2 3 5 6 of the major key (in D: D E F# A B), `strings` `hold` |
+| building, triumphant | minor turning major | 96 to 120 | `strings` `pulse`, `piano` `octaves` in the bass, `drums` kick on every beat in the last scene, level `full` |
+| clean product tour | major | 110 to 124 | `pluck` `offbeat`, `bass` `octaves`, `bells` accents, `drums` kick and hat |
+
+Keep one mood per film and move it with `level` and with parts entering and leaving: start with two parts, add the melody on the second scene, add drums at the peak, drop back to two parts at the end.
+
+### Shape
+
+```json
+"audio": {
+    "mode": "score",
+    "key": "G",
+    "score": {
+        "room": "room",
+        "instruments": { "keys": "piano", "lead": "flute", "low": "bass", "beat": "drums" },
+        "scenes": {
+            "<scene id>": {
+                "level": "soft",
+                "chords": ["G", "D/F#", "Em", "C"],
+                "play": {
+                    "keys": "arpeggio",
+                    "low": "root",
+                    "lead": ["D5 G5 B5:2", "A5:1.5 G5:0.5 F#5:2"],
+                    "beat": { "kick": "x...x...", "shaker": ".x.x.x.x" }
+                }
+            }
+        }
+    }
+}
+```
+
+- `instruments` names up to 8 parts and gives each an instrument, or `{ "instrument": "flute", "volume": 0.8, "pan": 0.2 }` (volume 0 to 2, pan -1 to 1). The same instrument can play two parts, such as a piano's left and right hand.
+- `scenes` gives each scene its music. A scene you leave out starts no new notes. `level` is `soft`, `medium` (default) or `full`.
+- `chords` has one entry per bar: `"Dm"`, `"Dm G7"` (two chords sharing the bar), `"Dm:3 G7:1"` (lengths in beats) or `"-"` (no chord). Symbols: a root `C` to `B` with `#` or `b`, then nothing, `m`, `7`, `m7`, `maj7`, `dim`, `aug`, `sus2`, `sus4`, `add9`, `6`, `m6`, `9` or `m9`, and an optional slash bass such as `C/E`.
+- `play` gives each part one of three things:
+  - a pattern name, which plays the scene's chords: `hold`, `pulse` (every beat), `offbeat` (every half beat after the beat), `arpeggio` (eighths up and down), `broken` (eighths low, top, middle, top), `strum` (start and middle of the bar), `root`, `root-fifth`, `octaves`. On `flute`, `clarinet`, `bass` and `sub` the chord patterns play the root.
+  - an array of bars of notes: words like `D5` (C4 is middle C), `F#4:0.5`, `Bb4:1.5`, `G4:1/3`, `-:2` (rest), `~` (hold the note before, also across the bar line) and `D4+F4+A4` (several notes at once). A word without `:length` lasts one beat. The lengths in a bar add up to `beatsPerBar`.
+  - for `drums`, pieces to step strings: `kick`, `snare`, `hat`, `shaker`, `knock`, `clap`, with `x` hit, `X` accent, `.` silent. `"x...x..."` is eighths in 4/4.
+- Lists shorter than the scene repeat: four chords cover an eight-bar scene, one drum string covers every bar.
+
+| Instrument | Sounds like | Range |
+|---|---|---|
+| `piano` | a soft piano | A0 to C8 |
+| `celesta` | small sweet bells | C4 to C8 |
+| `musicbox` | a music box | C4 to G7 |
+| `bells` | glockenspiel | G4 to C8 |
+| `marimba` | wooden mallets | A2 to C7 |
+| `pluck` | nylon guitar | E2 to C6 |
+| `harp` | harp | C1 to G7 |
+| `strings` | a string section, slow bow | C2 to C7 |
+| `pad` | a soft synth pad | C2 to C7 |
+| `flute` | flute, one note at a time | C4 to C7 |
+| `clarinet` | clarinet, one note at a time | D3 to G6 |
+| `bass` | plucked upright bass, one note at a time | E1 to C4 |
+| `sub` | deep sine bass, one note at a time | C1 to G3 |
+| `drums` | a soft kit | |
+
+### Write it in this order
+
+1. Fix the bpm and the scene bars for the picture first (`references/timeline.md`). The score never changes the length.
+2. Chords for each scene. Four-bar loops are fine. End the last scene on the home chord (`G` in G, `Dm` in Dm).
+3. One accompaniment pattern and one bass part.
+4. The melody, only where it earns attention. Put a chord note on beat 1 of each bar, move mostly by step, leave a rest before a new phrase, and let the last note of the film be the home note, held for the whole bar. Keep a flute mostly between G4 and E6, a clarinet between D4 and C6.
+5. `level` per scene and drums only where the film peaks.
+6. Run check. Every mistake comes back as `timeline-invalid` with the JSON path of the field.
+
+A seed that grows into a tree, 92 bpm in G major:
+
+<!-- check: timeline -->
+```json
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 12,
+    "bpm": 92,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "seed", "bars": 2 },
+        { "id": "rain", "bars": 2 },
+        { "id": "grow", "bars": 4 },
+        { "id": "tree", "bars": 2, "hold": true }
+    ],
+    "cues": [
+        { "id": "bloom", "scene": "tree", "beat": 0, "kind": "sfx", "sfx": "ding" }
+    ],
+    "audio": {
+        "mode": "score",
+        "key": "G",
+        "score": {
+            "room": "room",
+            "instruments": {
+                "keys": "piano",
+                "bed": "strings",
+                "lead": "flute",
+                "low": "bass",
+                "beat": "drums"
+            },
+            "scenes": {
+                "seed": {
+                    "level": "soft",
+                    "chords": ["G", "Em"],
+                    "play": { "keys": "arpeggio", "bed": "hold" }
+                },
+                "rain": {
+                    "level": "soft",
+                    "chords": ["C", "D"],
+                    "play": { "keys": "arpeggio", "bed": "hold", "lead": ["-:2 B4 D5", "A4:4"] }
+                },
+                "grow": {
+                    "level": "full",
+                    "chords": ["G", "D/F#", "Em", "C"],
+                    "play": {
+                        "keys": "broken",
+                        "bed": "hold",
+                        "low": "root",
+                        "lead": ["D5 G5 B5:2", "A5:1.5 G5:0.5 F#5:2", "E5 G5 B5 A5", "G5:3 E5"],
+                        "beat": { "kick": "x...x...", "shaker": ".x.x.x.x" }
+                    }
+                },
+                "tree": {
+                    "level": "soft",
+                    "chords": ["Am7 D", "G"],
+                    "play": {
+                        "keys": "hold",
+                        "bed": "hold",
+                        "low": "root",
+                        "lead": ["C5 B4 A4 F#4", "G4:4"]
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### When check rejects it
+
+| The message says | Do |
+|---|---|
+| `adds up to 3.5 beats, bars in scene "x" hold 4` | Fix that bar's lengths. Count the words without `:length` as 1 |
+| `has 6 bars, scene "x" has 4` | Cut the list to the scene's bars, or give the scene more bars |
+| `is outside the flute's range C4 to C7` | Move the note an octave, or give the part another instrument |
+| `plays one note at a time` | Take out the `+`, or play the chord on `piano`, `harp` or `strings` |
+| `plays the "arpeggio" pattern, which needs "chords"` | Add `chords` to that scene |
+| `names no part in audio.score.instruments` | Declare the part under `instruments`, or fix the spelling |
+| `"~" holds the note before it, but nothing sounds before it` | Start the scene's first bar with a note or a rest |
+
+Listen to it with the `audio` command below before rendering when the user wants to hear the music first.
 
 ## Find sounds
 
 ```bash
 bash <skill-dir>/scripts/run.sh stock search <dir> page turn --audio --length shortest
 bash <skill-dir>/scripts/run.sh stock search <dir> bach prelude --audio --source wikimedia_audio
-bash <skill-dir>/scripts/run.sh stock search <dir> music box --audio --length short
+bash <skill-dir>/scripts/run.sh stock search <dir> cello suite --audio --length short
 bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse-audio:<id> --as page-turn
 ```
 
-Full example: `examples/page-turn/` in the flipbook repository, a found page turn on both page cues over a found music box melody.
+Full example: `examples/page-turn/` in the flipbook repository, a found page turn on both page cues over a written score.
 
-- Search with one to three concrete English words for the sound itself: `page turn`, `pencil scribble`, `typewriter`, `stamp`, `music box`, `minuet`, `cello suite`, `bach prelude`, `gymnopedie`. Every word must match, so start short and add a word only to narrow down. Leave out moods and quality words.
+- Search with one to three concrete English words for the sound itself: `page turn`, `pencil scribble`, `typewriter`, `stamp`, `rain`, `minuet`, `cello suite`, `bach prelude`, `gymnopedie`. Every word must match, so start short and add a word only to narrow down. Leave out moods and quality words.
 - `--audio` asks Openverse only, for public domain (`cc0`, `pdm`) only. Short effects mostly come from Freesound's CC0 recordings (`--source freesound`), whole recorded pieces from Wikimedia Commons (`--source wikimedia_audio`).
 - `--length shortest` is under 30 s (effects), `short` 30 s to 2 min, `medium` 2 to 10 min, `long` over 10 min. `--count` up to 20.
 - You cannot listen, so pick by what each result says. For an effect: a title naming one action ("Page Turn", not "Page turns and book close/open") and `durationSec` under about 3 s. For music: `durationSec` at least the video length plus the `offset` you plan, a title naming the piece or instrument, and no tags such as `creepy`, `horror` or `glitch` unless the film wants them.
 - `stock fetch` saves `assets/<name>.mp3` (or `.ogg`, `.flac`, `.wav`, whatever the file is) as it came and records its source and license in `assets/SOURCES.json`. Its report gives `durationSec`.
-- When nothing fits after two or three queries, use a preset or a built-in effect and tell the user. Never download sounds by other means or from other sites, and never write a source or license you did not get from `stock fetch` or the user.
+- When nothing fits after two or three queries, write a score or use a built-in effect and tell the user. Never download sounds by other means or from other sites, and never write a source or license you did not get from `stock fetch` or the user.
 - Every audio file the timeline names needs its source and license in `assets/SOURCES.json`, otherwise check and render fail with `audio-unlicensed`.
 
 ## Presets
