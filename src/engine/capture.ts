@@ -282,9 +282,8 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
             }
         };
         try {
-            for (;;) {
-                const frame = await claim();
-                if (frame === null) break;
+            // Reopening happens before taking a frame, so no frame waits on a page load.
+            while (!stopped && nextClaim < frameCount) {
                 if (page && state.onPage > 0) {
                     let reason: 'frames' | 'heap' | 'nodes' | null =
                         state.onPage >= recycle.everyFrames ? 'frames' : null;
@@ -295,7 +294,6 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
                     }
                 }
                 if (!page) {
-                    if (stopped) break;
                     const opened = await options.open(worker);
                     pages.opened += 1;
                     page = opened.page;
@@ -307,6 +305,8 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
                         break;
                     }
                 }
+                const frame = await claim();
+                if (frame === null) break;
                 const failed = await page.seek(frame, options.seekTimeoutMs);
                 if (failed) {
                     findings.push(failed);
