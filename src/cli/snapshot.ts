@@ -81,7 +81,7 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
     const timeline = applySize(loaded.resolved, options.size);
     rb.report.composition = {
         dir,
-        hash: compositionHash(dir),
+        hash: compositionHash(dir, timeline),
         width: timeline.width,
         height: timeline.height,
         fps: timeline.fps,

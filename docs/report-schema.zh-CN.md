@@ -34,7 +34,7 @@ read_when:
 | `exitCode` | 0、1、2、78 | 和进程退出码一致 |
 | `flipbook.version` | string | CLI 版本 |
 | `environment` | object | `platform`（如 `darwin-arm64`）、`node`、`chromium`（`version`、`revision`、`launchMode`：`normal` 或 `single-process`）、`ffmpeg` |
-| `composition` | object | `dir`、`hash`（合成目录哈希，`sha256:` 开头，不含 `out/` 和 `.flipbook/`）、`width`、`height`（舞台的 CSS 像素，给了 `--size` 时是换过的尺寸）、`fps`、`frames`、`durationSec` |
+| `composition` | object | `dir`、`hash`（合成目录哈希，`sha256:` 开头，不含 `out/` 和 `.flipbook/`，软链按它指向哪里算，timeline.json 指了 brand.json 时再加上解析后的品牌和它的字体，brand.json 可以在目录外面）、`width`、`height`（舞台的 CSS 像素，给了 `--size` 时是换过的尺寸）、`scale`（check 和 render 的 `--scale`，没给是 1）、`fps`、`frames`、`durationSec` |
 | `failures` | Finding[] | 错误，任何一条都让退出码变 1 |
 | `warnings` | Finding[] | 提示，不影响退出码 |
 | `artifacts` | object | 产物路径：`video`、`contactSheet`、`rejectedVideo`、`zoom1` 等，`report` 是这份报告存盘的路径 |
@@ -73,7 +73,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 
 每一页画到一定帧数就关掉重开，长片的内存不跟着帧数涨。默认帧数按输出大小定：1920×1080 一页 2400 帧，像素越多越早重开，最少 600 帧。另外每 48 帧读一次这一页的 JS 堆和 DOM 节点数，第一次读数当基线，涨过线（先做一次完整垃圾回收再确认）就提前重开。线是所有页合起来 512 MB 堆、4 万个节点，平分给同时在画的页，每页至少 64 MB、5000 个节点，所以页数多时内存合计也不超过这个数。`--recycle <帧数>` 改成固定帧数且不看内存，`--recycle 0` 一直用同一页。重开不改变像素，理由和并行相同。
 
-多页的前提是这个合成最近一次 check 的确定性三项都过了：读 `.flipbook/reports/check.json`，合成文件哈希、flipbook 版本、Chromium 构建号都要和这次 render 相同，`check.determinism` 里 `seekOrder`（换一个顺序 seek）、`perturbation`（换时钟和随机种子）、`latePaint`（seek 后连截两张）都是 `pass`。每项的值是 `pass`、`fail` 或 `skipped`（check 没跑到这一项就停了）。check 因为别的问题没退 0（比如文字出画）不影响多页。否则只用一页，`reason` 是 `no check report for this composition`、`the saved check report is not valid JSON`、`the last check ran on other files`、`the last check ran on another flipbook version`、`the last check ran on another Chromium`、`the last check failed the determinism checks: ` 加没过的几项，或 `the last check did not finish the determinism checks`。直接调 `runCheck` 不存报告，要并行得自己 `saveReport`。
+多页的前提是这个合成最近一次 check 的确定性三项都过了：读 `.flipbook/reports/check.json`，合成文件哈希、舞台尺寸、`scale`、flipbook 版本、Chromium 构建号都要和这次 render 相同（check 用和 render 一样的 `--size` 和 `--scale`），`check.determinism` 里 `seekOrder`（换一个顺序 seek）、`perturbation`（换时钟和随机种子）、`latePaint`（seek 后连截两张）都是 `pass`。每项的值是 `pass`、`fail` 或 `skipped`（check 没跑到这一项就停了）。check 因为别的问题没退 0（比如文字出画）不影响多页。否则只用一页，`reason` 是 `no check report for this composition`、`the saved check report is not valid JSON`、`the last check ran on other files`、`the last check ran at WxH, this render is WxH: run check with the same --size`、`the last check ran at --scale N, this render at --scale N: run check with the same --scale`、`the last check ran on another flipbook version`、`the last check ran on another Chromium`、`the last check failed the determinism checks: ` 加没过的几项，或 `the last check did not finish the determinism checks`。直接调 `runCheck` 不存报告，要并行得自己 `saveReport`。
 
 ## 输出目录
 

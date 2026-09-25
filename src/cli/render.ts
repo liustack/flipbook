@@ -108,12 +108,13 @@ export async function runRender(options: RenderOptions): Promise<Report> {
     const timeline = applySize(loaded.resolved, options.size);
     const scale = options.scale ?? 1;
     const output = outputSize(timeline, scale);
-    const hash = compositionHash(dir);
+    const hash = compositionHash(dir, timeline);
     rb.report.composition = {
         dir,
         hash,
         width: timeline.width,
         height: timeline.height,
+        scale,
         fps: timeline.fps,
         frames: timeline.frameCount,
         durationSec: timeline.durationSec,
@@ -194,14 +195,23 @@ const DETERMINISM_LABELS: Record<keyof Determinism, string> = {
     latePaint: 'late paint',
 };
 
+/** What a check has to have run on for its determinism checks to cover this render. */
+export interface GateInput {
+    hash: string;
+    width: number;
+    height: number;
+    scale: number;
+}
+
 /**
  * Parallel pages only for a composition whose determinism checks passed: the
- * saved report of the last check must be for these exact files, this
- * flipbook and this Chromium, and its seek order, perturbation and late paint
- * checks must all have passed. Other failures in that check do not matter
+ * saved report of the last check must be for these exact files at this stage
+ * size and scale (a composition may lay out differently at another size),
+ * this flipbook and this Chromium, and its seek order, perturbation and late
+ * paint checks must all have passed. Other failures in that check do not matter
  * here, since pages only differ from one another in which frames they draw.
  */
-export function parallelGate(ws: Workspace, hash: string, session: Session): ParallelGate {
+export function parallelGate(ws: Workspace, input: GateInput, session: Session): ParallelGate {
     let text: string | null;
     try {
         text = ws.readText(ws.path('.flipbook', 'reports', 'check.json'));
@@ -215,8 +225,21 @@ export function parallelGate(ws: Workspace, hash: string, session: Session): Par
     } catch {
         return { allowed: false, reason: 'the saved check report is not valid JSON' };
     }
-    if (report.command !== 'check' || report.composition?.hash !== hash) {
+    const checked = report.composition;
+    if (report.command !== 'check' || checked?.hash !== input.hash) {
         return { allowed: false, reason: 'the last check ran on other files' };
+    }
+    if (checked.width !== input.width || checked.height !== input.height) {
+        return {
+            allowed: false,
+            reason: `the last check ran at ${checked.width}x${checked.height}, this render is ${input.width}x${input.height}: run check with the same --size`,
+        };
+    }
+    if ((checked.scale ?? 1) !== input.scale) {
+        return {
+            allowed: false,
+            reason: `the last check ran at --scale ${checked.scale ?? 1}, this render at --scale ${input.scale}: run check with the same --scale`,
+        };
     }
     if (report.flipbook?.version !== appVersion()) {
         return { allowed: false, reason: 'the last check ran on another flipbook version' };
@@ -254,7 +277,11 @@ async function encodeFrames(
     const requested = plan.jobs;
     let gate: ParallelGate = { allowed: true };
     if (plan.jobs > 1) {
-        gate = parallelGate(ctx.ws, ctx.hash, session);
+        gate = parallelGate(
+            ctx.ws,
+            { hash: ctx.hash, width: timeline.width, height: timeline.height, scale: ctx.scale },
+            session,
+        );
         if (!gate.allowed) {
             plan.jobs = 1;
             progress(`render: one page, ${gate.reason}. Run check first for parallel pages.`);

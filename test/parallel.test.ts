@@ -18,6 +18,7 @@ import {
     planJobs,
 } from '../src/engine/capture.ts';
 import type { Session } from '../src/engine/session.ts';
+import { parseSize } from '../src/engine/size.ts';
 import { Workspace } from '../src/engine/workspace.ts';
 import { appVersion } from '../src/paths.ts';
 import { closeSession, session } from './browser.ts';
@@ -92,6 +93,7 @@ describe('pageLimit', () => {
 describe('parallelGate', () => {
     const session = { chromium: { revision: '1243' } } as Session;
     const hash = 'sha256:abc';
+    const stage = { hash, width: 640, height: 360, scale: 1 };
 
     function gate(check: Record<string, unknown>, extra: Record<string, unknown> = {}) {
         const dir = tempDir('gate');
@@ -99,7 +101,7 @@ describe('parallelGate', () => {
         const report = {
             command: 'check',
             ok: false,
-            composition: { dir, hash },
+            composition: { dir, hash, width: 640, height: 360, scale: 1 },
             flipbook: { version: appVersion() },
             environment: { chromium: { revision: '1243' } },
             check,
@@ -109,7 +111,7 @@ describe('parallelGate', () => {
             path.join(dir, '.flipbook', 'reports', 'check.json'),
             JSON.stringify(report),
         );
-        return parallelGate(Workspace.open(dir), hash, session);
+        return parallelGate(Workspace.open(dir), stage, session);
     }
 
     const passed = { seekOrder: 'pass', perturbation: 'pass', latePaint: 'pass' };
@@ -141,6 +143,22 @@ describe('parallelGate', () => {
         expect(
             gate({ determinism: passed }, { composition: { dir: '.', hash: 'sha256:other' } }),
         ).toEqual({ allowed: false, reason: 'the last check ran on other files' });
+    });
+
+    it('refuses a check made at another stage size or scale', () => {
+        const at = (width: number, height: number, scale: number) =>
+            gate(
+                { determinism: passed },
+                { composition: { dir: '.', hash, width, height, scale } },
+            );
+        expect(at(360, 640, 1)).toEqual({
+            allowed: false,
+            reason: 'the last check ran at 360x640, this render is 640x360: run check with the same --size',
+        });
+        expect(at(640, 360, 2)).toEqual({
+            allowed: false,
+            reason: 'the last check ran at --scale 2, this render at --scale 1: run check with the same --scale',
+        });
     });
 });
 
@@ -219,6 +237,23 @@ describe('parallel render', () => {
         const render = report.render as RenderSection;
         expect(render.parallel.jobs).toBe(1);
         expect(render.parallel.reason).toBe('the last check ran on other files');
+    });
+
+    it('stays on one page for another stage size than the check, and uses pages after a check at it', async () => {
+        const dir = copyFixture('stage');
+        const s = await session();
+        const size = parseSize('1:1');
+        saveReport(await runCheck({ dir, session: s, recordAttempts: false }));
+        let report = await runRender({ dir, session: s, size, jobs: 3, recordAttempts: false });
+        let render = report.render as RenderSection;
+        expect(render.parallel.jobs).toBe(1);
+        expect(render.parallel.reason).toBe(
+            'the last check ran at 640x360, this render is 360x360: run check with the same --size',
+        );
+        saveReport(await runCheck({ dir, session: s, size, recordAttempts: false }));
+        report = await runRender({ dir, session: s, size, jobs: 3, recordAttempts: false });
+        render = report.render as RenderSection;
+        expect(render.parallel.jobs).toBe(3);
     });
 });
 

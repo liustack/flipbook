@@ -167,15 +167,23 @@ program
     .option('--samples <n>', 'number of frames to sample', '8')
     .option('--seek-timeout <ms>', 'time limit for one seek', '10000')
     .option('--size <size>', 'stage size in place of the timeline: 9:16, 1:1, 4:5 or WxH')
+    .option('--scale <n>', 'output pixels per CSS pixel, as render --scale will use', '1')
     .action(
         async (
             dir: string,
-            options: { seed: string; samples: string; seekTimeout: string; size?: string },
+            options: {
+                seed: string;
+                samples: string;
+                seekTimeout: string;
+                size?: string;
+                scale: string;
+            },
         ) => {
             await execute('check', dir, () =>
                 runCheck({
                     dir,
                     size: options.size ? parseSize(options.size) : undefined,
+                    scale: parseNumber(options.scale, '--scale', 1, 4),
                     seed: parseInteger(options.seed, '--seed', 0, 4294967295),
                     samples: parseInteger(options.samples, '--samples', 2, 64),
                     seekTimeoutMs: parseInteger(

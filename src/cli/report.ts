@@ -62,6 +62,8 @@ export interface Report {
         hash?: string;
         width?: number;
         height?: number;
+        /** Device scale factor the pages ran at (check and render). */
+        scale?: number;
         fps?: number;
         frames?: number;
         durationSec?: number;

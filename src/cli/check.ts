@@ -46,6 +46,8 @@ export interface CheckOptions {
     recordAttempts?: boolean;
     /** Stage size in place of the timeline's width and height, as render --size would use. */
     size?: SizeSpec;
+    /** Device scale factor, as render --scale would use. Default 1. */
+    scale?: number;
 }
 
 /** Clock origin and random seed shifts for the perturbation pages. */
@@ -101,6 +103,7 @@ async function perturbed(
     readyTimeoutMs: number | undefined,
     seekTimeoutMs: number | undefined,
     env: NodeJS.ProcessEnv | undefined,
+    deviceScaleFactor: number,
 ): Promise<PerturbedRun> {
     const { page, findings } = await openPage(session, {
         dir,
@@ -108,6 +111,7 @@ async function perturbed(
         clock,
         readyTimeoutMs,
         env,
+        deviceScaleFactor,
     });
     const run: PerturbedRun = { shots: new Map(), findings: [...findings] };
     try {
@@ -159,9 +163,10 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
     if (!timeline || missingIndex) return finish();
     rb.report.composition = {
         dir,
-        hash: compositionHash(dir),
+        hash: compositionHash(dir, timeline),
         width: timeline.width,
         height: timeline.height,
+        scale: options.scale ?? 1,
         fps: timeline.fps,
         frames: timeline.frameCount,
         durationSec: timeline.durationSec,
@@ -179,6 +184,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
             timeline,
             readyTimeoutMs: options.readyTimeoutMs,
             env: options.env,
+            deviceScaleFactor: options.scale ?? 1,
         });
         dynamic.push(...loadFindings);
         const frames = sampleFrames(timeline.frameCount, options.samples ?? 8, seed);
@@ -414,6 +420,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     options.readyTimeoutMs,
                     options.seekTimeoutMs,
                     options.env,
+                    options.scale ?? 1,
                 );
                 // A failure the base page did not have is a failure of this check too.
                 const known = new Set(dynamic.map(findingKey));

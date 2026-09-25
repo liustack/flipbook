@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { ResolvedTimeline } from './timelineResolve.ts';
 
 const SKIP = new Set(['.flipbook', 'out', 'node_modules', '.git', '.DS_Store']);
 
@@ -9,23 +10,40 @@ function walk(dir: string, root: string, out: string[]): void {
         if (SKIP.has(entry.name)) continue;
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) walk(full, root, out);
-        else if (entry.isFile()) out.push(path.relative(root, full).split(path.sep).join('/'));
+        else if (entry.isFile() || entry.isSymbolicLink()) {
+            out.push(path.relative(root, full).split(path.sep).join('/'));
+        }
     }
 }
 
-/** sha256 over every source file of the composition (paths and bytes), outputs excluded. */
-export function compositionHash(dir: string): string {
+/**
+ * sha256 over every source file of the composition (paths and bytes),
+ * outputs excluded. A link counts by where it points, since its target is
+ * hashed under its own path. With the resolved timeline, a brand also counts
+ * by its resolved content: brand.json may live outside the folder, and its
+ * logo is inlined and its fonts carry their content hash.
+ */
+export function compositionHash(
+    dir: string,
+    resolved?: Pick<ResolvedTimeline, 'brand' | 'fonts'>,
+): string {
     const files: string[] = [];
     walk(dir, dir, files);
     files.sort();
     const hash = createHash('sha256');
     for (const rel of files) {
-        const bytes = fs.readFileSync(path.join(dir, rel));
+        const full = path.join(dir, rel);
+        const link = fs.lstatSync(full).isSymbolicLink();
+        const bytes = link ? Buffer.from(`link:${fs.readlinkSync(full)}`) : fs.readFileSync(full);
         hash.update(rel);
         hash.update('\0');
         hash.update(String(bytes.length));
         hash.update('\0');
         hash.update(bytes);
+    }
+    if (resolved?.brand) {
+        hash.update('\0brand\0');
+        hash.update(JSON.stringify({ brand: resolved.brand, fonts: resolved.fonts }));
     }
     return `sha256:${hash.digest('hex')}`;
 }
