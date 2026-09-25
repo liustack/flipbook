@@ -61,6 +61,50 @@ jobs:
       - run: pnpm test:e2e
       - run: pnpm build
 
+  examples:
+    # Every example rendered in full and passed through acceptance on Linux,
+    # exactly as release.yml renders them for the Release. A render that only
+    # fails on Linux (a still end card a hair past the freeze limit) shows here,
+    # before a tag is pushed: scripts/release.mjs refuses a commit whose CI is
+    # not green. Only on pushes to main, since it takes several minutes.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19'
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/liustack/flipbook
+          key: flipbook-Linux-${{ hashFiles('pnpm-lock.yaml', 'src/fonts/manifest.json') }}
+      - name: Install the pinned Chromium headless shell
+        run: PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/liustack/flipbook/browsers" pnpm exec playwright-core install --with-deps chromium-headless-shell
+      - run: pnpm build
+      - name: Render the examples
+        run: |
+          mkdir -p example-reports
+          find examples -name timeline.json -not -path '*/.flipbook/*' | sort | while read -r timeline; do
+            dir="$(dirname "$timeline")"
+            name="$(echo "${dir#examples/}" | tr '/' '-')"
+            if ! node dist/main.js render "$dir" > "example-reports/$name-render.json" < /dev/null; then
+              cat "example-reports/$name-render.json"
+              exit 1
+            fi
+          done
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-reports
+          path: |
+            example-reports/
+            examples/**/.flipbook/rejected/
+            examples/**/.flipbook/evidence/render/
+
   install:
     # INSTALL.md from scratch on a fresh Ubuntu x64 runner. Before a release the
     # npm package and the git tag do not exist yet, so the packed tarball is

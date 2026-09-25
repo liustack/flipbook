@@ -74,6 +74,26 @@ try {
 } catch {
     fail('local main is behind or diverged from origin/main. Pull first.');
 }
+// The commit being released must already be on origin/main with a green CI,
+// the Linux render of every example included: release.yml renders them again
+// for the Release, and a failure there comes after the tag is out.
+const head = run('git', ['rev-parse', 'HEAD']);
+if (run('git', ['rev-parse', 'origin/main']) !== head) {
+    fail('HEAD is not on origin/main yet. Push main, wait for CI to pass, then release.');
+}
+let ci;
+try {
+    ci = JSON.parse(
+        run('gh', ['run', 'list', '--workflow', 'ci.yml', '--commit', head, '--json', 'status,conclusion,url']),
+    );
+} catch (error) {
+    fail(`cannot read the CI runs for ${head.slice(0, 7)} with gh: ${error.message ?? error}`);
+}
+if (!ci.some((r) => r.status === 'completed' && r.conclusion === 'success')) {
+    const seen = ci.map((r) => `${r.status}/${r.conclusion || '-'} ${r.url}`).join(', ') || 'no run yet';
+    fail(`CI has not passed on ${head.slice(0, 7)} (${seen}). Wait for it to go green, then release.`);
+}
+
 try {
     if (run('git', ['ls-remote', '--tags', 'origin', `refs/tags/v${next}`])) {
         fail(`tag v${next} already exists on origin.`);

@@ -51,7 +51,7 @@ test/release/      vitest 发版档：hello、eggs-five/five、long-scroll 的�
 ## 验证
 
 - `pnpm lint && pnpm typecheck && pnpm test && pnpm build`，全部通过才算完成。`pnpm test` 会先构建。
-- 测试分三档。CI（main 和 PR）跑前两档，`scripts/release.mjs` 的门禁三档都跑。
+- 测试分三档。CI（main 和 PR）跑前两档。推 main 时 CI 另有一列 Linux，把全部样例完整渲染并过成片验收，和 release.yml 渲 Release 附件的做法一样，只在 Linux 上出的问题（比如片尾静止时长在 Linux 上刚好越过定格线）在打标签之前就能看到。`scripts/release.mjs` 要求当前提交已推到 origin/main 且 CI 全绿才发版，门禁三档都跑。
   - `pnpm test`（`test/`）：单元测试和拿小 fixture 跑的引擎测试，本机一分钟内，改代码时随手跑。
   - `pnpm test:e2e`（`test/e2e/`）：坏片语料过 check 和 render，reference 片段过 check，每个样例过 check 再比 snapshot 帧摘要，不渲样例成片，本机约一分钟。本地改了引擎、运行时库、类型码或样例，推送前跑一遍。
   - `pnpm test:release`（`test/release/`）：hello（纯纸底）和 eggs-five/five（纹理纸底）完整渲染、对 expected.json、另开浏览器再渲一遍逐帧比哈希，long-scroll 渲一遍核帧数和时长，本机约三分半。其他样例的成片由 release.yml 渲成 Release 附件，不在门禁里比。
