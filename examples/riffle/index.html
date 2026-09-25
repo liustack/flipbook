@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>riffle: Mohammed running, a flip book</title>
+<style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #a88661; }
+  canvas { position: absolute; left: 0; top: 0; }
+  #title { position: absolute; left: 0; width: 100%; margin: 0; text-align: center; opacity: 0;
+           top: calc(50% + 360px * var(--u, 1)); font: 500 calc(64px * var(--u, 1))/1.2 "Noto Serif SC";
+           letter-spacing: calc(4px * var(--u, 1)); color: #f4ead8; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<h1 id="title">flipbook</h1>
+<script type="module">
+import {
+  boil, composition, cueProgress, drawPaper, onTwos, ease, fillText, FONTS, grainLayer, pageTurn,
+  photo, progress, rand, rng, setupCanvas, specimens, staticLayer, timeline,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const U = Math.min(W, H) / 1080;
+document.documentElement.style.setProperty('--u', String(U));
+const ctx = setupCanvas(document.getElementById('stage'), W, H);
+const title = document.getElementById('title');
+const [desk, riffle, stop] = tl.scenes;
+const snap = (s) => Math.round(s * tl.fps) / tl.fps;
+
+// The twenty frames of Muybridge's plate of the horse Mohammed running, one
+// stride: specimens() finds each light frame on the dark ground of the plate,
+// and they are put in reading order, row by row.
+const PLATE = 'assets/mohammed.jpg';
+const found = (await specimens(PLATE, { paper: '#3c3632', threshold: 60, margin: 0 }))
+  .map((f) => f.crop)
+  .sort((a, b) => (Math.abs(a.y - b.y) < 0.05 ? a.x - b.x : a.y - b.y));
+const frames = await Promise.all(
+  found.map((c) =>
+    photo(PLATE, {
+      // A hair inside each frame, so none of the dark ground shows.
+      crop: { x: c.x + c.width * 0.02, y: c.y + c.height * 0.02, width: c.width * 0.96, height: c.height * 0.96 },
+      cutout: 'none',
+      sticker: false,
+      size: 640 * U,
+    }),
+  ),
+);
+if (frames.length !== 20) throw new Error(`expected 20 frames on the plate, found ${frames.length}`);
+
+
+// The turns: two slow ones from a still book, a riffle that speeds up to ten
+// pages a second and holds, then slows and settles on the standing mare.
+const turns = [];
+const durations = [];
+function add(at, duration) {
+  turns.push(snap(at));
+  durations.push(duration);
+}
+add(desk.end - 0.95, 0.75);
+add(desk.end - 0.35, 0.6);
+let at = riffle.start + 0.2;
+while (at < riffle.end - 1.6) {
+  const k = ease.inOutSine(progress(at, riffle.start, riffle.start + 2.2));
+  const gap = 0.32 - 0.22 * k;
+  add(at, Math.max(0.3, gap * 2.6));
+  at += gap;
+}
+while (at < stop.start + 0.3) {
+  const k = ease.inQuad(progress(at, riffle.end - 1.6, stop.start + 0.3));
+  const gap = 0.1 + 0.28 * k;
+  add(at, Math.max(0.3, gap * 2.2));
+  at += gap;
+}
+const pages = turns.length + 1;
+// Page 0 and the last page show the first frame; the rest run the stride over and over.
+const frameOf = (i) => (i === 0 || i === pages - 1 ? 0 : (i - 1) % frames.length);
+
+// A small pad lying open on the desk: the spine in the middle, the unturned
+// pages on the right.
+const box = { x: 960, y: 170, width: 720, height: 500 };
+let sheets;
+let deskLayer;
+
+/** A cheap, much-thumbed page: yellowed stock, foxing, a grimy thumb corner, worn edges. */
+function agedSheet(c, k) {
+  const w = box.width;
+  const h = box.height;
+  const tones = ['#eee1c4', '#e9dbbb', '#f0e4ca', '#e6d7b5', '#ecdfc1', '#e9dcbf'];
+  c.save();
+  c.beginPath();
+  roughOutline(c, w, h, k);
+  c.clip();
+  drawPaper(c, w, h, { seed: tl.seed + 10 + k, color: tones[k], mottle: 1.4, fibers: 1.3, specks: 1.5, grain: 1.2 });
+  const r = rng(tl.seed + 20 + k);
+  const blot = (x, y, radius, color, alpha) => {
+    const g = c.createRadialGradient(x, y, 0, x, y, radius);
+    g.addColorStop(0, `rgba(${color}, ${alpha})`);
+    g.addColorStop(1, `rgba(${color}, 0)`);
+    c.fillStyle = g;
+    c.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  };
+  // Foxing: small rusty spots, more of them toward the edges.
+  const spots = 8 + Math.floor(r.next() * 10);
+  for (let n = 0; n < spots; n++) {
+    const edge = r.next() < 0.6;
+    const x = edge ? (r.next() < 0.5 ? r.range(0, 60) : r.range(w - 60, w)) : r.range(0, w);
+    blot(x, r.range(0, h), r.range(1.5, 6), '138, 88, 40', r.range(0.15, 0.35));
+  }
+  // The corner the thumb riffles, grey-brown with use, and a soft crease.
+  blot(w, h, 210, '84, 60, 34', 0.3);
+  c.strokeStyle = 'rgba(96, 72, 44, 0.28)';
+  c.lineWidth = 1.2;
+  c.beginPath();
+  const a = 34 + r.next() * 30;
+  c.moveTo(w - a, h);
+  c.quadraticCurveTo(w - a * 0.4, h - a * 0.4, w, h - a * (0.9 + r.next() * 0.3));
+  c.stroke();
+  // Edges browned by air and hands.
+  const side = (x0, y0, x1, y1, len) => {
+    const g = c.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, 'rgba(120, 84, 44, 0.22)');
+    g.addColorStop(1, 'rgba(120, 84, 44, 0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  };
+  side(0, 0, 0, 16);
+  side(0, h, 0, h - 16);
+  side(w, 0, w - 16, 0);
+  c.restore();
+}
+
+/**
+ * A hand-cut sheet: every edge wavers a pixel or two inward, the corners are
+ * worn round, the thumbed one most of all. Traced clockwise from top left.
+ */
+function roughOutline(c, w, h, k) {
+  const r = rng(tl.seed + 40 + k);
+  // Worn radius at each corner: top left, top right, bottom right (thumbed), bottom left.
+  const worn = [3 + r.next() * 3, 3 + r.next() * 3, 12 + r.next() * 8, 3 + r.next() * 3];
+  const corners = [[0, 0], [w, 0], [w, h], [0, h]];
+  const inward = [[0, 1], [-1, 0], [0, -1], [1, 0]];
+  const edges = [];
+  for (let e = 0; e < 4; e++) {
+    const [ax, ay] = corners[e];
+    const [bx, by] = corners[(e + 1) % 4];
+    const [nx, ny] = inward[e];
+    const len = Math.hypot(bx - ax, by - ay);
+    const steps = Math.ceil(len / 14);
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const d = worn[e] + ((len - worn[e] - worn[(e + 1) % 4]) * i) / steps;
+      const u = d / len;
+      const q = 0.5 + 1.8 * (0.5 + 0.5 * Math.sin(u * (6 + e) + k * 1.7)) * r.next();
+      pts.push([ax + (bx - ax) * u + nx * q, ay + (by - ay) * u + ny * q]);
+    }
+    edges.push(pts);
+  }
+  c.moveTo(...edges[0][0]);
+  for (let e = 0; e < 4; e++) {
+    for (const p of edges[e]) c.lineTo(...p);
+    const [cx, cy] = corners[(e + 1) % 4];
+    const [n1x, n1y] = inward[e];
+    const [n2x, n2y] = inward[(e + 1) % 4];
+    c.quadraticCurveTo(cx + (n1x + n2x) * 1.5, cy + (n1y + n2y) * 1.5, ...edges[(e + 1) % 4][0]);
+  }
+  c.closePath();
+}
+
+function front(c, i) {
+  c.drawImage(sheets[i % sheets.length].canvas, 0, 0, box.width, box.height);
+  // Printed a little off on every page, with uneven ink.
+  const dx = (rand(tl.seed, 'dx', i) - 0.5) * 10;
+  const dy = (rand(tl.seed, 'dy', i) - 0.5) * 8;
+  const rot = (rand(tl.seed, 'rot', i) - 0.5) * 1.4;
+  c.save();
+  c.globalCompositeOperation = 'multiply';
+  c.globalAlpha = 0.8 + 0.2 * rand(tl.seed, 'ink', i);
+  frames[frameOf(i)].draw(c, box.width / 2 + 10 + dx, box.height / 2 - 6 + dy, { rotate: rot });
+  c.restore();
+  // The page rises out of the binding: shade along the spine side, on the paper only.
+  c.save();
+  c.globalCompositeOperation = 'source-atop';
+  const g = c.createLinearGradient(0, 0, 80, 0);
+  g.addColorStop(0, 'rgba(70, 48, 26, 0.26)');
+  g.addColorStop(1, 'rgba(70, 48, 26, 0)');
+  c.fillStyle = g;
+  c.fillRect(0, 0, 80, box.height);
+  c.restore();
+  c.fillStyle = 'rgba(52, 38, 24, 0.62)';
+  c.textAlign = 'right';
+  c.font = `500 17px "${FONTS.serif}"`;
+  fillText(c, String(i + 1), box.width - 28 + dx * 0.3, box.height - 22);
+}
+
+/** The back of a page: the same sheet seen from behind, so its outline mirrors the front. */
+function backSide(c, i) {
+  c.save();
+  c.transform(-1, 0, 0, 1, box.width, 0);
+  c.drawImage(sheets[i % sheets.length].canvas, 0, 0, box.width, box.height);
+  c.restore();
+}
+
+const book = pageTurn({
+  box,
+  turns,
+  duration: durations,
+  spread: true,
+  curl: 0.1,
+  tilt: 0.35,
+  paper: '#d8c6a0',
+  showThrough: 0.12,
+  shadow: 0.7,
+  front,
+  back: backSide,
+});
+
+/** The page blocks: the right one thins and the left one thickens as pages turn. */
+function blocks(c, t) {
+  const turned = turns.filter((s, i) => t >= s + durations[i]).length;
+  const right = Math.round(16 * (1 - turned / turns.length));
+  const left = Math.round(16 * (turned / turns.length));
+  c.save();
+  c.shadowColor = 'rgba(30, 18, 8, 0.55)';
+  c.shadowBlur = 30;
+  c.shadowOffsetX = 6;
+  c.shadowOffsetY = 16;
+  c.fillStyle = '#e2d3b4';
+  c.fillRect(box.x, box.y, box.width + right * 1.1 + 3, box.height + right * 1.3 + 3);
+  if (turned > 0) c.fillRect(box.x - box.width - left * 1.1 - 3, box.y, box.width + left * 1.1 + 3, box.height + left * 1.3 + 3);
+  c.restore();
+  // Hand-cut sheets never line up: each sheet sticks out by its own amount,
+  // its edge wavers, the thumbed corner fans out, and paper and gaps alternate.
+  const edge = (x, i, sign) => {
+    const j = rand(tl.seed, 'edge', sign, i);
+    const out = i * 1.3 + (j - 0.5) * 3.2 + (j > 0.9 ? 2.5 : 0);
+    const down = i * 1.5 + (rand(tl.seed, 'edgey', sign, i) - 0.5) * 3;
+    const fan = Math.max(0, i - 3) * 0.9;
+    const pts = [];
+    const along = (a, b, n, fx, fy) => {
+      for (let k = 0; k <= n; k++) {
+        const u = k / n;
+        const wob = (rand(tl.seed, 'wob', sign, i, pts.length) - 0.5) * 1.1;
+        pts.push([a[0] + (b[0] - a[0]) * u + fx * wob, a[1] + (b[1] - a[1]) * u + fy * wob]);
+      }
+    };
+    const x0 = x + sign * out;
+    const top = [x0 + sign * box.width, box.y + down];
+    const corner = [x0 + sign * (box.width + fan), box.y + box.height + down + fan * 0.7];
+    const bottom = [x0, box.y + box.height + down];
+    along(top, corner, 16, 1, 0);
+    along(corner, bottom, 24, 0, 1);
+    c.beginPath();
+    pts.forEach(([px, py], k) => (k ? c.lineTo(px, py) : c.moveTo(px, py)));
+    c.lineTo(x0, box.y + down);
+    c.closePath();
+    c.fillStyle = j > 0.45 ? '#e6d6b3' : '#d6c29b';
+    c.fill();
+    c.strokeStyle = `rgba(88, 64, 38, ${0.2 + 0.3 * j})`;
+    c.lineWidth = 0.6 + j * 0.5;
+    c.beginPath();
+    pts.forEach(([px, py], k) => (k ? c.lineTo(px, py) : c.moveTo(px, py)));
+    c.stroke();
+  };
+  // Deepest sheet first, so the ones above cover it.
+  for (let i = right; i >= 1; i--) edge(box.x, i, 1);
+  for (let i = left; i >= 1; i--) edge(box.x, i, -1);
+}
+
+composition({
+  setup() {
+    sheets = Array.from({ length: 6 }, (_, k) => staticLayer(box.width, box.height, (c) => agedSheet(c, k)));
+    deskLayer = staticLayer(W, H, (c) => {
+      drawPaper(c, W, H, { seed: tl.seed + 3, color: '#a88661', mottle: 1.6, fibers: 2, specks: 1.2, vignette: 0.55 });
+    });
+    grainLayer(W, H, { seed: tl.seed, amount: 0.6 });
+  },
+  seek(time) {
+    // The camera and the pad move on twos, shifting a hair between drawings
+    // as paper does under a camera shot one exposure at a time. The pages keep
+    // turning on every frame, so the riffle stays smooth.
+    const t = onTwos(time, tl.fps);
+    const nudge = boil(t, tl.fps, { seed: 'pad', amount: 1.2, turn: 0.12 });
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(deskLayer.canvas, 0, 0, W, H);
+    // The camera: centered on the closed pad and creeping in, pushed into the
+    // right-hand page while the pages run, then back out to the whole book.
+    const creep = ease.inOutSine(progress(t, 0, desk.end));
+    const push = ease.inOutCubic(progress(t, desk.end - 0.6, riffle.start + 1.6));
+    const back = ease.inOutCubic(progress(t, stop.start - 0.4, stop.start + 1.0));
+    const page = [box.x + box.width / 2, box.y + box.height / 2];
+    const spine = [box.x, box.y + box.height / 2 + 30];
+    const s = (1 + 0.1 * creep + 0.32 * push) * (1 - back) + back;
+    const fx = page[0] + (spine[0] - page[0]) * back;
+    const fy = page[1] + (spine[1] - page[1]) * back;
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(s, s);
+    ctx.translate(-fx + nudge.x, -fy + nudge.y);
+    ctx.rotate(nudge.rotate);
+    blocks(ctx, time);
+    book.draw(ctx, time);
+    // The gutter where the pages bend into the spine.
+    const g = ctx.createLinearGradient(box.x - 40, 0, box.x + 40, 0);
+    g.addColorStop(0, 'rgba(60, 40, 20, 0)');
+    g.addColorStop(0.5, 'rgba(60, 40, 20, 0.22)');
+    g.addColorStop(1, 'rgba(60, 40, 20, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(box.x - 40, box.y, 80, box.height);
+    ctx.restore();
+    // Warm light from the upper left, falling off toward the lower right.
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const light = ctx.createRadialGradient(W * 0.3, H * 0.15, 0, W * 0.3, H * 0.15, W * 0.95);
+    light.addColorStop(0, '#fffaf0');
+    light.addColorStop(0.55, '#f1e3cc');
+    light.addColorStop(1, '#b89a78');
+    ctx.fillStyle = light;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    const a = ease.outCubic(cueProgress(tl, t, 'title'));
+    title.style.opacity = String(a);
+    title.style.transform = `translateY(${(1 - a) * 14 * U}px)`;
+  },
+});
+</script>
+</body>
+</html>

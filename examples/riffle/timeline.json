@@ -1,0 +1,66 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 1878,
+    "bpm": 96,
+    "beatsPerBar": 4,
+    "scenes": [
+        {
+            "id": "desk",
+            "bars": 1
+        },
+        {
+            "id": "riffle",
+            "bars": 3
+        },
+        {
+            "id": "stop",
+            "bars": 1,
+            "hold": true
+        }
+    ],
+    "cues": [
+        {
+            "id": "lift",
+            "scene": "desk",
+            "beat": 3,
+            "kind": "sfx",
+            "sfx": "paper"
+        },
+        {
+            "id": "go",
+            "scene": "riffle",
+            "beat": 0,
+            "kind": "sfx",
+            "sfx": "sweep"
+        },
+        {
+            "id": "title",
+            "scene": "stop",
+            "beat": 1,
+            "kind": "text",
+            "text": "flipbook",
+            "settleBeats": 1
+        },
+        {
+            "id": "chime",
+            "scene": "stop",
+            "beat": 1,
+            "kind": "sfx",
+            "sfx": "ding"
+        }
+    ],
+    "audio": {
+        "mode": "preset",
+        "preset": "pluck",
+        "key": "G",
+        "progression": 0,
+        "dynamics": {
+            "desk": "soft",
+            "riffle": "full",
+            "stop": "medium"
+        }
+    }
+}
