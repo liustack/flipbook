@@ -24,47 +24,40 @@ https://github.com/user-attachments/assets/d0358eec-777e-4237-9695-e70ff8a7905d
 <p align="center"><sub>A flip book of Muybridge's 1878 Horse in Motion: the pages riffle faster and faster until the horse runs, then settle on the standing mare. 12.5 s, preset music.</sub></p>
 
 <table>
-  <tr>
-    <td colspan="2" valign="top">
+<tr>
+<td colspan="2" valign="top">
 
 https://github.com/user-attachments/assets/4720fa7b-ec6e-4c25-b361-1ca15e2cc42e
 
 <sub>Claude Opus 5.5 made this from one prompt: a paper boat sails through sun, rain and snow. First try, 6.7 minutes, $1.48. 25 s, preset music.</sub>
 
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
 
 https://github.com/user-attachments/assets/9016d9cb-d2dc-4fa3-84aa-f36801ead9e9
 
 <sub>Bird eggs land one by one and build a 5. 8 s, silent.</sub>
 
-    </td>
-    <td width="50%" valign="top">
+</td>
+<td width="50%" valign="top">
 
 https://github.com/user-attachments/assets/2345e6a3-4a8b-4012-a5d7-c1698e2fd000
 
 <sub>The same template builds 书 (book). 8 s, silent.</sub>
 
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
 
 https://github.com/user-attachments/assets/3ec35052-1e5a-44bf-b854-56fb95b80d55
 
 <sub>Three phrases land on the beat, then a stamped title. 12 s, marimba preset with sound effects.</sub>
 
-    </td>
-    <td width="50%" valign="top">
-
-https://github.com/user-attachments/assets/37f8b8ac-f48d-422d-826f-852a5dccd22c
-
-<sub>The test render from the install guide. 5 s.</sub>
-
-    </td>
-  </tr>
+</td>
+</tr>
 </table>
 
 <p align="center"><sub>Every video plays in place. All of them are flipbook renders: the paper boat comes from an eval run, the others from the examples in this repository.</sub></p>
