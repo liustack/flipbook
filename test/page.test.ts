@@ -296,10 +296,17 @@ describe('a renderer the system takes away', () => {
         const timeline = loadTimeline(dir).resolved;
         if (!timeline) throw new Error('hello has no timeline');
 
+        // Both cases wait for Chromium to report the renderer gone before closing:
+        // what is checked here is how the end is classified, and on a loaded
+        // machine the report can come later than close() waits (up to 16 s on a
+        // Windows runner running other suites next to this one).
+
         // chrome://kill ends the renderer from outside, as the OOM killer would.
         const killed = await openPage(s, { dir, timeline });
         expect(await killed.page.seek(0)).toBeNull();
+        const kill = killed.page.page.waitForEvent('crash', { timeout: 60_000 });
         await killed.page.page.goto('chrome://kill').catch(() => undefined);
+        await kill;
         await expect(killed.page.close()).rejects.toMatchObject({
             name: 'EnvError',
             code: 'resource-exhausted',
@@ -308,8 +315,7 @@ describe('a renderer the system takes away', () => {
 
         // chrome://crash is the renderer crashing by itself. Where the kernel
         // hands crashes to a core dump handler (systemd-coredump on Ubuntu),
-        // Chromium hears of it only once the dump is written, 1.5 s later on
-        // a GitHub runner, so wait for the crash before closing.
+        // Chromium hears of it only once the dump is written.
         const crashed = await openPage(s, { dir, timeline });
         const crash = crashed.page.page.waitForEvent('crash', { timeout: 60_000 });
         await crashed.page.page.goto('chrome://crash').catch(() => undefined);
