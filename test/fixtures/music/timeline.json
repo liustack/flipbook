@@ -7,5 +7,5 @@
     "bpm": 120,
     "beatsPerBar": 4,
     "scenes": [{ "id": "main", "bars": 1 }],
-    "audio": { "mode": "file", "file": "music.wav", "bpmOffset": 0.5 }
+    "audio": { "mode": "file", "file": "assets/music.wav", "bpmOffset": 0.5 }
 }

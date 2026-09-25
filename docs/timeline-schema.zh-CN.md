@@ -71,7 +71,8 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `kind` | 是 | `text`、`sfx`、`mark` | |
 | `text` | kind 为 text 时必填 | 非空字符串 | 上屏文字，check 用它核对字形覆盖 |
 | `settleBeats` | 否 | 0 到 64 | 文字完全出来要几拍，check 和 render 在这个时刻做文字检查，缺省 0（在 cue 时刻就完全出来）。文字 cue 必须在本场结束前出完 |
-| `sfx` | kind 为 sfx 时必填 | `paper`、`drop`、`ding`、`sweep` | 音效名，峰值对准 cue 所在的帧，见 audio 一节 |
+| `sfx` | kind 为 sfx 且没给 `file` 时必填 | `paper`、`drop`、`ding`、`sweep` | 内置音效，峰值对准 cue 所在的帧，见 audio 一节 |
+| `file` | 只用于 kind 为 sfx，代替 `sfx` | 合成目录内的相对路径，如 `assets/page-turn.mp3` | 合成目录里的音效文件，一般是 `stock fetch` 存下的。文件里最响的采样对准 cue 所在的帧。`assets/SOURCES.json` 里要有它的来源和许可，否则报 `audio-unlicensed`。`sfx` 和 `file` 都给报 `timeline-invalid` |
 
 ## audio
 
@@ -82,14 +83,17 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `key` | 全部 | `A` 到 `G`，可带 `#` 或 `b`，末尾加 `m` 是小调，缺省 `C` | 配乐的调，`ding` 音效也按它的主音定音高 |
 | `progression` | preset | 0 到 5 的整数，缺省 0 | 和声进行编号，见下表 |
 | `dynamics` | preset | 场景 id 到 `rest`、`soft`、`medium`、`full` 的映射 | 每场强弱，没写的场景按 `medium` |
-| `file` | file，必填 | 合成目录内的相对路径 | 用户自带音乐，文件不在合成目录里时报 `timeline-invalid` |
-| `bpmOffset` | file | 0 到 60，缺省 0 | 用户音乐里第一拍落在第几秒 |
+| `file` | file，必填 | 合成目录内的相对路径 | 来自文件的音乐：用户自带的，或 `stock fetch` 存下的。文件不在合成目录里报 `timeline-invalid`，`assets/SOURCES.json` 里没有它的来源和许可报 `audio-unlicensed` |
+| `bpmOffset` | file | 0 到 60，缺省 0 | timeline 跟着这首音乐的节拍走时，它的第一拍落在第几秒 |
+| `offset` | file | 0 到 3600 | 成片从文件的第几秒开始用，给 timeline 不跟节拍的音乐用。`offset` 和 `bpmOffset` 都给报 `timeline-invalid` |
+| `fadeIn` | file | 0 到 30，缺省 0 | 开头淡入几秒 |
+| `fadeOut` | file | 0 到 30，缺省 1（片长不足 4 秒时取片长四分之一） | 结尾淡出几秒。`fadeIn` 加 `fadeOut` 不能超过片长 |
 
 字段写在不用它的 mode 下（比如 `mode: none` 带 `preset`）报 `timeline-invalid`，路径指到那个字段。
 
 - `none`：没有配乐。有 `sfx` cue 时成片只带音效，没有 `sfx` cue 时是无声成片。
 - `preset`：`audio` 命令按预设、调、和声进行和每场强弱合成配乐，render 自动调用。
-- `file`：用户自带音乐，不做节拍检测，`bpm` 和 `bpmOffset` 由用户给。文件解析软链后必须是合成目录里的普通文件，否则报 `timeline-invalid`。ffmpeg 只按本地文件读它，格式限 wav、w64、mp3、flac、ogg、aac、mov 系（m4a、mp4）、aiff、matroska 系（mkv、webm），播放列表和 concat 这类会引用别的文件的格式不收。
+- `file`：来自文件的音乐，不做节拍检测。用户自带的歌由用户给 `bpm` 和 `bpmOffset`。找来的曲子 timeline 不跟它的节拍时，用 `offset` 选从哪里开始。文件解析软链后必须是合成目录里的普通文件，否则报 `timeline-invalid`。ffmpeg 只按本地文件读它，格式限 wav、w64、mp3、flac、ogg、aac、mov 系（m4a、mp4）、aiff、matroska 系（mkv、webm），播放列表和 concat 这类会引用别的文件的格式不收。
 
 ### 和声进行
 
@@ -126,12 +130,15 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 
 每个音效单独合成，找到自己的最大采样，再把这个采样放到 cue 帧在 48 kHz 上的位置（帧号乘 48000 除以 fps 取整）。峰值前的部分落到 t = 0 之前的截掉。
 
+带 `file` 的 sfx cue 规则相同：文件解码成 48 kHz 立体声（只按本地文件读，格式限 `mode: file` 列的那些），两个声道里最响的采样放到 cue 帧上，整体缩放到这个采样为 0.6，和内置音效差不多响。落到 t = 0 之前和超出片尾的部分截掉。ffmpeg 读不了或整段无声的文件报 `timeline-invalid`，路径指到那条 cue 的 `file`。挑或裁文件时让它要对准的那一下是全段最响的地方。
+
 ### 合成、混音和响度
 
 - `audio` 命令开一个空白页面加载 `/__flipbook/audio.js`，用 `OfflineAudioContext` 合成，PCM 分块 base64 传回 Node，写到 `.flipbook/audio/`：`music.wav`（preset）、`sfx.wav`（有 sfx cue），48 kHz 立体声 32 位浮点，长度等于画面。另写 `score.json`（和弦、强弱、音效位置）和 `audio.json`（各轨哈希、峰值、每个音效实际峰值的位置）。
 - 同机同版本合成两次，两个 WAV 逐字节一致。timeline、audio.js 和 Chromium 版本都没变时，render 直接用已有的轨。
+- 来自文件的音效不经合成：只要有带 `file` 的 sfx cue，`audio` 命令和 render 就把这些文件叠到合成的 `sfx.wav` 上（同时有内置音效时），写成同格式的 `.flipbook/audio/effects.wav`，混音和验收都用这条轨。没有内置音效也没有 preset 配乐时，音频不开浏览器页面。
 - render 把配乐（preset 合成的轨或用户文件）和音效用 `amix`（`normalize=0`）混在一起。有配乐时先量配乐自己的整合响度，把音效峰值放在它上方 12 dB。再量整体，线性增益到 -14 LUFS，4 倍过采样限幅到 -3 dBFS，然后量一遍限幅后的响度，把差值补进增益。只有音效时按峰值放到 -4 dBFS 再限幅。最后编 AAC 48 kHz 立体声 192 kbps。
-- 用户文件从 `bpmOffset` 秒处截起，让第一拍落在 t = 0，不够长补静音，超长截掉，最后一秒（片长不足 4 秒时取片长四分之一）淡出，然后和上面一样归一。
+- 音乐文件从 `bpmOffset`（或 `offset`）秒处截起，给 `bpmOffset` 时第一拍落在 t = 0，不够长补静音，超长截掉，开头按 `fadeIn` 秒淡入，结尾按 `fadeOut` 秒淡出（缺省最后一秒，片长不足 4 秒时取片长四分之一），然后和上面一样归一。
 - 响度一律用 ffmpeg `ebur128` 量，和验收同一个表。旁白的 sidechain 压低留了接口（`MixOptions.voice`），没实现。
 
 ## 换算规则

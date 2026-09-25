@@ -11,7 +11,7 @@ import {
     SFX_NAMES,
     type SfxName,
 } from './audioScore.ts';
-import { loadAssets } from './brand.ts';
+import { loadAssets, SOURCES_FILE } from './brand.ts';
 import {
     type ResolvedScene,
     type ResolvedTimeline,
@@ -96,6 +96,16 @@ class Checker {
     str(value: Json, at: string, pattern?: RegExp, what = 'a string'): value is string {
         if (typeof value !== 'string' || value.length === 0 || (pattern && !pattern.test(value))) {
             this.fail(at, `must be ${what} (got ${describe(value)})`);
+            return false;
+        }
+        return true;
+    }
+
+    /** A relative path that stays inside the composition directory. */
+    localFile(value: Json, at: string): boolean {
+        if (!this.str(value, at, undefined, 'a path inside the composition')) return false;
+        if (path.isAbsolute(value) || value.split(/[\\/]/).includes('..')) {
+            this.fail(at, 'must be a relative path inside the composition');
             return false;
         }
         return true;
@@ -192,7 +202,16 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
                     c.fail(at, 'must be an object with id, scene, beat and kind');
                     return;
                 }
-                c.keys(cue, at, ['id', 'scene', 'beat', 'kind', 'text', 'settleBeats', 'sfx']);
+                c.keys(cue, at, [
+                    'id',
+                    'scene',
+                    'beat',
+                    'kind',
+                    'text',
+                    'settleBeats',
+                    'sfx',
+                    'file',
+                ]);
                 if (c.str(cue.id, `${at}.id`, ID_PATTERN, 'an id of letters, digits, - or _')) {
                     if (cueIds.has(cue.id)) c.fail(`${at}.id`, `duplicates cue "${cue.id}"`);
                     cueIds.add(cue.id);
@@ -229,14 +248,23 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
                     c.fail(`${at}.text`, 'is only allowed on kind "text"');
                 }
                 if (cue.kind === 'sfx') {
-                    if (!SFX_NAMES.includes(cue.sfx as SfxName)) {
+                    if (cue.file !== undefined) {
+                        if (cue.sfx !== undefined) {
+                            c.fail(`${at}.file`, 'and sfx both name the sound: keep one');
+                        } else {
+                            c.localFile(cue.file, `${at}.file`);
+                        }
+                    } else if (!SFX_NAMES.includes(cue.sfx as SfxName)) {
                         c.fail(
                             `${at}.sfx`,
-                            `must be one of ${SFX_NAMES.map((n) => `"${n}"`).join(', ')} (got ${describe(cue.sfx)})`,
+                            `must be one of ${SFX_NAMES.map((n) => `"${n}"`).join(', ')}, or give "file" with a sound in the composition instead (got ${describe(cue.sfx)})`,
                         );
                     }
-                } else if (cue.sfx !== undefined) {
-                    c.fail(`${at}.sfx`, 'is only allowed on kind "sfx"');
+                } else {
+                    if (cue.sfx !== undefined) c.fail(`${at}.sfx`, 'is only allowed on kind "sfx"');
+                    if (cue.file !== undefined) {
+                        c.fail(`${at}.file`, 'is only allowed on kind "sfx"');
+                    }
                 }
                 if (cue.settleBeats !== undefined) {
                     c.num(cue.settleBeats, `${at}.settleBeats`, 0, 64);
@@ -258,6 +286,9 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
                 'dynamics',
                 'file',
                 'bpmOffset',
+                'offset',
+                'fadeIn',
+                'fadeOut',
             ]);
             const mode = audio.mode;
             if (mode !== 'preset' && mode !== 'file' && mode !== 'none') {
@@ -320,17 +351,28 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
                 }
             }
             if (mode === 'file') {
-                if (c.str(audio.file, '$.audio.file', undefined, 'a path inside the composition')) {
-                    const file = audio.file as string;
-                    if (path.isAbsolute(file) || file.split(/[\\/]/).includes('..')) {
-                        c.fail('$.audio.file', 'must be a relative path inside the composition');
-                    }
-                }
+                c.localFile(audio.file, '$.audio.file');
             } else {
                 onlyWith('file', 'file');
             }
             if (onlyWith('bpmOffset', 'file') && audio.bpmOffset !== undefined) {
                 c.num(audio.bpmOffset, '$.audio.bpmOffset', 0, 60);
+            }
+            if (onlyWith('offset', 'file') && audio.offset !== undefined) {
+                if (
+                    c.num(audio.offset, '$.audio.offset', 0, 3600) &&
+                    audio.bpmOffset !== undefined
+                ) {
+                    c.fail(
+                        '$.audio.offset',
+                        'and bpmOffset both set where the file starts: keep bpmOffset when the timeline follows the beat of the file, offset otherwise',
+                    );
+                }
+            }
+            for (const fade of ['fadeIn', 'fadeOut'] as const) {
+                if (onlyWith(fade, 'file') && audio[fade] !== undefined) {
+                    c.num(audio[fade], `$.audio.${fade}`, 0, 30);
+                }
             }
         }
     }
@@ -345,6 +387,15 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
         }
         if (Math.round(duration * (input.fps as number)) < 1) {
             c.fail('$.scenes', 'add up to less than one frame');
+        }
+        const audio = isObject(input.audio) ? input.audio : {};
+        const fadeIn = isNum(audio.fadeIn) ? audio.fadeIn : 0;
+        const fadeOut = isNum(audio.fadeOut) ? audio.fadeOut : 0;
+        if (fadeIn + fadeOut > duration) {
+            c.fail(
+                audio.fadeOut !== undefined ? '$.audio.fadeOut' : '$.audio.fadeIn',
+                `and the other fade add up to ${fadeIn + fadeOut} s, longer than the ${Number(duration.toFixed(3))} s video`,
+            );
         }
     }
 
@@ -391,6 +442,80 @@ export function audioSource(dir: string, file: string): { file: string } | { pro
     return { file: real };
 }
 
+/** Every audio file the timeline names, with the JSON path that names it. */
+export function audioFiles(timeline: TimelineV1): { path: string; file: string }[] {
+    const files: { path: string; file: string }[] = [];
+    if (timeline.audio?.mode === 'file' && timeline.audio.file) {
+        files.push({ path: '$.audio.file', file: timeline.audio.file });
+    }
+    (timeline.cues ?? []).forEach((cue, i) => {
+        if (cue.kind === 'sfx' && cue.file)
+            files.push({ path: `$.cues[${i}].file`, file: cue.file });
+    });
+    return files;
+}
+
+/**
+ * The audio files must be regular files inside the composition
+ * (timeline-invalid otherwise), each with its source and license in
+ * assets/SOURCES.json (audio-unlicensed otherwise).
+ */
+function audioFileFindings(dir: string, timeline: TimelineV1): Finding[] {
+    const files = audioFiles(timeline);
+    if (files.length === 0) return [];
+    const missing: Finding[] = [];
+    for (const { path: at, file } of files) {
+        const source = audioSource(dir, file);
+        if ('problem' in source) {
+            missing.push(
+                finding('timeline-invalid', `${at} ${source.problem}`, { detail: { path: at } }),
+            );
+        }
+    }
+    if (missing.length > 0) return missing;
+    const sourcesShown = SOURCES_FILE.split(path.sep).join('/');
+    let sources: Record<string, Json> = {};
+    let broken: string | null = null;
+    try {
+        const parsed: Json = JSON.parse(fs.readFileSync(path.join(dir, SOURCES_FILE), 'utf-8'));
+        if (isObject(parsed)) sources = parsed;
+        else broken = 'must be a JSON object keyed by file path under assets/';
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            broken = `is not valid JSON: ${(error as Error).message}`;
+        }
+    }
+    const findings: Finding[] = [];
+    for (const { path: at, file } of files) {
+        // Keyed by the path under assets/ (or, for a file elsewhere in the
+        // composition, by its path from the composition directory).
+        const shown = path.normalize(file).split(path.sep).join('/');
+        const inAssets = shown.startsWith('assets/');
+        const key = inAssets ? shown.slice('assets/'.length) : shown;
+        const entry = inAssets ? (sources[key] ?? sources[shown]) : sources[shown];
+        const lacking = broken
+            ? ['source', 'license']
+            : ['source', 'license'].filter(
+                  (key) =>
+                      !isObject(entry) ||
+                      typeof entry[key] !== 'string' ||
+                      (entry[key] as string).trim() === '',
+              );
+        if (lacking.length === 0) continue;
+        const why = broken
+            ? `${sourcesShown} ${broken}`
+            : `${shown} has no ${lacking.join(' and ')} in ${sourcesShown}`;
+        findings.push(
+            finding(
+                'audio-unlicensed',
+                `${why}. Fetch sounds with stock fetch, which records both, or add "${key}": { "source": "...", "license": "..." } from what the user says.`,
+                { element: shown, detail: { path: at, file: shown, lacking } },
+            ),
+        );
+    }
+    return findings;
+}
+
 export interface LoadedTimeline {
     timeline?: TimelineV1;
     resolved?: ResolvedTimeline;
@@ -432,18 +557,8 @@ export function loadTimeline(dir: string, write = true): LoadedTimeline {
             ),
         };
     }
-    if (timeline.audio?.mode === 'file' && timeline.audio.file) {
-        const source = audioSource(dir, timeline.audio.file);
-        if ('problem' in source) {
-            return {
-                findings: [
-                    finding('timeline-invalid', `$.audio.file ${source.problem}`, {
-                        detail: { path: '$.audio.file' },
-                    }),
-                ],
-            };
-        }
-    }
+    const audioProblems = audioFileFindings(dir, timeline);
+    if (audioProblems.length > 0) return { timeline, findings: audioProblems };
     const assets = loadAssets(dir, timeline.brand);
     if (assets.findings.length > 0) return { timeline, findings: assets.findings };
     const resolved: ResolvedTimeline = {

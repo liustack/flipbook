@@ -94,7 +94,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `.flipbook/tmp/` | render、stock fetch | 中间文件，结束后删掉 |
 | `.flipbook/stock/thumbs/` | stock search | 最近一次搜索的缩略图，每次搜索前清空 |
 | `.flipbook/render.lock` | render | 同一目录同时只跑一个 render（同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。锁用 O_EXCL 建，内容是 pid 和随机令牌。持有进程已退出，或锁里没有可读的持有者且建了超过 10 秒，才算过期被接管。释放时只删令牌仍是自己的锁 |
-| `.flipbook/audio/` | audio、render | 合成的 `music.wav`、`sfx.wav`，`score.json`（和弦、强弱、音效位置），`audio.json`（各轨哈希、峰值、音效实际峰值位置）。audio 命令也拿 `render.lock` |
+| `.flipbook/audio/` | audio、render | 合成的 `music.wav`、`sfx.wav`，`effects.wav`（有 cue 用音效文件时，叠上这些文件的音效轨），`score.json`（和弦、强弱、音效位置），`audio.json`（各轨哈希、峰值、音效实际峰值位置）。audio 命令也拿 `render.lock` |
 
 ## Finding
 
@@ -154,6 +154,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `audio-missing` | render | timeline 要声音（`preset`、`file` 或有 sfx cue），成片却没有音轨 | 重渲一次，还出现就带 JSON 报 issue |
 | `audio-loudness` | render | 有配乐的音轨整合响度不在 -14 LUFS 上下 1 LU 内 | 重渲一次，还出现就带 JSON 报 issue。自带音乐先确认 `bpmOffset` 之后不是静音 |
 | `audio-peak` | render | 音轨真峰值高于 -1 dBTP | 重渲一次，还出现就带 JSON 报 issue |
+| `audio-unlicensed` | check、snapshot、audio、render | timeline 用到的音频文件（`audio.file` 或 sfx cue 的 `file`）在 `assets/SOURCES.json` 里没有 `source` 或没有 `license`，或者这个文件不是读得出的 JSON 对象。`element` 是那个文件，`detail.path` 是 timeline 里的字段，`detail.lacking` 是缺了什么 | 声音用 `stock search --audio` 和 `stock fetch` 找，两样都会记下。用户自己的文件按用户说的写来源和许可 |
 | `audio-cue-offset` | render | 某个音效的峰值离它的 cue 帧超过一帧，或在音轨里找不到，`element` 是 `cue <id>` | sfx cue 之间至少隔 1/8 拍。隔开了还报就重渲一次，再出现带 JSON 报 issue |
 | `stock-no-results` | stock search | 哪家都没找到图（带 `--audio` 时是没找到声音），只报 warning | 换两到四个别的具体英文词再搜，或加 `--source`。都不合适就不用图或声音，告诉用户 |
 | `stock-rejected` | stock fetch | 文件没存：id 不存在、许可不是 `cc0` 或 `pdm`（Openverse）、地址不是公网 HTTPS、文件不是图片（上限 40 MB）或不是 ffmpeg 读得了的 mp3、Ogg、FLAC、WAV 声音（上限 60 MB）。`detail.reason` 是 `not-found`、`license`、`unsafe-url`、`not-image`、`not-audio` 或 `too-large` | 从 stock search 的结果里另挑一个 |
@@ -180,7 +181,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 
 - `artifacts`：`music`（有预设配乐时）、`sfx`（有 sfx cue 时），都是 WAV 路径。
 - `audio`：`mode`、`preset`、`key`、`progression`、`sampleRate`（48000）、`samples`、`durationSec`、`synthMs`，`music` 和 `sfx` 各有 `file`、`sha256`、`peakDb`，`sfx.cues[]` 每项有 `id`、`sfx`、`frame`、`target`（cue 帧在 48 kHz 上的采样位置）、`peakSample`（合成后音效轨在 cue 附近实际最大的采样位置）。
-- 没东西可合成时报 `audio-skipped` warning，退 0。
+- 有用音效文件的 sfx cue 时还写 `effects.wav`，在 `sfx` 和 `artifacts.sfx` 里给的就是它：合成的音效（如果有）加上每个文件，最响的采样对准各自的 cue。这时 `sfx.cues[]` 里文件 cue 的 `sfx` 是文件路径，`peakSample` 在这条轨上量。只有文件 cue 时什么都不合成，`preset`、`key`、`progression`、`synthMs`、`music` 为 `null`。
+- 没东西可合成、也没有文件 cue 时报 `audio-skipped` warning，退 0。
 
 ### render 报告里的 audio
 

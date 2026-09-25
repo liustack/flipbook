@@ -21,6 +21,8 @@ export interface CueV1 {
     text?: string;
     settleBeats?: number;
     sfx?: string;
+    /** An sfx cue's sound file in the composition, instead of a built-in `sfx`. */
+    file?: string;
 }
 
 export type AudioLevel = 'rest' | 'soft' | 'medium' | 'full';
@@ -34,6 +36,12 @@ export interface AudioV1 {
     dynamics?: Record<string, AudioLevel>;
     file?: string;
     bpmOffset?: number;
+    /** Mode file: the second of the file the video starts at, for files without a beat grid. */
+    offset?: number;
+    /** Mode file: seconds of fade in at the start. */
+    fadeIn?: number;
+    /** Mode file: seconds of fade out at the end. */
+    fadeOut?: number;
 }
 
 export interface TimelineV1 {
@@ -100,6 +108,7 @@ export interface ResolvedCue {
     settleFrame: number;
     text?: string;
     sfx?: string;
+    file?: string;
 }
 
 export interface ResolvedTimeline {
@@ -195,6 +204,7 @@ export function resolveTimeline(timeline: TimelineV1): ResolvedTimeline {
         };
         if (cue.text !== undefined) resolved.text = cue.text;
         if (cue.sfx !== undefined) resolved.sfx = cue.sfx;
+        if (cue.file !== undefined) resolved.file = cue.file;
         return resolved;
     });
     return {

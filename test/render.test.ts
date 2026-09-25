@@ -71,7 +71,7 @@ describe('user soundtrack', () => {
             'sine=frequency=880:sample_rate=48000:duration=6',
             '-af',
             clicks,
-            path.join(dir, 'music.wav'),
+            path.join(dir, 'assets', 'music.wav'),
         ]);
         expect(made.code).toBe(0);
         const rendered = await runRender({ dir, session: s, recordAttempts: false });

@@ -94,7 +94,7 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `.flipbook/tmp/` | render, stock fetch | Intermediate files, deleted at the end |
 | `.flipbook/stock/thumbs/` | stock search | The thumbnails of the latest search, cleared before each search |
 | `.flipbook/render.lock` | render | One render per directory at a time (re-entry from the same process counts). A second one gets `render-busy` and exit 1, which does not count as an attempt. The lock is created with O_EXCL and holds a pid and a random token. It counts as stale, and gets taken over, only when its holder has exited, or when it has no readable holder and is more than 10 seconds old. Releasing deletes the lock only while the token is still its own |
-| `.flipbook/audio/` | audio, render | The synthesized `music.wav` and `sfx.wav`, `score.json` (chords, dynamics, sound-effect positions), `audio.json` (hash and peak of each track, actual peak position of each sound effect). The audio command takes `render.lock` too |
+| `.flipbook/audio/` | audio, render | The synthesized `music.wav` and `sfx.wav`, `effects.wav` (the effects track with sound files laid over it, when a cue plays a file), `score.json` (chords, dynamics, sound-effect positions), `audio.json` (hash and peak of each track, actual peak position of each sound effect). The audio command takes `render.lock` too |
 
 ## Finding
 
@@ -154,6 +154,7 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `audio-missing` | render | The timeline asks for sound (`preset`, `file`, or sfx cues) but the video has no audio track | Render again. If it happens again, open an issue with the JSON |
 | `audio-loudness` | render | A track with music has integrated loudness outside -14 LUFS ±1 LU | Render again. If it happens again, open an issue with the JSON. With your own music, first make sure it is not silent after `bpmOffset` |
 | `audio-peak` | render | The track's true peak is above -1 dBTP | Render again. If it happens again, open an issue with the JSON |
+| `audio-unlicensed` | check, snapshot, audio, render | An audio file the timeline names (`audio.file` or an sfx cue's `file`) has no `source` or no `license` in `assets/SOURCES.json`, or that file is not a readable JSON object. `element` is the file, `detail.path` the timeline field, `detail.lacking` what is missing | Fetch sounds with `stock search --audio` and `stock fetch`, which record both. For the user's own file, write its source and license from what the user says |
 | `audio-cue-offset` | render | A sound effect's peak is more than one frame away from its cue frame, or cannot be found in the track. `element` is `cue <id>` | Keep sfx cues at least 1/8 beat apart. If they are and it still happens, render again, and if it happens again open an issue with the JSON |
 | `stock-no-results` | stock search | No service found an image (or, with `--audio`, a sound) for the query. Warning only | Search again with two to four other concrete English words, or with `--source`. When nothing fits, leave the picture or sound out and tell the user |
 | `stock-rejected` | stock fetch | The file was not saved: the id is unknown, its license is not `cc0` or `pdm` (Openverse), its address is not a public HTTPS address, the file is not an image (over 40 MB) or not an mp3, Ogg, FLAC or WAV sound ffmpeg can read (over 60 MB). `detail.reason` is `not-found`, `license`, `unsafe-url`, `not-image`, `not-audio` or `too-large` | Pick another result from stock search |
@@ -180,7 +181,8 @@ Audio checks (`audio-missing`, `audio-loudness`, `audio-peak`, `audio-cue-offset
 
 - `artifacts`: `music` (with preset music) and `sfx` (with sfx cues), both WAV paths.
 - `audio`: `mode`, `preset`, `key`, `progression`, `sampleRate` (48000), `samples`, `durationSec`, `synthMs`. `music` and `sfx` each have `file`, `sha256`, `peakDb`. Each item in `sfx.cues[]` has `id`, `sfx`, `frame`, `target` (the cue frame's sample position at 48 kHz) and `peakSample` (the sample position near the cue where the synthesized effect track actually peaks).
-- With nothing to synthesize it reports an `audio-skipped` warning and exits 0.
+- With sfx cues that play files, it also writes `effects.wav` and reports it as `sfx` and `artifacts.sfx`: the synthesized effects (if any) with each file's loudest sample on its cue. There each item in `sfx.cues[]` has the file path in `sfx` for a file cue, and `peakSample` is measured on this track. With file cues only, nothing is synthesized: `preset`, `key`, `progression`, `synthMs` and `music` are `null`.
+- With nothing to synthesize and no file cues it reports an `audio-skipped` warning and exits 0.
 
 ### audio in the render report
 

@@ -46,9 +46,12 @@ export function hasEffects(tl: ResolvedTimeline): boolean {
     return tl.cues.some((cue) => cue.kind === 'sfx');
 }
 
-/** Something to synthesize: preset music or effect cues. */
+/** Something to synthesize: preset music or built-in effect cues. Effects from files are not synthesized. */
 export function needsSynthesis(tl: ResolvedTimeline): boolean {
-    return tl.audio.mode === 'preset' || hasEffects(tl);
+    return (
+        tl.audio.mode === 'preset' ||
+        tl.cues.some((cue) => cue.kind === 'sfx' && cue.sfx !== undefined)
+    );
 }
 
 /** The video gets an audio track. */
@@ -358,8 +361,18 @@ export interface MixOptions {
     video: string;
     output: string;
     durationSec: number;
-    /** The music bed: the preset stem, or the user's file cut at its first beat. */
-    music?: { file: string; offsetSec: number; user: boolean };
+    /**
+     * The music bed: the preset stem, or a file from the composition cut at
+     * `offsetSec`, faded in over `fadeInSec` (default none) and out over
+     * `fadeOutSec` (default one second, a quarter of a shorter video).
+     */
+    music?: {
+        file: string;
+        offsetSec: number;
+        user: boolean;
+        fadeInSec?: number;
+        fadeOutSec?: number;
+    };
     /** The effects stem and its sample peak. */
     sfx?: { file: string; peakDb: number };
     /** Test hook: move the effects this many seconds later. */
@@ -403,10 +416,17 @@ function mixGraph(
     if (o.music && include.music) {
         const parts = [`[${index}:a]`];
         if (o.music.user) {
-            const fade = Math.min(1, o.durationSec / 4);
+            const fadeIn = Math.min(o.music.fadeInSec ?? 0, o.durationSec);
+            const fadeOut = Math.min(
+                o.music.fadeOutSec ?? Math.min(1, o.durationSec / 4),
+                o.durationSec,
+            );
             parts.push(
                 `atrim=start=${num(o.music.offsetSec)},asetpts=PTS-STARTPTS,aresample=48000,${FMT},apad,atrim=0:${d},` +
-                    `afade=t=out:st=${num(Math.max(0, o.durationSec - fade))}:d=${num(fade)},`,
+                    (fadeIn > 0 ? `afade=t=in:st=0:d=${num(fadeIn)},` : '') +
+                    (fadeOut > 0
+                        ? `afade=t=out:st=${num(Math.max(0, o.durationSec - fadeOut))}:d=${num(fadeOut)},`
+                        : ''),
             );
         } else {
             parts.push(`${FMT},apad,atrim=0:${d},`);

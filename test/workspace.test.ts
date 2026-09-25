@@ -165,6 +165,12 @@ function withAudio(file: string): string {
         JSON.stringify({ ...TIMELINE, audio: { mode: 'file', file, bpmOffset: 0 } }),
     );
     fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
+    fs.writeFileSync(
+        path.join(dir, 'assets', 'SOURCES.json'),
+        JSON.stringify({
+            [path.relative('assets', file)]: { source: 'made by the test', license: 'cc0' },
+        }),
+    );
     return dir;
 }
 

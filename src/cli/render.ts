@@ -10,6 +10,7 @@ import {
     type StemSet,
     synthesize,
 } from '../engine/audio.ts';
+import { AudioFileError, placeFileEffects } from '../engine/audioFiles.ts';
 import {
     autoRecycle,
     type CaptureOutput,
@@ -409,6 +410,21 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
         progress('render: synthesizing audio');
         stems = await synthesize(session, timeline, ws);
     }
+    let effects = stems?.sfx ?? null;
+    if (audioFfmpeg) {
+        try {
+            effects = await placeFileEffects(audioFfmpeg.ffmpeg, dir, timeline, ws, effects);
+        } catch (error) {
+            if (!(error instanceof AudioFileError)) throw error;
+            rb.add(
+                finding('timeline-invalid', error.message.split('\n')[0], {
+                    element: error.file,
+                    detail: { path: error.at, log: error.message },
+                }),
+            );
+            return;
+        }
+    }
     const video = path.join(tmp, 'video.mp4');
     const encoded = await encodeFrames(ctx, video);
     if (!encoded) return;
@@ -464,7 +480,13 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
             if ('problem' in source) {
                 userProblem(source.problem);
             } else {
-                music = { file: source.file, offsetSec: timeline.audio.bpmOffset ?? 0, user: true };
+                music = {
+                    file: source.file,
+                    offsetSec: timeline.audio.offset ?? timeline.audio.bpmOffset ?? 0,
+                    user: true,
+                    fadeInSec: timeline.audio.fadeIn,
+                    fadeOutSec: timeline.audio.fadeOut,
+                };
             }
         } else if (stems?.music) {
             music = { file: stems.music.file, offsetSec: 0, user: false };
@@ -475,7 +497,7 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
             output: withAudio,
             durationSec: timeline.frameCount / timeline.fps,
             music,
-            sfx: stems?.sfx ? { file: stems.sfx.file, peakDb: stems.sfx.peakDb } : undefined,
+            sfx: effects ? { file: effects.file, peakDb: effects.peakDb } : undefined,
             shiftSfxSec: options.audioShiftSec,
         };
         let mixed: MixResult | null = null;
@@ -493,7 +515,7 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
                 ffmpeg: audioFfmpeg,
                 video: delivered,
                 timeline,
-                effects: stems?.sfx ? { file: stems.sfx.file, cues: stems.sfx.cues } : null,
+                effects: effects ? { file: effects.file, cues: effects.cues } : null,
                 mix: mixOptions,
             });
             rb.addAll(checked.findings);

@@ -1,0 +1,12 @@
+{
+    "version": 1,
+    "width": 640,
+    "height": 360,
+    "fps": 12,
+    "seed": 7,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [{ "id": "main", "bars": 2 }],
+    "cues": [{ "id": "tap", "scene": "main", "beat": 2, "kind": "sfx", "file": "assets/tap.wav" }],
+    "audio": { "mode": "none" }
+}

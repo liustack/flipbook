@@ -76,6 +76,104 @@ describe('validateTimeline', () => {
     });
 });
 
+describe('audio files in the timeline', () => {
+    const fileCue =
+        (extra: Record<string, unknown> = {}) =>
+        (t: Record<string, unknown>) => {
+            t.cues = [{ id: 'turn', scene: 'a', beat: 1, kind: 'sfx', ...extra }];
+        };
+
+    it('takes an sfx cue with a file instead of a built-in name, never both', () => {
+        expect(errorsFor(fileCue({ file: 'assets/page-turn.mp3' }))).toEqual([]);
+        const both = errorsFor(fileCue({ sfx: 'paper', file: 'assets/page-turn.mp3' }));
+        expect(both.map((e) => e.path)).toEqual(['$.cues[0].file']);
+        const neither = errorsFor(fileCue());
+        expect(neither[0].path).toBe('$.cues[0].sfx');
+        expect(neither[0].message).toContain('"file"');
+        for (const file of ['../x.wav', '/tmp/x.wav', '']) {
+            expect(errorsFor(fileCue({ file }))[0].path).toBe('$.cues[0].file');
+        }
+        const onText = errorsFor((t) => {
+            (t.cues as Record<string, unknown>[])[0].file = 'assets/x.wav';
+        });
+        expect(onText[0].path).toBe('$.cues[0].file');
+    });
+
+    it('takes offset, fadeIn and fadeOut with mode file only', () => {
+        const file = { mode: 'file', file: 'assets/song.ogg' };
+        expect(
+            errorsFor((t) => (t.audio = { ...file, offset: 12.5, fadeIn: 0.5, fadeOut: 2 })),
+        ).toEqual([]);
+        expect(errorsFor((t) => (t.audio = { ...file, offset: -1 }))[0].path).toBe(
+            '$.audio.offset',
+        );
+        expect(errorsFor((t) => (t.audio = { ...file, fadeIn: 31 }))[0].path).toBe(
+            '$.audio.fadeIn',
+        );
+        const twice = errorsFor((t) => (t.audio = { ...file, offset: 3, bpmOffset: 0.5 }));
+        expect(twice.map((e) => e.path)).toEqual(['$.audio.offset']);
+        const preset = errorsFor(
+            (t) => (t.audio = { mode: 'preset', preset: 'pluck', fadeOut: 1 }),
+        );
+        expect(preset.map((e) => e.path)).toEqual(['$.audio.fadeOut']);
+        // The base timeline lasts 5 s.
+        const tooLong = errorsFor((t) => (t.audio = { ...file, fadeIn: 3, fadeOut: 3 }));
+        expect(tooLong.map((e) => e.path)).toEqual(['$.audio.fadeOut']);
+    });
+
+    function composition(timeline: (t: Record<string, unknown>) => void): string {
+        const dir = tempDir('timeline-audio');
+        const t = base();
+        timeline(t);
+        fs.writeFileSync(path.join(dir, 'timeline.json'), JSON.stringify(t));
+        fs.mkdirSync(path.join(dir, 'assets'));
+        fs.writeFileSync(path.join(dir, 'assets', 'tap.wav'), 'RIFF');
+        fs.writeFileSync(path.join(dir, 'assets', 'song.ogg'), 'OggS');
+        return dir;
+    }
+    const writeSources = (dir: string, sources: unknown) =>
+        fs.writeFileSync(path.join(dir, 'assets', 'SOURCES.json'), JSON.stringify(sources));
+
+    it('needs every audio file listed with its source and license in assets/SOURCES.json', () => {
+        const dir = composition((t) => {
+            fileCue({ file: 'assets/tap.wav' })(t);
+            t.audio = { mode: 'file', file: 'assets/song.ogg' };
+        });
+        const none = loadTimeline(dir, false).findings;
+        expect(none.map((f) => [f.code, f.element, f.detail?.path])).toEqual([
+            ['audio-unlicensed', 'assets/song.ogg', '$.audio.file'],
+            ['audio-unlicensed', 'assets/tap.wav', '$.cues[0].file'],
+        ]);
+
+        writeSources(dir, {
+            'song.ogg': { source: 'https://commons.wikimedia.org/x', license: 'cc0' },
+            'tap.wav': { source: 'https://freesound.org/x' },
+        });
+        const partial = loadTimeline(dir, false).findings;
+        expect(partial.map((f) => f.element)).toEqual(['assets/tap.wav']);
+        expect(partial[0].message).toContain('license');
+
+        writeSources(dir, {
+            'song.ogg': { source: 'https://commons.wikimedia.org/x', license: 'cc0' },
+            'tap.wav': { source: 'https://freesound.org/x', license: 'cc0' },
+        });
+        const loaded = loadTimeline(dir, false);
+        expect(loaded.findings).toEqual([]);
+        expect(loaded.resolved?.cues[0]).toMatchObject({ kind: 'sfx', file: 'assets/tap.wav' });
+
+        fs.writeFileSync(path.join(dir, 'assets', 'SOURCES.json'), '{ broken');
+        expect(loadTimeline(dir, false).findings[0].code).toBe('audio-unlicensed');
+    });
+
+    it('reports a missing effect file as timeline-invalid at its cue', () => {
+        const dir = composition(fileCue({ file: 'assets/nope.wav' }));
+        const findings = loadTimeline(dir, false).findings;
+        expect(findings.map((f) => [f.code, f.detail?.path])).toEqual([
+            ['timeline-invalid', '$.cues[0].file'],
+        ]);
+    });
+});
+
 describe('resolveTimeline', () => {
     it('turns beats into seconds and frames', () => {
         const r = resolveTimeline(base() as unknown as TimelineV1);

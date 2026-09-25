@@ -135,6 +135,15 @@ describe('bad composition corpus', () => {
         expect(checked.exitCode).toBe(1);
     });
 
+    it('audio-unlicensed: a sound file with no source and license in assets/SOURCES.json', async () => {
+        const checked = await check('audio-unlicensed');
+        expect(codes(checked)).toEqual(['audio-unlicensed']);
+        expect(checked.failures[0].detail?.path).toBe('$.cues[0].file');
+        const rendered = await render('audio-unlicensed');
+        expect(codes(rendered)).toEqual(['audio-unlicensed']);
+        expect(rendered.artifacts.video).toBeUndefined();
+    });
+
     it('random: drawing from Math.random', async () => {
         const checked = await check('random');
         expect(codes(checked)).toContain('random-dependent');

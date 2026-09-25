@@ -71,7 +71,8 @@ Any other field is an error, so a misspelled field is never silently ignored.
 | `kind` | yes | `text`, `sfx`, `mark` | |
 | `text` | when kind is text | non-empty string | The text on screen. check uses it to verify glyph coverage |
 | `settleBeats` | no | 0 to 64 | How many beats until the text has fully appeared. check and render run the text checks at that moment. Defaults to 0 (fully there at the cue time). A text cue must finish appearing before its scene ends |
-| `sfx` | when kind is sfx | `paper`, `drop`, `ding`, `sweep` | Sound effect name. Its peak lands on the cue's frame, see the audio section |
+| `sfx` | when kind is sfx, unless `file` is given | `paper`, `drop`, `ding`, `sweep` | Built-in sound effect. Its peak lands on the cue's frame, see the audio section |
+| `file` | kind sfx only, instead of `sfx` | path relative to the composition directory, such as `assets/page-turn.mp3` | A sound file from the composition, usually one `stock fetch` saved. Its loudest sample lands on the cue's frame. Needs its source and license in `assets/SOURCES.json` (`audio-unlicensed` otherwise). Giving both `sfx` and `file` is `timeline-invalid` |
 
 ## audio
 
@@ -82,14 +83,17 @@ Any other field is an error, so a misspelled field is never silently ignored.
 | `key` | all | `A` to `G`, optionally with `#` or `b`, a trailing `m` for minor, defaults to `C` | The key of the music. The `ding` effect is pitched to its tonic too |
 | `progression` | preset | integer from 0 to 5, defaults to 0 | Chord progression number, see the table below |
 | `dynamics` | preset | map from scene id to `rest`, `soft`, `medium`, `full` | Dynamics per scene. Scenes left out play `medium` |
-| `file` | file, required | path relative to the composition directory | The user's own music. `timeline-invalid` when the file is not inside the composition directory |
-| `bpmOffset` | file | 0 to 60, defaults to 0 | The second where beat 1 falls in the user's music |
+| `file` | file, required | path relative to the composition directory | Music from a file: the user's own or one `stock fetch` saved. `timeline-invalid` when the file is not inside the composition directory, `audio-unlicensed` when `assets/SOURCES.json` does not give its source and license |
+| `bpmOffset` | file | 0 to 60, defaults to 0 | The second where beat 1 falls in the music, when the timeline follows its beat |
+| `offset` | file | 0 to 3600 | The second of the file the video starts at, for music whose beat the timeline does not follow. Giving both `offset` and `bpmOffset` is `timeline-invalid` |
+| `fadeIn` | file | 0 to 30, defaults to 0 | Seconds of fade in at the start |
+| `fadeOut` | file | 0 to 30, defaults to 1 (a quarter of a video under 4 seconds) | Seconds of fade out at the end. `fadeIn` plus `fadeOut` may not pass the video length |
 
 A field written under a mode that does not use it (such as `preset` with `mode: none`) is `timeline-invalid`, with the path pointing at that field.
 
 - `none`: no music. With `sfx` cues the video carries only the effects. Without them it is silent.
 - `preset`: the `audio` command synthesizes music from the preset, key, progression and per-scene dynamics. render calls it on its own.
-- `file`: the user's own music, with no beat detection: the user supplies `bpm` and `bpmOffset`. After resolving symlinks the file must be a regular file inside the composition directory, otherwise `timeline-invalid`. ffmpeg reads it only as a local file, and only in these formats: wav, w64, mp3, flac, ogg, aac, the mov family (m4a, mp4), aiff, the matroska family (mkv, webm). Formats that pull in other files, such as playlists and concat, are refused.
+- `file`: music from a file, with no beat detection. For the user's own song the user supplies `bpm` and `bpmOffset`. For a found piece whose beat the timeline does not follow, `offset` picks where it starts. After resolving symlinks the file must be a regular file inside the composition directory, otherwise `timeline-invalid`. ffmpeg reads it only as a local file, and only in these formats: wav, w64, mp3, flac, ogg, aac, the mov family (m4a, mp4), aiff, the matroska family (mkv, webm). Formats that pull in other files, such as playlists and concat, are refused.
 
 ### Chord progressions
 
@@ -126,12 +130,15 @@ Dynamics follow the scene where a note starts. A long note that crosses into the
 
 Each effect is synthesized on its own, its loudest sample is found, and that sample is placed at the cue frame's position at 48 kHz (frame number times 48000 divided by fps, rounded). Any part before the peak that would land before t = 0 is cut.
 
+An sfx cue with `file` follows the same rule: the file is decoded to 48 kHz stereo (read only as a local file, in the formats listed for `mode: file`), its loudest sample over both channels is placed on the cue frame, and the file is scaled so that sample sits at 0.6, about as loud as the built-in effects. The part before t = 0 and the part past the end are cut. A file that ffmpeg cannot read, or that is silent, is `timeline-invalid` with the path of that cue's `file`. Trim or pick the file so its hit is its loudest moment.
+
 ### Synthesis, mixing and loudness
 
 - The `audio` command opens a blank page, loads `/__flipbook/audio.js`, synthesizes with `OfflineAudioContext`, sends the PCM back to Node in base64 chunks, and writes to `.flipbook/audio/`: `music.wav` (preset) and `sfx.wav` (with sfx cues), 48 kHz stereo 32-bit float, as long as the picture. It also writes `score.json` (chords, dynamics, effect positions) and `audio.json` (hash and peak of each track, actual peak position of each effect).
 - Two syntheses on the same machine and version produce byte-identical WAVs. When the timeline, audio.js and the Chromium version are unchanged, render reuses the existing tracks.
+- Effects from files are not synthesized: with any sfx cue that has `file`, the `audio` command and render lay the files over the synthesized `sfx.wav` (when there are built-in effects too) into `.flipbook/audio/effects.wav`, the same format, and mix and check that track instead. Without built-in effects or preset music no browser page is opened for audio.
 - render mixes the music (the synthesized preset track or the user's file) with the effects using `amix` (`normalize=0`). With music, it first measures the music's own integrated loudness and puts the effect peaks 12 dB above it. Then it measures the whole mix, applies linear gain to -14 LUFS, limits to -3 dBFS with 4x oversampling, measures the limited result again and folds the difference into the gain. With only effects, it puts the peak at -4 dBFS and then limits. Finally it encodes AAC at 48 kHz stereo, 192 kbps.
-- The user's file is cut from `bpmOffset` seconds so that beat 1 lands at t = 0, padded with silence when too short, cut when too long, and faded out over the last second (a quarter of the length when the video is under 4 seconds), then normalized as above.
+- The music file is cut from `bpmOffset` (or `offset`) seconds, so that with `bpmOffset` beat 1 lands at t = 0, padded with silence when too short, cut when too long, faded in over `fadeIn` seconds and out over `fadeOut` seconds (by default the last second, a quarter of the length when the video is under 4 seconds), then normalized as above.
 - Loudness is always measured with ffmpeg `ebur128`, the same meter acceptance uses. Ducking the music under voice-over has an interface (`MixOptions.voice`) but is not implemented.
 
 ## Conversion rules

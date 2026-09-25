@@ -292,6 +292,12 @@ A sound effect peaks more than one frame away from its sfx cue frame, or cannot 
 
 Fix: Keep sfx cues at least 1/8 beat apart and inside the scene they belong to. If the cues are clean, render again and report it with this JSON if it repeats.
 
+### `audio-unlicensed`
+
+An audio file timeline.json names (audio.file or an sfx cue file) has no source and license in assets/SOURCES.json.
+
+Fix: Fetch sounds with stock search --audio and stock fetch, which record both. For a file the user supplied, write its source and license in assets/SOURCES.json from what the user says, and ask when the license is unknown.
+
 ### `render-busy`
 
 Another render of this composition is running.
