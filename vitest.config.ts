@@ -1,3 +1,4 @@
+import { availableParallelism } from 'os';
 import { defineConfig } from 'vitest/config';
 import pkg from './package.json' with { type: 'json' };
 
@@ -19,6 +20,9 @@ export default defineConfig({
         globalSetup: './test/globalSetup.ts',
         testTimeout: 240_000,
         hookTimeout: 240_000,
-        maxWorkers: 4,
+        // Each worker drives Chromium and ffmpeg, which need more CPU than the
+        // worker itself: leave one core to them. Four workers on the 3-core
+        // macOS runner let a seek wait over 10 s.
+        maxWorkers: Math.max(1, Math.min(4, availableParallelism() - 1)),
     },
 });
