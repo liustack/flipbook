@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <title>hello</title>
 <style>
-  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #f4efe4; }
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #f4efe4; }
   canvas { position: absolute; left: 0; top: 0; }
-  .line { position: absolute; left: 0; width: 1920px; margin: 0; text-align: center; color: #2b2622; }
-  #zh { top: 360px; font: 400 128px/1.2 "LXGW WenKai"; }
-  #en { top: 560px; font: 600 88px/1.2 "Noto Serif SC"; letter-spacing: 2px; }
+  .line { position: absolute; left: 0; width: 100%; margin: 0; text-align: center; color: #2b2622; }
+  #zh { top: calc(50% - 180px * var(--u, 1)); font: 400 calc(128px * var(--u, 1))/1.2 "LXGW WenKai"; }
+  #en { top: calc(50% + 20px * var(--u, 1)); font: 600 calc(88px * var(--u, 1))/1.2 "Noto Serif SC";
+        letter-spacing: calc(2px * var(--u, 1)); }
 </style>
 </head>
 <body>
@@ -25,6 +26,9 @@ import {
 const tl = await timeline();
 const W = tl.width;
 const H = tl.height;
+// One unit is one pixel of a 1080-pixel short edge: any --size keeps the proportions.
+const U = Math.min(W, H) / 1080;
+document.documentElement.style.setProperty('--u', String(U));
 const ink = setupCanvas(document.getElementById('ink'), W, H);
 const zh = document.getElementById('zh');
 const en = document.getElementById('en');
@@ -36,7 +40,8 @@ composition({
       ctx.fillStyle = '#f4efe4';
       ctx.fillRect(0, 0, W, H);
       const r = rng(tl.seed);
-      for (let i = 0; i < 9000; i++) {
+      const specks = Math.round((9000 * W * H) / (1920 * 1080));
+      for (let i = 0; i < specks; i++) {
         ctx.fillStyle = `rgba(90, 70, 40, ${r.range(0.02, 0.08)})`;
         ctx.fillRect(r.range(0, W), r.range(0, H), r.range(1, 3), r.range(1, 3));
       }
@@ -49,19 +54,19 @@ composition({
     const p = ease.inOutCubic(progress(drawn, 0, tl.durationSec));
     ink.clearRect(0, 0, W, H);
     ink.save();
-    ink.translate(lerp(260, W - 260, p), 860 + Math.sin(p * Math.PI * 2) * 60);
+    ink.translate(lerp(260 * U, W - 260 * U, p), H - 220 * U + Math.sin(p * Math.PI * 2) * 60 * U);
     ink.rotate(p * Math.PI);
-    const wobble = (rand(tl.seed, Math.round(drawn * tl.fps)) - 0.5) * 6;
+    const wobble = (rand(tl.seed, Math.round(drawn * tl.fps)) - 0.5) * 6 * U;
     ink.fillStyle = '#c8452d';
-    ink.fillRect(-90 + wobble, -90, 180, 180);
+    ink.fillRect(-90 * U + wobble, -90 * U, 180 * U, 180 * U);
     ink.restore();
 
     const a = ease.outCubic(cueProgress(tl, t, 'zh'));
     zh.style.opacity = String(a);
-    zh.style.transform = `translateY(${(1 - a) * 40}px)`;
+    zh.style.transform = `translateY(${(1 - a) * 40 * U}px)`;
     const b = ease.outCubic(cueProgress(tl, t, 'en'));
     en.style.opacity = String(b);
-    en.style.transform = `translateY(${(1 - b) * 40}px)`;
+    en.style.transform = `translateY(${(1 - b) * 40 * U}px)`;
   },
 });
 </script>

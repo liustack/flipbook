@@ -21,13 +21,25 @@ import {
 import { drawEgg } from './eggs.js';
 
 /**
- * config: { glyph, font, grow, box: { x, y, width, height } }. The glyph takes
- * one egg per mark cue whose id starts with "egg-".
+ * config: { glyph, font, grow, box: { x, y, width, height } }, laid out for a
+ * 1920x1080 stage. On any other stage the box keeps its shape, stays centered
+ * and grows or shrinks to fit. The glyph takes one egg per mark cue whose id
+ * starts with "egg-".
  */
 export async function film(config) {
   const tl = await timeline();
   const W = tl.width;
   const H = tl.height;
+  // One unit is one pixel of a 1080-pixel short edge, for the title.
+  const U = Math.min(W, H) / 1080;
+  document.documentElement.style.setProperty('--u', String(U));
+  const fit = Math.min(H / 1080, (W * 0.8) / config.box.width);
+  const box = {
+    x: W / 2 + (config.box.x + config.box.width / 2 - 960) * fit - (config.box.width * fit) / 2,
+    y: H / 2 + (config.box.y + config.box.height / 2 - 540) * fit - (config.box.height * fit) / 2,
+    width: config.box.width * fit,
+    height: config.box.height * fit,
+  };
   const ctx = setupCanvas(document.getElementById('eggs'), W, H);
   const title = document.getElementById('title');
   const gather = tl.scenes[0];
@@ -42,12 +54,12 @@ export async function film(config) {
       const mask = glyphMask({
         text: config.glyph,
         font: config.font,
-        grow: config.grow,
-        box: config.box,
+        grow: config.grow * fit,
+        box,
       });
       const packed = packSlots(mask, { count: times.length, seed: tl.seed });
       const slots = orderSlots(packed, 'random', tl.seed);
-      center = [config.box.x + config.box.width / 2, config.box.y + config.box.height / 2];
+      center = [box.x + box.width / 2, box.y + box.height / 2];
       eggs = assemble({
         slots,
         times,
@@ -79,7 +91,7 @@ export async function film(config) {
       }
       const p = ease.outCubic(cueProgress(tl, t, 'title'));
       title.style.opacity = String(p);
-      title.style.transform = `translateY(${(1 - p) * 14}px)`;
+      title.style.transform = `translateY(${(1 - p) * 14 * U}px)`;
     },
   });
 }
