@@ -17,5 +17,36 @@
         { "id": "title", "scene": "title", "beat": 2, "kind": "text", "text": "月有阴晴圆缺", "settleBeats": 1.5 },
         { "id": "credit", "scene": "title", "beat": 3, "kind": "text", "text": "苏轼《水调歌头》", "settleBeats": 1 }
     ],
-    "audio": { "mode": "file", "file": "assets/music-box.mp3", "fadeOut": 2.5 }
+    "audio": {
+        "mode": "score",
+        "key": "D",
+        "score": {
+            "room": "hall",
+            "instruments": {
+                "harp": "harp",
+                "bed": { "instrument": "strings", "volume": 0.8 },
+                "lead": "flute"
+            },
+            "scenes": {
+                "open": {
+                    "level": "soft",
+                    "chords": ["D", "Bm"],
+                    "play": { "harp": "arpeggio", "bed": "hold", "lead": ["-:4", "-:2 A4 D5"] }
+                },
+                "flip": {
+                    "chords": ["G", "Asus4 A"],
+                    "play": {
+                        "harp": "broken",
+                        "bed": "hold",
+                        "lead": ["B5:1.5 A5:0.5 F#5 E5", "E5:1.5 F#5:0.5 A5:2"]
+                    }
+                },
+                "title": {
+                    "level": "soft",
+                    "chords": ["Bm A", "D"],
+                    "play": { "harp": "arpeggio", "bed": "hold", "lead": ["F#5:2 E5 D5", "D5:4"] }
+                }
+            }
+        }
+    }
 }

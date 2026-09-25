@@ -7,14 +7,5 @@
         "title": "Page Turn",
         "creator": "davidbain",
         "url": "https://cdn.freesound.org/previews/136/136778_2207512-hq.mp3"
-    },
-    "music-box.mp3": {
-        "source": "https://freesound.org/people/DRFX/sounds/338986",
-        "license": "cc0",
-        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-        "id": "openverse-audio:138cc846-97bf-44aa-ae12-b68e55d6b425",
-        "title": "Music Box Melody 1",
-        "creator": "DRFX",
-        "url": "https://cdn.freesound.org/previews/338/338986_5106192-hq.mp3"
     }
 }
