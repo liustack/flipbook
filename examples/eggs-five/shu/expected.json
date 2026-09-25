@@ -5,5 +5,9 @@
     "width": 1920,
     "height": 1080,
     "check": "pass",
-    "render": "pass"
+    "render": "pass",
+    "snapshot": {
+        "chromium": "1243",
+        "digest": "5b1e26bb015d7290598e4c8dea177dd5485fedcb9dc2de187ec5d35828256b7a"
+    }
 }

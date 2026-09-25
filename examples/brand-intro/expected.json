@@ -12,5 +12,9 @@
         "channels": 2,
         "integratedLufs": -14,
         "sfxCues": 1
+    },
+    "snapshot": {
+        "chromium": "1243",
+        "digest": "08195536939b7570b283d67158a3b3f006c523067a02b6694ce58acd348cab9d"
     }
 }

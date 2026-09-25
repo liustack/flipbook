@@ -36,7 +36,7 @@ src/
   engine/          浏览器、页面、时钟、timeline、截帧、编码、验收、字体和自带字体、品牌资产、缓存、扫描、配乐合成和混音、渲染进程监视
   runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、audio）
   fonts/           字体清单、码位表、OFL 全文
-scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）
+scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）、examples-baseline.mjs（记样例的帧摘要）
 skills/flipbook/   SKILL.md（英文）、references/（rules、timeline、audio、paper、materials、text、templates、brand、troubleshooting）、scripts/run.sh 和 run.ps1
 docs/              report-schema.md、timeline-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
 docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
@@ -55,7 +55,7 @@ test/e2e/          vitest 端到端档：样例、坏片语料、reference 片�
 - 坏片语料每类至少一条，新增检查时先加一条会被拦下的坏片。
 - `skills/flipbook/references/` 里标了 `<!-- check: ... -->` 的代码片段由 `test/e2e/references.test.ts` 真跑 check。`troubleshooting.md` 从 `src/cli/codes.ts` 生成，改了类型码跑 `UPDATE_REFERENCES=1 pnpm test test/skillText.test.ts`。
 - 评测花真实额度，按 docs/eval.md 本地跑，CI 只跑 `--dry-run`。
-- 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。
+- 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。然后在 macOS arm64 上跑 `pnpm examples:baseline` 重出样例的帧摘要（写进各样例的 `expected.json`），和升级放同一个提交。改了样例的画面也跑它。
 - 确定性只在同机同版本比原始帧哈希，跨机器不比。
 
 ## 文档
