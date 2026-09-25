@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>specimen-board</title>
+<style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #efe5d0; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="board"></canvas>
+<script type="module">
+import {
+  composition, timeline, setupCanvas, paperLayer, grainLayer, photo, PAPER,
+  ease, clamp, progress, cue, cueProgress, fillText,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+// One unit is one pixel of a 1080-pixel short edge: any --size keeps the proportions.
+const U = Math.min(W, H) / 1080;
+const ctx = setupCanvas(document.getElementById('board'), W, H);
+
+// Public domain plates from the Biodiversity Heritage Library and the
+// Biblioteca Rector Machado y Nuñez, fetched with flipbook stock fetch
+// (sources in assets/SOURCES.json). Each is cut from its paper and made a sticker.
+const specimens = [
+  { src: 'assets/hercules-beetle.jpg', at: [0.2, 0.4], size: 400, sticker: { tilt: -4 } },
+  {
+    src: 'assets/birdwing.jpg', at: [0.41, 0.34], size: 380,
+    crop: { x: 0.02, y: 0.06, width: 0.96, height: 0.42 }, sticker: { tilt: 3 },
+  },
+  { src: 'assets/flower-chafer.jpg', at: [0.61, 0.42], size: 380, sticker: { tilt: 2.5 } },
+  {
+    src: 'assets/cone-shells.jpg', at: [0.81, 0.41], size: 260,
+    crop: { x: 0.16, y: 0.715, width: 0.305, height: 0.172 }, sticker: { tilt: -3 },
+  },
+];
+const cut = await Promise.all(
+  specimens.map((s) =>
+    photo(s.src, { crop: s.crop, size: s.size * U, sticker: { border: 10 * U, ...s.sticker } }),
+  ),
+);
+
+composition({
+  setup() {
+    paperLayer(W, H, { seed: tl.seed, color: PAPER.cream, grid: { spacing: 36 * U, major: 5 } });
+    grainLayer(W, H, { seed: tl.seed, vignette: 0.35 });
+  },
+  seek(t) {
+    ctx.clearRect(0, 0, W, H);
+    // A slow push toward the board over the whole film.
+    const push = 1 + 0.045 * ease.inOutSine(progress(t, 0, tl.durationSec));
+    ctx.save();
+    ctx.translate(W / 2, H * 0.45);
+    ctx.scale(push, push);
+    ctx.translate(-W / 2, -H * 0.45);
+
+    specimens.forEach((s, i) => {
+      const start = cue(tl, `drop-${i + 1}`).time;
+      if (t < start) return;
+      // Dropped from above the board: it falls, turns into its tilt and lands flat.
+      const p = ease.outCubic(clamp((t - start) / 0.45, 0, 1));
+      const settle = ease.outBack(clamp((t - start - 0.3) / 0.5, 0, 1));
+      const piece = cut[i];
+      const scale = 1 + 0.16 * (1 - p) - 0.02 * (1 - settle);
+      piece.draw(ctx, s.at[0] * W, s.at[1] * H - (1 - p) * 70 * U, {
+        scale,
+        rotate: (1 - p) * (i % 2 ? 7 : -7),
+        alpha: 0.4 + 0.6 * clamp(p * 3, 0, 1),
+        lift: 1 - p,
+      });
+    });
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    const zh = ease.outCubic(cueProgress(tl, t, 'zh'));
+    if (zh > 0) {
+      ctx.globalAlpha = zh;
+      ctx.fillStyle = '#2b2622';
+      ctx.font = `600 ${104 * U}px "Noto Serif SC"`;
+      fillText(ctx, '博物笔记', W / 2, H * 0.8 + (1 - zh) * 24 * U, { id: 'zh' });
+    }
+    const en = ease.outCubic(cueProgress(tl, t, 'en'));
+    if (en > 0) {
+      ctx.globalAlpha = en;
+      ctx.fillStyle = '#6b4a2e';
+      ctx.font = `400 ${40 * U}px "Noto Serif SC"`;
+      fillText(ctx, 'Field notes from the public domain', W / 2, H * 0.88 + (1 - en) * 16 * U, { id: 'en' });
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  },
+});
+</script>
+</body>
+</html>

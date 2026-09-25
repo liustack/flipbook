@@ -1,0 +1,31 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 20260927,
+    "bpm": 96,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "board", "bars": 2 },
+        { "id": "title", "bars": 2 }
+    ],
+    "cues": [
+        { "id": "drop-1", "scene": "board", "beat": 0, "kind": "mark" },
+        { "id": "drop-2", "scene": "board", "beat": 1, "kind": "mark" },
+        { "id": "drop-3", "scene": "board", "beat": 2, "kind": "mark" },
+        { "id": "drop-4", "scene": "board", "beat": 3, "kind": "mark" },
+        { "id": "land-1", "scene": "board", "beat": 0.75, "kind": "sfx", "sfx": "paper" },
+        { "id": "land-2", "scene": "board", "beat": 1.75, "kind": "sfx", "sfx": "paper" },
+        { "id": "land-3", "scene": "board", "beat": 2.75, "kind": "sfx", "sfx": "paper" },
+        { "id": "land-4", "scene": "board", "beat": 3.75, "kind": "sfx", "sfx": "paper" },
+        { "id": "zh", "scene": "title", "beat": 0, "kind": "text", "text": "博物笔记", "settleBeats": 1.5 },
+        { "id": "en", "scene": "title", "beat": 2, "kind": "text", "text": "Field notes from the public domain", "settleBeats": 1.5 }
+    ],
+    "audio": {
+        "mode": "preset",
+        "preset": "pluck",
+        "key": "D",
+        "dynamics": { "board": "soft", "title": "medium" }
+    }
+}

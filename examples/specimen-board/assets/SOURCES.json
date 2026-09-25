@@ -1,0 +1,38 @@
+{
+    "hercules-beetle.jpg": {
+        "source": "https://www.flickr.com/photos/61021753@N02/6008781054",
+        "license": "pdm",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "id": "openverse:61c0c260-a80e-4f31-9e3f-ea1b3804a234",
+        "title": "n38_w1150",
+        "creator": "BioDivLibrary",
+        "url": "https://live.staticflickr.com/6146/6008781054_84ea3c83de_b.jpg"
+    },
+    "flower-chafer.jpg": {
+        "source": "https://www.flickr.com/photos/61021753@N02/6008793356",
+        "license": "pdm",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "id": "openverse:a88d372d-f9e1-46e9-91f4-754a16b01f37",
+        "title": "n290_w1150",
+        "creator": "BioDivLibrary",
+        "url": "https://live.staticflickr.com/6010/6008793356_69291b0da2_b.jpg"
+    },
+    "birdwing.jpg": {
+        "source": "https://www.flickr.com/photos/61021753@N02/6011985561",
+        "license": "pdm",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "id": "openverse:e23a8736-b181-452f-b3da-36b634c91805",
+        "title": "n10_w1150",
+        "creator": "BioDivLibrary",
+        "url": "https://live.staticflickr.com/6124/6011985561_0e042eac95_b.jpg"
+    },
+    "cone-shells.jpg": {
+        "source": "https://www.flickr.com/photos/37667416@N04/3816619629",
+        "license": "pdm",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "id": "openverse:16a349f0-f0cc-4d2d-892a-0106ea6429e4",
+        "title": "Conus Gloria Maris...",
+        "creator": "Biblioteca Rector Machado y Nuñez",
+        "url": "https://live.staticflickr.com/2527/3816619629_055f882867_b.jpg"
+    }
+}
