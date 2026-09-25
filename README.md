@@ -22,27 +22,27 @@
 <table>
   <tr>
     <td colspan="2" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/paper-boat.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/paper-boat-contact-sheet.png" width="100%" alt="Twelve frames: a folded paper boat sails under a paper sun, through heavy rain and lightning, through falling snow, and into a warm evening where the words 纸船 appear"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.0/paper-boat.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.0/paper-boat-contact-sheet.png" width="100%" alt="Twelve frames: a folded paper boat sails under a paper sun, through heavy rain and lightning, through falling snow, and into a warm evening where the words 纸船 appear"></a>
       <br><sub>Claude Opus 5.5 made this from one prompt: a paper boat sails through sun, rain and snow. First try, 6.7 minutes, $1.48. 25 s, preset music.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-five-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one on beige paper, form the digit 5, then give way to the word flipbook"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.0/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.0/eggs-five-five-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one on beige paper, form the digit 5, then give way to the word flipbook"></a>
       <br><sub>Bird eggs land one by one and build a 5. 8 s, silent.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-shu.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-shu-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one and form the Chinese character 书, then give way to the words 手翻书"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.0/eggs-five-shu.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.0/eggs-five-shu-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one and form the Chinese character 书, then give way to the words 手翻书"></a>
       <br><sub>The same template builds 书 (book). 8 s, silent.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/beat-title.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/beat-title-contact-sheet.png" width="100%" alt="Twelve frames: a card is pinned to the page, three phrases land on it one per bar, then the title 翻页书 appears with a red stamp"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.0/beat-title.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.0/beat-title-contact-sheet.png" width="100%" alt="Twelve frames: a card is pinned to the page, three phrases land on it one per bar, then the title 翻页书 appears with a red stamp"></a>
       <br><sub>Three phrases land on the beat, then a stamped title. 12 s, marimba preset with sound effects.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/hello.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/hello-contact-sheet.png" width="100%" alt="Twelve frames: a red square moves across the frame under the lines 你好，翻页书 and Hello, flipbook"></a>
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.0/hello.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.0/hello-contact-sheet.png" width="100%" alt="Twelve frames: a red square moves across the frame under the lines 你好，翻页书 and Hello, flipbook"></a>
       <br><sub>The test render from the install guide. 5 s.</sub>
     </td>
   </tr>
@@ -63,22 +63,22 @@ It fixes three things that go wrong with AI-written web animation: every recordi
 Hand this line to your agent:
 
 ```text
-Install flipbook following https://github.com/liustack/flipbook/blob/v0.3.0/INSTALL.md, render the hello example, and tell me the result.
+Install flipbook following https://github.com/liustack/flipbook/blob/v0.5.0/INSTALL.md, render the hello example, and tell me the result.
 ```
 
 Or install the skill yourself. For Claude Code:
 
 ```bash
-npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global --agent claude-code -y
+npx -y skills add liustack/flipbook#v0.5.0 --skill flipbook --global --agent claude-code -y
 ```
 
 For Codex:
 
 ```bash
-npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global --agent codex -y
+npx -y skills add liustack/flipbook#v0.5.0 --skill flipbook --global --agent codex -y
 ```
 
-You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the skill's renderer globally: `npm install -g @liustack/flipbook@0.3.0`.
+You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the skill's renderer globally: `npm install -g @liustack/flipbook@0.5.0`.
 
 ## One sentence to a video
 
