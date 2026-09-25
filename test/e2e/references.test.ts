@@ -9,6 +9,8 @@
 // ```html block is the whole page. Both run against the block marked
 // <!-- snippet-timeline --> in the same file, next to every block marked
 // <!-- snippet-file: <path> --> (written to that path in the composition).
+// A .wav file the snippet timeline names (an sfx cue's `file`, `audio.file`)
+// and no block supplies is written as a short generated tone.
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -66,6 +68,43 @@ function snippets(file: string): {
     return { timeline, files, items };
 }
 
+/** A 0.4 s 16-bit mono WAV: a quiet tone with one loud click in the middle. */
+function toneWav(): Buffer {
+    const rate = 8000;
+    const frames = Math.round(0.4 * rate);
+    const data = Buffer.alloc(frames * 2);
+    for (let i = 0; i < frames; i++) {
+        const click = Math.abs(i - frames / 2) < 4 ? 0.8 : 0;
+        const v = 0.1 * Math.sin((2 * Math.PI * 660 * i) / rate) + click;
+        data.writeInt16LE(Math.round(v * 32767), i * 2);
+    }
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0, 'ascii');
+    header.writeUInt32LE(36 + data.length, 4);
+    header.write('WAVEfmt ', 8, 'ascii');
+    header.writeUInt32LE(16, 16);
+    header.writeUInt16LE(1, 20);
+    header.writeUInt16LE(1, 22);
+    header.writeUInt32LE(rate, 24);
+    header.writeUInt32LE(rate * 2, 28);
+    header.writeUInt16LE(2, 32);
+    header.writeUInt16LE(16, 34);
+    header.write('data', 36, 'ascii');
+    header.writeUInt32LE(data.length, 40);
+    return Buffer.concat([header, data]);
+}
+
+/** The .wav files a timeline names. */
+function namedWavs(timeline: string): string[] {
+    const t = JSON.parse(timeline) as {
+        cues?: { file?: string }[];
+        audio?: { file?: string };
+    };
+    return [t.audio?.file, ...(t.cues ?? []).map((cue) => cue.file)].filter(
+        (file): file is string => typeof file === 'string' && file.endsWith('.wav'),
+    );
+}
+
 function page(code: string): string {
     return `<!doctype html>
 <html>
@@ -110,6 +149,11 @@ describe.concurrent('reference snippets pass check as marked', () => {
                 for (const [name, content] of Object.entries(extra)) {
                     fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
                     fs.writeFileSync(path.join(dir, name), content);
+                }
+                for (const name of namedWavs(timeline as string)) {
+                    if (name in extra) continue;
+                    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+                    fs.writeFileSync(path.join(dir, name), toneWav());
                 }
                 fs.writeFileSync(
                     path.join(dir, 'index.html'),

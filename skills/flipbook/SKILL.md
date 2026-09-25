@@ -23,6 +23,7 @@ bash <skill-dir>/scripts/run.sh render <dir> --size 9:16        # another shape:
 bash <skill-dir>/scripts/run.sh render <dir> --scale 2          # 3840x2160 from a 1920x1080 stage
 bash <skill-dir>/scripts/run.sh stock search <dir> beetle plate  # public domain images, see references/photo.md
 bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse:<id> --as beetle
+bash <skill-dir>/scripts/run.sh stock search <dir> page turn --audio  # public domain sounds and music, see references/audio.md
 bash <skill-dir>/scripts/run.sh cutout <dir> assets/beetle.jpg          # every specimen as a transparent PNG, before composing
 ```
 
@@ -52,7 +53,7 @@ If scripts cannot run, use the first line that works (the pinned version is 0.5.
   - Claude Code, `~/.claude/settings.json`: the cache directory in `sandbox.filesystem.allowWrite` plus `cdn.playwright.dev`, `storage.googleapis.com`, `github.com` and `*.githubusercontent.com` in `sandbox.network.allowedDomains`. Or the launcher command in `sandbox.excludedCommands`.
   - Codex, `~/.codex/config.toml` under `[sandbox_workspace_write]`: the cache directory in `writable_roots` and `network_access = true`. Codex on Linux needs `network_access = true` for every run.
 - Codex `read-only` cannot run flipbook: ask the user for `workspace-write`.
-- `stock search` and `stock fetch` reach image services every time. Inside a sandbox that blocks them they exit 78 with `stock-unreachable`: run that command outside the sandbox after the user approves.
+- `stock search` and `stock fetch` reach image and sound services every time. Inside a sandbox that blocks them they exit 78 with `stock-unreachable`: run that command outside the sandbox after the user approves.
 - Exit 78 with `sandbox-blocked` or `tmp-unwritable`: relay its `fix` lines.
 
 ## The six steps
@@ -73,6 +74,7 @@ Defaults:
 | duration | about 30 s, within 5% of what the user asked, at most 180 s |
 | look | the paper skin: `paperLayer()` and `grainLayer()` from `references/paper.md`, dark ink, one or two accent colors, serif type |
 | music | preset `pluck` (`"audio": { "mode": "preset", "preset": "pluck" }`), silent only when the user asks |
+| found music or effects | when the user names an instrument or a piece the presets lack, or a real sound matters (a page turn, a pencil): `stock search --audio`, see `references/audio.md` |
 | the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
 | characters | none unless asked |
 | photos | none unless asked, or the film calls for real specimens, plates, micrographs or maps: `references/photo.md` |
@@ -85,7 +87,7 @@ Defaults:
 - Size `html` and `body` to the stage (`100vw` by `100vh`) with `overflow: hidden`, and place things from `tl.width` and `tl.height`, not fixed pixels, so `--size` works. Mark paper and grain layers `data-flipbook-layer="paper"`. Draw static layers once in `setup()`.
 - Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"`, or font files the user supplied with their license in brand.json or `assets/fonts/` (`references/brand.md`). Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1 (check measures DOM text only: judge canvas text on the contact sheet). Mark deliberate bleeds `data-flipbook-allow-overflow`. Never animate `transform: scale()` on DOM text (on Linux and Windows two renders of it can differ): text that grows or shrinks goes through `fillText()` on a canvas.
 - Scenes where the picture stands still for more than 1.5 s need `"hold": true`.
-- Images go in `assets/` with their source and license in `assets/SOURCES.json`: fetch them with `stock fetch`, which writes both, or take them from the user. Never download images any other way.
+- Images and sound files go in `assets/` with their source and license in `assets/SOURCES.json`: fetch them with `stock fetch`, which writes both, or take them from the user. Never download images or sounds any other way.
 - Cut specimens out with `cutout` before composing, open its sheet (`out/cutout/<name>.png`) and use only cutouts that look clean on all three grounds. Draw them with `photo('assets/cut/<name>/<name>-01.png')`. A plate `cutout` cannot part (`cutout-none`) is used whole and moved by the camera, never cropped by guess.
 - Never edit `.flipbook/` or `out/`.
 
@@ -101,7 +103,7 @@ Defaults:
 |---|---|
 | `references/rules.md` | before the first index.html, and when a determinism, text or layer code is unclear |
 | `references/timeline.md` | before the first timeline.json, and when matching a requested duration |
-| `references/audio.md` | before choosing the music or placing sound effects, and when an `audio-*` code appears |
+| `references/audio.md` | before choosing the music, finding sounds or placing sound effects, and when an `audio-*` code appears |
 | `references/troubleshooting.md` | whenever check or render exits non-zero |
 | `references/paper.md` | before the first index.html, for the paper and grain layers of the default look |
 | `references/materials.md` | when a picture needs pencil lines, hatching, halftone, stipple or torn paper |
