@@ -1,6 +1,6 @@
 {
     "name": "@liustack/flipbook",
-    "version": "0.1.0",
+    "version": "0.3.0",
     "description": "Deterministic HTML-to-MP4 rendering with built-in acceptance checks, for coding agents",
     "type": "module",
     "bin": {

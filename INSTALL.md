@@ -43,7 +43,7 @@ The skill is the `skills/flipbook` folder of the repository: `SKILL.md`, `refere
 
 ```bash
 rm -rf /tmp/flipbook-src
-git clone --depth 1 --branch v0.1.0 https://github.com/liustack/flipbook.git /tmp/flipbook-src
+git clone --depth 1 --branch v0.3.0 https://github.com/liustack/flipbook.git /tmp/flipbook-src
 mkdir -p ~/.claude/skills/flipbook          # replace with your TARGET
 cp -R /tmp/flipbook-src/skills/flipbook/. ~/.claude/skills/flipbook/
 ```
@@ -61,7 +61,7 @@ Running it again overwrites the earlier copy in place.
 ### Path B: the skills CLI (third party)
 
 ```bash
-npx -y skills add liustack/flipbook#v0.1.0 --skill flipbook --global
+npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global
 ```
 
 **If it fails**, or the folder does not appear under your `TARGET`, use Path A.
@@ -76,7 +76,7 @@ npx -y skills add liustack/flipbook#v0.1.0 --skill flipbook --global
 node --version
 ```
 
-Below v22.19, or `command not found`: install Node 22 LTS or newer from https://nodejs.org (or the user's version manager). The launcher finds the CLI through `npx`, so nothing else from npm has to be installed. Optional, to skip the npx download on every run: `npm install -g @liustack/flipbook@0.1.0`.
+Below v22.19, or `command not found`: install Node 22 LTS or newer from https://nodejs.org (or the user's version manager). The launcher finds the CLI through `npx`, so nothing else from npm has to be installed. Optional, to skip the npx download on every run: `npm install -g @liustack/flipbook@0.3.0`.
 
 ### 3b. ffmpeg with libx264
 

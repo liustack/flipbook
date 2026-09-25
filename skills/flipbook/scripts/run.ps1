@@ -31,7 +31,7 @@ catch { }
 # scripts/stamp.test.mjs asserts $Pinned equals the package.json version.
 $Package = '@liustack/flipbook'
 $Bin = 'flipbook'
-$Pinned = '0.1.0'
+$Pinned = '0.3.0'
 # -------------------------------------------------------------------------------
 
 # Environment snapshot, filled by Collect and read by the emitters.

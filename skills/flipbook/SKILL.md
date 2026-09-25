@@ -30,11 +30,11 @@ bash <skill-dir>/scripts/run.sh render <dir>                    # MP4 plus accep
 | 2 | the command is wrong | fix the command |
 | 78 | the machine is missing something | relay the `fix` lines to the user (from the JSON on stderr, or on stdout for `doctor`), leave the composition alone |
 
-If scripts cannot run, use the first line that works (the pinned version is 0.1.0):
+If scripts cannot run, use the first line that works (the pinned version is 0.3.0):
 
 1. A `flipbook` on PATH with the same major.minor as the pinned version and not older than it: `flipbook <args>`.
-2. `npx --yes --package @liustack/flipbook@0.1.0 flipbook <args>`.
-3. `bunx --bun @liustack/flipbook@0.1.0 <args>`.
+2. `npx --yes --package @liustack/flipbook@0.3.0 flipbook <args>`.
+3. `bunx --bun @liustack/flipbook@0.3.0 <args>`.
 4. None: tell the user to install Node 22.19+ from https://nodejs.org.
 
 ## Sandbox
