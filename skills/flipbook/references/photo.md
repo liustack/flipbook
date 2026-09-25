@@ -23,6 +23,20 @@ bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse:<id> --as beetle
 - Images the user supplies go in `assets/` too, with an entry in `assets/SOURCES.json` written from what the user says: `"plate.jpg": { "source": "...", "license": "..." }`. Ask when the license is unknown.
 - `stock search` and `stock fetch` need the network. Inside a sandbox, exit 78 with `stock-unreachable` means: run that one command outside the sandbox after the user approves.
 
+## Cut out ahead of render
+
+```bash
+bash <skill-dir>/scripts/run.sh cutout <dir> assets/beetle.jpg
+bash <skill-dir>/scripts/run.sh cutout <dir> assets/hand-study.jpg --ink
+bash <skill-dir>/scripts/run.sh cutout <dir> assets/medusae.jpg --paper '#09330b' --threshold 52 --holes 0.02
+```
+
+- `cutout` finds every specimen on the plate, cuts each into a transparent PNG `assets/cut/<name>/<name>-01.png` (biggest first), records its source and license in `assets/SOURCES.json` and draws `out/cutout/<name>.png`, every cutout on light paper, dark ground and a checkerboard.
+- Open that sheet and pick by looking: a clean cutout has no pale rim on the dark ground, no dark fringe on the light paper and no leftover ground on the checkerboard. Leave out the rest.
+- In the composition, `photo('assets/cut/beetle/beetle-01.png')` takes the file's transparency as it is (`'auto'` becomes `'alpha'`) and only adds the sticker: nothing is cut while rendering.
+- `--ink` is for line art (engravings, pen drawings): the paper turns transparent and the lines keep their weight. `--paper` and `--threshold` set the ground on dark plates, `--holes` clears ground enclosed by a specimen, `--gap` (default `0.012` of the long edge) joins pieces that belong together.
+- `cutout-none` means no specimen stands apart: use the plate whole (see below). `cutout-clipped` warnings name specimens that were left out because their crop cut through them.
+
 ## photo() in the composition
 
 Await `photo()` at module level or in `setup()`, never in `seek()`: the cutout, border and shadow are prepared once, then `draw()` only places the finished sticker.
@@ -98,7 +112,7 @@ The result:
 | `draw(ctx, x, y, options)` | draws the sticker centered at `(x, y)`. `scale`, `rotate` (degrees added to the tilt), `alpha`, `lift` (0 lies flat, 1 is lifted: the shadow moves out, spreads and fades) |
 | `width`, `height` | size in CSS px at scale 1, border included, before the tilt |
 | `tilt` | degrees |
-| `cutout` | what was used: `'alpha'`, `'paper'` or `'none'` |
+| `cutout` | what was used: `'alpha'`, `'paper'`, `'ink'` or `'none'` |
 | `paper` | the paper color removed, or null |
 | `canvas` | the finished sticker, for `drawImage` or a pattern |
 | `clipped` | the sides of the crop the subject touches, such as `['right']`: the crop cut through it. Empty when nothing was cut. Fix a non-empty one before drawing |

@@ -184,6 +184,24 @@ stock fetch did not save the image: the id is unknown, its license is not public
 
 Fix: Pick another result from stock search. `detail.reason` says why this one was refused.
 
+### `cutout-invalid`
+
+flipbook cutout did not start: the image is missing, lies outside the composition, is not in assets/, or has no source and license in assets/SOURCES.json.
+
+Fix: Pass an image under assets/ that stock fetch saved, or add its source and license to assets/SOURCES.json first.
+
+### `cutout-none`
+
+flipbook cutout found no specimen standing apart on the plate: they touch one another (tentacles, spines), or the ground color is wrong.
+
+Fix: Use the plate whole with cutout: none and move the camera over it, pass --paper with the ground color, or search for a plate whose specimens stand apart.
+
+### `cutout-clipped`
+
+A specimen reaches past its crop, so its cutout would have a straight cut edge. It was left out.
+
+Fix: Nothing to do when enough specimens were kept. Otherwise raise --gap so its pieces count as one, or use the plate whole.
+
 ### `asset-conflict`
 
 stock fetch did not save the image: another file already has that name in assets/, or assets/SOURCES.json is not a readable JSON object.

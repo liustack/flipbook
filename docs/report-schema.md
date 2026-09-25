@@ -29,7 +29,7 @@ For `sandbox-blocked` and `tmp-unwritable`, `detail.signature` names the row of 
 | Field | Type | Description |
 |---|---|---|
 | `schema` | string | Always `flipbook.report/1` |
-| `command` | string | `check`, `snapshot`, `render`, `audio`, `stock-search`, `stock-fetch`, or `usage` on a usage error |
+| `command` | string | `check`, `snapshot`, `render`, `audio`, `stock-search`, `stock-fetch`, `cutout`, or `usage` on a usage error |
 | `ok` | boolean | true when the exit code is 0 |
 | `exitCode` | 0, 1, 2, 78 | Same as the process exit code |
 | `flipbook.version` | string | CLI version |
@@ -158,6 +158,9 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `stock-no-results` | stock search | No service found an image for the query. Warning only | Search again with two to four other concrete English words, or with `--source`. When nothing fits, leave the picture out and tell the user |
 | `stock-rejected` | stock fetch | The image was not saved: the id is unknown, its license is not `cc0` or `pdm` (Openverse), its address is not a public HTTPS address, the file is not an image or is over 40 MB. `detail.reason` is `not-found`, `license`, `unsafe-url`, `not-image` or `too-large` | Pick another result from stock search |
 | `asset-conflict` | stock fetch | The image was not saved: another file in `assets/` already has that name (`detail.reason` `name-taken`), or `assets/SOURCES.json` is not a readable JSON object (`sources-invalid`) | Pass another `--as` name, or fix `assets/SOURCES.json` |
+| `cutout-invalid` | cutout | Nothing was cut: the image is missing, lies outside the composition or outside `assets/`, or has no source and license in `assets/SOURCES.json` (or that file is not valid JSON) | Pass an image `stock fetch` saved, or add its source and license first |
+| `cutout-none` | cutout | No specimen on the plate stands apart: they touch one another (tentacles, spines), or the ground color is wrong. `detail.found` is how many groups were found before the rest were refused | Use the plate whole with `cutout: 'none'` and move the camera over it, pass `--paper`, or pick another plate |
+| `cutout-clipped` | cutout, warning | A specimen reaches past its crop and was left out: its cutout would have a straight edge. `detail.index` and `detail.sides` say which and where | Nothing when enough were kept. Otherwise raise `--gap`, or use the plate whole |
 | `render-busy` | render | Another render is running in the same composition directory. Does not count as an attempt | Wait for it to finish |
 | `internal-error` | all | flipbook itself failed | Leave the composition alone and open an issue with the JSON |
 
@@ -251,6 +254,25 @@ The image is saved as `assets/<name>.<ext>`, the extension from the file's forma
 | `artifacts.image`, `artifacts.sources` | The image and `assets/SOURCES.json` |
 
 A malformed id or `--as` name exits 2 before anything is downloaded. A Pexels or Pixabay id without its key exits 78 with `stock-key-missing`.
+
+### cutout
+
+`flipbook cutout <dir> <image>` cuts every specimen on a plate under `assets/` ahead of render. It runs `specimens()` and `photo()` of the runtime in a bare page that loads nothing but the runtime and files from the composition (never its `index.html`), keeps the biggest piece of each, and leaves out any the crop still cuts through. Options: `--ink` for line art, `--paper #rrggbb` for the ground, `--threshold`, `--gap` (default `0.012`), `--holes`, `--max` (default 12), `--size` (default: each cutout's size on the plate, at most 1200).
+
+- The cutouts are transparent PNGs `assets/cut/<name>/<name>-01.png`, `-02.png` ..., biggest first. A rerun replaces the set.
+- `assets/cut/<name>/cutout.json` lists them with the crop and area each came from.
+- `assets/SOURCES.json` gets one entry per cutout, `"cut/<name>/<name>-01.png": { "source", "license", "cutFrom" }`, with the plate's source and license. The plate needs its own entry first.
+- `out/cutout/<name>.png` shows every cutout on light paper, on dark ground and on a checkerboard: look at it before using them.
+
+| Field | Description |
+|---|---|
+| `cutout.image` | The plate |
+| `cutout.found` | Specimens found |
+| `cutout.kept` | The cutouts written: `file`, `width`, `height` (pixels), `crop` (fractions of the plate), `area` (share of the plate) |
+| `cutout.skipped` | Specimens left out because their crop cuts through them: `index`, `sides` |
+| `cutout.sheet`, `artifacts.sheet` | The sheet |
+
+It exits 0 when at least one cutout was written and 1 with `cutout-invalid` or `cutout-none`.
 
 ## Codes: environment (exit 78)
 

@@ -2,6 +2,7 @@
 import { Command, CommanderError } from 'commander';
 import { runAudio } from './cli/audio.ts';
 import { runCheck } from './cli/check.ts';
+import { runCutout } from './cli/cutout.ts';
 import { buildDoctorReport, MIN_NODE, renderDoctorReport } from './cli/doctor.ts';
 import { runRender } from './cli/render.ts';
 import {
@@ -336,6 +337,73 @@ stock
     .action(async (dir: string, id: string, options: { as: string }) => {
         await execute('stock-fetch', dir, () => runStockFetch({ dir, id, as: options.as }));
     });
+
+program
+    .command('cutout')
+    .description(
+        'Cut every specimen on a plate under assets/ into transparent PNGs under assets/cut/, with a sheet to look at',
+    )
+    .argument('<dir>', 'composition directory')
+    .argument('<image>', 'the plate, such as assets/beetles.jpg')
+    .option(
+        '--ink',
+        'line art (engravings, pen drawings): turn the paper transparent and keep the lines',
+    )
+    .option('--paper <color>', 'ground color as #rrggbb, measured along the edge when not given')
+    .option(
+        '--threshold <n>',
+        'how far from the ground a color may be and still count as ground, 1 to 255',
+    )
+    .option(
+        '--gap <share>',
+        'pieces closer than this share of the long edge are one specimen',
+        '0.012',
+    )
+    .option(
+        '--holes <share>',
+        'also clear ground enclosed by a specimen covering at least this share of it',
+    )
+    .option('--max <n>', 'most specimens to cut, biggest first', '12')
+    .option(
+        '--size <px>',
+        'long edge of each cutout (default: its size on the plate, at most 1200)',
+    )
+    .action(
+        async (
+            dir: string,
+            image: string,
+            options: {
+                ink?: boolean;
+                paper?: string;
+                threshold?: string;
+                gap: string;
+                holes?: string;
+                max: string;
+                size?: string;
+            },
+        ) => {
+            if (options.paper && !/^#[0-9a-fA-F]{6}$/.test(options.paper)) {
+                throw new UsageError(
+                    `Invalid --paper "${options.paper}". Use a color such as #efe6d2.`,
+                );
+            }
+            await execute('cutout', dir, () =>
+                runCutout({
+                    dir,
+                    image,
+                    mode: options.ink ? 'ink' : 'paper',
+                    paper: options.paper,
+                    threshold: options.threshold
+                        ? parseInteger(options.threshold, '--threshold', 1, 255)
+                        : undefined,
+                    gap: parseNumber(options.gap, '--gap', 0, 0.2),
+                    holes: options.holes ? parseNumber(options.holes, '--holes', 0, 1) : undefined,
+                    max: parseInteger(options.max, '--max', 1, 64),
+                    size: options.size ? parseInteger(options.size, '--size', 64, 4000) : undefined,
+                }),
+            );
+        },
+    );
 
 try {
     await program.parseAsync(process.argv, { from: 'node' });

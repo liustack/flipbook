@@ -21,6 +21,7 @@ export type Command =
     | 'audio'
     | 'stock-search'
     | 'stock-fetch'
+    | 'cutout'
     | 'doctor'
     | 'usage';
 export type Severity = 'error' | 'warning';

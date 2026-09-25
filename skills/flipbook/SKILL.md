@@ -23,6 +23,7 @@ bash <skill-dir>/scripts/run.sh render <dir> --size 9:16        # another shape:
 bash <skill-dir>/scripts/run.sh render <dir> --scale 2          # 3840x2160 from a 1920x1080 stage
 bash <skill-dir>/scripts/run.sh stock search <dir> beetle plate  # public domain images, see references/photo.md
 bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse:<id> --as beetle
+bash <skill-dir>/scripts/run.sh cutout <dir> assets/beetle.jpg          # every specimen as a transparent PNG, before composing
 ```
 
 Once check has passed its determinism checks (seek order, shifted clock and seed, late paint), render draws on several pages at once (CPU cores minus one, at most 6, fewer for short films or big frames). `--jobs <n>` sets the count. `check` and `snapshot` take `--size` too, and `check` takes `--scale`: check at the size and scale you will render, so text and the safe area are checked in that shape, and render gets parallel pages only after a check at the same size and scale.
@@ -85,6 +86,7 @@ Defaults:
 - Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"`, or font files the user supplied with their license in brand.json or `assets/fonts/` (`references/brand.md`). Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1 (check measures DOM text only: judge canvas text on the contact sheet). Mark deliberate bleeds `data-flipbook-allow-overflow`. Never animate `transform: scale()` on DOM text (on Linux and Windows two renders of it can differ): text that grows or shrinks goes through `fillText()` on a canvas.
 - Scenes where the picture stands still for more than 1.5 s need `"hold": true`.
 - Images go in `assets/` with their source and license in `assets/SOURCES.json`: fetch them with `stock fetch`, which writes both, or take them from the user. Never download images any other way.
+- Cut specimens out with `cutout` before composing, open its sheet (`out/cutout/<name>.png`) and use only cutouts that look clean on all three grounds. Draw them with `photo('assets/cut/<name>/<name>-01.png')`. A plate `cutout` cannot part (`cutout-none`) is used whole and moved by the camera, never cropped by guess.
 - Never edit `.flipbook/` or `out/`.
 
 ## Stopping

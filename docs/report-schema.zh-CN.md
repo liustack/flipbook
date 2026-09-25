@@ -29,7 +29,7 @@ read_when:
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `schema` | string | 固定 `flipbook.report/1` |
-| `command` | string | `check`、`snapshot`、`render`、`audio`、`stock-search`、`stock-fetch`，用法错时是 `usage` |
+| `command` | string | `check`、`snapshot`、`render`、`audio`、`stock-search`、`stock-fetch`、`cutout`，用法错时是 `usage` |
 | `ok` | boolean | 退出码为 0 时为 true |
 | `exitCode` | 0、1、2、78 | 和进程退出码一致 |
 | `flipbook.version` | string | CLI 版本 |
@@ -158,6 +158,9 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `stock-no-results` | stock search | 哪家都没找到图，只报 warning | 换两到四个别的具体英文词再搜，或加 `--source`。都不合适就不用图，告诉用户 |
 | `stock-rejected` | stock fetch | 图没存：id 不存在、许可不是 `cc0` 或 `pdm`（Openverse）、地址不是公网 HTTPS、文件不是图片或超过 40 MB。`detail.reason` 是 `not-found`、`license`、`unsafe-url`、`not-image` 或 `too-large` | 从 stock search 的结果里另挑一张 |
 | `asset-conflict` | stock fetch | 图没存：`assets/` 里已有别的文件用了这个名字（`detail.reason` 为 `name-taken`），或 `assets/SOURCES.json` 不是读得出的 JSON 对象（`sources-invalid`） | 换个 `--as` 名字，或修好 `assets/SOURCES.json` |
+| `cutout-invalid` | cutout | 一张都没抠：图不存在、在合成目录外或不在 `assets/` 下，或 `assets/SOURCES.json` 里没有它的来源和许可（或这个文件不是合法 JSON） | 用 `stock fetch` 存下的图，或先补上来源和许可 |
+| `cutout-none` | cutout | 图版上没有一个标本是单独分得开的：彼此连着（触手、长刺），或底色给错了。`detail.found` 是被整组拒掉之前找到的组数 | 整张图版用 `cutout: 'none'` 靠镜头动，或给 `--paper`，或换一张图版 |
+| `cutout-clipped` | cutout，警告 | 有个标本超出了它的裁剪框，没收：抠出来会有一条直边。`detail.index` 和 `detail.sides` 说是哪个、哪边 | 收下的够用就不用管。不够就调大 `--gap`，或整张用 |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 
@@ -251,6 +254,25 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `artifacts.image`、`artifacts.sources` | 图片和 `assets/SOURCES.json` |
 
 id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 的 id 没配对应的 key，退 78 报 `stock-key-missing`。
+
+### cutout
+
+`flipbook cutout <dir> <image>` 在渲染之前把 `assets/` 下一张图版上的标本都抠出来。它在一个只加载运行时库和合成目录文件的空白页面里（不跑合成的 `index.html`）调运行时的 `specimens()` 和 `photo()`，每个标本只留最大的一块，裁剪框仍然切到的不收。选项：`--ink` 线稿模式，`--paper #rrggbb` 指定底色，`--threshold`，`--gap`（默认 `0.012`），`--holes`，`--max`（默认 12），`--size`（默认按图版上的原尺寸，最大 1200）。
+
+- 抠图是透明 PNG：`assets/cut/<name>/<name>-01.png`、`-02.png` ……，大的在前。重跑整组替换。
+- `assets/cut/<name>/cutout.json` 列出每个抠图和它来自的裁剪框、面积。
+- `assets/SOURCES.json` 给每个抠图记一条 `"cut/<name>/<name>-01.png": { "source", "license", "cutFrom" }`，来源和许可沿用图版的。图版自己要先有条目。
+- `out/cutout/<name>.png` 把每个抠图分别放在浅纸、深底和棋盘格上，用之前先看这张。
+
+| 字段 | 说明 |
+|---|---|
+| `cutout.image` | 图版 |
+| `cutout.found` | 找到的标本数 |
+| `cutout.kept` | 写下的抠图：`file`、`width`、`height`（像素）、`crop`（占图版的比例）、`area`（占图版面积的比例） |
+| `cutout.skipped` | 被裁剪框切到而没收的：`index`、`sides` |
+| `cutout.sheet`、`artifacts.sheet` | 联系表 |
+
+至少写下一个抠图时退 0，`cutout-invalid` 或 `cutout-none` 时退 1。
 
 ## 类型码：环境缺件（退出码 78）
 
