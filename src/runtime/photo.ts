@@ -60,6 +60,17 @@ export interface PhotoOptions {
     paper?: string;
     /** 'paper': drop islands smaller than this share of the picture. Default 0.002. */
     despeckle?: number;
+    /**
+     * 'paper' and 'alpha': 'largest' keeps only the biggest piece, dropping
+     * parts of neighbours that came in with the crop. Default 'all'.
+     */
+    keep?: 'all' | 'largest';
+    /**
+     * 'paper': also clear ground enclosed by the subject (dark water between
+     * tentacles) when a patch covers at least this share of the subject.
+     * Default 0 (off): on light paper an enclosed patch is usually a highlight.
+     */
+    holes?: number;
     /** Border, tilt, shadow and grain, or false for the bare cutout. */
     sticker?: StickerOptions | false;
 }
@@ -86,6 +97,11 @@ export interface Photo {
     readonly height: number;
     /** Degrees. */
     readonly tilt: number;
+    /**
+     * Sides of the crop the subject touches, so the crop cut through it: pick
+     * a bigger crop (specimens() gives one). Empty when nothing was cut.
+     */
+    readonly clipped: readonly ('top' | 'right' | 'bottom' | 'left')[];
     /** The finished sticker (or bare cutout) in device pixels. */
     readonly canvas: HTMLCanvasElement;
     /** Draw centered at (x, y) in the context's CSS px. */
@@ -165,7 +181,7 @@ function paperAlpha(
     paper: [number, number, number],
     threshold: number,
     softness: number,
-): Uint8Array {
+): { alpha: Uint8Array; dist: Float32Array } {
     const n = w * h;
     const dist = new Float32Array(n);
     for (let i = 0; i < n; i++) {
@@ -231,7 +247,89 @@ function paperAlpha(
             alpha[i] = Math.round(255 * Math.min(1, Math.max(0, ramp)));
         }
     }
-    return alpha;
+    return { alpha, dist };
+}
+
+/** 8-connected islands of alpha > 0: a label per pixel (0 for none) and each island's size, from label 1. */
+function islands(alpha: Uint8Array, w: number, h: number): { label: Int32Array; sizes: number[] } {
+    const n = w * h;
+    const label = new Int32Array(n);
+    const queue = new Int32Array(n);
+    const sizes = [0];
+    for (let start = 0; start < n; start++) {
+        if (alpha[start] === 0 || label[start] !== 0) continue;
+        const id = sizes.length;
+        let head = 0;
+        let tail = 0;
+        label[start] = id;
+        queue[tail++] = start;
+        while (head < tail) {
+            const i = queue[head++];
+            const x = i % w;
+            const y = (i - x) / w;
+            for (let dy = -1; dy <= 1; dy++) {
+                const yy = y + dy;
+                if (yy < 0 || yy >= h) continue;
+                for (let dx = -1; dx <= 1; dx++) {
+                    const xx = x + dx;
+                    if (xx < 0 || xx >= w) continue;
+                    const k = yy * w + xx;
+                    if (alpha[k] !== 0 && label[k] === 0) {
+                        label[k] = id;
+                        queue[tail++] = k;
+                    }
+                }
+            }
+        }
+        sizes.push(tail);
+    }
+    return { label, sizes };
+}
+
+/** Zero every island but the biggest. */
+function keepLargest(alpha: Uint8Array, w: number, h: number): void {
+    const { label, sizes } = islands(alpha, w, h);
+    let best = 0;
+    for (let id = 1; id < sizes.length; id++) if (best === 0 || sizes[id] > sizes[best]) best = id;
+    for (let i = 0; i < alpha.length; i++) if (label[i] !== best) alpha[i] = 0;
+}
+
+/**
+ * Clear patches of ground-colored pixels inside the subject (closer than
+ * `threshold` to the paper, 4-connected) that cover at least `share` of it.
+ */
+function clearHoles(
+    alpha: Uint8Array,
+    dist: Float32Array,
+    w: number,
+    h: number,
+    threshold: number,
+    share: number,
+): void {
+    const n = w * h;
+    let area = 0;
+    for (let i = 0; i < n; i++) if (alpha[i] > 0) area++;
+    const minArea = Math.max(1, share * area);
+    const seen = new Uint8Array(n);
+    const queue = new Int32Array(n);
+    for (let start = 0; start < n; start++) {
+        if (seen[start] || alpha[start] === 0 || dist[start] >= threshold) continue;
+        let head = 0;
+        let tail = 0;
+        seen[start] = 1;
+        queue[tail++] = start;
+        while (head < tail) {
+            const i = queue[head++];
+            const x = i % w;
+            const next = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w];
+            for (const k of next) {
+                if (k < 0 || k >= n || seen[k] || alpha[k] === 0 || dist[k] >= threshold) continue;
+                seen[k] = 1;
+                queue[tail++] = k;
+            }
+        }
+        if (tail >= minArea) for (let q = 0; q < tail; q++) alpha[queue[q]] = 0;
+    }
 }
 
 /** Zero every 8-connected island of alpha > 0 smaller than minArea pixels. */
@@ -401,11 +499,19 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
     if (mode === 'paper') {
         const color = options.paper ? rgb(options.paper) : edgeMedian(data, w, h);
         paper = hex(color);
-        alpha = paperAlpha(data, w, h, color, options.threshold ?? 36, options.softness ?? 24);
+        const threshold = options.threshold ?? 36;
+        const cut = paperAlpha(data, w, h, color, threshold, options.softness ?? 24);
+        alpha = cut.alpha;
         despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
+        if (options.keep === 'largest') keepLargest(alpha, w, h);
+        if (options.holes) {
+            clearHoles(alpha, cut.dist, w, h, threshold, options.holes);
+            despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
+        }
     } else {
         alpha = new Uint8Array(w * h);
         for (let i = 0; i < w * h; i++) alpha[i] = mode === 'alpha' ? data[i * 4 + 3] : 255;
+        if (mode === 'alpha' && options.keep === 'largest') keepLargest(alpha, w, h);
     }
 
     // Trim to what is left.
@@ -427,6 +533,13 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
             `photo(): nothing is left of ${src.slice(0, 120)} after the ${mode} cutout. Lower threshold, pass paper, or use cutout: 'none'.`,
         );
     }
+    const clipped: ('top' | 'right' | 'bottom' | 'left')[] = [];
+    if (mode !== 'none') {
+        if (y0 === 0) clipped.push('top');
+        if (x1 === w - 1) clipped.push('right');
+        if (y1 === h - 1) clipped.push('bottom');
+        if (x0 === 0) clipped.push('left');
+    }
     const tw = x1 - x0 + 1;
     const th = y1 - y0 + 1;
     const trimmed = new Uint8ClampedArray(tw * th * 4);
@@ -437,7 +550,7 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
             trimmed[to * 4] = data[from * 4];
             trimmed[to * 4 + 1] = data[from * 4 + 1];
             trimmed[to * 4 + 2] = data[from * 4 + 2];
-            trimmed[to * 4 + 3] = mode === 'alpha' ? data[from * 4 + 3] : alpha[from];
+            trimmed[to * 4 + 3] = alpha[from];
         }
     }
     // Then it is scaled so its long edge is `size` CSS px: the border is added
@@ -543,6 +656,7 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
         width,
         height,
         tilt,
+        clipped,
         canvas: out,
         draw(ctx, x, y, drawOptions = {}) {
             const scale = drawOptions.scale ?? 1;
@@ -579,4 +693,104 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
             ctx.restore();
         },
     };
+}
+
+export interface SpecimenOptions {
+    /** The ground color. Default: measured along the edge of the picture. */
+    paper?: string;
+    /** How far from the ground a color may be and still count as ground, 0 to 255. Default 36. */
+    threshold?: number;
+    /** Pieces smaller than this share of the picture are dust, captions or plate numbers. Default 0.003. */
+    minArea?: number;
+    /** Pieces closer than this share of the long edge are one specimen (antennae, a stalk). Default 0.012. */
+    gap?: number;
+    /** Room left around each specimen, as a share of the long edge. Default 0.015. */
+    margin?: number;
+}
+
+export interface Specimen {
+    /** A crop for photo(), fractions of the file, the specimen with room around it. */
+    crop: PhotoCrop;
+    /** The specimen's share of the picture's area. */
+    area: number;
+}
+
+/**
+ * Find the separate specimens on a plate: every patch of the picture that is
+ * not ground, pieces close together counted as one, biggest first. Pass a
+ * specimen's crop to photo() instead of guessing one, so the crop neither
+ * cuts through it nor brings in half a neighbour.
+ */
+export async function specimens(src: string, options: SpecimenOptions = {}): Promise<Specimen[]> {
+    const img = await loadImage(src);
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    if (!nw || !nh) throw new Error(`specimens(): ${src.slice(0, 120)} has no size.`);
+    const k = Math.min(1, 1200 / Math.max(nw, nh));
+    const w = Math.max(1, Math.round(nw * k));
+    const h = Math.max(1, Math.round(nh * k));
+    const work = canvasOf(w, h);
+    work.ctx.imageSmoothingQuality = 'high';
+    work.ctx.drawImage(img, 0, 0, w, h);
+    const data = work.ctx.getImageData(0, 0, w, h).data;
+    const color = options.paper ? rgb(options.paper) : edgeMedian(data, w, h);
+    const { alpha } = paperAlpha(data, w, h, color, options.threshold ?? 36, 0);
+    despeckle(alpha, w, h, Math.round((options.minArea ?? 0.003) * w * h));
+    const { label, sizes } = islands(alpha, w, h);
+    const boxes = sizes.map(() => ({ x0: w, y0: h, x1: -1, y1: -1, area: 0 }));
+    for (let i = 0; i < label.length; i++) {
+        const id = label[i];
+        if (id === 0) continue;
+        const b = boxes[id];
+        const x = i % w;
+        const y = (i - x) / w;
+        if (x < b.x0) b.x0 = x;
+        if (x > b.x1) b.x1 = x;
+        if (y < b.y0) b.y0 = y;
+        if (y > b.y1) b.y1 = y;
+        b.area++;
+    }
+    let found = boxes.filter((b) => b.area > 0);
+    // Pieces within `gap` of each other belong to one specimen.
+    const gap = (options.gap ?? 0.012) * Math.max(w, h);
+    let merged = true;
+    while (merged) {
+        merged = false;
+        outer: for (let i = 0; i < found.length; i++) {
+            for (let j = i + 1; j < found.length; j++) {
+                const a = found[i];
+                const b = found[j];
+                if (
+                    a.x0 - gap <= b.x1 &&
+                    b.x0 - gap <= a.x1 &&
+                    a.y0 - gap <= b.y1 &&
+                    b.y0 - gap <= a.y1
+                ) {
+                    found[i] = {
+                        x0: Math.min(a.x0, b.x0),
+                        y0: Math.min(a.y0, b.y0),
+                        x1: Math.max(a.x1, b.x1),
+                        y1: Math.max(a.y1, b.y1),
+                        area: a.area + b.area,
+                    };
+                    found = found.filter((_, n) => n !== j);
+                    merged = true;
+                    break outer;
+                }
+            }
+        }
+    }
+    const margin = (options.margin ?? 0.015) * Math.max(w, h);
+    return found
+        .sort((a, b) => b.area - a.area)
+        .map((b) => {
+            const x0 = Math.max(0, b.x0 - margin);
+            const y0 = Math.max(0, b.y0 - margin);
+            const x1 = Math.min(w, b.x1 + 1 + margin);
+            const y1 = Math.min(h, b.y1 + 1 + margin);
+            return {
+                crop: { x: x0 / w, y: y0 / h, width: (x1 - x0) / w, height: (y1 - y0) / h },
+                area: b.area / (w * h),
+            };
+        });
 }

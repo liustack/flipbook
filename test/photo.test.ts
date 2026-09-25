@@ -50,6 +50,28 @@ window.cutPng = () => {
     ctx.fillRect(60, 25, 80, 50);
     return c.toDataURL('image/png');
 };
+// A dark plate with three specimens: a thick ring that encloses a patch of
+// the ground (like tentacles around dark water), a disc, and a small square.
+window.specimenPlate = () => {
+    const c = document.createElement('canvas');
+    c.width = 320;
+    c.height = 200;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#0d3a12';
+    ctx.fillRect(0, 0, 320, 200);
+    ctx.strokeStyle = '#e8d8b0';
+    ctx.lineWidth = 16;
+    ctx.beginPath();
+    ctx.arc(90, 100, 50, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#d9a441';
+    ctx.beginPath();
+    ctx.arc(220, 70, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#c8452d';
+    ctx.fillRect(250, 140, 24, 24);
+    return c.toDataURL('image/png');
+};
 window.alphaAt = (canvas, x, y) =>
     canvas.getContext('2d').getImageData(x, y, 1, 1).data[3];
 window.rgbaAt = (canvas, x, y) =>
@@ -68,6 +90,7 @@ type Rt = typeof import('../src/runtime/index.ts');
 type Win = {
     rt: Rt;
     plate(): string;
+    specimenPlate(): string;
     cutPng(): string;
     alphaAt(canvas: HTMLCanvasElement, x: number, y: number): number;
     rgbaAt(canvas: HTMLCanvasElement, x: number, y: number): number[];
@@ -241,5 +264,96 @@ describe('photo sticker', () => {
         expect(out.above[3]).toBe(0);
         expect(out.shadow[3]).toBeGreaterThan(20);
         expect(out.far[3]).toBe(0);
+    });
+});
+
+describe('photo on a crowded plate', () => {
+    it('finds each specimen with a margin, largest first', async () => {
+        const found = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            return w.rt.specimens(w.specimenPlate(), { paper: '#0d3a12' });
+        });
+        expect(found).toHaveLength(3);
+        const px = found.map((f) => ({
+            x0: f.crop.x * 320,
+            y0: f.crop.y * 200,
+            x1: (f.crop.x + f.crop.width) * 320,
+            y1: (f.crop.y + f.crop.height) * 200,
+        }));
+        // The ring spans 32..148 x 42..158, the disc 190..250 x 40..100, the square 250..274 x 140..164.
+        expect(px[0].x0).toBeLessThan(32);
+        expect(px[0].x1).toBeGreaterThan(148);
+        expect(px[0].y0).toBeLessThan(42);
+        expect(px[0].y1).toBeGreaterThan(158);
+        expect(px[0].x1).toBeLessThan(190);
+        expect(px[1].x0).toBeLessThan(190);
+        expect(px[1].x1).toBeGreaterThan(250);
+        expect(px[2].x0).toBeLessThan(250);
+        expect(px[2].y1).toBeGreaterThan(164);
+        expect(found[0].area).toBeGreaterThan(found[1].area);
+        expect(found[1].area).toBeGreaterThan(found[2].area);
+    });
+
+    it('says which sides of the crop cut through the subject', async () => {
+        const out = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            const plate = w.specimenPlate();
+            const [ring] = await w.rt.specimens(plate, { paper: '#0d3a12' });
+            const whole = await w.rt.photo(plate, {
+                crop: ring.crop,
+                paper: '#0d3a12',
+                sticker: false,
+            });
+            const cut = await w.rt.photo(plate, {
+                crop: { x: 0.05, y: 0.05, width: 0.35, height: 0.9 },
+                paper: '#0d3a12',
+                sticker: false,
+            });
+            return { whole: whole.clipped, cut: cut.clipped };
+        });
+        expect(out.whole).toEqual([]);
+        expect(out.cut).toEqual(['right']);
+    });
+
+    it('keeps only the largest piece, and clears ground enclosed by the subject', async () => {
+        const out = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            const plate = w.specimenPlate();
+            // The ring plus a slice of the disc beside it.
+            const crop = { x: 0.05, y: 0.05, width: 0.65, height: 0.9 };
+            const all = await w.rt.photo(plate, { crop, paper: '#0d3a12', sticker: false });
+            const largest = await w.rt.photo(plate, {
+                crop,
+                paper: '#0d3a12',
+                sticker: false,
+                keep: 'largest',
+            });
+            const hollow = await w.rt.photo(plate, {
+                crop,
+                paper: '#0d3a12',
+                sticker: false,
+                keep: 'largest',
+                holes: 0.05,
+            });
+            return {
+                allWidth: all.width,
+                largestWidth: largest.width,
+                filledCenter: w.alphaAt(
+                    largest.canvas,
+                    Math.round(largest.width / 2),
+                    Math.round(largest.height / 2),
+                ),
+                hollowCenter: w.alphaAt(
+                    hollow.canvas,
+                    Math.round(hollow.width / 2),
+                    Math.round(hollow.height / 2),
+                ),
+            };
+        });
+        expect(out.allWidth).toBeGreaterThan(150);
+        expect(out.largestWidth).toBeGreaterThanOrEqual(114);
+        expect(out.largestWidth).toBeLessThanOrEqual(120);
+        expect(out.filledCenter).toBe(255);
+        expect(out.hollowCenter).toBe(0);
     });
 });

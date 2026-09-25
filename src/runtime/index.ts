@@ -74,9 +74,11 @@ export type {
     PhotoCrop,
     PhotoOptions,
     PhotoShadowOptions,
+    Specimen,
+    SpecimenOptions,
     StickerOptions,
 } from './photo.ts';
-export { photo } from './photo.ts';
+export { photo, specimens } from './photo.ts';
 export type {
     ArcCuts,
     ArcCutsOptions,

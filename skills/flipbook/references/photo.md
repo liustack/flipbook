@@ -84,6 +84,8 @@ composition({
 | `softness` | `24` | `'paper'`: width of the soft edge above `threshold` |
 | `paper` | measured | `'paper'`: the paper color, measured along the edge of the picture unless given |
 | `despeckle` | `0.002` | `'paper'`: islands smaller than this share of the picture are dropped (dust, plate numbers, captions) |
+| `keep` | `'all'` | `'largest'` keeps only the biggest piece and drops parts of neighbours that came in with the crop |
+| `holes` | `0` (off) | `'paper'`: also clear ground enclosed by the subject when a patch covers at least this share of it, such as dark water between a jellyfish's tentacles. Leave it off on light paper, where an enclosed pale patch is usually a highlight |
 | `sticker` | on | `false` for the bare cutout, or the options below |
 
 `sticker` options: `border` (CSS px, default 9, 6 to 12 reads as cut with scissors), `color` (default `'#fbf8f1'`), `tilt` (degrees, default a seeded angle within ±3.5), `shadow` (`{ x, y, blur, color }`, default `{ x: 3, y: 8, blur: 10 }`, or `false`), `grain` (0 to 2, default 1), `seed`.
@@ -98,11 +100,40 @@ The result:
 | `cutout` | what was used: `'alpha'`, `'paper'` or `'none'` |
 | `paper` | the paper color removed, or null |
 | `canvas` | the finished sticker, for `drawImage` or a pattern |
+| `clipped` | the sides of the crop the subject touches, such as `['right']`: the crop cut through it. Empty when nothing was cut. Fix a non-empty one before drawing |
 
 Only paper that touches the edge of the picture is removed, so pale areas inside the subject (a white wing, a highlight) stay. Only light, even paper cuts well: for a photo with a real background use `cutout: 'none'` and let the border frame it. Check each cutout on the snapshot contact sheet, and zoom in with `snapshot --zoom` when an edge looks wrong.
+
+## Specimens on one plate
+
+Never guess a crop on a plate that holds several specimens: a guessed crop cuts through the one you want and brings in half of its neighbour, and both show as straight edges that no border hides. `specimens(src, options)` finds every separate specimen on the plate, biggest first, each with a crop that has room around it. Pass that crop to `photo()` with `keep: 'largest'`. Options: `paper` and `threshold` as in `photo()`, `minArea` (default `0.003` of the picture, smaller pieces are dust or captions), `gap` (default `0.012` of the long edge, pieces closer than this are one specimen), `margin` (default `0.015`).
+
+<!-- check: pass -->
+```js
+import { composition, paperLayer, photo, PAPER, setupCanvas, specimens, timeline } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
+const [egg] = await specimens('assets/egg-plate.svg');
+const cut = await photo('assets/egg-plate.svg', { crop: egg.crop, keep: 'largest', size: 200 });
+if (cut.clipped.length > 0) throw new Error(`the crop cuts the egg on its ${cut.clipped.join(', ')}`);
+
+composition({
+  setup() {
+    paperLayer(tl.width, tl.height, { seed: tl.seed, color: PAPER.cream });
+  },
+  seek() {
+    ctx.clearRect(0, 0, tl.width, tl.height);
+    cut.draw(ctx, tl.width / 2, tl.height / 2);
+  },
+});
+```
+
+On a dark plate (Haeckel's green or black grounds) give `paper` and add `holes`, for example `{ paper: '#09330b', threshold: 52, holes: 0.02 }`.
 
 ## Rules
 
 - Every image in `assets/` has its source and license in `assets/SOURCES.json`, written by `stock fetch` or taken from the user.
 - The pictures are material, not the story: the film still needs its own device (objects assembling a glyph, a lens montage, a page turn) and its own motion.
 - One cutout style per film: the same border width and color on every sticker, the same light direction for every shadow.
+- Fewer cutouts, cleaner ones: a whole plate moved by the camera (a slow push, a pan, a cut on the beat) often reads better than many small cutouts each moving on its own. Cut out only what has to move by itself, and look at every cutout on the contact sheet.
