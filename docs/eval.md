@@ -87,3 +87,36 @@ B level, for every 0.x minor version: the flagship model on 10 cases, one run ea
 The 5 cases from v0.1: a New Year countdown (big numbers and a hold), population bars for four cities (a data chart), an explainer on deterministic rendering (a concept diagram), a book quote (text appearing character by character), and hits on the user's own music (bring-your-own music and beat points). All in Chinese, none relying on the paper materials.
 
 The 3 illustration and story cases added once the paper look and music shipped: a seed growing into a tree (20 seconds, continuous growth), a paper boat through three kinds of weather (25 seconds, scene changes), the life of a butterfly (30 seconds, four stages with small titles). All require the paper look and preset music, and no voice-over.
+
+## Results
+
+### Before 0.3.0: 8 cases, one run each
+
+Claude Code 2.1.280 with Claude Opus 5.5, on commit d3dbe63. The commits between it and the 0.3.0 tag change only tests, CI, docs and version numbers.
+
+| Case | Result | Time | Cost |
+|---|---|---|---|
+| beat-dots (hits on the user's music) | one-shot pass | 1.9 min | $0.79 |
+| book-quote (book quote) | one-shot pass | 2.1 min | $0.65 |
+| city-bars (population bars) | one-shot pass | 3.0 min | $0.73 |
+| countdown (New Year countdown) | one-shot pass | 5.2 min | $1.16 |
+| determinism-explainer (30-second explainer) | one-shot pass | 8.5 min | $1.58 |
+| seed-tree (illustration) | one-shot pass | 10.3 min | $2.00 |
+| paper-boat (illustration) | one-shot pass | 6.7 min | $1.48 |
+| butterfly-life (illustration) | one-shot pass | 13.5 min | $2.78 |
+
+8 of 8 one-shot passes, about 51 minutes and $11 in all. Human review found no silent bad films. The three illustration videos have paper texture, cut-paper surfaces and real illustration (leaf veins, roots, spray, rain and snow), keep one protagonist throughout, and move from scene to scene without a break. None of them counts as moving slides. This round checked moving slides on those three only. Illustration cases take 2 to 3 times the time and cost of the text cases.
+
+### v0.1: 5 cases, two runs each
+
+Claude Code 2.1.280 with Claude Opus 5.5, on commit 9f2e316.
+
+| Case | Run 1 | Run 2 |
+|---|---|---|
+| beat-dots | 1.6 min, $0.69 | 1.5 min, $0.53 |
+| book-quote | 2.1 min, $0.53 | 1.9 min, $0.54 |
+| city-bars | 4.9 min, $0.94 | 3.3 min, $0.74 |
+| countdown | 5.8 min, $1.31 | 3.1 min, $0.87 |
+| determinism-explainer | 6.4 min, $1.15 | 7.1 min, $1.19 |
+
+10 of 10 one-shot passes against a gate of 6, about 38 minutes and $8.50 in all. Every check passed on its first round, so no retry was ever triggered. Human review found no silent bad films. Moving slides were not part of the v0.1 gate: 9 of the 10 runs counted as moving slides, which is expected for text and data cases written before the paper materials existed.
