@@ -594,7 +594,7 @@ export async function runStockFetch(
 
     const net = netFor(deps, keys);
     if (ref.kind === 'audio') {
-        await fetchAudio(rb, ws, { ref, id, as: options.as, sources }, deps, net, env);
+        await fetchAudio(rb, ws, { ref, id, as: options.as, sources }, deps, keys, net, env);
         return rb.finish();
     }
     let image: StockImage;
@@ -763,11 +763,11 @@ async function fetchAudio(
     ws: Workspace,
     target: { ref: StockRef; id: string; as: string; sources: SourcesFile },
     deps: StockDeps,
+    keys: StockKeys,
     net: Net,
     env: NodeJS.ProcessEnv,
 ): Promise<void> {
     const { ref, id, sources } = target;
-    const keys = keysFromEnv(env);
     let sound: AudioHit;
     let bytes: Buffer;
     try {
