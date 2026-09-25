@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
 import {
@@ -24,13 +25,16 @@ import {
     decodeGray,
     decodeRgb,
     extractFrame,
+    grayFilter,
     isFlat,
     matchesBaseline,
     psnr,
     RGB_H,
     RGB_W,
+    rgbFilter,
     selectExpr,
-    streamGray,
+    splitFrames,
+    streamFrames,
 } from './pixels.ts';
 import { run, tail } from './proc.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
@@ -99,6 +103,8 @@ export interface VerifyOptions {
     baselines: Map<number, string>;
     /** Where evidence images are kept; inside the workspace, outliving the render's tmp. */
     evidenceDir: string;
+    /** Scratch space for the decoded samples, removed with the render's tmp. */
+    workDir: string;
     workspace: Workspace;
 }
 
@@ -151,34 +157,16 @@ export function freezePieces(
     return pieces.filter((piece) => piece.end - piece.start >= STILL_LIMIT_SEC - 1e-6);
 }
 
-/** Frozen spans reported by ffmpeg freezedetect on the video scaled to `size` and blurred. */
-export async function freezeSpans(
-    ffmpeg: string,
-    video: string,
-    durationSec: number,
-    size: { width: number; height: number },
-): Promise<{ start: number; end: number }[]> {
-    const result = await run(
-        ffmpeg,
-        [
-            '-hide_banner',
-            '-nostats',
-            '-i',
-            video,
-            '-vf',
-            `scale=${size.width}:${size.height}:flags=area,gblur=sigma=1.5,freezedetect=n=-60dB:d=${STILL_LIMIT_SEC}`,
-            '-map',
-            '0:v',
-            '-f',
-            'null',
-            '-',
-        ],
-        { timeoutMs: 600_000 },
-    );
-    if (result.code !== 0) throw new Error(`ffmpeg freezedetect failed: ${tail(result.stderr)}`);
+/** freezedetect on the video scaled to `size` and blurred, so grain and noise do not count as change. */
+function freezeFilter(size: { width: number; height: number }): string {
+    return `scale=${size.width}:${size.height}:flags=area,gblur=sigma=1.5,freezedetect=n=-60dB:d=${STILL_LIMIT_SEC}`;
+}
+
+/** Frozen spans from freezedetect's log. A freeze still open at the end runs to `durationSec`. */
+export function parseFreezeLog(log: string, durationSec: number): { start: number; end: number }[] {
     const spans: { start: number; end: number }[] = [];
     let open: number | null = null;
-    for (const line of result.stderr.split('\n')) {
+    for (const line of log.split('\n')) {
         const start = /freeze_start:\s*([\d.]+)/.exec(line);
         if (start) open = Number(start[1]);
         const end = /freeze_end:\s*([\d.]+)/.exec(line);
@@ -189,6 +177,73 @@ export async function freezeSpans(
     }
     if (open !== null) spans.push({ start: open, end: durationSec });
     return spans;
+}
+
+/**
+ * One decode of the video feeding every pixel check: gray frames streamed to
+ * `onGray`, freezedetect's spans, and the sampled frames as RGB written to
+ * `rgbFile`. A three-minute video used to be decoded once per check.
+ */
+async function analysisPass(
+    ffmpeg: string,
+    video: string,
+    options: {
+        durationSec: number;
+        gray: { width: number; height: number };
+        rgb: { width: number; height: number };
+        sampleFrames: number[];
+        rgbFile: string;
+        onGray: (index: number, pixels: Uint8Array) => void;
+    },
+): Promise<{ freezes: { start: number; end: number }[] }> {
+    const { gray, rgb, sampleFrames } = options;
+    const branches = [
+        `[g]${grayFilter(gray.width, gray.height)}[gray]`,
+        `[f]${freezeFilter(gray)}[freeze]`,
+    ];
+    if (sampleFrames.length > 0) {
+        branches.push(`[r]${selectExpr(sampleFrames)}${rgbFilter(rgb.width, rgb.height)}[rgb]`);
+    }
+    const labels = sampleFrames.length > 0 ? '[g][f][r]' : '[g][f]';
+    const graph = `[0:v]split=${branches.length}${labels};${branches.join(';')}`;
+    const args = [
+        '-hide_banner',
+        '-nostats',
+        '-i',
+        video,
+        '-filter_complex',
+        graph,
+        '-map',
+        '[gray]',
+        '-fps_mode',
+        'passthrough',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'gray',
+        'pipe:1',
+        '-map',
+        '[freeze]',
+        '-f',
+        'null',
+        '-',
+    ];
+    if (sampleFrames.length > 0) {
+        args.push(
+            '-map',
+            '[rgb]',
+            '-fps_mode',
+            'passthrough',
+            '-f',
+            'rawvideo',
+            '-pix_fmt',
+            'rgb24',
+            '-y',
+            options.rgbFile,
+        );
+    }
+    const { stderr } = await streamFrames(ffmpeg, args, gray.width * gray.height, options.onGray);
+    return { freezes: parseFreezeLog(stderr, options.durationSec) };
 }
 
 /** Acceptance checks on the encoded video. */
@@ -267,10 +322,15 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     };
     const runs: EmptyRun[] = [];
     let current: EmptyRun | null = null;
-    await streamGray(
-        ffmpeg.ffmpeg,
-        video,
-        (index, pixels) => {
+    const sampleFrames = [...options.samples.keys()].sort((a, b) => a - b);
+    const rgbFile = path.join(options.workDir, 'samples-decoded.rgb');
+    const { freezes } = await analysisPass(ffmpeg.ffmpeg, video, {
+        durationSec: probe.durationSec,
+        gray,
+        rgb,
+        sampleFrames,
+        rgbFile,
+        onGray: (index, pixels) => {
             let kind: 'blank' | 'paper' | 'content' = 'content';
             if (isFlat(pixels)) kind = 'blank';
             else {
@@ -286,9 +346,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
             current.to = index;
             current[kind] += 1;
         },
-        gray.width,
-        gray.height,
-    );
+    });
     if (current) runs.push(current);
     const minFrames = Math.ceil(STILL_LIMIT_SEC * fps);
     for (const r of runs) {
@@ -325,7 +383,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     }
 
     // Freezes longer than the limit, outside scenes marked hold.
-    for (const span of await freezeSpans(ffmpeg.ffmpeg, video, probe.durationSec, gray)) {
+    for (const span of freezes) {
         for (const piece of freezePieces(span, timeline.scenes)) {
             const seconds = piece.end - piece.start;
             const frame = Math.round(piece.start * fps);
@@ -366,15 +424,8 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     }
 
     // Decoded frames against their captures.
-    const sampleFrames = [...options.samples.keys()].sort((a, b) => a - b);
     if (sampleFrames.length > 0) {
-        const decoded = await decodeRgb(
-            ffmpeg.ffmpeg,
-            ['-i', video],
-            rgb.width,
-            rgb.height,
-            selectExpr(sampleFrames),
-        );
+        const decoded = splitFrames(fs.readFileSync(rgbFile), rgb.width * rgb.height * 3);
         const captured = await decodeRgb(
             ffmpeg.ffmpeg,
             ['-i', sequencePattern(path.dirname(options.samples.get(sampleFrames[0]) as string))],

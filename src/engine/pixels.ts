@@ -42,8 +42,12 @@ export function writeSequence(ws: Workspace, dir: string, frames: Buffer[]): str
     return path.join(dir, 'f_%05d.png');
 }
 
-function grayFilter(width: number, height: number): string {
+export function grayFilter(width: number, height: number): string {
     return `scale=${width}:${height}:flags=area,format=gray`;
+}
+
+export function rgbFilter(width: number, height: number): string {
+    return `scale=${width}:${height}:flags=area,format=rgb24`;
 }
 
 /** Decode an image sequence or a video into gray frames of width x height (see analysisSize). */
@@ -74,7 +78,7 @@ export async function decodeGray(
         { timeoutMs: 600_000 },
     );
     if (result.code !== 0) throw new Error(`ffmpeg gray decode failed: ${tail(result.stderr)}`);
-    return split(result.stdout, width * height);
+    return splitFrames(result.stdout, width * height);
 }
 
 /** Decode to RGB frames of width x height (see analysisSize). */
@@ -85,7 +89,7 @@ export async function decodeRgb(
     height: number,
     filterPrefix = '',
 ): Promise<Uint8Array[]> {
-    const vf = `${filterPrefix}scale=${width}:${height}:flags=area,format=rgb24`;
+    const vf = `${filterPrefix}${rgbFilter(width, height)}`;
     const result = await run(
         ffmpeg,
         [
@@ -105,10 +109,11 @@ export async function decodeRgb(
         { timeoutMs: 600_000 },
     );
     if (result.code !== 0) throw new Error(`ffmpeg rgb decode failed: ${tail(result.stderr)}`);
-    return split(result.stdout, width * height * 3);
+    return splitFrames(result.stdout, width * height * 3);
 }
 
-function split(bytes: Buffer, size: number): Uint8Array[] {
+/** Cut raw bytes into frames of `size` bytes, dropping a partial tail. */
+export function splitFrames(bytes: Buffer, size: number): Uint8Array[] {
     const frames: Uint8Array[] = [];
     for (let offset = 0; offset + size <= bytes.length; offset += size) {
         frames.push(new Uint8Array(bytes.buffer, bytes.byteOffset + offset, size));
@@ -117,37 +122,22 @@ function split(bytes: Buffer, size: number): Uint8Array[] {
 }
 
 /**
- * Stream every frame of a video as gray bytes without holding the whole
- * decode in memory. Calls `onFrame(index, pixels)` in order.
+ * Run ffmpeg with `args` and stream its stdout as raw frames of `frameSize`
+ * bytes without holding the whole decode in memory. Calls `onFrame(index,
+ * pixels)` in order and resolves with the frame count and ffmpeg's stderr,
+ * where filters such as freezedetect log what they found.
  */
-export function streamGray(
+export function streamFrames(
     ffmpeg: string,
-    video: string,
+    args: string[],
+    frameSize: number,
     onFrame: (index: number, pixels: Uint8Array) => void,
-    width: number,
-    height: number,
-): Promise<number> {
+): Promise<{ frames: number; stderr: string }> {
     return new Promise((resolve, reject) => {
-        const size = width * height;
-        const child = spawn(
-            ffmpeg,
-            [
-                '-v',
-                'error',
-                '-i',
-                video,
-                '-vf',
-                grayFilter(width, height),
-                '-fps_mode',
-                'passthrough',
-                '-f',
-                'rawvideo',
-                '-pix_fmt',
-                'gray',
-                '-',
-            ],
-            { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
-        );
+        const child = spawn(ffmpeg, args, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            windowsHide: true,
+        });
         let pending: Buffer = Buffer.alloc(0);
         let index = 0;
         const errors: Buffer[] = [];
@@ -158,9 +148,9 @@ export function streamGray(
         }, 600_000);
         child.stdout.on('data', (chunk: Buffer) => {
             pending = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
-            while (pending.length >= size) {
-                onFrame(index++, new Uint8Array(pending.subarray(0, size)));
-                pending = pending.subarray(size);
+            while (pending.length >= frameSize) {
+                onFrame(index++, new Uint8Array(pending.subarray(0, frameSize)));
+                pending = pending.subarray(frameSize);
             }
         });
         child.stderr.on('data', (chunk: Buffer) => errors.push(chunk));
@@ -170,17 +160,14 @@ export function streamGray(
         });
         child.on('close', (code, signal) => {
             clearTimeout(timer);
+            const stderr = Buffer.concat(errors).toString('utf-8');
             const killed = timedOut ? null : killedBySystem(ffmpeg, signal);
             if (killed) {
                 reject(killed);
             } else if (code !== 0) {
-                reject(
-                    new Error(
-                        `ffmpeg gray stream failed: ${tail(Buffer.concat(errors).toString('utf-8'))}`,
-                    ),
-                );
+                reject(new Error(`ffmpeg frame stream failed: ${tail(stderr)}`));
             } else {
-                resolve(index);
+                resolve({ frames: index, stderr });
             }
         });
     });

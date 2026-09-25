@@ -400,6 +400,7 @@ async function renderVideo(ctx: RenderContext): Promise<void> {
         samples: captured.samples,
         baselines: captured.baselines,
         evidenceDir,
+        workDir: tmp,
         workspace: ws,
     });
     rb.addAll(verified.findings);

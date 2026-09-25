@@ -29,7 +29,8 @@
 - **长片样例**：新增 `examples/long-scroll`，三分钟纸面一直往上滚，发版门禁里整条过 check 和成片验收。
 - **DOM 文字逐帧缩放的漂移**：macOS 上两次渲染有十来帧不一致，根因是 60 Hz 限帧下截图抢在合成器按新缩放重画之前，不是字形缓存，上面的启动参数修好了，`dom-scale-drift` 语料钉住。Linux 和 Windows 上加了这个参数仍有帧不一致，所以「DOM 字不许逐帧改 scale」的硬规矩保留。
 - **报告**：`check` 多了 `determinism`，`snapshot` 每格多了截图的 `sha256`，另有汇总的 `digest`，`render` 多了 `output`、`parallel`、`pages`、`recycle`，mp4 标签多了 `stage` 和 `scale`。
-- **待办**：成片验收把视频解码三遍（空白和纸底一遍、定格一遍、花屏抽帧一遍），三分钟长片上要合成一遍。beat-title 还没改成按舞台宽高排版。Linux 和 Windows 上 DOM 文字逐帧缩放漂移的根因还没查。
+- **成片验收只解码一遍**：空白和只剩纸底、定格、花屏抽帧三项原来各自把视频从头解码一遍，现在共用一个 ffmpeg 进程分三路。三分钟 1080p 片在 M4 上验收解码从 7.4 秒降到 4.5 秒，CPU 时间从 46 秒降到 19 秒。
+- **待办**：beat-title 还没改成按舞台宽高排版。Linux 和 Windows 上 DOM 文字逐帧缩放漂移的根因还没查。
 
 ### 修复
 
