@@ -7,6 +7,7 @@
     "check": "pass",
     "render": "pass",
     "snapshot": {
+        "machine": "darwin-arm64 24.3.0 Apple M4",
         "chromium": "1243",
         "digest": "34969b1976e342b95b19d3649dcf3c4a5fb6aaad90697d96132fbdcd9537ee85"
     }

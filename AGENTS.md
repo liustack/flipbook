@@ -54,14 +54,14 @@ test/release/      vitest 发版档：hello、eggs-five/five、long-scroll 的�
   - `pnpm test`（`test/`）：单元测试和拿小 fixture 跑的引擎测试，本机一分钟内，改代码时随手跑。
   - `pnpm test:e2e`（`test/e2e/`）：坏片语料过 check 和 render，reference 片段过 check，每个样例过 check 再比 snapshot 帧摘要，不渲样例成片，本机约一分钟。本地改了引擎、运行时库、类型码或样例，推送前跑一遍。
   - `pnpm test:release`（`test/release/`）：hello（纯纸底）和 eggs-five/five（纹理纸底）完整渲染、对 expected.json、另开浏览器再渲一遍逐帧比哈希，long-scroll 渲一遍核帧数和时长，本机约三分半。其他样例的成片由 release.yml 渲成 Release 附件，不在门禁里比。
-- 样例帧摘要只在 macOS arm64 上比（本机和 CI 的两列 macOS），Linux 和 Windows 列只跑样例的 check。摘要记在各样例 `expected.json` 的 `snapshot` 里，是 snapshot 那组帧（每场中间一帧加 12 个等距帧）的截图哈希汇总，由 `pnpm examples:baseline` 在 macOS arm64 上生成。摘要对不上时先看画面是不是有意改的，是就重出，不是就查引擎。
+- 样例帧摘要只在记下它的那台机器上比。各样例 `expected.json` 的 `snapshot` 里记着 `machine`（平台、内核版本、CPU 型号）、`chromium` 和 `digest`，`machine` 对不上就跳过。同一版 Chromium 换一台 Mac 摘要就不同（CI 的 macOS 列和作者的 M4 全对不上），所以 CI 各列都只跑样例的 check，摘要比对在作者机器上的本地开发和发版门禁里起作用。摘要是 snapshot 那组帧（每场中间一帧加 12 个等距帧）的截图哈希汇总，由 `pnpm examples:baseline` 在作者的 Mac 上生成，系统升级后也要重出。摘要对不上时先看画面是不是有意改的，是就重出，不是就查引擎。
 - 新测试按跑的内容分档：样例的完整渲染放 `test/release/`。坏片语料、reference 片段、样例的 check 和摘要放 `test/e2e/`。其余放 `test/`，包括拿小 fixture 过一次 check 或 render 的引擎测试，这类单条要几秒内跑完：画面小、帧数少、期限短，别等满 60 秒的 ready 期限。
 - 用到浏览器的测试把 fixture 复制到临时目录再跑。首次运行需要联网装 Chromium 和字体，写的是用户缓存目录。
 - 坏片语料每类至少一条，新增检查时先加一条会被拦下的坏片。
 - `skills/flipbook/references/` 里标了 `<!-- check: ... -->` 的代码片段由 `test/e2e/references.test.ts` 真跑 check。`troubleshooting.md` 从 `src/cli/codes.ts` 生成，改了类型码跑 `UPDATE_REFERENCES=1 pnpm test test/skillText.test.ts`。
 - 评测花真实额度，按 docs/eval.md 本地跑，CI 只跑 `--dry-run`。
-- 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。然后在 macOS arm64 上跑 `pnpm examples:baseline` 重出样例的帧摘要（写进各样例的 `expected.json`），和升级放同一个提交。改了样例的画面也跑它。
-- 两次渲染比原始帧哈希只在同机同版本做。样例帧摘要按平台记，只在 macOS arm64 上比。
+- 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。然后在作者的 Mac 上跑 `pnpm examples:baseline` 重出样例的帧摘要（写进各样例的 `expected.json`），和升级放同一个提交。改了样例的画面也跑它。
+- 原始帧哈希和样例帧摘要都只在同机同版本比，跨机器不比。
 
 ## 文档
 

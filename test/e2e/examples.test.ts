@@ -1,8 +1,10 @@
-// Every example passes check with no findings, and on macOS arm64 the frames
-// snapshot takes hash to the digest in its expected.json (recorded by
-// pnpm examples:baseline). No video is encoded here: the full renders are in
-// test/release/, run by the release gate.
+// Every example passes check with no findings, and on the machine that
+// recorded expected.json (pnpm examples:baseline) the frames snapshot takes
+// hash to the digest in it. Elsewhere, CI included, the digest is skipped: the
+// same Chromium on another Mac already gives other hashes. No video is encoded
+// here: the full renders are in test/release/, run by the release gate.
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../../src/cli/check.ts';
@@ -15,9 +17,8 @@ afterAll(async () => {
     cleanTemps();
 });
 
-/** Digests only match on the platform they were recorded on. */
-const DIGEST_PLATFORM = 'darwin-arm64';
-const comparesDigests = `${process.platform}-${process.arch}` === DIGEST_PLATFORM;
+/** Same as machineId() in scripts/examples-baseline.mjs. */
+const machine = `${process.platform}-${process.arch} ${os.release()} ${os.cpus()[0]?.model ?? 'unknown CPU'}`;
 
 /** Every folder under examples/ holding a timeline.json, as a path under examples/. */
 function exampleNames(): string[] {
@@ -51,22 +52,25 @@ describe.concurrent.each(exampleNames())('examples/%s', (name) => {
         expect(checked.warnings).toEqual([]);
     });
 
-    it.runIf(comparesDigests)('snapshot frames match the digest in expected.json', async () => {
-        const s = await session();
-        expect(
-            s.chromium.revision,
-            'expected.json was recorded on another Chromium: run pnpm examples:baseline',
-        ).toBe(expected.snapshot?.chromium);
-        const dir = copyFixture(name, 'examples');
-        const snap = await runSnapshot({ dir, session: s });
-        expect(snap.failures).toEqual([]);
-        const { digest, tiles } = snap.snapshot as {
-            digest: string;
-            tiles: { frame: number; sha256: string }[];
-        };
-        expect(
-            digest,
-            `frames ${tiles.map((tile) => tile.frame).join(', ')} changed: if on purpose, run pnpm examples:baseline`,
-        ).toBe(expected.snapshot.digest);
-    });
+    it.runIf(expected.snapshot?.machine === machine)(
+        'snapshot frames match the digest in expected.json',
+        async () => {
+            const s = await session();
+            expect(
+                s.chromium.revision,
+                'expected.json was recorded on another Chromium: run pnpm examples:baseline',
+            ).toBe(expected.snapshot?.chromium);
+            const dir = copyFixture(name, 'examples');
+            const snap = await runSnapshot({ dir, session: s });
+            expect(snap.failures).toEqual([]);
+            const { digest, tiles } = snap.snapshot as {
+                digest: string;
+                tiles: { frame: number; sha256: string }[];
+            };
+            expect(
+                digest,
+                `frames ${tiles.map((tile) => tile.frame).join(', ')} changed: if on purpose, run pnpm examples:baseline`,
+            ).toBe(expected.snapshot.digest);
+        },
+    );
 });

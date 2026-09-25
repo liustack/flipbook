@@ -14,6 +14,7 @@
         "sfxCues": 1
     },
     "snapshot": {
+        "machine": "darwin-arm64 24.3.0 Apple M4",
         "chromium": "1243",
         "digest": "08d79d144eab7d62caebaf85c52464e2e0aaa58f9adf9d340c90ee82f7811b3c"
     }

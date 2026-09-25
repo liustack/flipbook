@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // Record every example's snapshot digest in its expected.json: the frames
 // snapshot takes (each scene's middle plus 12 evenly spaced frames), hashed as
-// captured, with the Chromium build they came from. test/e2e/examples.test.ts
-// compares against it. Digests are recorded and compared on macOS arm64 only.
-// Rerun after upgrading playwright-core, together with scripts/rebaseline.mjs.
+// captured, with the Chromium build and the machine they came from.
+// test/e2e/examples.test.ts compares against it on that same machine only:
+// the same Chromium on another Mac already gives other hashes. Recorded on
+// macOS arm64. Rerun after upgrading playwright-core, together with
+// scripts/rebaseline.mjs, and after a system update.
 //
 //   pnpm examples:baseline                  every example
 //   pnpm examples:baseline hello page-turn  only these (paths under examples/)
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpus, release, tmpdir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,6 +19,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cli = join(root, 'dist', 'main.js');
 const examplesDir = join(root, 'examples');
 export const DIGEST_PLATFORM = 'darwin-arm64';
+
+/** What the digests depend on beyond Chromium: platform, kernel release and CPU model. */
+export function machineId() {
+    return `${process.platform}-${process.arch} ${release()} ${cpus()[0]?.model ?? 'unknown CPU'}`;
+}
 
 function fail(message) {
     console.error(`examples:baseline: ${message}`);
@@ -67,6 +74,7 @@ function baseline(name) {
         const file = join(source, 'expected.json');
         const expected = JSON.parse(readFileSync(file, 'utf-8'));
         expected.snapshot = {
+            machine: machineId(),
             chromium: report.environment.chromium.revision,
             digest: report.snapshot.digest,
         };
