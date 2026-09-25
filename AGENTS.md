@@ -34,7 +34,7 @@ src/
   skillPin.ts      读各宿主 skill 副本钉的版本
   cli/             doctor、check、snapshot、audio、render、stock、报告和类型码
   engine/          浏览器、页面、时钟、timeline、截帧、编码、验收、字体和自带字体、品牌资产、缓存、扫描、配乐合成和混音、渲染进程监视
-  runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、audio）
+  runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、photo、audio）
   stock/           找图：Pexels、Pixabay、Openverse 三家的搜索和详情、下载防护（只走 HTTPS、拒内网地址、连接钉在核对过的地址上）、图片格式嗅探
   fonts/           字体清单、码位表、OFL 全文
 scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）、examples-baseline.mjs（记样例的帧摘要）

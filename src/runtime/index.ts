@@ -68,6 +68,16 @@ export {
 export type { GrainOptions, GridOptions, PaperOptions } from './paper.ts';
 export { drawGrain, drawPaper, grainLayer, PAPER, paperLayer } from './paper.ts';
 export type {
+    CutoutMode,
+    DrawPhotoOptions,
+    Photo,
+    PhotoCrop,
+    PhotoOptions,
+    PhotoShadowOptions,
+    StickerOptions,
+} from './photo.ts';
+export { photo } from './photo.ts';
+export type {
     ArcCuts,
     ArcCutsOptions,
     ArcGeometry,
