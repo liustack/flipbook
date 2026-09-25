@@ -34,18 +34,11 @@ https://github.com/user-attachments/assets/4720fa7b-ec6e-4c25-b361-1ca15e2cc42e
 </td>
 </tr>
 <tr>
-<td width="50%" valign="top">
+<td colspan="2" valign="top">
 
 https://github.com/user-attachments/assets/9016d9cb-d2dc-4fa3-84aa-f36801ead9e9
 
 <sub>鸟蛋一颗颗落下，拼成「5」。8 秒，无声。</sub>
-
-</td>
-<td width="50%" valign="top">
-
-https://github.com/user-attachments/assets/2345e6a3-4a8b-4012-a5d7-c1698e2fd000
-
-<sub>同一个模板拼出「书」。8 秒，无声。</sub>
 
 </td>
 </tr>
