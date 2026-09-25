@@ -8,7 +8,7 @@
     "beatsPerBar": 4,
     "scenes": [
         { "id": "board", "bars": 2 },
-        { "id": "title", "bars": 2 }
+        { "id": "title", "bars": 2, "hold": true }
     ],
     "cues": [
         { "id": "drop-1", "scene": "board", "beat": 0, "kind": "mark" },
