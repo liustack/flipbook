@@ -128,13 +128,20 @@ describe('render lock', () => {
         const dir = tempDir('lock-race');
         fs.mkdirSync(path.join(dir, '.flipbook'));
         const go = path.join(dir, 'go');
+        const done = path.join(dir, 'done');
+        // Every child says ready once its imports are loaded, all try at the go
+        // file together, and whoever got the lock holds it until every child
+        // has answered: a slow child can never arrive after the lock is free.
+        const wait = (file: string) =>
+            `while (!existsSync(${JSON.stringify(file)})) await new Promise((r) => setTimeout(r, 2));`;
         const script = [
             `import { existsSync } from 'node:fs';`,
             `import { acquireLock } from ${JSON.stringify(pathToFileURL(path.join(repoRoot, 'src/engine/workspace.ts')).href)};`,
-            `while (!existsSync(${JSON.stringify(go)})) await new Promise((r) => setTimeout(r, 2));`,
+            `process.stdout.write('ready\\n');`,
+            wait(go),
             `const release = acquireLock(${JSON.stringify(dir)});`,
-            `process.stdout.write(release ? 'got' : 'busy');`,
-            `await new Promise((r) => setTimeout(r, 400));`,
+            `process.stdout.write(release ? 'got\\n' : 'busy\\n');`,
+            wait(done),
             'release?.();',
         ].join('\n');
         const children = Array.from({ length: 8 }, () =>
@@ -142,23 +149,32 @@ describe('render lock', () => {
                 stdio: ['ignore', 'pipe', 'pipe'],
             }),
         );
-        const results = children.map(
-            (child) =>
-                new Promise<string>((resolve) => {
-                    let out = '';
-                    let err = '';
-                    child.stdout.on('data', (chunk) => {
-                        out += chunk;
-                    });
-                    child.stderr.on('data', (chunk) => {
-                        err += chunk;
-                    });
-                    child.on('close', () => resolve(out || `error: ${err}`));
-                }),
+        const lines = children.map(() => [] as string[]);
+        const errors = children.map(() => '');
+        children.forEach((child, i) => {
+            child.stdout.on('data', (chunk) => {
+                lines[i].push(...String(chunk).split('\n').filter(Boolean));
+            });
+            child.stderr.on('data', (chunk) => {
+                errors[i] += chunk;
+            });
+        });
+        const closed = children.map(
+            (child) => new Promise<void>((resolve) => child.on('close', () => resolve())),
         );
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        const until = async (test: () => boolean, what: string) => {
+            const deadline = Date.now() + 60_000;
+            while (!test()) {
+                if (Date.now() > deadline) throw new Error(`${what}: ${errors.join(' | ')}`);
+                await new Promise((resolve) => setTimeout(resolve, 10));
+            }
+        };
+        await until(() => lines.every((l) => l.includes('ready')), 'children never got ready');
         fs.writeFileSync(go, '');
-        const outcomes = await Promise.all(results);
+        await until(() => lines.every((l) => l.length >= 2), 'children never answered');
+        fs.writeFileSync(done, '');
+        await Promise.all(closed);
+        const outcomes = lines.map((l) => l[1]);
         expect(
             outcomes.filter((o) => o === 'got'),
             outcomes.join(', '),
