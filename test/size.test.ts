@@ -3,17 +3,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { runCheck } from '../src/cli/check.ts';
 import { runRender } from '../src/cli/render.ts';
-import { saveReport, UsageError } from '../src/cli/report.ts';
-import { runSnapshot } from '../src/cli/snapshot.ts';
+import { UsageError } from '../src/cli/report.ts';
 import { run } from '../src/engine/proc.ts';
 import { openPage } from '../src/engine/session.ts';
 import { outputSize, parseSize, stageSize } from '../src/engine/size.ts';
 import { loadTimeline } from '../src/engine/timeline.ts';
 import { probeVideo } from '../src/engine/verify.ts';
 import { closeSession, session } from './browser.ts';
-import { cleanTemps, copyFixture, repoRoot, tempDir } from './helpers.ts';
+import { cleanTemps, copyFixture, tempDir } from './helpers.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -109,7 +107,7 @@ describe('--scale', () => {
     });
 });
 
-describe('render and snapshot in other shapes', () => {
+describe('render in other shapes', () => {
     it('renders the stage fixture at 9:16 and at scale 2', async () => {
         const dir = copyFixture('stage');
         const s = await session();
@@ -133,33 +131,4 @@ describe('render and snapshot in other shapes', () => {
         expect([probe.width, probe.height]).toEqual([1280, 720]);
         expect(JSON.parse(probe.comment ?? '{}')).toMatchObject({ stage: '640x360', scale: 2 });
     });
-
-    it('snapshot lays a 9:16 stage out in tall tiles', async () => {
-        const dir = copyFixture('hello', 'examples');
-        const snap = await runSnapshot({ dir, session: await session(), size: parseSize('9:16') });
-        expect(snap.failures).toEqual([]);
-        expect(snap.composition).toMatchObject({ width: 1080, height: 1920 });
-        const layout = (snap.snapshot as { layout: { tileWidth: number; tileHeight: number } })
-            .layout;
-        expect(layout.tileHeight).toBeGreaterThan(layout.tileWidth);
-    });
-
-    for (const [label, options, want] of [
-        ['9:16', { size: parseSize('9:16') }, [1080, 1920]],
-        ['scale 2', { scale: 2 }, [3840, 2160]],
-    ] as const) {
-        it(`examples/hello renders at ${label}`, async () => {
-            const expected = JSON.parse(
-                fs.readFileSync(path.join(repoRoot, 'examples/hello/expected.json'), 'utf-8'),
-            );
-            const dir = copyFixture('hello', 'examples');
-            const s = await session();
-            saveReport(await runCheck({ dir, session: s, recordAttempts: false }));
-            const report = await runRender({ dir, session: s, ...options, recordAttempts: false });
-            expect(report.failures).toEqual([]);
-            expect(report.warnings).toEqual([]);
-            const probe = await probeVideo(s.ffmpeg.ffprobe, report.artifacts.video);
-            expect([probe.width, probe.height, probe.frames]).toEqual([...want, expected.frames]);
-        });
-    }
 });

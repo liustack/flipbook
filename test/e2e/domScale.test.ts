@@ -4,12 +4,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { runRender } from '../src/cli/render.ts';
-import { openPage } from '../src/engine/session.ts';
-import { loadTimeline } from '../src/engine/timeline.ts';
-import { sha256 } from '../src/engine/workspace.ts';
-import { closeSession, session } from './browser.ts';
-import { cleanTemps, copyFixture } from './helpers.ts';
+import { runRender } from '../../src/cli/render.ts';
+import { openPage } from '../../src/engine/session.ts';
+import { loadTimeline } from '../../src/engine/timeline.ts';
+import { sha256 } from '../../src/engine/workspace.ts';
+import { closeSession, session } from '../browser.ts';
+import { cleanTemps, copyFixture } from '../helpers.ts';
 
 afterAll(async () => {
     await closeSession();
