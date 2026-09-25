@@ -111,15 +111,6 @@ export function docTargets(root, pkgName, slug) {
             format: (version) => `${slug}/blob/v${version}`,
             required: false,
         },
-        {
-            // The README sample wall links the contact sheets and videos the
-            // release job uploads under the same names for every tag.
-            name: `${relative} release asset pin`,
-            file: join(root, relative),
-            pattern: new RegExp(`${escapeRe(slug)}/releases/download/v(\\d+\\.\\d+\\.\\d+)`, 'g'),
-            format: (version) => `${slug}/releases/download/v${version}`,
-            required: false,
-        },
     ]);
 }
 

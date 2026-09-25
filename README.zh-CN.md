@@ -19,36 +19,55 @@
   <img src="https://img.shields.io/badge/users-unknown-lightgrey?style=flat-square" alt="Users unknown">
 </p>
 
+https://github.com/user-attachments/assets/d0358eec-777e-4237-9695-e70ff8a7905d
+
+<p align="center"><sub>迈布里奇 1878 年《运动中的马》做成的手翻书：书页越翻越快，马跑了起来，最后停在站着的那一格。12.5 秒，预设配乐。</sub></p>
+
 <table>
   <tr>
     <td colspan="2" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/paper-boat.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/paper-boat-contact-sheet.png" width="100%" alt="联系表 12 帧：纸折的小船在纸剪的太阳下出发，穿过大雨和闪电，驶过大雪，最后在暖色黄昏里出现「纸船」两个字"></a>
-      <br><sub>Claude Opus 5.5 从一句话做出来：一只纸船依次驶过晴天、大雨和大雪。一次跑通，6.7 分钟，1.48 美元。25 秒，预设配乐。</sub>
+
+https://github.com/user-attachments/assets/4720fa7b-ec6e-4c25-b361-1ca15e2cc42e
+
+<sub>Claude Opus 5.5 从一句话做出来：一只纸船依次驶过晴天、大雨和大雪。一次跑通，6.7 分钟，1.48 美元。25 秒，预设配乐。</sub>
+
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/eggs-five-five-contact-sheet.png" width="100%" alt="联系表 12 帧：米褐纸上鸟蛋一颗颗落下拼成数字 5，最后换成 flipbook 字样"></a>
-      <br><sub>鸟蛋一颗颗落下，拼成「5」。8 秒，无声。</sub>
+
+https://github.com/user-attachments/assets/9016d9cb-d2dc-4fa3-84aa-f36801ead9e9
+
+<sub>鸟蛋一颗颗落下，拼成「5」。8 秒，无声。</sub>
+
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/eggs-five-shu.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/eggs-five-shu-contact-sheet.png" width="100%" alt="联系表 12 帧：鸟蛋一颗颗落下拼成汉字书，最后换成手翻书字样"></a>
-      <br><sub>同一个模板拼出「书」。8 秒，无声。</sub>
+
+https://github.com/user-attachments/assets/2345e6a3-4a8b-4012-a5d7-c1698e2fd000
+
+<sub>同一个模板拼出「书」。8 秒，无声。</sub>
+
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/beat-title.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/beat-title-contact-sheet.png" width="100%" alt="联系表 12 帧：一张卡片钉上纸面，一小节落一个词，最后出现翻页书标题和红色印章"></a>
-      <br><sub>三个词踩着拍子落上卡片，最后盖章出标题。12 秒，马林巴预设配乐加音效。</sub>
+
+https://github.com/user-attachments/assets/3ec35052-1e5a-44bf-b854-56fb95b80d55
+
+<sub>三个词踩着拍子落上卡片，最后盖章出标题。12 秒，马林巴预设配乐加音效。</sub>
+
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/hello.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/hello-contact-sheet.png" width="100%" alt="联系表 12 帧：红方块在「你好，翻页书」和「Hello, flipbook」下面移动"></a>
-      <br><sub>安装指南里的试渲那一条。5 秒。</sub>
+
+https://github.com/user-attachments/assets/37f8b8ac-f48d-422d-826f-852a5dccd22c
+
+<sub>安装指南里的试渲那一条。5 秒。</sub>
+
     </td>
   </tr>
 </table>
 
-<p align="center"><sub>每张图是成片里均匀取的 12 帧，点开播放 mp4。纸船来自一次评测。另外四条由发版流程在 Linux 上从样例渲出。</sub></p>
+<p align="center"><sub>每条视频都能直接播放，全部由 flipbook 渲染：纸船来自一次评测，其余是本仓库里的样例。</sub></p>
 
 flipbook 是一个 agent skill。agent 写一个 HTML 合成文件和一份按拍写的时间轴，skill 逐帧渲染成带配乐的 mp4，交付前先自己验收一遍。
 

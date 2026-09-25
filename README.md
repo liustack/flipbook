@@ -19,36 +19,55 @@
   <img src="https://img.shields.io/badge/users-unknown-lightgrey?style=flat-square" alt="Users unknown">
 </p>
 
+https://github.com/user-attachments/assets/d0358eec-777e-4237-9695-e70ff8a7905d
+
+<p align="center"><sub>A flip book of Muybridge's 1878 Horse in Motion: the pages riffle faster and faster until the horse runs, then settle on the standing mare. 12.5 s, preset music.</sub></p>
+
 <table>
   <tr>
     <td colspan="2" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/paper-boat.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/paper-boat-contact-sheet.png" width="100%" alt="Twelve frames: a folded paper boat sails under a paper sun, through heavy rain and lightning, through falling snow, and into a warm evening where the words 纸船 appear"></a>
-      <br><sub>Claude Opus 5.5 made this from one prompt: a paper boat sails through sun, rain and snow. First try, 6.7 minutes, $1.48. 25 s, preset music.</sub>
+
+https://github.com/user-attachments/assets/4720fa7b-ec6e-4c25-b361-1ca15e2cc42e
+
+<sub>Claude Opus 5.5 made this from one prompt: a paper boat sails through sun, rain and snow. First try, 6.7 minutes, $1.48. 25 s, preset music.</sub>
+
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/eggs-five-five-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one on beige paper, form the digit 5, then give way to the word flipbook"></a>
-      <br><sub>Bird eggs land one by one and build a 5. 8 s, silent.</sub>
+
+https://github.com/user-attachments/assets/9016d9cb-d2dc-4fa3-84aa-f36801ead9e9
+
+<sub>Bird eggs land one by one and build a 5. 8 s, silent.</sub>
+
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/eggs-five-shu.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/eggs-five-shu-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one and form the Chinese character 书, then give way to the words 手翻书"></a>
-      <br><sub>The same template builds 书 (book). 8 s, silent.</sub>
+
+https://github.com/user-attachments/assets/2345e6a3-4a8b-4012-a5d7-c1698e2fd000
+
+<sub>The same template builds 书 (book). 8 s, silent.</sub>
+
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/beat-title.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/beat-title-contact-sheet.png" width="100%" alt="Twelve frames: a card is pinned to the page, three phrases land on it one per bar, then the title 翻页书 appears with a red stamp"></a>
-      <br><sub>Three phrases land on the beat, then a stamped title. 12 s, marimba preset with sound effects.</sub>
+
+https://github.com/user-attachments/assets/3ec35052-1e5a-44bf-b854-56fb95b80d55
+
+<sub>Three phrases land on the beat, then a stamped title. 12 s, marimba preset with sound effects.</sub>
+
     </td>
     <td width="50%" valign="top">
-      <a href="https://github.com/liustack/flipbook/releases/download/v0.5.3/hello.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.5.3/hello-contact-sheet.png" width="100%" alt="Twelve frames: a red square moves across the frame under the lines 你好，翻页书 and Hello, flipbook"></a>
-      <br><sub>The test render from the install guide. 5 s.</sub>
+
+https://github.com/user-attachments/assets/37f8b8ac-f48d-422d-826f-852a5dccd22c
+
+<sub>The test render from the install guide. 5 s.</sub>
+
     </td>
   </tr>
 </table>
 
-<p align="center"><sub>Each image is 12 evenly spaced frames of the finished video. Click one to play the MP4. The paper boat comes from an eval run. The release job rendered the other four on Linux from the examples.</sub></p>
+<p align="center"><sub>Every video plays in place. All of them are flipbook renders: the paper boat comes from an eval run, the others from the examples in this repository.</sub></p>
 
 flipbook is an agent skill. Your agent writes one HTML composition and a timeline counted in beats, the skill renders it frame by frame into an MP4 with music, and checks the video before you get it.
 
