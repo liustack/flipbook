@@ -49,15 +49,6 @@ https://github.com/user-attachments/assets/2345e6a3-4a8b-4012-a5d7-c1698e2fd000
 
 </td>
 </tr>
-<tr>
-<td colspan="2" valign="top">
-
-https://github.com/user-attachments/assets/3ec35052-1e5a-44bf-b854-56fb95b80d55
-
-<sub>三个词踩着拍子落上卡片，最后盖章出标题。12 秒，马林巴预设配乐加音效。</sub>
-
-</td>
-</tr>
 </table>
 
 <p align="center"><sub>每条视频都能直接播放，全部由 flipbook 渲染：纸船来自一次评测，其余是本仓库里的样例。</sub></p>

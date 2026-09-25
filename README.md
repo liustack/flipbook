@@ -49,15 +49,6 @@ https://github.com/user-attachments/assets/2345e6a3-4a8b-4012-a5d7-c1698e2fd000
 
 </td>
 </tr>
-<tr>
-<td colspan="2" valign="top">
-
-https://github.com/user-attachments/assets/3ec35052-1e5a-44bf-b854-56fb95b80d55
-
-<sub>Three phrases land on the beat, then a stamped title. 12 s, marimba preset with sound effects.</sub>
-
-</td>
-</tr>
 </table>
 
 <p align="center"><sub>Every video plays in place. All of them are flipbook renders: the paper boat comes from an eval run, the others from the examples in this repository.</sub></p>
