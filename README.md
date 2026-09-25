@@ -1,92 +1,158 @@
-# flipbook
+<h1 align="center">flipbook</h1>
 
-**让 agent 从一句话做出一条验收过的 mp4 动画。**
+<p align="center"><b>Your coding agent turns one sentence into an MP4 animation, checked before you see it.</b></p>
 
-flipbook 是一个 agent skill 加一个命令行工具。你对 Claude Code 说「做一段 15 秒的新年倒计时」，agent 写一个 HTML 合成文件和一份节拍时间轴，flipbook 在无头 Chromium 里逐帧确定性地渲染成 mp4，配上按时间轴合成的配乐和音效，交付前自动查空白、定格、花屏、缺字、文字出画、不确定的画面和音画对不上，查不过就告诉 agent 哪一秒、哪个元素、怎么改。
+<p align="center">
+  <a href="./README.zh-CN.md">简体中文</a> ·
+  <a href="INSTALL.md">Install</a> ·
+  <a href="skills/flipbook/references/rules.md">Composition rules</a> ·
+  <a href="skills/flipbook/references/troubleshooting.md">Troubleshooting</a> ·
+  <a href="SECURITY.md">Security</a>
+</p>
 
-给想用 AI 做短动画的人：片头、数据动画、概念讲解、书摘、跟着音乐打点的短片。解决的是 AI 写的网页动画「录出来每次不一样、中文缺字、成片空白也报成功」这几件事。
+<p align="center">
+  <a href="https://x.com/liustack"><img src="https://img.shields.io/badge/follow-%40liustack-black?style=flat-square&logo=x&logoColor=white" alt="Follow @liustack on X"></a>
+  <a href="https://www.npmjs.com/package/@liustack/flipbook"><img src="https://img.shields.io/npm/v/@liustack/flipbook?style=flat-square&label=npm&color=cb3837" alt="npm"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/@liustack/flipbook?style=flat-square" alt="Node.js"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/Not%20backed%20by-Y%20Combinator-FF6600?style=flat-square&logo=ycombinator&logoColor=white" alt="Not backed by Y Combinator">
+  <img src="https://img.shields.io/badge/users-unknown-lightgrey?style=flat-square" alt="Users unknown">
+</p>
 
-> 0.x 阶段，接口可能变。现在默认是纸感画面（纸底和颗粒、铅笔排线半调等手作材质、画布上的手写字、物件拼字形模板）加预设配乐（拨弦、马林巴、软铺底三套，四种音效，响度统一到 -14 LUFS），也可以换成无声或自己的音乐，中文不缺字。
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-five-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one on beige paper, form the digit 5, then give way to the word flipbook"></a>
+      <br><sub>Bird eggs land one by one and build a 5. 8 s, silent.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-shu.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-shu-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one and form the Chinese character 书, then give way to the words 手翻书"></a>
+      <br><sub>The same template builds 书 (book). 8 s, silent.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/beat-title.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/beat-title-contact-sheet.png" width="100%" alt="Twelve frames: a card is pinned to the page, three phrases land on it one per bar, then the title 翻页书 appears with a red stamp"></a>
+      <br><sub>Three phrases land on the beat, then a stamped title. 12 s, marimba preset with sound effects.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/hello.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/hello-contact-sheet.png" width="100%" alt="Twelve frames: a red square moves across the frame under the lines 你好，翻页书 and Hello, flipbook"></a>
+      <br><sub>The test render from the install guide. 5 s.</sub>
+    </td>
+  </tr>
+</table>
 
-## 安装
+<p align="center"><sub>Each image is 12 evenly spaced frames of the finished video. Click one to play the MP4. The release job rendered all four on Linux.</sub></p>
 
-把这句话交给你的 agent：
+flipbook is an agent skill plus a CLI. Your agent writes one HTML composition and a timeline counted in beats, flipbook renders it frame by frame into an MP4 with music, and checks the video before you get it.
+
+It is for anyone who wants short animations from AI: intros, data animations, concept explainers, book quotes, clips cut to music.
+
+It fixes three things that go wrong with AI-written web animation: every recording comes out different, Chinese characters drop out, and a blank video gets reported as a success.
+
+> 0.x, so interfaces may change. The default look is paper: a paper ground with grain, handmade materials such as pencil hatching and halftone, handwriting drawn on canvas, and templates that build a glyph out of objects. The default sound is preset music: three sets (pluck, marimba, soft pad) and four sound effects, normalized to -14 LUFS. You can go silent or bring your own music. Chinese text renders with no missing glyphs.
+
+## Install
+
+Hand this line to your agent:
 
 ```text
-按 https://github.com/liustack/flipbook/blob/v0.3.0/INSTALL.md 安装 flipbook，装完渲一遍 hello 例子，告诉我结果。
+Install flipbook following https://github.com/liustack/flipbook/blob/v0.3.0/INSTALL.md, render the hello example, and tell me the result.
 ```
 
-或者自己装 skill：
+Or install the skill yourself. For Claude Code:
 
 ```bash
-npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global
+npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global --agent claude-code -y
 ```
 
-需要 Node 22.19 起和带 libx264 的 ffmpeg（macOS `brew install ffmpeg`，Debian 和 Ubuntu `sudo apt-get install -y ffmpeg`）。第一次 check 或 render 会下载钉死版本的 Chromium（约 95 MB）和两款中文字体（约 50 MB）到用户缓存目录。想省掉每次 npx 的下载，可以全局装 CLI：`npm install -g @liustack/flipbook@0.3.0`。
+For Codex:
 
-## 一句话出片
+```bash
+npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global --agent codex -y
+```
 
-你说：
+You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the CLI globally: `npm install -g @liustack/flipbook@0.3.0`.
+
+## One sentence to a video
+
+You say:
 
 ```text
-做一段 15 秒的新年倒计时动画：从 10 倒数到 0，数字要有节奏感，最后出现「2027 新年快乐」。
+Make a 15-second New Year countdown: count from 10 down to 0 with the numbers hitting the beat, then show "Happy New Year 2027".
 ```
 
-agent 照 skill 走六步：定规格，写 `timeline.json`（按拍写分场和文字），写 `index.html`，跑 `check` 和 `snapshot` 看联系表改到通过，跑 `render`，看成片联系表后交付：
+The agent follows the skill's six steps: settle the spec, write `timeline.json` (scenes and text placed on beats), write `index.html`, run `check` and `snapshot` and fix things until the contact sheet looks right, run `render`, then look at the final contact sheet and deliver:
 
 ```bash
 bash ~/.claude/skills/flipbook/scripts/run.sh check countdown
 bash ~/.claude/skills/flipbook/scripts/run.sh snapshot countdown
 bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
-# countdown/out/video.mp4 和 countdown/out/contact-sheet.png
+# countdown/out/video.mp4 and countdown/out/contact-sheet.png
 ```
 
-每条命令往 stdout 打一份 JSON 报告，失败的每一条都带类型码、时间点、帧号、元素、证据图和改法。同一类问题连续改不好，CLI 会让 agent 停下来把联系表和报告交给你，不会一直烧额度。
+Each command prints a JSON report to stdout. Every failure in it names a code, the second, the frame, the element, an evidence image and the fix. When the same kind of problem keeps failing, the CLI tells the agent to stop and hand you the contact sheet and the report, instead of burning through your quota.
 
-## 验收会拦什么
+## What the checks catch
 
-| 阶段 | 查什么 |
+| Stage | What it checks |
 |---|---|
-| check | timeline 字段（报错带 JSON 路径）、禁用写法和对禁用时钟、随机函数的实际调用、控制台报错、资源缺失、联网请求、越界读文件、ready 和 seek 超时、换 seek 顺序画面变不变、换时钟和随机种子画面变不变、迟到的绘制、空白和只剩纸底、缺字和系统字体回退、文字出画和安全区、文字对比度 |
-| render | 帧数和时长、连续空白或只剩纸底、没声明 hold 的定格、成片和原帧的 PSNR、yuv420p 和 bt709 色彩标记、音轨时长、响度和真峰值、每个音效是否落在它的帧上 |
+| check | timeline fields (errors point to the JSON path), forbidden code patterns and actual calls to forbidden clock and random functions, console errors, missing files, network requests, reads outside the directory, ready and seek timeouts, whether a frame changes when frames are visited in another order, whether it changes under another clock or random seed, late paints, blank frames and frames with nothing but paper, missing glyphs and fallback to system fonts, text off the frame or in the safe margin, text contrast |
+| render | frame count and duration, runs of blank or paper-only frames, freezes in scenes not marked as holds, PSNR between the encoded video and the captured frames, yuv420p and bt709 color tags, audio duration, loudness and true peak, whether each sound effect lands on its frame |
 
-同一台机器、同一个版本渲两次，原始帧逐帧哈希一致。
+Render twice on the same machine with the same version and the raw frames match hash for hash.
 
-## 支持
+## Eval
 
-| 项 | 状态 |
+Before the 0.3 release, Claude Code with Claude Opus 5.5 ran 8 prompts once each, unattended. All 8 were one-shot passes: from one sentence to a video that passed acceptance, with nobody stepping in. A run took 1.9 to 13.5 minutes and cost $0.65 to $2.78. Illustrated stories (a seed growing into a tree, the life of a butterfly) took 2 to 3 times the time and money of text and data videos. A person then went through every video and found none broken in a way the checks missed. Cases, judging rules and per-case numbers are in [docs/eval.md](docs/eval.md).
+
+## Support
+
+| Item | Status |
 |---|---|
-| macOS arm64 | 支持。本机直跑、Claude Code 沙箱、Codex 沙箱都实测过 |
-| Linux x64（Ubuntu 22.04、24.04，Debian 12） | 支持。CI 按 INSTALL.md 从头装到渲出 hello |
-| Linux arm64 | 尽力而为。Ubuntu 24.04 arm64 容器里测过受限容器和两家宿主的 Linux 沙箱 |
-| macOS x64（Intel） | 尽力而为，没测 |
-| Windows | 不支持，在 WSL2 里用。原生 Windows 退 78 |
-| Claude Code | 沙箱里能跑。首次下载在沙箱外跑一次，或加放行设置 |
-| Codex | macOS 的 `workspace-write` 沙箱里能跑，首次下载同上。Linux 上要开 `network_access`。`read-only` 跑不了 |
-| 资源 | 1080p 渲染至少 2 GB 内存、128 个进程，不够时退 78 `resource-exhausted` |
-| 模型 | 门槛按旗舰 Claude Opus 5.5 和最低 Claude Opus 5 设，评测数字随 v0.1 评测公布 |
+| macOS arm64 | Supported. Tested directly, in the Claude Code sandbox and in the Codex sandbox |
+| Linux x64 (Ubuntu 22.04 and 24.04, Debian 12) | Supported. CI installs from scratch following INSTALL.md and renders hello |
+| Linux arm64 | Best effort. Tested in an Ubuntu 24.04 arm64 container, under restricted container limits and both hosts' Linux sandboxes |
+| macOS x64 (Intel) | Best effort, untested |
+| Windows | Not supported, use WSL2. Native Windows exits 78 |
+| Claude Code | Runs inside the sandbox. The first run downloads Chromium and fonts and asks you once to allow it. Everything after that runs inside the sandbox, with no settings to change and no restart |
+| Codex | macOS `workspace-write`: same as Claude Code. On Linux, add `network_access = true` to the Codex config, because Codex's sandbox blocks the socket calls Chromium needs to start. `read-only` mode cannot write files: use `workspace-write` |
+| Resources | 1080p rendering needs at least 2 GB of memory and 128 processes. With less it exits 78 with `resource-exhausted` |
+| Model | Needs Claude Opus 5 or a model in its class, in a host that can read images (the agent reviews contact sheets). Gates are set on Claude Opus 5.5 and Claude Opus 5. Published eval numbers so far are for Opus 5.5 |
 
-每个平台实测了什么、沙箱怎么放行、容器至少要多少内存，见 [平台](docs/platform.md)。
+What each platform was tested on, the sandbox settings and the memory a container needs: [Platform](docs/platform.md) (in Chinese).
 
-## 文档
+## What it does not do
 
-| 文档 | 什么时候看 |
+- **3D characters.** Nothing with rigged models, skeletons or motion capture.
+- **Editing real footage.** It does not cut video you shot. That is a job for a video editor or ffmpeg.
+- **Generated images or video as the main picture.** What moves on screen is drawn by code.
+- **Voice-over.** No text-to-speech narration yet, only music and sound effects.
+- **Beat detection.** With your own music, you give the bpm and the second where beat 1 falls.
+- **Native Windows.** Run it inside WSL2.
+- **Identical frames across machines.** Frames match hash for hash on the same machine and version. Another machine or system can differ slightly.
+- **Taste.** The checks catch broken frames, not ugly ones. The agent looks at the contact sheet before it delivers, and you have the last word.
+
+## Documentation
+
+| Doc | Read it when |
 |---|---|
-| [INSTALL.md](INSTALL.md) | 安装，写给 agent 的步骤 |
-| [skills/flipbook/SKILL.md](skills/flipbook/SKILL.md) | agent 做片的流程和硬规矩 |
-| [合成规矩](skills/flipbook/references/rules.md) | 写 index.html |
-| [时间轴](skills/flipbook/references/timeline.md) | 写 timeline.json，凑片长 |
-| [配乐和音效](skills/flipbook/references/audio.md) | 挑预设、调和强弱，放音效，用自己的音乐 |
-| [纸](skills/flipbook/references/paper.md)、[材质](skills/flipbook/references/materials.md)、[画布文字](skills/flipbook/references/text.md)、[构图模板](skills/flipbook/references/templates.md) | 纸感画面的各个部件，样张在 [docs/samples](docs/samples) |
-| [排错](skills/flipbook/references/troubleshooting.md) | 每个类型码的含义和改法 |
-| [报告格式](docs/report-schema.md) | 解析 JSON 报告、判定阈值、输出目录 |
-| [平台](docs/platform.md) | 支持矩阵、沙箱报错和放行办法、容器限制、GPU 结论 |
-| [评测](docs/eval.md) | 评测怎么跑、怎么判 |
+| [INSTALL.md](INSTALL.md) | Installing, step by step (written for an agent) |
+| [skills/flipbook/SKILL.md](skills/flipbook/SKILL.md) | Seeing how the agent makes a video and which rules it must keep |
+| [Composition rules](skills/flipbook/references/rules.md) | Writing index.html |
+| [Timeline](skills/flipbook/references/timeline.md) | Writing timeline.json and hitting a target duration |
+| [Music and sound effects](skills/flipbook/references/audio.md) | Picking a preset, setting dynamics, placing effects, using your own music |
+| [Paper](skills/flipbook/references/paper.md), [materials](skills/flipbook/references/materials.md), [canvas text](skills/flipbook/references/text.md), [templates](skills/flipbook/references/templates.md) | Using the parts of the paper look. Sample sheets are in [docs/samples](docs/samples) |
+| [Troubleshooting](skills/flipbook/references/troubleshooting.md) | Looking up what a code means and how to fix it |
+| [Report format](docs/report-schema.md) | Parsing the JSON report, its thresholds and the output directory |
+| [timeline.json format](docs/timeline-schema.md) | Looking up every timeline field, its allowed values and how beats become frames |
+| [Platform](docs/platform.md) | Checking the support matrix, sandbox errors and settings, container limits, GPU findings (in Chinese) |
+| [Eval](docs/eval.md) | Running the eval, judging it, reading the results |
 
-## 参与
+## Contributing
 
-不接受 pull request，欢迎开 issue，也欢迎 fork，见 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请私下报告，见 [SECURITY.md](SECURITY.md)。
+Pull requests are not accepted. Issues and forks are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately, see [SECURITY.md](SECURITY.md).
 
-## 许可
+## License
 
-MIT。第三方代码、依赖和字体的许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+MIT. Licenses for third-party code, dependencies and fonts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

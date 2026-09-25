@@ -49,6 +49,7 @@ describe('launcher version stamping', () => {
         const base = mkdtempSync(join(tmpdir(), 'flipbook-stamp-'));
         const docs = [
             'README.md',
+            'README.zh-CN.md',
             'INSTALL.md',
             'INSTALL.zh-CN.md',
             join('skills', 'flipbook', 'SKILL.md'),
