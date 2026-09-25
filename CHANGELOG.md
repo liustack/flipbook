@@ -28,7 +28,7 @@
 ### 文档
 
 - **英文 README 当默认**：README.md 改成英文，开头是发版渲出的四条样片联系表，点开播放 mp4。补上评测数字和「它不做什么」。中文版挪到 README.zh-CN.md，两边章节一一对应。
-- **文档成对**：`docs/report-schema.md`、`docs/timeline-schema.md`、`docs/eval.md`、`docs/platform.md` 改成英文，中文原文改名成同名 `.zh-CN.md`。新增中文版 INSTALL.zh-CN.md。
+- **文档成对**：`docs/report-schema.md`、`docs/timeline-schema.md`、`docs/eval.md`、`docs/platform.md` 改成英文，中文原文改名成同名 `.zh-CN.md`。新增中文版 INSTALL.zh-CN.md。SECURITY.md 和 CONTRIBUTING.md 也改成英文，中文版是同名 `.zh-CN.md`。
 - **装 skill 一条命令跑完**：`skills add` 带上 `--agent claude-code -y`，另给 Codex 一行 `--agent codex -y`，装的时候不再停下来问。Codex 这条装到 `~/.agents/skills/flipbook`。
 - **沙箱说明**：首次下载被沙箱挡住时点一次允许就行，之后全在沙箱里跑，不用改设置也不用重启。INSTALL 里的放行设置改成可选，给连这一次确认都不想看到的人。Linux 上的 Codex 要加 `network_access = true`，`read-only` 模式要换成 `workspace-write`。
 - **评测结果**：`docs/eval.md` 记下两轮 B 级评测的逐条耗时和花费。0.3.0 发版前 8 条全部一次跑通，单条 1.9 到 13.5 分钟、0.65 到 2.78 美元。

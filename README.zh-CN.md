@@ -7,7 +7,7 @@
   <a href="INSTALL.zh-CN.md">安装</a> ·
   <a href="skills/flipbook/references/rules.md">合成规矩</a> ·
   <a href="skills/flipbook/references/troubleshooting.md">排错</a> ·
-  <a href="SECURITY.md">安全</a>
+  <a href="SECURITY.zh-CN.md">安全</a>
 </p>
 
 <p align="center">
@@ -153,7 +153,7 @@ skill 和 reference 写给 agent 看，只有英文。
 
 ## 参与
 
-不接受 pull request，欢迎开 issue，也欢迎 fork，见 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请私下报告，见 [SECURITY.md](SECURITY.md)。
+不接受 pull request，欢迎开 issue，也欢迎 fork，见 [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md)。安全问题请私下报告，见 [SECURITY.zh-CN.md](SECURITY.zh-CN.md)。
 
 ## 许可
 
