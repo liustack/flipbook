@@ -84,14 +84,26 @@ if (run('git', ['rev-parse', 'origin/main']) !== head) {
 let ci;
 try {
     ci = JSON.parse(
-        run('gh', ['run', 'list', '--workflow', 'ci.yml', '--commit', head, '--json', 'status,conclusion,url']),
+        run('gh', [
+            'run',
+            'list',
+            '--workflow',
+            'ci.yml',
+            '--commit',
+            head,
+            '--json',
+            'status,conclusion,url',
+        ]),
     );
 } catch (error) {
     fail(`cannot read the CI runs for ${head.slice(0, 7)} with gh: ${error.message ?? error}`);
 }
 if (!ci.some((r) => r.status === 'completed' && r.conclusion === 'success')) {
-    const seen = ci.map((r) => `${r.status}/${r.conclusion || '-'} ${r.url}`).join(', ') || 'no run yet';
-    fail(`CI has not passed on ${head.slice(0, 7)} (${seen}). Wait for it to go green, then release.`);
+    const seen =
+        ci.map((r) => `${r.status}/${r.conclusion || '-'} ${r.url}`).join(', ') || 'no run yet';
+    fail(
+        `CI has not passed on ${head.slice(0, 7)} (${seen}). Wait for it to go green, then release.`,
+    );
 }
 
 try {
