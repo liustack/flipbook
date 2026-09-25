@@ -1,4 +1,3 @@
-// Adapted from liustack/modlens scripts/stamp.test.mjs.
 // Copyright (c) 2026 Leon Liu (liustack). MIT License.
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

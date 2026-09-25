@@ -1,4 +1,3 @@
-// Adapted from liustack/modlens src/skillPin.test.ts.
 // Copyright (c) 2026 Leon Liu (liustack). MIT License.
 import * as fs from 'fs';
 import * as path from 'path';

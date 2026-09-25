@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Adapted from liustack/modlens scripts/release.mjs.
 // Copyright (c) 2026 Leon Liu (liustack). MIT License.
 //
 //   pnpm release 0.1.0        explicit version

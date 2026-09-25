@@ -1,51 +1,8 @@
 # 第三方声明
 
-flipbook 以 MIT 许可发布（见 [LICENSE](LICENSE)）。下列代码、依赖和资源来自第三方或作者的其他项目，各自的许可证照录如下。
+flipbook 以 MIT 许可发布（见 [LICENSE](LICENSE)）。下列代码、依赖和资源来自第三方，各自的许可证照录如下。
 
 ## 借用的代码
-
-### liustack/modlens
-
-- 来源：https://github.com/liustack/modlens
-- 许可证：MIT，Copyright (c) 2026 Leon Liu (liustack)
-- 借用并改写的文件：
-  - `skills/flipbook/scripts/run.sh`、`run.ps1`：来自 `skills/modlens/scripts/run.sh`、`run.ps1`，改了包名、命令名和钉死版本，去掉了原生制品占位。
-  - `scripts/stamp.mjs`、`scripts/stamp.test.mjs`：来自同名文件，目标文件换成 flipbook 的启动器和文档，加了 `skills add` 标签检查和 `npx`、`bunx` 未钉版本检查。
-  - `scripts/release.mjs`：来自同名文件，加了 THIRD_PARTY_NOTICES 检查和首个版本的处理。
-  - `src/skillPin.ts`、`test/skillPin.test.ts`：来自 `src/skillPin.ts` 和同名测试，宿主目录表去掉了 dsh。
-  - `.github/workflows/ci.yml`、`release.yml`、`dependabot.yml`、issue 和 PR 模板、`biome.json`、`CONTRIBUTING.md`、`SECURITY.md` 的结构。
-
-### liustack/pagepress
-
-- 来源：https://github.com/liustack/pagepress
-- 许可证：MIT，Copyright (c) 2026 Leon Liu (liustack)
-- 借用的做法：`src/update.ts` 的 `resolvePlaywrightCliPath`（用已安装的 Playwright 包自带的 CLI 装浏览器）改写进 `src/engine/browser.ts`，`src/renderer.ts` 的 `context.route` 管网络和 `try/finally` 关浏览器用在 `src/engine/page.ts` 和各命令里。
-
-以上两个项目的 MIT 许可证全文：
-
-```
-MIT License
-
-Copyright (c) 2026 Leon Liu (liustack)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
 
 ### buildwithhanif/claude-animation-skill
 

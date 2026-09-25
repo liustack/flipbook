@@ -140,7 +140,7 @@ stress 的 GPU 各次之间差得很小：灰度最大差 2 级，PSNR 不低于
 - CI 加 windows-latest 一列，lint、typecheck、build 和平台无关的测试必须过。渲染相关的测试和只认 POSIX 的测试（run.sh 启动器、评测脚本的 sh 垫片、编码器测试里冒充 ffmpeg 的 sh 脚本和 `/bin/sleep`、`pgrep`）允许失败，报告存成 `windows-tests-node-*` 附件。
 - 第一次跑（2026-09-25，Node 22.19 和 24 各一列）：必过的一组 22 个文件全过。允许失败的一组里 corpus、doctor、references、render 四个文件也过了，Windows 上能渲出片子。没过的是 encode（sh 冒充的 ffmpeg、`/bin/sleep`、`pgrep` 在 Windows 上起不来）、launcher（run.sh 在 Git Bash 里调不起假的 flipbook、npx、bunx）、eval（评测脚本的 sh 垫片）、page 里靠 chmod 做出删不掉的目录的两条（Windows 不认这个权限，render 和 snapshot 照常成功）。Node 24 那列另有一次 `chrome://kill` 之后 close() 没报 resource-exhausted，Node 22.19 那列同一条过了。
 
-run.ps1 按 modlens 在 Windows 上踩过的坑逐条查过：
+run.ps1 按 Windows 上启动器常踩的四个坑逐条查过：
 
 | 坑 | run.ps1 的情况 |
 |---|---|

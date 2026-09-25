@@ -66,3 +66,7 @@ test/              vitest，坏片语料在 test/fixtures/bad/
 - `node_modules/`、`dist/`、`coverage/`
 - `out/`、`.flipbook/`
 - `rebaseline/`、`eval/results/`
+
+## 不提作者的其他项目
+
+文档、注释、声明、提交信息里不写作者其他项目的名字。从别处借来的经验直接写经验本身（做法、坑、规矩），不写来自哪个项目。同一作者的代码不算第三方，不进 THIRD_PARTY_NOTICES.md。

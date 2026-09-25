@@ -1,4 +1,3 @@
-// Adapted from liustack/modlens src/skillPin.ts.
 // Copyright (c) 2026 Leon Liu (liustack). MIT License.
 //
 // An installed skill is a copy whose launcher carries the version it was

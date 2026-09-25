@@ -1,4 +1,3 @@
-// Adapted from liustack/modlens scripts/stamp.mjs.
 // Copyright (c) 2026 Leon Liu (liustack). MIT License.
 //
 // Version stamping for every file that names a version: the skill launchers
