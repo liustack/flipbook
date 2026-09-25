@@ -170,7 +170,7 @@ By default Chromium produces frames at 60 Hz and a screenshot waits for the next
 | hello | 29.7 | 56.9 | Unchanged |
 | eggs-five/five | 11.8 | 13.6 | Unchanged |
 
-The same flag also fixed two renders disagreeing when DOM text scales frame by frame, see "DOM text scaled frame by frame" below.
+On macOS the same flag also fixed two renders disagreeing when DOM text scales frame by frame, see "DOM text scaled frame by frame" below.
 
 ### Page count
 
@@ -255,7 +255,9 @@ Reproduction: `test/fixtures/bad/dom-scale-drift` is a trimmed version of that p
 
 Root cause: the screenshot races the compositor's repaint, and the glyph cache has nothing to do with it. By default Chromium produces frames at 60 Hz, and `Page.captureScreenshot` takes the next frame the compositor produces after the seek. When the text's transform changes, the compositor has to rasterize that text layer again at the new scale. On the 60 Hz tick, the frame a screenshot gets sometimes does not have the layer redrawn yet, and only the frame after it is right. Which frames get caught depends on the timing of the moment, so the same frame can differ between two renders. The finished pixels themselves are deterministic, as the three identical "second captures" in the table show. check's two captures in a row (`late-paint`) only look at the 8 sampled frames, and that run did not sample the frames that went wrong.
 
-The fix: the launch flag `--disable-frame-rate-limit`. The compositor no longer waits for the 60 Hz tick, and the first frame a screenshot gets is already finished. `test/e2e/domScale.test.ts` pins two things: two captures in a row match on every frame, and two independent renders match on every frame. Without the flag both tests fail. The rule in rules.md and SKILL.md is gone, and DOM text may scale and rotate frame by frame.
+The fix: the launch flag `--disable-frame-rate-limit`. The compositor no longer waits for the 60 Hz tick, and the first frame a screenshot gets is already finished. `test/e2e/domScale.test.ts` pins two things: two captures in a row match on every frame, and two independent renders match on every frame. Without the flag both tests fail.
+
+This fix holds on macOS only. On the same day the CI's Linux (ubuntu-latest) and Windows (windows-latest) columns still went wrong with the flag on: two captures in a row after one seek differed on 2 of 115 frames, and two independent renders disagreed on some frames too. The root cause on Linux and Windows is not found yet. So the rule against changing `scale()` on DOM text frame by frame stays in rules.md and SKILL.md, and `test/e2e/domScale.test.ts` runs on macOS only, pinning the fix there.
 
 ## Windows
 

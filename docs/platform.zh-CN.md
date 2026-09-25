@@ -170,7 +170,7 @@ Chromium 默认按 60 Hz 出帧，截图要等下一个节拍，简单画面单�
 | hello | 29.7 | 56.9 | 不变 |
 | eggs-five/five | 11.8 | 13.6 | 不变 |
 
-这个参数同时修好了 DOM 文字逐帧缩放时两次渲染不一致的问题，见「DOM 文字逐帧缩放」一节。
+在 macOS 上，这个参数同时修好了 DOM 文字逐帧缩放时两次渲染不一致的问题，见「DOM 文字逐帧缩放」一节。
 
 ### 并行页数
 
@@ -255,7 +255,9 @@ Claude Code 沙箱里 Chromium 走单进程模式，每页一个浏览器。hell
 
 根因：截图和合成器的重画在抢时间，不是字形缓存。Chromium 默认按 60 Hz 出帧，`Page.captureScreenshot` 拿的是 seek 之后合成器出的下一帧。字的变换一变，合成器要按新的缩放重新光栅化这层字，按 60 Hz 节拍出帧时，截图有时拿到的那一帧里这层还没画成新的，下一帧才对。哪几帧赶上取决于当时的时序，所以同一帧两次渲染可能不同。画好之后的像素本身是确定的，上表「第二张」三次相同就是证据。check 的连截两张（`late-paint`）只看抽中的 8 帧，那次没抽中出事的帧。
 
-修法：启动参数加 `--disable-frame-rate-limit`，合成器不再等 60 Hz 节拍，截图拿到的第一帧就是画好的。`test/e2e/domScale.test.ts` 钉住两件事：逐帧连截两张相同，两次独立渲染逐帧相同。去掉这个参数，两条测试都失败。rules.md 和 SKILL.md 里那条硬规矩已删，DOM 字可以逐帧缩放和旋转。
+修法：启动参数加 `--disable-frame-rate-limit`，合成器不再等 60 Hz 节拍，截图拿到的第一帧就是画好的。`test/e2e/domScale.test.ts` 钉住两件事：逐帧连截两张相同，两次独立渲染逐帧相同。去掉这个参数，两条测试都失败。
+
+这个修法只在 macOS 上成立。同一天 CI 的 Linux（ubuntu-latest）和 Windows（windows-latest）列加着这个参数照样出问题：同一页 seek 后连截两张，115 帧里有 2 帧不同，两次独立渲染也有帧对不上。Linux 和 Windows 上的根因还没查。所以 rules.md 和 SKILL.md 里「DOM 字不许逐帧改 scale」的硬规矩留着，`test/e2e/domScale.test.ts` 只在 macOS 上跑，钉住 macOS 上的修法。
 
 ## Windows
 

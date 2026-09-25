@@ -167,6 +167,7 @@ check looks for these by sampling: it draws a few frames again under a moved clo
 | awaiting `requestAnimationFrame`, timers or events inside `seek()` | finish drawing before `seek()` returns |
 | network requests | files in the composition directory |
 | `<video>`, `<iframe>`, `loading="lazy"`, `content-visibility: auto`, OffscreenCanvas in a Worker, `desynchronized: true` | images in `assets/`, plain canvases |
+| DOM text whose `transform: scale()` changes from frame to frame | text that grows or shrinks goes on a canvas through `fillText()` |
 
 Reading the clock fails check with `clock-dependent`:
 
@@ -351,7 +352,7 @@ composition({
 - At the moment each text cue settles, check measures every line: past the frame edge is an error (`text-offstage`), inside the outer 5% margin is a warning (`text-safe-area`), contrast below 3:1 against what is behind it is a warning (`low-contrast`). Contrast is measured for DOM text only: text drawn on a canvas is listed under `check.contrastSkipped`, so judge its contrast yourself on the contact sheet. DOM text that cannot be told apart from its background also gets `low-contrast`, with `detail.measured: false`.
 - Text that bleeds off the frame on purpose carries `data-flipbook-allow-overflow` (DOM) or `allowOverflow: true` (canvas).
 - Text laid out entirely off the frame counts as offstage too. Text waiting outside for a later scene stays hidden (`display: none`, `visibility: hidden` or `opacity: 0`) until it enters.
-- DOM text may move, rotate and scale from frame to frame through `transform`.
+- Never change a DOM text element's `transform: scale()` from frame to frame. On Linux and Windows the screenshot can catch the text before it is redrawn at its new scale, so two separate renders of the same frame come out different, and check only samples a few frames. Text that grows or shrinks goes on a canvas: `ctx.scale()` or a changing font size, then `fillText()`. Moving DOM text with `translate` is fine.
 
 <!-- check: pass -->
 ```js
