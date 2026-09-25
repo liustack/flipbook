@@ -44,7 +44,7 @@
 
 <p align="center"><sub>每张图是成片里均匀取的 12 帧，点开播放 mp4。四条都由发版流程在 Linux 上渲出。</sub></p>
 
-flipbook 是一个 agent skill 加一个命令行工具。agent 写一个 HTML 合成文件和一份按拍写的时间轴，flipbook 逐帧渲染成带配乐的 mp4，交付前先自己验收一遍。
+flipbook 是一个 agent skill。agent 写一个 HTML 合成文件和一份按拍写的时间轴，skill 逐帧渲染成带配乐的 mp4，交付前先自己验收一遍。
 
 给想用 AI 做短动画的人：片头、数据动画、概念讲解、书摘、跟着音乐打点的短片。
 
@@ -72,7 +72,7 @@ Codex：
 npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global --agent codex -y
 ```
 
-需要 Node 22.19 起和带 libx264 的 ffmpeg（macOS `brew install ffmpeg`，Debian 和 Ubuntu `sudo apt-get install -y ffmpeg`）。第一次 check 或 render 会下载钉死版本的 Chromium（约 95 MB）和两款中文字体（约 50 MB）到用户缓存目录。想省掉每次 npx 的下载，可以全局装 CLI：`npm install -g @liustack/flipbook@0.3.0`。
+需要 Node 22.19 起和带 libx264 的 ffmpeg（macOS `brew install ffmpeg`，Debian 和 Ubuntu `sudo apt-get install -y ffmpeg`）。第一次 check 或 render 会下载钉死版本的 Chromium（约 95 MB）和两款中文字体（约 50 MB）到用户缓存目录。想省掉每次 npx 的下载，可以全局装 skill 的渲染器：`npm install -g @liustack/flipbook@0.3.0`。
 
 ## 一句话出片
 
@@ -91,7 +91,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 # countdown/out/video.mp4 和 countdown/out/contact-sheet.png
 ```
 
-每条命令往 stdout 打一份 JSON 报告，失败的每一条都带类型码、时间点、帧号、元素、证据图和改法。同一类问题连续改不好，CLI 会让 agent 停下来把联系表和报告交给你，不会一直烧额度。
+每条命令往 stdout 打一份 JSON 报告，失败的每一条都带类型码、时间点、帧号、元素、证据图和改法。同一类问题连续改不好，flipbook 会让 agent 停下来把联系表和报告交给你，不会一直烧额度。
 
 ## 验收会拦什么
 

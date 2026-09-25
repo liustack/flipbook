@@ -2,7 +2,7 @@
 
 ## 目标
 
-提供 `flipbook` CLI（npm 包 `@liustack/flipbook`）和同名 agent skill：模型写一个 HTML 合成文件和一份 `timeline.json`，flipbook 逐帧确定性地渲染成 mp4，并在交付前自动验收。
+flipbook 是一个 agent skill。渲染器是 skill 背后的 `flipbook` 命令（npm 包 `@liustack/flipbook`），由 skill 的启动器按钉死版本拉取，不单独当产品介绍。模型写一个 HTML 合成文件和一份 `timeline.json`，flipbook 逐帧确定性地渲染成 mp4，并在交付前自动验收。
 
 ## 范围
 
@@ -16,7 +16,7 @@
 
 ## 技术路线
 
-- **一个仓库两样产物**：npm 包（`dist/main.js` 是 Node CLI，`dist/runtime/runtime.js` 和 `audio.js` 是浏览器端 ESM）和 `skills/flipbook/`（只有 SKILL.md、references、启动器，没有代码）。启动器按 PATH、npx、bunx 的顺序找钉死版本的 CLI。
+- **一个仓库两份发布物**（对外仍是一个 skill）：npm 包（`dist/main.js` 是 Node CLI，`dist/runtime/runtime.js` 和 `audio.js` 是浏览器端 ESM）和 `skills/flipbook/`（只有 SKILL.md、references、启动器，没有代码）。启动器按 PATH、npx、bunx 的顺序找钉死版本的 CLI。
 - **合成协议 v1**：页面暴露 `window.__flipbook = { protocol: 1, ready, seek(t) }`。时间只来自 `timeline.json`，Node 先校验并换算成 `.flipbook/timeline.resolved.json`。
 - **加载**：Playwright `context.route` 挂假源 `http://flipbook.local/`，从合成目录回文件，`/__flipbook/` 下由 CLI 提供运行时库、字体和换算后的 timeline。非本源请求拦下记进报告。
 - **时间**：init script 接管 Date、performance.now、rAF、定时器、Math.random 和 crypto 随机。每帧推进虚拟时钟、调 seek、把 CSS 和 SMIL 动画钉到当前时刻，再用 CDP 截 PNG。

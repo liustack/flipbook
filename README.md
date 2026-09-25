@@ -44,7 +44,7 @@
 
 <p align="center"><sub>Each image is 12 evenly spaced frames of the finished video. Click one to play the MP4. The release job rendered all four on Linux.</sub></p>
 
-flipbook is an agent skill plus a CLI. Your agent writes one HTML composition and a timeline counted in beats, flipbook renders it frame by frame into an MP4 with music, and checks the video before you get it.
+flipbook is an agent skill. Your agent writes one HTML composition and a timeline counted in beats, the skill renders it frame by frame into an MP4 with music, and checks the video before you get it.
 
 It is for anyone who wants short animations from AI: intros, data animations, concept explainers, book quotes, clips cut to music.
 
@@ -72,7 +72,7 @@ For Codex:
 npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global --agent codex -y
 ```
 
-You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the CLI globally: `npm install -g @liustack/flipbook@0.3.0`.
+You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the skill's renderer globally: `npm install -g @liustack/flipbook@0.3.0`.
 
 ## One sentence to a video
 
@@ -91,7 +91,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 # countdown/out/video.mp4 and countdown/out/contact-sheet.png
 ```
 
-Each command prints a JSON report to stdout. Every failure in it names a code, the second, the frame, the element, an evidence image and the fix. When the same kind of problem keeps failing, the CLI tells the agent to stop and hand you the contact sheet and the report, instead of burning through your quota.
+Each command prints a JSON report to stdout. Every failure in it names a code, the second, the frame, the element, an evidence image and the fix. When the same kind of problem keeps failing, flipbook tells the agent to stop and hand you the contact sheet and the report, instead of burning through your quota.
 
 ## What the checks catch
 
