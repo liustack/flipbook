@@ -21,6 +21,12 @@
 
 <table>
   <tr>
+    <td colspan="2" valign="top">
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/paper-boat.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/paper-boat-contact-sheet.png" width="100%" alt="联系表 12 帧：纸折的小船在纸剪的太阳下出发，穿过大雨和闪电，驶过大雪，最后在暖色黄昏里出现「纸船」两个字"></a>
+      <br><sub>Claude Opus 5.5 从一句话做出来：一只纸船依次驶过晴天、大雨和大雪。一次跑通，6.7 分钟，1.48 美元。25 秒，预设配乐。</sub>
+    </td>
+  </tr>
+  <tr>
     <td width="50%" valign="top">
       <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-five-contact-sheet.png" width="100%" alt="联系表 12 帧：米褐纸上鸟蛋一颗颗落下拼成数字 5，最后换成 flipbook 字样"></a>
       <br><sub>鸟蛋一颗颗落下，拼成「5」。8 秒，无声。</sub>
@@ -42,7 +48,7 @@
   </tr>
 </table>
 
-<p align="center"><sub>每张图是成片里均匀取的 12 帧，点开播放 mp4。四条都由发版流程在 Linux 上渲出。</sub></p>
+<p align="center"><sub>每张图是成片里均匀取的 12 帧，点开播放 mp4。纸船来自一次评测。另外四条由发版流程在 Linux 上从样例渲出。</sub></p>
 
 flipbook 是一个 agent skill。agent 写一个 HTML 合成文件和一份按拍写的时间轴，skill 逐帧渲染成带配乐的 mp4，交付前先自己验收一遍。
 

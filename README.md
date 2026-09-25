@@ -21,6 +21,12 @@
 
 <table>
   <tr>
+    <td colspan="2" valign="top">
+      <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/paper-boat.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/paper-boat-contact-sheet.png" width="100%" alt="Twelve frames: a folded paper boat sails under a paper sun, through heavy rain and lightning, through falling snow, and into a warm evening where the words 纸船 appear"></a>
+      <br><sub>Claude Opus 5.5 made this from one prompt: a paper boat sails through sun, rain and snow. First try, 6.7 minutes, $1.48. 25 s, preset music.</sub>
+    </td>
+  </tr>
+  <tr>
     <td width="50%" valign="top">
       <a href="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-five.mp4"><img src="https://github.com/liustack/flipbook/releases/download/v0.3.0/eggs-five-five-contact-sheet.png" width="100%" alt="Twelve frames: bird eggs land one by one on beige paper, form the digit 5, then give way to the word flipbook"></a>
       <br><sub>Bird eggs land one by one and build a 5. 8 s, silent.</sub>
@@ -42,7 +48,7 @@
   </tr>
 </table>
 
-<p align="center"><sub>Each image is 12 evenly spaced frames of the finished video. Click one to play the MP4. The release job rendered all four on Linux.</sub></p>
+<p align="center"><sub>Each image is 12 evenly spaced frames of the finished video. Click one to play the MP4. The paper boat comes from an eval run. The release job rendered the other four on Linux from the examples.</sub></p>
 
 flipbook is an agent skill. Your agent writes one HTML composition and a timeline counted in beats, the skill renders it frame by frame into an MP4 with music, and checks the video before you get it.
 
