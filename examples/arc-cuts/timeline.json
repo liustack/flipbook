@@ -1,0 +1,24 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 20260922,
+    "bpm": 90,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "cuts", "bars": 4 },
+        { "id": "end", "bars": 2 }
+    ],
+    "cues": [
+        { "id": "sweep", "scene": "end", "beat": 0, "kind": "sfx", "sfx": "sweep" },
+        { "id": "phrase", "scene": "end", "beat": 1, "kind": "text", "text": "还有更多值得发现", "settleBeats": 2 }
+    ],
+    "audio": {
+        "mode": "preset",
+        "preset": "pluck",
+        "key": "E",
+        "progression": 2,
+        "dynamics": { "cuts": "full", "end": "soft" }
+    }
+}

@@ -66,6 +66,15 @@ export {
 export type { GrainOptions, GridOptions, PaperOptions } from './paper.ts';
 export { drawGrain, drawPaper, grainLayer, PAPER, paperLayer } from './paper.ts';
 export type {
+    ArcCuts,
+    ArcCutsOptions,
+    ArcGeometry,
+    LabelOptions,
+    ShotDrawer,
+    ShotInfo,
+} from './templates/arc.ts';
+export { arcCuts } from './templates/arc.ts';
+export type {
     AssembleOptions,
     Assembly,
     GlyphMaskOptions,

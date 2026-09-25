@@ -1,6 +1,7 @@
 // The composition templates and the helpers they share: timing, the camera
 // move, text registration while a page turns.
 import { afterAll, describe, expect, it } from 'vitest';
+import type { RegisteredText } from '../src/engine/host.ts';
 import { resolveTimeline } from '../src/engine/timelineResolve.ts';
 import { moveCamera } from '../src/runtime/templates/camera.ts';
 import { accelerate, beatTimes } from '../src/runtime/templates/timing.ts';
@@ -192,6 +193,48 @@ describe('templates in the browser', () => {
             expect(probe.open).toBeCloseTo(360 * 0.36, 6);
             expect(probe.full).toBeGreaterThanOrEqual(Math.hypot(320, 180));
             expect(probe.plates).toEqual([0, 1, 1, 2]);
+        } finally {
+            await page.close();
+        }
+    });
+
+    it('arc: the arc holds across cuts and a label sits centered on its top', async () => {
+        const page = await runtimePage(await session(), 640, 360);
+        try {
+            await installHelpers(page);
+            const probe = await page.page.evaluate(() => {
+                const w = window as unknown as {
+                    rt: typeof import('../src/runtime/index.ts');
+                    freshCanvas(w: number, h: number): CanvasRenderingContext2D;
+                    __flipbookHost: { texts: RegisteredText[] };
+                };
+                const { rt } = w;
+                const cuts = rt.arcCuts({
+                    stage: { width: 640, height: 360 },
+                    times: [0, 1, 1.5],
+                    end: 2,
+                    apex: 220,
+                    rise: 60,
+                    push: 0,
+                    above() {},
+                    below() {},
+                });
+                const arc = cuts.arcAt(1.2);
+                w.__flipbookHost.texts.length = 0;
+                const ctx = w.freshCanvas(640, 360);
+                ctx.font = `600 40px "${rt.FONTS.serif}"`;
+                cuts.label(ctx, 1.2, '发现');
+                return {
+                    shots: [0.5, 1, 1.7].map((t) => cuts.shotAt(t)),
+                    apex: arc.y(320),
+                    edge: arc.y(0),
+                    texts: w.__flipbookHost.texts.map((entry) => entry.text),
+                };
+            });
+            expect(probe.shots).toEqual([0, 1, 2]);
+            expect(probe.apex).toBeCloseTo(220, 6);
+            expect(probe.edge).toBeCloseTo(280, 6);
+            expect(probe.texts).toEqual(['发现']);
         } finally {
             await page.close();
         }

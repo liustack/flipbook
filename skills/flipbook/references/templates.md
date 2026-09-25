@@ -7,6 +7,7 @@ A template carries one device through a whole film. Pick at most one per film:
 | [Objects assemble a glyph](#objects-assemble-a-glyph) | objects land one by one and build a digit, a letter or a Chinese character |
 | [Page turn](#page-turn) | a book opens into the first scene, a page turns between two scenes, or pages flip on the beat into an animation |
 | [Lens montage](#lens-montage) | plates cut on the beat inside a round eyepiece, then the window opens onto the full frame |
+| [Arc match cut](#arc-match-cut) | one arc holds still while the material above and below it changes at every cut, the cuts speed up, words ride the arc |
 
 ## Objects assemble a glyph
 
@@ -344,6 +345,86 @@ composition({
 | `refocus` (0.2), `blur` (6) | seconds each plate takes to come into focus after its cut, and the blur in px at the cut. `refocus: 0` cuts sharp |
 
 `view.plateAt(t)` is the plate up at time t. `view.windowAt(t)` gives the window `center` and `radius`.
+
+## Arc match cut
+
+One arc stays in the same place from shot to shot while what lies above and below it changes at every cut: an atmosphere, a droplet, a crust of bread, a leaf, a slice of agate. The shots get shorter as the film goes on. The whole picture pushes in slowly across all the shots. Words sit on the arc, one per shot or a whole line at the end.
+
+Sample image: `docs/samples/arc-cuts.png` in the flipbook repository. Full example: `examples/arc-cuts/`, eighteen shots over twelve materials.
+
+### Steps
+
+1. Shot times: `accelerate(tl, { scene, count, ratio })` fills a scene with `count` shots, each shorter than the one before by the same factor, the last `ratio` times as long as the first. It snaps every cut to a frame and throws when a shot would get no frame of its own. Use `from` and `to` in beats instead of `scene` for part of a scene.
+2. Build it once: `arcCuts({ stage: tl, times, above, below, edge, end })`.
+3. In `seek(t)`, call `cuts.draw(ctx, t)`, then `cuts.label(ctx, t, text, options)` for words.
+
+### The shot drawers
+
+`above`, `below` and `edge` are `(ctx, index, info) => void`. `above` is clipped to the part of the frame above the arc, `below` to the part under it, `edge` draws on top unclipped (a lit rim, a meniscus, beads sitting on the arc). Fill well past the stage edges: the push scales the picture up. `info` has `index`, `t`, `local`, `span`, `progress` and `arc`:
+
+| `info.arc` | Meaning |
+|---|---|
+| `cx`, `cy`, `r` | the circle the arc belongs to. Bands parallel to the rim are circles around `(cx, cy)` with radius `r - depth` |
+| `apex` | the top of the arc |
+| `y(x)` | height of the arc at x |
+| `path(u)` | the arc from the left frame edge (u 0) to the right one (u 1) |
+| `trace(ctx)` | adds the arc to the current path, for a stroke |
+
+`cuts.label(ctx, t, text, options)` draws text along the arc, centered on its top, and registers it with check. It takes the `textOnPath` options (`font`, `color` or the context's fill, `spacing`, `progress` for one character after another, `id`, `allowOverflow`), plus `lift` (default half the font size above the arc) and `shift` (px along the arc from its top).
+
+<!-- check: pass -->
+```js
+import { accelerate, arcCuts, composition, FONTS, setupCanvas, timeline } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
+const skies = ['#0b0d12', '#ebe7df', '#2a5b8a', '#8a3278'];
+const grounds = ['#d9a441', '#5e8c3a', '#23507d', '#e6d2e2'];
+const inks = ['#f4efe6', '#2a2520', '#f5f2ea', '#fdf0f8'];
+const cover = (c, color) => {
+  c.fillStyle = color;
+  c.fillRect(-tl.width, -tl.height, tl.width * 3, tl.height * 3);
+};
+const cuts = arcCuts({
+  stage: tl,
+  times: accelerate(tl, { scene: 'gather', count: 10, ratio: 0.25 }),
+  end: tl.durationSec,
+  above: (c, i) => cover(c, skies[i % 4]),
+  below(c, i, info) {
+    cover(c, grounds[i % 4]);
+    c.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    for (let k = 1; k < 6; k++) {
+      c.beginPath();
+      c.arc(info.arc.cx, info.arc.cy, info.arc.r - k * 16, 0, Math.PI * 2);
+      c.stroke();
+    }
+  },
+});
+
+composition({
+  seek(t) {
+    ctx.clearRect(0, 0, tl.width, tl.height);
+    cuts.draw(ctx, t);
+    const i = cuts.shotAt(t);
+    ctx.fillStyle = inks[i % 4];
+    cuts.label(ctx, t, ['还有', '更多', '值得', '发现'][i % 4], { font: `600 40px "${FONTS.serif}"` });
+  },
+});
+```
+
+### Options
+
+| Option (default) | Meaning |
+|---|---|
+| `stage` | the stage size, `tl` works |
+| `times` | when each shot starts, seconds, rising |
+| `above`, `below`, `edge` | the shot drawers, `edge` optional |
+| `end` (one more gap after the last shot) | when the last shot ends |
+| `apex` (58% of the height) | height of the arc's top |
+| `rise` (16% of the height) | how far the arc drops from its top to the frame edges |
+| `push` (0.06) | how much the picture grows about the arc's top from the first cut to `end`, at a steady rate |
+
+`cuts.shotAt(t)` is the shot up at time t. `cuts.arcAt(t)` is the arc in stage coordinates at time t, push included.
 
 ## Camera moves
 

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>arc-cuts: 还有更多值得发现</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #04050a; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script type="module">
+import {
+  accelerate,
+  arcCuts,
+  composition,
+  cueProgress,
+  ease,
+  FONTS,
+  grainLayer,
+  progress,
+  setupCanvas,
+  timeline,
+} from '/__flipbook/runtime.js';
+import { specimens } from './specimens.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const ctx = setupCanvas(document.getElementById('stage'), W, H);
+const end = tl.scenes[1];
+const beat = tl.secondsPerBeat;
+
+// Eighteen shots, each shorter than the last, then the atmosphere again for the end.
+const shots = accelerate(tl, { scene: 'cuts', count: 18, ratio: 0.18 });
+const ORDER = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 2, 5, 8, 1, 6, 9, 0];
+const WORDS = ['还有', '更多', '值得', '发现'];
+const FONT = `600 72px "${FONTS.serif}"`;
+let kinds;
+
+const pick = (i) => kinds[ORDER[i]];
+const cuts = arcCuts({
+  stage: tl,
+  times: [...shots, end.start],
+  end: tl.durationSec,
+  apex: H * 0.6,
+  rise: H * 0.17,
+  push: 0.08,
+  above: (c, i, info) => pick(i).above(c, i, info),
+  below: (c, i, info) => pick(i).below(c, i, info),
+  edge: (c, i, info) => pick(i).edge?.(c, i, info),
+});
+
+composition({
+  setup() {
+    kinds = specimens(W, H, tl.seed, cuts.arcAt(0));
+    grainLayer(W, H, { seed: tl.seed, amount: 0.5, dust: 0.3 });
+  },
+  seek(t) {
+    ctx.clearRect(0, 0, W, H);
+    // After the phrase has settled, the planet sets and leaves the stars.
+    const sink = ease.inOutCubic(progress(t, end.start + 4.5 * beat, tl.durationSec));
+    ctx.save();
+    ctx.translate(0, sink * 420);
+    cuts.draw(ctx, t);
+    const i = cuts.shotAt(t);
+    ctx.fillStyle = pick(i).ink;
+    if (t >= end.start) {
+      const p = cueProgress(tl, t, 'phrase');
+      ctx.globalAlpha = 1 - sink;
+      if (p > 0 && sink < 1) cuts.label(ctx, t, WORDS.join(''), { font: FONT, progress: p, id: 'phrase' });
+    } else {
+      // One word per shot over the last two thirds of the cuts, like a sentence read in flashes.
+      const word = Math.floor((i - 6) / 3);
+      if (word >= 0) cuts.label(ctx, t, WORDS[Math.min(word, WORDS.length - 1)], { font: FONT });
+    }
+    ctx.restore();
+  },
+});
+</script>
+</body>
+</html>
