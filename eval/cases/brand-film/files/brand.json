@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "name": "潮汐茶室",
+    "tagline": "一壶慢茶，等一次涨潮。",
+    "logo": {
+        "file": "assets/tide-logo.svg",
+        "license": "MIT, a made-up brand for the flipbook eval",
+        "source": "hand-written SVG in the flipbook repository, eval/cases/brand-film"
+    },
+    "colors": {
+        "primary": "#1f6f78",
+        "secondary": "#e0a94a",
+        "ink": "#1c2326",
+        "paper": "#f1ece2"
+    },
+    "fonts": {
+        "title": "Noto Serif SC",
+        "text": "LXGW WenKai"
+    }
+}

@@ -163,6 +163,14 @@ function loadCases(ids) {
                 problems.push('expect.durationSec must be [min, max]');
             if (!['none', 'preset', 'file'].includes(spec.expect?.audio))
                 problems.push('expect.audio must be "none", "preset" or "file"');
+            for (const [rel, item] of Object.entries(spec.workspace ?? {})) {
+                if (item.generator === 'copy') {
+                    if (!existsSync(join(casesDir, d.name, item.from ?? '')) || !item.from)
+                        problems.push(`workspace ${rel}: no file ${item.from} in the case`);
+                } else if (item.generator !== 'clicks') {
+                    problems.push(`workspace ${rel}: unknown generator ${item.generator}`);
+                }
+            }
             return { name: d.name, spec, problems };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -260,6 +268,8 @@ function prepareWorkspace(entry, host) {
         const file = join(ws, rel);
         mkdirSync(dirname(file), { recursive: true });
         if (spec.generator === 'clicks') makeClicks(file, spec);
+        else if (spec.generator === 'copy')
+            cpSync(join(evalDir, 'cases', entry.name, spec.from), file);
         else throw new Error(`${entry.name}: unknown workspace generator ${spec.generator}`);
     }
     return { ws, bin };
@@ -527,6 +537,17 @@ async function main() {
             process.stdout.write(
                 `     workspace install ${installed ? 'ok' : 'FAILED'}, flipbook shim ${shim || 'FAILED'}\n`,
             );
+            rmSync(ws, { recursive: true, force: true });
+        }
+        for (const c of cases.filter((c) => c.problems.length === 0 && c.spec.workspace)) {
+            const { ws } = prepareWorkspace(c, matrix[0]?.host ?? 'claude-code');
+            const missing = Object.keys(c.spec.workspace).filter(
+                (rel) => !existsSync(join(ws, rel)),
+            );
+            process.stdout.write(
+                `  ${missing.length === 0 ? 'ok' : '!!'} ${c.name} workspace files${missing.length ? `: missing ${missing.join(', ')}` : ''}\n`,
+            );
+            if (missing.length > 0) process.exitCode = 1;
             rmSync(ws, { recursive: true, force: true });
         }
         process.stdout.write(

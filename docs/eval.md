@@ -77,7 +77,7 @@ B level, for every 0.x minor version: the flagship model on 10 cases, one run ea
 |---|---|
 | `id`, `title` | An id matching the directory name, and a Chinese title |
 | `prompt` | The user's one sentence |
-| `workspace` | Optional files placed in the workspace before the run. `{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` generates a click track with ffmpeg |
+| `workspace` | Optional files placed in the workspace before the run, keyed by their path in the workspace. `{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` generates a click track with ffmpeg, and `{ "generator": "copy", "from": "files/<file>" }` copies a ready-made file from the case directory. `--dry-run` lays out these files for every case to confirm they can be produced |
 | `expect.durationSec` | The allowed duration range `[min, max]` |
 | `expect.width`, `expect.height` | Frame size |
 | `expect.textInSource` | Text that must appear in the composition source |
@@ -87,6 +87,8 @@ B level, for every 0.x minor version: the flagship model on 10 cases, one run ea
 The 5 cases from v0.1: a New Year countdown (big numbers and a hold), population bars for four cities (a data chart), an explainer on deterministic rendering (a concept diagram), a book quote (text appearing character by character), and hits on the user's own music (bring-your-own music and beat points). All in Chinese, none relying on the paper materials.
 
 The 3 illustration and story cases added once the paper look and music shipped: a seed growing into a tree (20 seconds, continuous growth), a paper boat through three kinds of weather (25 seconds, scene changes), the life of a butterfly (30 seconds, four stages with small titles). All require the paper look and preset music, and no voice-over.
+
+The 3 cases added once the composition templates and brands shipped: scientific wonders strung together with arc cuts (20 seconds, the prompt only says "arc cuts", to see whether the agent finds the arc match-cut template, and the source must contain `arcCuts`), a book quote that opens with a page turn (15 seconds, the book opening is the intro, and the source must contain `pageTurn`), and a brand film from brand.json (15 seconds, the workspace root comes with brand.json and a logo for a made-up tea house, to see whether the agent looks for existing assets first, whether the timeline sets `brand`, and whether the picture takes its colors and logo from `brand()`). All require preset music.
 
 ## Results
 

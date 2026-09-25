@@ -1,0 +1,29 @@
+{
+    "id": "brand-film",
+    "title": "按 brand.json 做品牌片",
+    "prompt": "按工作区里的 brand.json 做一条 15 秒的品牌片。",
+    "workspace": {
+        "brand.json": {
+            "generator": "copy",
+            "from": "files/brand.json"
+        },
+        "assets/tide-logo.svg": {
+            "generator": "copy",
+            "from": "files/tide-logo.svg"
+        }
+    },
+    "expect": {
+        "durationSec": [
+            14,
+            16
+        ],
+        "width": 1920,
+        "height": 1080,
+        "textInSource": [
+            "brand.json",
+            "brand("
+        ],
+        "audio": "preset",
+        "notes": "timeline 要写 brand 指到工作区根的 brand.json，画面从 brand() 取主色、logo 和字体，品牌名「潮汐茶室」和那句话要出现在片子里。无人值守时直接用找到的 brand.json，不另造颜色或 logo。"
+    }
+}
