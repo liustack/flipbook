@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### 改进
+
+- **搜索结果标出实际能下到的尺寸**：有些馆藏只给预览图，原来搜索结果写的是原图尺寸，挑了大图、下到手才发现只有 1024 像素。现在每条结果多一个 `servedEdge`，写明 `stock fetch` 实际拿到的长边：Flickr（生物多样性遗产图书馆的图版也在上面）和 rawpixel 是 1024，Pixabay 是 1280，下到的就是原图时为 `null`。`width`、`height` 仍是原图尺寸。`references/photo.md` 写明 1024 像素的图铺满 1920 的画面会发虚，大图改搜直接给原图的馆藏（Wikimedia、Met、Smithsonian、Rijksmuseum），预览图留给贴纸和小块画面。
+
 ## 0.5.5 - 2026-09-26
 
 ### 修复
