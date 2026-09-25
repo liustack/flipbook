@@ -70,3 +70,7 @@ test/              vitest，坏片语料在 test/fixtures/bad/
 ## 不提作者的其他项目
 
 文档、注释、声明、提交信息里不写作者其他项目的名字。从别处借来的经验直接写经验本身（做法、坑、规矩），不写来自哪个项目。同一作者的代码不算第三方，不进 THIRD_PARTY_NOTICES.md。
+
+## 草稿目录
+
+仓库草稿目录是 `.issues/<YYYY-MM-DD-主题>/`，不入库（`.git/info/exclude` 已排除）。方案、调研、评测记录、审稿意见都放这里。当前主线在 `.issues/2026-09-24-web-video-skill/`，开工依据是里面的 `design.md`。
