@@ -270,6 +270,53 @@ describe('fonts in assets/fonts/', () => {
         expect(loaded.findings[0].message).toMatch(/flipbook font already/);
     });
 
+    // Windows needs admin rights to make symbolic links.
+    it.skipIf(process.platform === 'win32')(
+        'stay inside the composition folder, links included',
+        () => {
+            const dir = composition();
+            const outside = path.join(path.dirname(dir), 'outside.ttf');
+            fs.writeFileSync(outside, buildTestFont({ family: 'Wren Hand', chars: 'ab' }));
+            fs.mkdirSync(path.join(dir, 'assets/fonts'), { recursive: true });
+            fs.symlinkSync(outside, path.join(dir, 'assets/fonts/Out.ttf'));
+            fs.symlinkSync(
+                path.join(dir, 'assets/fonts/missing.ttf'),
+                path.join(dir, 'assets/fonts/Broken.ttf'),
+            );
+            write(
+                dir,
+                'assets/SOURCES.json',
+                JSON.stringify({
+                    'fonts/Out.ttf': { license: 'OFL-1.1' },
+                    'fonts/Broken.ttf': { license: 'OFL-1.1' },
+                }),
+            );
+            const loaded = loadTimeline(dir, false);
+            expect(loaded.findings.map((f) => [f.code, f.detail?.file])).toEqual([
+                ['font-invalid', 'assets/fonts/Broken.ttf'],
+                ['font-invalid', 'assets/fonts/Out.ttf'],
+            ]);
+            expect(loaded.findings[0].message).toMatch(/cannot be read/);
+            expect(loaded.findings[1].message).toMatch(/outside the composition folder/);
+            expect(loaded.resolved?.fonts ?? []).toEqual([]);
+
+            // The whole folder linked from elsewhere is outside too.
+            const other = composition();
+            fs.mkdirSync(path.join(other, 'assets'), { recursive: true });
+            fs.symlinkSync(path.join(dir, 'assets/fonts'), path.join(other, 'assets/fonts'));
+            fs.copyFileSync(outside, path.join(dir, 'assets/fonts/In.ttf'));
+            write(
+                other,
+                'assets/SOURCES.json',
+                JSON.stringify({ 'fonts/In.ttf': { license: 'OFL-1.1' } }),
+            );
+            const linked = loadTimeline(other, false);
+            expect(
+                linked.findings.filter((f) => f.detail?.file === 'assets/fonts/In.ttf'),
+            ).toHaveLength(1);
+        },
+    );
+
     it('follow brand.json when it declares them, license and family included', () => {
         const dir = composition('brand.json');
         write(dir, 'assets/fonts/Hand.ttf', buildTestFont({ family: 'Internal', chars: 'ab' }));

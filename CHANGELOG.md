@@ -12,7 +12,7 @@
 - **运镜 `moveCamera`**：从取景一个矩形移到取景另一个矩形，绕一个定点匀速缩放，推进和拉远走同一条路。
 - **brand.json**：名字、一句话、logo、主色辅色和文字色纸色、标题和正文字体，放合成目录或工作区根，timeline.json 用 `brand` 字段指过去。check、snapshot、render 开页面前先校验：文件在本地且不出 brand.json 所在目录，logo 和字体都写了许可证，颜色格式对，字体文件读得出。出错报 `brand-invalid`，带出错字段的 JSON 路径。logo 以 data 地址内联进页面，brand.json 放在合成目录外面也能用。
 - **`brand()`**：运行时把色板、解码好的 logo 图、字体族名交给合成代码。`font()` 拼好 ctx.font，品牌字体后面自动接上 flipbook 的两款字体补缺字。`applyCss()` 写 CSS 变量给 DOM 文字用。
-- **自带字体**：brand.json 的 `fonts.files` 或合成目录 `assets/fonts/` 里的 .ttf、.otf，许可证写在 brand.json 或 `assets/SOURCES.json`。flipbook 读出每个字体的字符表、族名、字重和字形，按内容哈希登记，经 `/__flipbook/fonts/` 供给，页面加载前和 flipbook 自己的字体一起装好。缺字和字体回退检查按每个字体自己的字符表逐字核。缺许可证、读不出、族名和 flipbook 字体或 CSS 通用名撞了、两个文件同族同字重同字形，报 `font-invalid`。
+- **自带字体**：brand.json 的 `fonts.files` 或合成目录 `assets/fonts/` 里的 .ttf、.otf，许可证写在 brand.json 或 `assets/SOURCES.json`。flipbook 读出每个字体的字符表、族名、字重和字形，按内容哈希登记，经 `/__flipbook/fonts/` 供给，页面加载前和 flipbook 自己的字体一起装好。缺字和字体回退检查按每个字体自己的字符表逐字核。缺许可证、读不出（包括指空的软链）、文件或软链解析到合成目录外面、族名和 flipbook 字体或 CSS 通用名撞了、两个文件同族同字重同字形，报 `font-invalid`。
 - **样片**：`examples/page-turn/`（月相手翻书：布面精装书翻开，十二页月相按半拍翻，最后翻到苏轼的一句）、`examples/lens-montage/`（蕨叶、洋葱表皮、牛顿环、星图、玛瑙、硅藻，最后从月亮拉出到黄昏天空）、`examples/arc-cuts/`（十八个镜头十二种材质，最后「还有更多值得发现」沿弧线出来）、`examples/brand-intro/`（虚构的青柿文具，代码手写的 SVG logo，用清单字体）。都带预设配乐，check 无警告，两次渲染逐帧哈希一致。三个模板的样张由 `scripts/samples.mjs` 生成到 `docs/samples/`。
 - **skill**：第一步定规格时，涉及产品或品牌先在工作区找现成的 logo、主题色变量、设计 token、README 里的色值给用户确认，找不到就问。硬规矩里的字体放开到用户带许可证的自带字体。新增 `references/brand.md`，`templates.md` 加手翻书、镜筒蒙太奇、弧线匹配剪辑和运镜各一节，片段都真跑 check。reference 片段的测试支持 `snippet-file` 标记，把 brand.json 这类附带文件一起写进合成目录。
 - **评测**：新增弧线剪辑科学奇观串、翻页开场的书摘、按 brand.json 做品牌片三条用例。工作区预置文件多了 `copy` 生成器，`--dry-run` 会把每条用例的预置文件都摆一遍。

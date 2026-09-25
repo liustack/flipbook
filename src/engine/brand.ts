@@ -194,14 +194,39 @@ function droppedFonts(dir: string, findings: Finding[]): Dropped[] {
         }
     }
     const out: Dropped[] = [];
+    const root = fs.realpathSync(dir);
     for (const name of files) {
         const rel = path.join(FONT_DIR, name);
         const shown = rel.split(path.sep).join('/');
         const full = path.join(dir, rel);
-        const real = fs.realpathSync(full);
+        // The files are the user's: a link may point nowhere or out of the
+        // composition folder, which the page must never be able to read.
+        let real: string;
+        try {
+            real = fs.realpathSync(full);
+            if (!fs.statSync(real).isFile()) throw new Error('not a regular file');
+        } catch (error) {
+            out.push({
+                real: full,
+                face: null,
+                problem: fontProblem(shown, `cannot be read: ${(error as Error).message}`),
+            });
+            continue;
+        }
+        if (!inside(root, real)) {
+            out.push({
+                real,
+                face: null,
+                problem: fontProblem(
+                    shown,
+                    'resolves outside the composition folder. Copy the font file into assets/fonts/',
+                ),
+            });
+            continue;
+        }
         let font: UserFontFile;
         try {
-            font = readUserFont(full);
+            font = readUserFont(real);
         } catch (error) {
             if (!(error instanceof FontFileError)) throw error;
             out.push({
