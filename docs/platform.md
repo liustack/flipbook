@@ -16,7 +16,7 @@ read_when:
 | Linux x64（Ubuntu 22.04、24.04，Debian 12） | 支持 | CI（ubuntu-latest）按 INSTALL.md 从头装到渲出 hello |
 | Linux arm64 | 尽力而为 | Ubuntu 24.04 arm64 容器：受限容器 13 种、Claude Code 沙箱运行时、Codex Linux 沙箱 |
 | macOS x64 | 尽力而为 | 没测 |
-| Windows | 不支持，在 WSL2 里用 | 原生 `win32` 退 78。CI 有一列 windows-latest，设 `FLIPBOOK_ALLOW_WIN32=1` 跑，还没跑过 |
+| Windows | 不支持，在 WSL2 里用 | 原生 `win32` 退 78。CI 有一列 windows-latest，设 `FLIPBOOK_ALLOW_WIN32=1` 跑，结果见下面 Windows 一节 |
 
 | 宿主 | 状态 |
 |---|---|
@@ -137,7 +137,8 @@ stress 的 GPU 各次之间差得很小：灰度最大差 2 级，PSNR 不低于
 - 认出 `chrome-headless-shell-win64\chrome-headless-shell.exe`。playwright-core 没有 Windows arm64 的 headless shell。
 - 缺 Chromium 时给的安装命令是 PowerShell 写法（`$env:PLAYWRIGHT_BROWSERS_PATH="..."; npx ...`）。
 - 装 Chromium 的子进程带 `windowsHide`。
-- CI 加 windows-latest 一列，lint、typecheck、build 和平台无关的测试必须过。渲染相关的测试和只认 POSIX 的测试（run.sh 启动器、评测脚本的 sh 垫片、编码器测试里冒充 ffmpeg 的 sh 脚本和 `/bin/sleep`、`pgrep`）允许失败，报告存成 `windows-tests-node-*` 附件。这一列还没跑过。
+- CI 加 windows-latest 一列，lint、typecheck、build 和平台无关的测试必须过。渲染相关的测试和只认 POSIX 的测试（run.sh 启动器、评测脚本的 sh 垫片、编码器测试里冒充 ffmpeg 的 sh 脚本和 `/bin/sleep`、`pgrep`）允许失败，报告存成 `windows-tests-node-*` 附件。
+- 第一次跑（2026-09-25，Node 22.19 和 24 各一列）：必过的一组 22 个文件全过。允许失败的一组里 corpus、doctor、references、render 四个文件也过了，Windows 上能渲出片子。没过的是 encode（sh 冒充的 ffmpeg、`/bin/sleep`、`pgrep` 在 Windows 上起不来）、launcher（run.sh 在 Git Bash 里调不起假的 flipbook、npx、bunx）、eval（评测脚本的 sh 垫片）、page 里靠 chmod 做出删不掉的目录的两条（Windows 不认这个权限，render 和 snapshot 照常成功）。Node 24 那列另有一次 `chrome://kill` 之后 close() 没报 resource-exhausted，Node 22.19 那列同一条过了。
 
 run.ps1 按 modlens 在 Windows 上踩过的坑逐条查过：
 
@@ -149,7 +150,7 @@ run.ps1 按 modlens 在 Windows 上踩过的坑逐条查过：
 | 退出码透传 | 修了一个：Windows PowerShell 5.1 在 `$ErrorActionPreference = 'Stop'` 下把重定向的 stderr 当成终止错误，`doctor --json` 撞上 CLI 往 stderr 写诊断时丢掉 78、退 0。现在原生命令都在 `Continue` 的作用域里跑，退出码取 `$LASTEXITCODE` |
 | 编码 | 修了一个：5.1 按控制台代码页解读 CLI 的 UTF-8 输出，报告里的中文会乱。现在先把控制台编码设成 UTF-8 |
 
-`test/launcherPs1.test.ts` 在找得到的每个 PowerShell 上跑这些情况。旧契约在 PowerShell 7.4（Linux 容器）上过过。run.ps1 后来跟 run.sh 对齐了新契约（`fix`、`launcher`、doctor 始终输出 JSON、预发布只认钉死版本），新版本还没在任何 PowerShell 上跑过，要等 CI 的 windows 列。
+`test/launcherPs1.test.ts` 在找得到的每个 PowerShell 上跑这些情况。旧契约在 PowerShell 7.4（Linux 容器）上过过。run.ps1 后来跟 run.sh 对齐了新契约（`fix`、`launcher`、doctor 始终输出 JSON、预发布只认钉死版本），新版本在 CI 的 windows-latest 上过了，Windows PowerShell 5.1 和 PowerShell 7 各跑一遍。
 
 代码审查时列出的 Windows 问题，前四条已经修了：
 
