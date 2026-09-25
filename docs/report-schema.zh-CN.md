@@ -22,7 +22,7 @@ read_when:
 
 退出码 78 时 stderr 另打一份 JSON 诊断：`error`（环境类型码）、`message`、`meaning`、`fix`（能直接复制的命令或设置）、`detail`、`platform`、`node`。stdout 仍是报告，`environmentError` 字段放同一份诊断。
 
-`sandbox-blocked` 和 `tmp-unwritable` 的 `detail.signature` 是命中沙箱识别表的哪一行（`tmp-unwritable` 对应 `temp-dir`，`sandbox-blocked` 对应 `linux-socket-filter`、`mach-port`、`operation-not-permitted`，见 [platform.md](platform.md)），下载被拒的 `chromium-install-failed` 带 `detail.signature: "network-blocked"`。这几个和 `cache-unwritable` 都带 `detail.host`：`claude-code`、`codex` 或 `null`，按宿主设的环境变量认。
+`sandbox-blocked` 和 `tmp-unwritable` 的 `detail.signature` 是命中沙箱识别表的哪一行（`tmp-unwritable` 对应 `temp-dir`，`sandbox-blocked` 对应 `linux-socket-filter`、`mach-port`、`operation-not-permitted`，见 [platform.zh-CN.md](platform.zh-CN.md)），下载被拒的 `chromium-install-failed` 带 `detail.signature: "network-blocked"`。这几个和 `cache-unwritable` 都带 `detail.host`：`claude-code`、`codex` 或 `null`，按宿主设的环境变量认。
 
 ## 顶层字段
 

@@ -1,162 +1,164 @@
 ---
-summary: '支持哪些系统和宿主、每个平台实测过什么、沙箱特征识别表、GPU 结论、Windows 现状'
+summary: 'Supported systems and hosts, what was tested on each platform, the sandbox signature table, GPU findings, Windows status'
 read_when:
-  - 改 src/engine/browser.ts 的启动参数或沙箱识别表
-  - 用户报告沙箱里起不来、首次下载失败、容器里跑不动
-  - 考虑打开 GPU 或支持 Windows
+  - Changing the launch flags or the sandbox signature table in src/engine/browser.ts
+  - A user reports that Chromium will not start in a sandbox, the first download fails, or a container cannot run it
+  - Considering turning on the GPU or supporting Windows
 ---
 
-# 平台
+# Platform
 
-## 支持矩阵
+English | [中文](platform.zh-CN.md)
 
-| 平台 | 状态 | 实测 |
+## Support matrix
+
+| Platform | Status | Tested |
 |---|---|---|
-| macOS arm64 | 支持 | 本机直跑、Claude Code 沙箱、Codex 沙箱 `workspace-write` 和 `read-only`、GPU 对比 |
-| Linux x64（Ubuntu 22.04、24.04，Debian 12） | 支持 | CI（ubuntu-latest）按 INSTALL.md 从头装到渲出 hello |
-| Linux arm64 | 尽力而为 | Ubuntu 24.04 arm64 容器：受限容器 13 种、Claude Code 沙箱运行时、Codex Linux 沙箱 |
-| macOS x64 | 尽力而为 | 没测 |
-| Windows | 不支持，在 WSL2 里用 | 原生 `win32` 退 78。CI 有一列 windows-latest，设 `FLIPBOOK_ALLOW_WIN32=1` 跑，结果见下面 Windows 一节 |
+| macOS arm64 | Supported | Directly on the machine, the Claude Code sandbox, the Codex `workspace-write` and `read-only` sandboxes, GPU comparison |
+| Linux x64 (Ubuntu 22.04 and 24.04, Debian 12) | Supported | CI (ubuntu-latest) installs from scratch following INSTALL.md and renders hello |
+| Linux arm64 | Best effort | Ubuntu 24.04 arm64 container: 13 restricted container setups, the Claude Code sandbox runtime, the Codex Linux sandbox |
+| macOS x64 | Best effort | Untested |
+| Windows | Not supported, use WSL2 | Native `win32` exits 78. CI has a windows-latest column that runs with `FLIPBOOK_ALLOW_WIN32=1`, see the Windows section below |
 
-| 宿主 | 状态 |
+| Host | Status |
 |---|---|
-| Claude Code | 沙箱里能跑。首次下载要在沙箱外跑一次，或加放行设置（INSTALL.md 第 3e 步） |
-| Codex | macOS 上 `workspace-write` 沙箱里能跑，首次下载同上。Linux 上要开 `network_access = true` 才起得来。`read-only` 跑不了 |
+| Claude Code | Runs inside the sandbox. The first run downloads Chromium and fonts, which the sandbox blocks. On that exit 78 the agent reruns the same command with `dangerouslyDisableSandbox` as the fix says, and the user clicks allow once. Every run after that stays inside the sandbox, with no settings to change and no restart. The allow settings in INSTALL.md step 3e are only for users who want no prompt at all, and Claude Code applies sandbox settings as soon as they are saved |
+| Codex | Runs inside the `workspace-write` sandbox on macOS, and the first download works the same way. On Linux, Codex's seccomp filter blocks `shutdown()` on sockets, unix socketpairs included, and Chromium calls it as soon as it starts. flipbook cannot change that: turn on `network_access = true` in the Codex config. `read-only` mode does not allow writing files at all: use `workspace-write` |
 
-## 实测环境
+## Test environment
 
-2026-09-25 测的，版本如下：
+Tested on 2026-09-25 with these versions:
 
-- 本机：Apple M4，macOS 15.3，Node 24.13.0，ffmpeg 8.1.1，playwright-core 1.63.0，Chromium headless shell 153.0.8010.12（r1243）。
-- Claude Code 2.1.281 的 Bash 沙箱（macOS Seatbelt）。
-- Codex CLI 0.156.1：`codex sandbox -P :workspace` 和 `-P :read-only` 直接跑命令，再用 `codex exec` 让模型（gpt-6-astra）照 skill 跑 doctor、check、render。
-- Docker 29.5.2，镜像 ubuntu:24.04 linux/arm64，Node 22.19.0，ffmpeg 6.1.1。容器里另装 Claude Code 的沙箱运行时 `@anthropic-ai/sandbox-runtime` 0.0.77（bubblewrap 加 seccomp）和 Codex CLI 0.156.1 的 linux-arm64 版。
+- Local machine: Apple M4, macOS 15.3, Node 24.13.0, ffmpeg 8.1.1, playwright-core 1.63.0, Chromium headless shell 153.0.8010.12 (r1243).
+- The Bash sandbox of Claude Code 2.1.281 (macOS Seatbelt).
+- Codex CLI 0.156.1: commands run directly under `codex sandbox -P :workspace` and `-P :read-only`, then `codex exec` has the model (gpt-6-astra) run doctor, check and render following the skill.
+- Docker 29.5.2, image ubuntu:24.04 linux/arm64, Node 22.19.0, ffmpeg 6.1.1. The container also has Claude Code's sandbox runtime `@anthropic-ai/sandbox-runtime` 0.0.77 (bubblewrap plus seccomp) and the linux-arm64 build of Codex CLI 0.156.1.
 
-## 沙箱特征识别表
+## Sandbox signature table
 
-`src/engine/browser.ts` 的 `SANDBOX_SIGNATURES` 按下表顺序匹配 Chromium 启动失败的报错，先中先用。命中的行写进报告的 `detail.signature`，宿主写进 `detail.host`（看 `CODEX_SANDBOX` 和 `SANDBOX_RUNTIME=1` 这两个环境变量）。
+`SANDBOX_SIGNATURES` in `src/engine/browser.ts` matches the error from a failed Chromium launch against the rows below in order, and the first match wins. The matching row goes into the report's `detail.signature` and the host into `detail.host` (read from the environment variables `CODEX_SANDBOX` and `SANDBOX_RUNTIME=1`).
 
-| 行 | 报错原文 | 在哪见到 | 处理 |
+| Row | Error text | Seen in | Handling |
 |---|---|---|---|
-| `temp-dir` | `browserType.launch: EPERM: operation not permitted, mkdtemp '/var/folders/.../T/playwright-artifacts-XXXXXX'` | Codex `read-only`（macOS） | 不重试，退 78 `tmp-unwritable`，提示把 TMPDIR 指到能写的目录，Codex 换 `workspace-write` |
-| | `browserType.launch: EROFS: read-only file system, mkdtemp '/tmp/playwright-artifacts-XXXXXX'` | Codex `read-only`（Linux），只读根文件系统又没挂可写 /tmp 的容器 | 同上 |
-| | `browserType.launch: ENOENT: no such file or directory, mkdtemp '/tmp/claude/playwright-artifacts-XXXXXX'` | Claude Code 沙箱运行时，TMPDIR 指的目录还没建 | 同上 |
-| `linux-socket-filter` | `FATAL:content/browser/sandbox_host_linux.cc:41] Check failed: . shutdown: Operation not permitted (1)` | Codex Linux 沙箱，没开网络时它的 seccomp 过滤器拒绝 socket 上的 `shutdown`。正常和单进程两种方式都一样 | 不重试，退 78 `sandbox-blocked`，提示开 `network_access = true` 或在沙箱外跑 |
-| `mach-port` | `FATAL:base/apple/mach_port_rendezvous_mac.cc:159] Check failed: kr == KERN_SUCCESS. bootstrap_check_in org.chromium.Chromium.MachPortRendezvousServer.<pid>: Permission denied (1100)` | Claude Code 沙箱（macOS），Codex `workspace-write`（macOS）。Codex 的拒绝日志是 `mach-register org.chromium.Chromium.MachPortRendezvousServer.<pid>` | 用 `--single-process --no-zygote` 重试，两个宿主里都起得来。单进程也失败才退 78 `sandbox-blocked` |
-| `operation-not-permitted` | 其他含 `EPERM` 或 `Operation not permitted` 的报错 | 没在已知宿主里见过，兜底 | 同 `mach-port` |
+| `temp-dir` | `browserType.launch: EPERM: operation not permitted, mkdtemp '/var/folders/.../T/playwright-artifacts-XXXXXX'` | Codex `read-only` (macOS) | No retry. Exits 78 with `tmp-unwritable`, telling the user to point TMPDIR at a writable directory, or to switch Codex to `workspace-write` |
+| | `browserType.launch: EROFS: read-only file system, mkdtemp '/tmp/playwright-artifacts-XXXXXX'` | Codex `read-only` (Linux), containers with a read-only root file system and no writable /tmp | Same |
+| | `browserType.launch: ENOENT: no such file or directory, mkdtemp '/tmp/claude/playwright-artifacts-XXXXXX'` | The Claude Code sandbox runtime, when the directory TMPDIR points to does not exist yet | Same |
+| `linux-socket-filter` | `FATAL:content/browser/sandbox_host_linux.cc:41] Check failed: . shutdown: Operation not permitted (1)` | The Codex Linux sandbox: without network, its seccomp filter refuses `shutdown` on sockets. Normal and single-process launches fail alike | No retry. Exits 78 with `sandbox-blocked`, telling the user to set `network_access = true` or run outside the sandbox |
+| `mach-port` | `FATAL:base/apple/mach_port_rendezvous_mac.cc:159] Check failed: kr == KERN_SUCCESS. bootstrap_check_in org.chromium.Chromium.MachPortRendezvousServer.<pid>: Permission denied (1100)` | The Claude Code sandbox (macOS), Codex `workspace-write` (macOS). Codex's denial log reads `mach-register org.chromium.Chromium.MachPortRendezvousServer.<pid>` | Retry with `--single-process --no-zygote`, which starts in both hosts. Exits 78 with `sandbox-blocked` only when single-process fails too |
+| `operation-not-permitted` | Any other error containing `EPERM` or `Operation not permitted` | Not seen in any known host, a catch-all | Same as `mach-port` |
 
-不在表里的：
+Not in the table:
 
-- `error while loading shared libraries`：Linux 缺系统库，退 78 `linux-deps-missing`，给 `install-deps` 命令。
-- 首次下载被拒：`getaddrinfo ENOTFOUND cdn.playwright.dev`（Codex 没开网络），`server returned code 403 body 'Connection blocked by network allowlist'`（Claude Code 沙箱的代理）。退 78 `chromium-install-failed`，`detail.signature` 是 `network-blocked`，提示在沙箱外跑一次或开网络。
-- 缓存写不进：`cache-unwritable`，写之前就先探过。
+- `error while loading shared libraries`: Linux is missing system libraries. Exits 78 with `linux-deps-missing` and gives the `install-deps` command.
+- A refused first download: `getaddrinfo ENOTFOUND cdn.playwright.dev` (Codex without network), `server returned code 403 body 'Connection blocked by network allowlist'` (the Claude Code sandbox proxy). Exits 78 with `chromium-install-failed` and `detail.signature` set to `network-blocked`, telling the user to run once outside the sandbox or open the network.
+- An unwritable cache: `cache-unwritable`, probed before anything is written.
 
-## 各宿主实测
+## Per-host results
 
 ### Claude Code
 
-- macOS 沙箱：正常启动撞 `mach-port`，单进程起得来。
-- Linux 沙箱运行时（容器里的 bubblewrap 加 seccomp，嵌套用 `enableWeakerNestedSandbox`，`--privileged` 下也测了完整模式）：Unix socket 确实被拦（`listen EPERM`），网络确实只走代理，但 Chromium 正常模式就能起。check 退 0，render 退 0（约 24 帧/秒）。
-- 首次下载：缓存目录不在 `allowWrite` 里退 `cache-unwritable`。把缓存目录加进 `sandbox.filesystem.allowWrite`，再把 `cdn.playwright.dev`、`storage.googleapis.com`、`github.com`、`*.githubusercontent.com` 加进 `sandbox.network.allowedDomains`，冷启动的 check 在沙箱里 23 秒装完退 0。Chromium 从 `cdn.playwright.dev` 307 跳到 `storage.googleapis.com`，霞鹜文楷从 `github.com` 302 跳到 `release-assets.githubusercontent.com`。Playwright 顺带下的自家 ffmpeg 走 `playwright.download.prss.microsoft.com`，被拦也不影响安装，flipbook 用的是系统 ffmpeg。
+- macOS sandbox: the normal launch hits `mach-port`, single-process starts.
+- Linux sandbox runtime (bubblewrap plus seccomp in a container, nested with `enableWeakerNestedSandbox`, and the full mode also tested under `--privileged`): Unix sockets really are blocked (`listen EPERM`) and the network really goes only through the proxy, yet Chromium starts in normal mode. check exits 0, render exits 0 (about 24 frames per second).
+- First download: with the cache directory outside `allowWrite` it exits `cache-unwritable`. With the cache directory added to `sandbox.filesystem.allowWrite`, and `cdn.playwright.dev`, `storage.googleapis.com`, `github.com` and `*.githubusercontent.com` added to `sandbox.network.allowedDomains`, a cold check installs inside the sandbox in 23 seconds and exits 0. Chromium redirects from `cdn.playwright.dev` to `storage.googleapis.com` with a 307, LXGW WenKai from `github.com` to `release-assets.githubusercontent.com` with a 302. The ffmpeg Playwright fetches for itself comes from `playwright.download.prss.microsoft.com`. Blocking it does not affect the install, because flipbook uses the system ffmpeg.
 
-### Codex（macOS）
+### Codex (macOS)
 
-- skill 加载：`codex debug prompt-input` 渲出的技能列表里有 flipbook，`compatibility` 放顶层和放 `metadata` 下都能加载。Codex 自带的 skill 校验脚本（skill-creator 的 `quick_validate.py`）只认 `name`、`description`、`license`、`allowed-tools`、`metadata`，顶层 `compatibility` 报错，挪进 `metadata` 后通过。
-- `workspace-write`（默认，不联网）：doctor 退 0，`launch.mode` 是 `single-process`。check 退 0，render 退 0，截帧约 28 帧/秒。`codex exec` 让模型照 skill 跑同样三条命令，结果一样，成片和直接跑的逐字节一致。
-- 这个模式下 `~/Library/Caches/liustack/flipbook` 写不进（EPERM），网络不通（ENOTFOUND）。冷启动时默认缓存退 `cache-unwritable`，缓存指到可写目录后退 `chromium-install-failed`。
-- `~/.codex/config.toml` 的 `[sandbox_workspace_write]` 里加 `writable_roots = [缓存目录]` 和 `network_access = true` 后，冷启动的 check 在沙箱里 40 秒装完退 0（Chromium 198 MB，字体 49 MB）。
-- `read-only`：Playwright 建临时目录就失败，命中 `temp-dir`。
-- 用户自己的 execpolicy 规则会挡启动器：本机 `~/.codex/rules/` 里有一条把 `bash` 设成 `prompt` 的规则，又配了 `approval_policy = "never"`，`bash .../run.sh` 直接被拒（`approval required by policy, but AskForApproval is set to Never`）。这不是 Codex 默认行为，换干净的 `CODEX_HOME` 就没有了。SKILL.md 的手工兜底顺序（PATH 上的 flipbook、npx、bunx）能绕开。
+- Skill loading: the skill list rendered by `codex debug prompt-input` includes flipbook, with `compatibility` either at the top level or under `metadata`. Codex's own skill validator (`quick_validate.py` from skill-creator) accepts only `name`, `description`, `license`, `allowed-tools` and `metadata`. It rejects a top-level `compatibility` and passes once it moves under `metadata`.
+- `workspace-write` (the default, no network): doctor exits 0 with `launch.mode` set to `single-process`. check exits 0, render exits 0, capturing about 28 frames per second. Having the model run the same three commands through `codex exec` following the skill gives the same result, and the video is byte-for-byte identical to the one from running them directly.
+- In this mode `~/Library/Caches/liustack/flipbook` is not writable (EPERM) and the network is down (ENOTFOUND). A cold start exits `cache-unwritable` with the default cache, and `chromium-install-failed` once the cache points at a writable directory.
+- With `writable_roots = [cache directory]` and `network_access = true` under `[sandbox_workspace_write]` in `~/.codex/config.toml`, a cold check installs inside the sandbox in 40 seconds and exits 0 (Chromium 198 MB, fonts 49 MB).
+- `read-only`: Playwright fails to create its temp directory, which hits `temp-dir`.
+- The user's own execpolicy rules can block the launcher. On the test machine a rule in `~/.codex/rules/` sets `bash` to `prompt`, together with `approval_policy = "never"`, so `bash .../run.sh` is refused outright (`approval required by policy, but AskForApproval is set to Never`). That is not Codex's default behavior and goes away with a clean `CODEX_HOME`. The manual fallback order in SKILL.md (flipbook on PATH, npx, bunx) gets around it.
 
-### Codex（Linux）
+### Codex (Linux)
 
-容器里用 `codex sandbox -P :workspace` 跑（容器要放开 seccomp 和 apparmor，bubblewrap 才建得了命名空间）：
+Run in a container with `codex sandbox -P :workspace` (the container needs seccomp and apparmor relaxed so bubblewrap can create namespaces):
 
-- 默认不联网：正常和单进程都撞 `linux-socket-filter`，check 和 render 退 78。
-- 权限配置开网络（`permissions.<名字>.network.enabled = true`）：Chromium 正常模式起得来，check 和 render 退 0。
-- `-P :workspace` 这个内置配置不读老的 `sandbox_workspace_write.network_access`。`codex exec` 走老配置时 `network_access = true` 是否同样去掉过滤器，在 macOS 上确认了网络通，Linux 上没测（容器里没有 Codex 登录）。
+- No network by default: normal and single-process launches both hit `linux-socket-filter`, and check and render exit 78.
+- Network turned on through a permission profile (`permissions.<name>.network.enabled = true`): Chromium starts in normal mode, check and render exit 0.
+- The built-in `-P :workspace` profile does not read the older `sandbox_workspace_write.network_access`. Whether `network_access = true` removes the filter the same way when `codex exec` runs on the older config is untested on Linux (no Codex login in the container). On macOS it was confirmed to open the network.
 
-## 受限的 Linux 容器
+## Restricted Linux containers
 
-ubuntu:24.04 arm64，除第一行外都用非 root 用户（uid 1000），缓存事先装好，跑 `flipbook check` 渲 hello。
+ubuntu:24.04 arm64. Every row except the first runs as a non-root user (uid 1000) with the cache installed beforehand, and runs `flipbook check` on hello.
 
-| 限制 | 结果 |
+| Limit | Result |
 |---|---|
-| root，Docker 默认 | 退 0，正常模式 |
-| 非 root | 退 0，正常模式 |
-| 装好的缓存设成只读 | 退 0 |
-| 空缓存，`~/.cache` 只读 | 退 78 `cache-unwritable` |
-| HOME 指到不存在的目录 | 退 78 `cache-unwritable` |
-| 没有 /dev/shm（`--ipc=none`） | 退 0，Playwright 默认带 `--disable-dev-shm-usage` |
-| /dev/shm 只有 1 MB | 退 0 |
-| `--cap-drop ALL`，`no-new-privileges` | 退 0 |
-| 根文件系统只读，只有工作目录可写 | 退 78 `tmp-unwritable`，命中 `temp-dir`（EROFS） |
-| 根文件系统只读，另挂可写 /tmp | 退 0 |
-| 断网，空缓存 | 退 78 `chromium-install-failed` |
-| 进程数上限 48、64、96 | 不稳定：Playwright 抛 `Assertion error` 退 1，或 Node 退 13，或 Chromium 收到 SIGABRT 退 78 `browser-launch-failed` |
-| 进程数上限 128、192 | 三次都退 0 |
-| 内存 256 MB、512 MB | check 被 OOM 杀掉，退 137，没有报告 |
-| 内存 768 MB | check 退 0，render 退 1 |
-| 内存 1 GB | check 退 0。render 一次渲染进程被杀，报 `page-error`（The page crashed）加 `glitch` 退 1，另一次 ffmpeg 被杀后卡住十几分钟不退 |
-| 内存 2 GB | check 和 render 都退 0 |
+| root, Docker defaults | Exits 0, normal mode |
+| Non-root | Exits 0, normal mode |
+| Installed cache made read-only | Exits 0 |
+| Empty cache, `~/.cache` read-only | Exits 78 `cache-unwritable` |
+| HOME pointing at a directory that does not exist | Exits 78 `cache-unwritable` |
+| No /dev/shm (`--ipc=none`) | Exits 0, Playwright passes `--disable-dev-shm-usage` by default |
+| /dev/shm of only 1 MB | Exits 0 |
+| `--cap-drop ALL`, `no-new-privileges` | Exits 0 |
+| Read-only root file system, only the working directory writable | Exits 78 `tmp-unwritable`, hits `temp-dir` (EROFS) |
+| Read-only root file system with a writable /tmp mounted | Exits 0 |
+| No network, empty cache | Exits 78 `chromium-install-failed` |
+| Process limit 48, 64, 96 | Unstable: Playwright throws `Assertion error` and exits 1, or Node exits 13, or Chromium gets SIGABRT and exits 78 `browser-launch-failed` |
+| Process limit 128, 192 | Exits 0 all three times |
+| Memory 256 MB, 512 MB | check is killed by OOM, exits 137, no report |
+| Memory 768 MB | check exits 0, render exits 1 |
+| Memory 1 GB | check exits 0. One render had its renderer killed and reported `page-error` (The page crashed) plus `glitch`, exiting 1. In another, ffmpeg was killed and then hung for more than ten minutes without exiting |
+| Memory 2 GB | check and render both exit 0 |
 
-进程数和内存不足时报错五花八门，没法认成一行特征，所以不进识别表。1080p 渲染按至少 2 GB 内存、128 个进程准备。
+With too few processes or too little memory the errors vary too much to become one signature row, so they are not in the table. Plan on at least 2 GB of memory and 128 processes for 1080p rendering.
 
-渲染中途被杀的情况现在认得出：渲染进程按 CDP 报的终止状态（`killed`、`oom`、`failed to launch`、`evicted for memory`），浏览器整个退出，ffmpeg 被 SIGKILL，都报 78 `resource-exhausted`，不再报 `page-error` 或 `glitch`。ffmpeg 被杀后送帧和收尾立刻出错，不会卡住。启动阶段进程数不够时仍然各报各的。单进程模式下拿不到浏览器的退出信号，页面自己把整个进程搞崩也会报成 `resource-exhausted`。
+A kill in the middle of a render is recognized now: a renderer ending with a CDP termination status (`killed`, `oom`, `failed to launch`, `evicted for memory`), the whole browser exiting, or ffmpeg getting SIGKILL all report 78 `resource-exhausted`, no longer `page-error` or `glitch`. After ffmpeg is killed, sending frames and finishing fail right away instead of hanging. Too few processes at launch still report whatever each failure reports. Single-process mode has no exit signal from the browser, so a page that crashes the whole process also reports `resource-exhausted`.
 
-单进程模式在 Linux arm64 上：flipbook 自己的截帧没问题（用包装脚本逼它走单进程，check 和 render 退 0，约 13 帧/秒），但 Playwright 的 `page.screenshot` 在这个模式下经常报 `Unable to capture screenshot`。只有 Linux 上真撞到能靠单进程绕过的特征时才会走到这里，目前实测的 Linux 沙箱都不是这种。
+Single-process mode on Linux arm64: flipbook's own frame capture works (forced into single-process with a wrapper script, check and render exit 0 at about 13 frames per second), but Playwright's `page.screenshot` often fails with `Unable to capture screenshot` in this mode. flipbook only ends up here when Linux really hits a signature that single-process gets around, and none of the Linux sandboxes tested so far do.
 
 ## GPU
 
-问题：macOS 上给 2D 合成加 `--use-angle=metal --enable-gpu`，同机两次渲染的原始帧还逐帧一致吗。
+The question: on macOS, with `--use-angle=metal --enable-gpu` added for 2D compositions, do two renders on the same machine still give identical raw frames?
 
-做法：在打包好的 CLI 副本里给启动参数加上这两个开关，并把每帧 PNG 落盘，四个合成各渲两次软件光栅、两次 GPU。stress 另各渲到六次。默认启动参数没动。
+Method: in a copy of the packed CLI, add those two flags to the launch arguments and write every frame's PNG to disk. Render four compositions twice with software raster and twice with the GPU, and stress six times each. The default launch arguments stayed unchanged.
 
-先确认 GPU 真的开了：CDP `SystemInfo.getInfo` 显示默认是 SwiftShader（`2d_canvas: unavailable_software`），加开关后 `2d_canvas: enabled`、`rasterization: enabled`、`skia_graphite: enabled_on`，渲染器是 `ANGLE Metal Renderer: Apple M4`。
+First, confirm the GPU is really on: CDP `SystemInfo.getInfo` shows SwiftShader by default (`2d_canvas: unavailable_software`). With the flags it shows `2d_canvas: enabled`, `rasterization: enabled` and `skia_graphite: enabled_on`, and the renderer is `ANGLE Metal Renderer: Apple M4`.
 
-| 合成 | 帧数 | 软件光栅两次 | GPU 两次 | 软件对 GPU 的 PSNR |
+| Composition | Frames | Software raster, two runs | GPU, two runs | PSNR, software against GPU |
 |---|---|---|---|---|
-| examples/hello（canvas 方块加 DOM 文字） | 120 | 一致 | 一致 | 帧帧不同，最低 60.17 dB，平均 62.07 dB |
-| test/fixtures/color（纯色块） | 24 | 一致 | 一致 | 完全相同 |
-| test/fixtures/music | 24 | 一致 | 一致 | 帧帧不同，最低 51.40 dB，平均 52.39 dB |
-| stress（canvas 渐变、阴影模糊、透明、multiply 混合、贝塞尔，DOM 圆角阴影和文字阴影） | 120 | 六次全一致 | 第 2 到 6 次和第 1 次比，分别有 20、21、120、43、43 帧不同 | 最低 48.52 dB，平均 49.02 dB |
+| examples/hello (canvas square plus DOM text) | 120 | Identical | Identical | Every frame differs, lowest 60.17 dB, mean 62.07 dB |
+| test/fixtures/color (solid color blocks) | 24 | Identical | Identical | Exactly the same |
+| test/fixtures/music | 24 | Identical | Identical | Every frame differs, lowest 51.40 dB, mean 52.39 dB |
+| stress (canvas gradients, shadow blur, transparency, multiply blending, Bézier curves, DOM rounded-corner shadows and text shadows) | 120 | All six identical | Runs 2 to 6 against run 1: 20, 21, 120, 43 and 43 frames differ | Lowest 48.52 dB, mean 49.02 dB |
 
-stress 的 GPU 各次之间差得很小：灰度最大差 2 级，PSNR 不低于 91.84 dB。但原始帧哈希对不上了。
+The GPU runs of stress differ from each other only slightly: at most 2 gray levels, PSNR no lower than 91.84 dB. But the raw frame hashes no longer match.
 
-速度：stress 六次渲染的总耗时，软件光栅 11.6 到 23.3 秒，GPU 9.7 到 19.1 秒，hello 软件光栅 7.9 和 9.3 秒，GPU 8.9 秒。总耗时含编码和验收，看不出 GPU 有明显优势。
+Speed: six stress renders took 11.6 to 23.3 seconds each with software raster and 9.7 to 19.1 seconds with the GPU. hello took 7.9 and 9.3 seconds with software raster and 8.9 seconds with the GPU. These totals include encoding and acceptance, and show no clear advantage for the GPU.
 
-结论：2D 合成保持软件光栅。Metal 下带阴影、模糊、混合的 canvas 内容同机两次渲染不逐帧一致，过不了 A 级的原始帧哈希门槛。以后要对 2D 打开 GPU，确定性检查得从哈希改成 PSNR（比如不低于 90 dB）。3D 合成按设计本来就用 PSNR 验收，不受影响。沙箱里的单进程模式能不能用上 Metal 没测，Codex 的拒绝日志里有 `iokit-open-user-client AGXDeviceUserClient`，大概率用不上。
+Conclusion: 2D compositions stay on software raster. Under Metal, canvas content with shadows, blur and blending does not render frame-identical twice on the same machine, so it cannot pass the A-level raw frame hash gate. Turning on the GPU for 2D later would mean switching the determinism check from hashes to PSNR (for example at least 90 dB). 3D compositions are accepted by PSNR by design and are not affected. Whether single-process mode inside a sandbox can use Metal is untested. Codex's denial log contains `iokit-open-user-client AGXDeviceUserClient`, so most likely it cannot.
 
 ## Windows
 
-原生 Windows 不支持，`win32` 退 78 提示 WSL2。设 `FLIPBOOK_ALLOW_WIN32=1` 可以绕过，给 CI 用。
+Native Windows is not supported: `win32` exits 78 and points to WSL2. Setting `FLIPBOOK_ALLOW_WIN32=1` bypasses that, for CI.
 
-已经做了：
+Done so far:
 
-- 缓存放 `%LOCALAPPDATA%\liustack\flipbook`，没有这个变量时用 `%USERPROFILE%\AppData\Local`。
-- 认出 `chrome-headless-shell-win64\chrome-headless-shell.exe`。playwright-core 没有 Windows arm64 的 headless shell。
-- 缺 Chromium 时给的安装命令是 PowerShell 写法（`$env:PLAYWRIGHT_BROWSERS_PATH="..."; npx ...`）。
-- 装 Chromium 的子进程带 `windowsHide`。
-- CI 加 windows-latest 一列，和其他列一样跑全部测试，没有允许失败的一组。run.sh 的测试用 Git for Windows 的 sh 跑，跟 Git Bash 里一样。编码器测试冒充 ffmpeg 的是 Node 脚本。评测工作区在 Windows 上另写 `flipbook.cmd` 垫片。Windows 上跳过四条，都写了原因：编码器测试里系统杀进程的两条（Windows 没有信号，flipbook 靠 SIGKILL 认出系统杀的进程），page 里靠 chmod 造删不掉目录的两条（Windows 不按权限位管目录）。chrome://kill 那条两列都偶发过：和别的测试一起跑时，Chromium 要 5 毫秒到 16 秒才发现渲染进程没了，比 close() 等的久，现在这条先等崩溃报告再关页面。
-- 第一次跑（2026-09-25，Node 22.19 和 24 各一列）：必过的一组 22 个文件全过。允许失败的一组里 corpus、doctor、references、render 四个文件也过了，Windows 上能渲出片子。没过的是 encode（sh 冒充的 ffmpeg、`/bin/sleep`、`pgrep` 在 Windows 上起不来）、launcher（run.sh 在 Git Bash 里调不起假的 flipbook、npx、bunx）、eval（评测脚本的 sh 垫片）、page 里靠 chmod 做出删不掉的目录的两条（Windows 不认这个权限，render 和 snapshot 照常成功）。Node 24 那列另有一次 `chrome://kill` 之后 close() 没报 resource-exhausted，Node 22.19 那列同一条过了。
+- The cache lives in `%LOCALAPPDATA%\liustack\flipbook`, or in `%USERPROFILE%\AppData\Local` when that variable is missing.
+- `chrome-headless-shell-win64\chrome-headless-shell.exe` is recognized. playwright-core has no headless shell for Windows arm64.
+- When Chromium is missing, the install command is given in PowerShell form (`$env:PLAYWRIGHT_BROWSERS_PATH="..."; npx ...`).
+- The child process that installs Chromium runs with `windowsHide`.
+- CI has a windows-latest column that runs every test like the other columns, with no allowed-to-fail group. The run.sh tests run under Git for Windows' sh, the same as in Git Bash. The encoder tests fake ffmpeg with a Node script. The eval workspace gets an extra `flipbook.cmd` shim on Windows. Four tests are skipped on Windows, each with its reason: the two encoder tests where the system kills a process (Windows has no signals, and flipbook recognizes a system kill by SIGKILL), and the two page tests that make an undeletable directory with chmod (Windows does not govern directories by permission bits). The chrome://kill test flaked on both columns: running alongside other tests, Chromium takes anywhere from 5 milliseconds to 16 seconds to notice the renderer is gone, longer than close() waits, so this test now waits for the crash report before closing the page.
+- First run (2026-09-25, one column each for Node 22.19 and 24): all 22 files in the must-pass group passed. In the allowed-to-fail group, corpus, doctor, references and render passed too, so Windows can render videos. What failed: encode (the sh fake ffmpeg, `/bin/sleep` and `pgrep` do not start on Windows), launcher (run.sh in Git Bash cannot call the fake flipbook, npx and bunx), eval (the eval script's sh shim), and the two page tests that make an undeletable directory with chmod (Windows ignores that permission, and render and snapshot succeed as usual). Both columns also saw close() fail to report resource-exhausted after `chrome://kill`.
 
-run.ps1 按 Windows 上启动器常踩的四个坑逐条查过：
+run.ps1 was checked against the pitfalls a launcher usually hits on Windows, one by one:
 
-| 坑 | run.ps1 的情况 |
+| Pitfall | run.ps1 |
 |---|---|
-| `.cmd` 垫片 | Node 直接 spawn `.cmd` 会报 EINVAL，PowerShell 的 `&` 没这个问题。改成只找可执行文件和 `.cmd`（`Get-Command -CommandType Application`），不走 npm 同时装的 `.ps1` 垫片，执行策略拦不到 |
-| PATH 大小写 | run.ps1 不自己拼环境变量，PowerShell 的 `$env:PATH` 本来不分大小写。测试里改 PATH 时先删掉原来任何大小写的 PATH 键 |
-| 控制台闪窗 | run.ps1 的子进程共用 PowerShell 的控制台，不另开窗 |
-| 退出码透传 | 修了一个：Windows PowerShell 5.1 在 `$ErrorActionPreference = 'Stop'` 下把重定向的 stderr 当成终止错误，`doctor --json` 撞上 CLI 往 stderr 写诊断时丢掉 78、退 0。现在原生命令都在 `Continue` 的作用域里跑，退出码取 `$LASTEXITCODE` |
-| 编码 | 修了一个：5.1 按控制台代码页解读 CLI 的 UTF-8 输出，报告里的中文会乱。现在先把控制台编码设成 UTF-8 |
+| `.cmd` shims | Node spawning a `.cmd` directly fails with EINVAL, PowerShell's `&` does not. It now looks only for executables and `.cmd` (`Get-Command -CommandType Application`) and never the `.ps1` shim npm installs alongside, so the execution policy cannot block it |
+| PATH case | run.ps1 builds no environment variables itself, and PowerShell's `$env:PATH` is case-insensitive anyway. Tests that change PATH first delete any existing PATH key, whatever its case |
+| Console window flashes | run.ps1's child processes share PowerShell's console and open no window of their own |
+| Passing the exit code through | One fix: Windows PowerShell 5.1 under `$ErrorActionPreference = 'Stop'` treats redirected stderr as a terminating error, so `doctor --json` lost its 78 and exited 0 whenever the CLI wrote a diagnosis to stderr. Native commands now run in a `Continue` scope, and the exit code comes from `$LASTEXITCODE` |
+| Encoding | One fix: 5.1 decoded the CLI's UTF-8 output with the console code page, which garbled Chinese in the report. The console encoding is now set to UTF-8 first |
 
-`test/launcherPs1.test.ts` 在找得到的每个 PowerShell 上跑这些情况。旧契约在 PowerShell 7.4（Linux 容器）上过过。run.ps1 后来跟 run.sh 对齐了新契约（`fix`、`launcher`、doctor 始终输出 JSON、预发布只认钉死版本），新版本在 CI 的 windows-latest 上过了，Windows PowerShell 5.1 和 PowerShell 7 各跑一遍。
+`test/launcherPs1.test.ts` runs these cases on every PowerShell it can find. The old contract passed on PowerShell 7.4 (Linux container). run.ps1 later caught up with run.sh's new contract (`fix`, `launcher`, doctor always printing JSON, prereleases accepting only the pinned version), and the new version passed on CI's windows-latest, once each on Windows PowerShell 5.1 and PowerShell 7.
 
-代码审查时列出的 Windows 问题，前四条已经修了：
+Of the Windows problems listed in code review, the first four are fixed:
 
-- `findOnPath` 在 win32 上给程序名补 `.exe`，PATH 键不分大小写，doctor、check、render 找得到 `ffmpeg.exe`。
-- 起 ffmpeg 的地方（`proc.ts`、`encode.ts`、`pixels.ts`）都带 `windowsHide: true`，没有控制台的宿主不再闪黑窗。
-- `test/globalSetup.ts` 经 shell 跑 `pnpm build`，Windows 上起得了 `pnpm.cmd`。
-- `test/doctor.test.ts` 换 PATH 时先删掉任何大小写的 PATH 键，安装命令按平台断言，Windows 上跳过靠目录写权限的用例。
+- `findOnPath` adds `.exe` to program names on win32 and treats the PATH key case-insensitively, so doctor, check and render find `ffmpeg.exe`.
+- Every place that starts ffmpeg (`proc.ts`, `encode.ts`, `pixels.ts`) passes `windowsHide: true`, so hosts without a console no longer flash a black window.
+- `test/globalSetup.ts` runs `pnpm build` through a shell, so it can start `pnpm.cmd` on Windows.
+- `test/doctor.test.ts` deletes the PATH key in any case before replacing PATH, asserts install commands per platform, and skips the cases that depend on directory write permission on Windows.
 
-还没修的一条：Node 24.0 到 24.13 在 Windows 上 `fs.rmSync` 遇到非 ASCII 路径会直接崩（nodejs/node#58759，24.13.1 修复），中文用户名很常见。要支持 Windows 时 Node 下限得避开这一段。
+Still open: on Windows, Node 24.0 to 24.13 crashes in `fs.rmSync` on non-ASCII paths (nodejs/node#58759, fixed in 24.13.1), and non-ASCII user names are common among Chinese users. Supporting Windows needs a Node floor that avoids that range.

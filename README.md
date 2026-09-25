@@ -120,7 +120,7 @@ Before the 0.3 release, Claude Code with Claude Opus 5.5 ran 8 prompts once each
 | Resources | 1080p rendering needs at least 2 GB of memory and 128 processes. With less it exits 78 with `resource-exhausted` |
 | Model | Needs Claude Opus 5 or a model in its class, in a host that can read images (the agent reviews contact sheets). Gates are set on Claude Opus 5.5 and Claude Opus 5. Published eval numbers so far are for Opus 5.5 |
 
-What each platform was tested on, the sandbox settings and the memory a container needs: [Platform](docs/platform.md) (in Chinese).
+What each platform was tested on, the sandbox settings and the memory a container needs: [Platform](docs/platform.md).
 
 ## What it does not do
 
@@ -146,7 +146,7 @@ What each platform was tested on, the sandbox settings and the memory a containe
 | [Troubleshooting](skills/flipbook/references/troubleshooting.md) | Looking up what a code means and how to fix it |
 | [Report format](docs/report-schema.md) | Parsing the JSON report, its thresholds and the output directory |
 | [timeline.json format](docs/timeline-schema.md) | Looking up every timeline field, its allowed values and how beats become frames |
-| [Platform](docs/platform.md) | Checking the support matrix, sandbox errors and settings, container limits, GPU findings (in Chinese) |
+| [Platform](docs/platform.md) | Checking the support matrix, sandbox errors and settings, container limits, GPU findings |
 | [Eval](docs/eval.md) | Running the eval, judging it, reading the results |
 
 ## Contributing

@@ -120,7 +120,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 | 资源 | 1080p 渲染至少 2 GB 内存、128 个进程，不够时退 78 `resource-exhausted` |
 | 模型 | 需要 Claude Opus 5 以上或同级模型，宿主要能读图（agent 要看联系表）。门槛按 Claude Opus 5.5 和 Claude Opus 5 设，目前公布的评测数字是 Opus 5.5 的 |
 
-每个平台实测了什么、沙箱怎么放行、容器至少要多少内存，见 [平台](docs/platform.md)。
+每个平台实测了什么、沙箱怎么放行、容器至少要多少内存，见 [平台](docs/platform.zh-CN.md)。
 
 ## 它不做什么
 
@@ -146,7 +146,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 | [排错](skills/flipbook/references/troubleshooting.md) | 每个类型码的含义和改法 |
 | [报告格式](docs/report-schema.zh-CN.md) | 解析 JSON 报告、判定阈值、输出目录 |
 | [timeline.json 格式](docs/timeline-schema.zh-CN.md) | timeline 的每个字段、取值范围、拍怎么换算成帧 |
-| [平台](docs/platform.md) | 支持矩阵、沙箱报错和放行办法、容器限制、GPU 结论 |
+| [平台](docs/platform.zh-CN.md) | 支持矩阵、沙箱报错和放行办法、容器限制、GPU 结论 |
 | [评测](docs/eval.zh-CN.md) | 评测怎么跑、怎么判、结果 |
 
 skill 和 reference 写给 agent 看，只有英文。

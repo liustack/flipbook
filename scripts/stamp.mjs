@@ -80,6 +80,7 @@ export function docTargets(root, pkgName, slug) {
         join('docs', 'eval.md'),
         join('docs', 'eval.zh-CN.md'),
         join('docs', 'platform.md'),
+        join('docs', 'platform.zh-CN.md'),
     ];
     return files.flatMap((relative) => [
         {
