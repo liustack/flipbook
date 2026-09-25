@@ -296,11 +296,13 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
             const current = page;
             page = null;
             if (!current) return;
-            issues.push(...current.issues);
             try {
                 await current.close();
             } catch (error) {
                 fail(error);
+            } finally {
+                // close() waits for a crash the renderer reports late: collect after it.
+                issues.push(...current.issues);
             }
         };
         try {

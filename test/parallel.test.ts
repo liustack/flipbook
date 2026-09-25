@@ -6,17 +6,20 @@ import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../src/cli/check.ts';
 import { parallelGate, runRender } from '../src/cli/render.ts';
-import { saveReport } from '../src/cli/report.ts';
+import { type Finding, finding, saveReport } from '../src/cli/report.ts';
 import {
     autoRecycle,
+    captureFrames,
     HEAP_GROWTH_BUDGET,
     MAX_AUTO_JOBS,
     MIN_PAGE_FRAMES,
     MIN_PAGE_HEAP_GROWTH,
     PAGE_FRAMES_1080P,
+    type PageOpener,
     pageLimit,
     planJobs,
 } from '../src/engine/capture.ts';
+import type { Encoder } from '../src/engine/encode.ts';
 import type { Session } from '../src/engine/session.ts';
 import { parseSize } from '../src/engine/size.ts';
 import { Workspace } from '../src/engine/workspace.ts';
@@ -299,5 +302,34 @@ describe('page recycling by memory', () => {
         const pages = (report.render as RenderSection).pages;
         expect(pages.recycled.nodes).toBeGreaterThan(0);
         expect(pages.recycled.heap).toBe(0);
+    });
+});
+
+describe('captureFrames', () => {
+    it('keeps a page error that arrives while the page is closing', async () => {
+        const dir = tempDir('late-crash');
+        const ws = Workspace.open(dir);
+        const page = {
+            issues: [] as Finding[],
+            broken: false,
+            seek: async () => null,
+            capture: async () => Buffer.from('x'),
+            // A renderer that crashed on its own is only reported while close() waits for it.
+            close: async () => {
+                page.issues.push(finding('page-error', 'the renderer crashed'));
+            },
+        };
+        const result = await captureFrames({
+            open: async () =>
+                ({ page, findings: [] }) as unknown as Awaited<ReturnType<PageOpener>>,
+            encoder: { write: async () => undefined } as unknown as Encoder,
+            frameCount: 1,
+            sampleFrames: [],
+            baselineFrames: [],
+            textFrames: [],
+            workspace: ws,
+            workDir: ws.path('.flipbook', 'tmp'),
+        });
+        expect(result.issues.map((issue) => issue.code)).toEqual(['page-error']);
     });
 });
