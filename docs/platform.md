@@ -1,9 +1,10 @@
 ---
-summary: 'Supported systems and hosts, what was tested on each platform, the sandbox signature table, GPU findings, Windows status'
+summary: 'Supported systems and hosts, what was tested on each platform, the sandbox signature table, GPU findings, measured render speed and memory, determinism of scaled DOM text, Windows status'
 read_when:
   - Changing the launch flags or the sandbox signature table in src/engine/browser.ts
   - A user reports that Chromium will not start in a sandbox, the first download fails, or a container cannot run it
   - Considering turning on the GPU or supporting Windows
+  - Changing capture, parallel pages, page reopening or encoder settings, to compare speed and memory with before
 ---
 
 # Platform
@@ -128,6 +129,115 @@ The GPU runs of stress differ from each other only slightly: at most 2 gray leve
 Speed: six stress renders took 11.6 to 23.3 seconds each with software raster and 9.7 to 19.1 seconds with the GPU. hello took 7.9 and 9.3 seconds with software raster and 8.9 seconds with the GPU. These totals include encoding and acceptance, and show no clear advantage for the GPU.
 
 Conclusion: 2D compositions stay on software raster. Under Metal, canvas content with shadows, blur and blending does not render frame-identical twice on the same machine, so it cannot pass the A-level raw frame hash gate. Turning on the GPU for 2D later would mean switching the determinism check from hashes to PSNR (for example at least 90 dB). 3D compositions are accepted by PSNR by design and are not affected. Whether single-process mode inside a sandbox can use Metal is untested. Codex's denial log contains `iokit-open-user-client AGXDeviceUserClient`, so most likely it cannot.
+
+## Render performance
+
+Measured on 2026-09-25 on the local machine: Apple M4 (4 performance cores and 6 efficiency cores), 16 GB of memory, macOS 15.3, Node 24.13.0, ffmpeg 8.1.1, Chromium headless shell 153.0.8010.12, normal launch mode. Other agents were running tests and renders on the same machine at the time, so the load kept jumping between 3 and 25 (on a 10-core machine a load of 10 is roughly full), with 15 GB of memory in use and 5 GB compressed. Each row gives the 1-minute load when it started, and a case measured twice lists both runs. Compare numbers only within one table. An idle machine is quite a bit faster.
+
+### Capture format
+
+Capture only, no encoding, eggs-five/five (textured beige paper, 1920×1080), one page seeking in order, averaged over 48 frames, load 6.7 to 7.2. This table was measured before `--disable-frame-rate-limit`, which does not affect the comparison between formats.
+
+| Method | Frames/s | KB per frame | PSNR against PNG |
+|---|---|---|---|
+| PNG, `optimizeForSpeed` (what it already used) | 12.0 | 2967 | Lossless |
+| PNG, default compression | 2.7 | 2404 | Lossless |
+| WebP quality 100 (lossless in practice) | 1.3 | 1865 | Lossless |
+| JPEG quality 90 | 29.8 | 313 | Lowest 41.9 dB, mean 43.3 dB |
+| JPEG quality 95 | 25.7 | 484 | Lowest 44.0 dB, mean 45.0 dB |
+| JPEG quality 98 | 24.0 | 742 | Lowest 46.2 dB, mean 47.1 dB |
+| JPEG quality 100 | 23.3 | 1084 | Lowest 47.6 dB, mean 48.4 dB |
+| `Page.startScreencast`, PNG | 14.0 | | |
+| `Page.startScreencast`, JPEG quality 100 | 29.2 | | |
+| One browser with 2 or 4 pages capturing PNG in parallel | 13.3, 15.6 | | |
+| 2 or 4 browsers with one page each capturing PNG in parallel | 23.1, 39.8 | | |
+
+- PNG encoding is why textured paper is slow: JPEG of the same picture is twice as fast. Each PNG frame is about 3 MB against 6 MB of raw 1920×1080 RGB, because the texture barely compresses.
+- A lower PNG compression level is not available: CDP's `Page.captureScreenshot` takes only `format`, `quality`, `clip`, `fromSurface`, `captureBeyondViewport` and `optimizeForSpeed`, and `optimizeForSpeed` is already the fastest setting (default compression is 4.5 times slower).
+- WebP quality 100 decodes to the same pixels as PNG, but encodes 9 times slower.
+- JPEG quality 100 reaches only 49.4 dB even when compared after conversion to the video's yuv420p, short of 50 dB. The video itself (x264 crf 18) averages 50.7 dB against the captured frames, 47.7 dB at the lowest, and JPEG would add another layer of loss on top.
+- Screencasting (startScreencast) with PNG is no faster than screenshots, and it sends no frame when the picture does not change, which would need a timeout as a fallback.
+- More pages in one browser barely help, because the browser queues screenshots. Only more browsers scale with the page count.
+
+Conclusion: the capture format stays PNG with `optimizeForSpeed`. The speed comes from two things: the launch flag `--disable-frame-rate-limit`, and more browsers in parallel.
+
+### The 60 Hz frame limit
+
+By default Chromium produces frames at 60 Hz and a screenshot waits for the next tick, which holds simple pictures at about 30 frames per second on one page. With `--disable-frame-rate-limit` (capture only, no encoding, 96 frames, load 2.6 to 2.7):
+
+| Composition | Before | With the flag | Frame hashes |
+|---|---|---|---|
+| hello | 29.7 | 56.9 | Unchanged |
+| eggs-five/five | 11.8 | 13.6 | Unchanged |
+
+The same flag also fixed two renders disagreeing when DOM text scales frame by frame, see "DOM text scaled frame by frame" below.
+
+### Page count
+
+Capture only, no encoding, eggs-five/five, 192 frames, one browser per page, with `--disable-frame-rate-limit`, load 2.5 to 3.7:
+
+| Pages | 1 | 2 | 3 | 4 | 6 | 8 | 9 |
+|---|---|---|---|---|---|---|---|
+| Frames/s | 13.6 | 26.2 | 35.5 | 43.2 | 50.8 | 49.4 | 54.9 |
+
+For every page count the frame hashes match the single-page run.
+
+### Whole renders
+
+`flipbook render` from start to finish, encoding and acceptance included. "v0.3" is the engine before these changes (one page, 60 Hz limit). "One page", "auto" and "4 pages" are the current engine, where "auto" works out the page count from the CPU core count minus one, memory and the video's length. The 30-second video is long-scroll cut to 30 seconds (15 bars). "Plain paper" uses `paperLayer({ grain: 0 })`, "textured paper" the default paper with `grainLayer()` on top. Each cell gives capture frames per second and total time for both runs, with the load at the start in brackets.
+
+| Video | v0.3, one page | One page | Auto | 4 pages |
+|---|---|---|---|---|
+| hello, 5 s, 120 frames | 22.8, 22.7 frames/s, 7.5, 7.8 s (7, 7) | 32.1, 32.1 frames/s, 5.2, 5.4 s (4, 3) | 2 pages, 37.7, 39.2 frames/s, 4.9, 4.9 s (4, 6) | Not measured |
+| eggs-five/five, 8 s, 192 frames | 6.5, 5.2 frames/s, 34.3, 42.4 s (7, 7) | 9.7, 10.0 frames/s, 22.3, 21.9 s (5, 5) | 4 pages, 16.7, 15.6 frames/s, 14.1, 15.0 s (4, 5) | Not measured |
+| 30 s plain paper, 720 frames | 17.1, 16.8 frames/s, 52.3, 53.0 s (9, 7) | 25.1, 24.7 frames/s, 35.0, 35.7 s (7, 6) | 9 pages, 30.3, 29.2 frames/s, 30.9, 33.6 s (7, 11) | 29.3, 31.2 frames/s, 31.8, 30.1 s (17, 17) |
+| 30 s textured paper, 720 frames | 6.5, 8.1 frames/s, 122.7, 100.3 s (9, 5) | 8.6, 8.9 frames/s, 94.5, 91.3 s (22, 8) | 9 pages, 14.0, 16.2 frames/s, 67.0, 57.0 s (5, 16) | 15.6, 15.5 frames/s, 58.1, 58.8 s (18, 19) |
+
+The second v0.3 run of eggs-five/five overlapped a round of unit tests and is slow. In every cell the frame hashes match the single-page render of the same video.
+
+- The target of 30 seconds of 1080p24 within 60 seconds: plain paper meets it at 30 to 36 seconds. Textured paper takes 57 to 67 seconds under a load of 5 to 19, right at the line.
+- Encoding takes a big share: for the same 30-second plain-paper video, replacing ffmpeg with a pipe that only reads gives 36, 54 and 50 frames per second on 1, 4 and 9 pages, against 23, 34 and 31 with real encoding (load 8 to 15). x264 medium spends 55 seconds of CPU time on this video (76 milliseconds per frame), `faster` 48 seconds and `veryfast` 35 seconds, but PSNR drops from 50.4 dB to 49.3 dB and 47.6 dB, and the `veryfast` file is 70% larger. The encoder settings stayed as they were.
+- When other processes fill the machine, the automatic 9 pages are about as fast as 4, and more pages only fight over the CPU.
+
+### Frame sizes
+
+hello and eggs-five, check first, then render with the automatic page count (2 pages for hello's 120 frames, 4 for eggs-five's 192). Each cell gives capture frames per second and total time, with the load at the start in brackets. All passed acceptance.
+
+| Video | 16:9, 1920×1080 | 9:16, 1080×1920 | 1:1, 1080×1080 | 4:5, 1080×1350 | `--scale 2`, 3840×2160 |
+|---|---|---|---|---|---|
+| hello | 39.9, 4.6 s (11) | 40.0, 4.8 s (11) | 54.0, 3.5 s (10) | 48.9, 3.9 s (10) | 12.5, 13.0 s (9). 7.0, 29.7 s (13) |
+| eggs-five/five | 14.2, 16.2 s (8) | 15.1, 15.5 s (13) | 25.6, 9.6 s (12) | 20.9, 11.5 s (11) | 4.7, 47.4 s (10). 2.8, 77.9 s (16). 2.1, 99.2 s (17) |
+| eggs-five/shu | 16.1, 14.5 s (15) | 16.6, 14.2 s (13) | 25.2, 10.0 s (12) | 21.2, 13.2 s (13) | 1.6, 140.3 s (13). 3.1, 70.6 s (13). 3.6, 64.9 s (24) |
+
+- Portrait has as many pixels as landscape and runs about as fast. 1:1 and 4:5 have fewer pixels and run faster.
+- 4K has 4 times the pixels of 1080p. A textured-paper PNG frame is about 10 MB, and eggs-five runs at 2 to 5 frames per second. 4K was measured two or three times, and the same video varied by a factor of two. Under high load the machine was also short of memory, so the speed mostly depends on what else is running. At 4K the per-page memory estimate grows, and on a 16 GB machine the memory limit works out to 7 pages, while these two videos get only 4 pages because of their length.
+- At 4K the egg outlines and stippling are drawn at twice the pixels, not scaled up from 1080p: `setupCanvas` sizes the backing store by `devicePixelRatio`, and the screenshot takes device pixels, pixel for pixel the same as Playwright's `screenshot({ scale: 'device' })`.
+- A trap: after Chromium captures a screenshot with `clip`, it restores the device metrics to whatever the CDP session that asked for the screenshot had set. flipbook captures through its own session, which had set none, so after one clipped screenshot (`snapshot --zoom`) the page's `devicePixelRatio` fell back to 1 and `screen` became 800×600. Now the page also sets the same device metrics on its own session when it opens, full frames are captured without `clip`, and `test/size.test.ts` checks the metrics and the pixels of the next frame after a zoom.
+
+### Memory for a three-minute video
+
+examples/long-scroll (3 minutes, 4320 frames, 1920×1080). During the render, the physical footprint of every process in the render's process tree was read once per second (macOS `phys_footprint`, which counts compressed memory too). The first round measured RSS, but the leaking video fills its array with the same number, macOS compresses it away and RSS barely grows, so the measure was switched. The "leaking video" is long-scroll pushing 50,000 different floats into a global array on every seek (about 400 KB of heap per frame, with the picture unchanged), to see whether reopening pages works.
+
+The Chromium column shows 6 readings taken evenly through the capture (MB, all Chromium processes together), and "peak total" includes Node and ffmpeg. ffmpeg stayed at 780 to 865 MB throughout.
+
+| Method | Chromium readings | Chromium range | Peak total | Reopens | Frames/s, total time (load) |
+|---|---|---|---|---|---|
+| One page, default reopening | 356 → 358 → 350 → 347 → 359 → 361 | 321 to 363 | 1321 | 1 (at 2400 frames) | 28.5, 177 s (17) |
+| One page, `--recycle 0` | 357 → 358 → 351 → 355 → 356 → 333 | 323 to 365 | 1345 | 0 | 28.4, 178 s (6) |
+| Auto, 9 pages | 2884 → 3164 → 3161 → 3076 → 3054 → 3096 | 2884 to 3189 | 4218 | 0 | 38.4, 140 s (9) |
+| Leaking video, one page, `--recycle 0` | 422 → 781 → 1081 → 1366 → 1745 → 2101 | 422 to 2101 | 3112 | 0 | 25.8, 194 s (7) |
+| Leaking video, one page, default reopening | 313 → 732 → 454 → 767 → 566 → 367 | 103 to 977 | 1976 | 3 (heap past the line) | 14.4, 339 s (30) |
+| Leaking video, auto 9 pages, a 256 MB line per page (since changed) | 2854 → 3657 → 3819 → 4155 → 4659 → 4978 | 2854 to 5000 | 6151 | 0 | 18.8, 295 s (6) |
+| Leaking video, auto 9 pages, now | 2862 → 3761 → 4026 → 3275 → 3708 → 4044 | 1484 to 4051 | 5115 | 17 (heap past the line) | 24.4, 245 s (19) |
+
+- long-scroll itself does not leak: one page stays at 320 to 365 MB from start to finish, 9 pages at 2.9 to 3.2 GB, both flat. The default rule reopens once at 2400 frames, with the same memory as not reopening.
+- A leaking video without reopening climbs all the way to 2.1 GB. Under the default rule one page reopens 3 times and the sawtooth stays under 1 GB.
+- With 9 pages in parallel each page draws only about 480 frames. The old 256 MB line per page was never reached, and the 9 pages together grew by 2.1 GB. Now the line is 512 MB for all pages together, 64 MB per page when split, and the pages reopen 17 times, with readings moving between 3.3 and 4.1 GB.
+- With 9 pages in parallel Chromium takes about 3 GB, 4.2 GB in total with ffmpeg and Node. The per-page memory estimate (300 MB plus 24 output frames) is 0.5 GB at 1080p, so going by half of 16 GB the machine could open 16 pages. In practice the CPU core count minus one holds it at 9.
+
+### Parallel pages in a sandbox
+
+In the Claude Code sandbox Chromium runs in single-process mode, with one browser per page. hello, check first, then `render --jobs 3`: 3 pages, frame hashes the same as in normal mode, and the video passes acceptance (load above 20, 9.5 frames per second).
 
 ## DOM text scaled frame by frame
 
