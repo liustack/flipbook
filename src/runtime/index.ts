@@ -65,8 +65,8 @@ export {
     tornPaper,
     tornPath,
 } from './materials.ts';
-export type { Boil, BoilOptions, MotionBlurOptions } from './motion.ts';
-export { boil, motionBlur } from './motion.ts';
+export type { Boil, BoilOptions, FallOptions, FallPose, MotionBlurOptions } from './motion.ts';
+export { boil, fall, motionBlur } from './motion.ts';
 export type { GrainOptions, GridOptions, PaperOptions } from './paper.ts';
 export { drawGrain, drawPaper, grainLayer, PAPER, paperLayer } from './paper.ts';
 export type {

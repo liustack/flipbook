@@ -133,6 +133,7 @@ Take every position, opacity and cut from `t` and the resolved timeline:
 | `ease.*`, `progress`, `lerp`, `remap`, `clamp`, `smoothstep` | easing and interpolation |
 | `onTwos(t, fps)`, `onFrames(t, fps, n)` | a time that only changes every 2 (or n) frames, for a hand-drawn cadence |
 | `boil(t, fps, { every, amount, turn, seed })` | `{ x, y, rotate }`: a small seeded shift and turn that holds for `every` frames (default 2) and jumps on the next drawing. Translate and rotate a held cutout by it, as paper moves under a camera between exposures |
+| `fall(t, { at, x, y, seed, speed, sway, wind, spin, floor })` | `{ x, y, rotate, flip, falling }` for a petal, leaf or scrap of paper that lets go at `at`: it speeds up, drifts down swinging side to side, turns, and tumbles (scale its width by `flip`, near 0 it is edge-on). With `floor` it lands and lies flat. `wind` blows it sideways, a strong wind and a low `speed` carry it across the frame |
 | `motionBlur(ctx, t, (c, time) => ..., { fps, shutter, samples })` | draws the callback at `samples` moments (default 8) across the shutter (default half a frame) and averages them onto ctx. Wrap only what moves fast: each sample costs a full draw |
 
 <!-- check: pass -->

@@ -2,7 +2,7 @@
 // (samples across the shutter, averaged). Both must stay pure functions of t.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CompositionPage } from '../src/engine/page.ts';
-import { boil } from '../src/runtime/motion.ts';
+import { boil, fall } from '../src/runtime/motion.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps } from './helpers.ts';
 import { installHelpers, runtimePage } from './runtimePage.ts';
@@ -26,6 +26,45 @@ describe('boil', () => {
             expect(Math.abs(b.rotate)).toBeLessThanOrEqual((0.5 * Math.PI) / 180 + 1e-12);
         }
         expect(boil(1, fps, { seed: 1 })).not.toEqual(boil(1, fps, { seed: 2 }));
+    });
+});
+
+describe('fall', () => {
+    const base = { at: 1, x: 500, y: 100, seed: 'petal' };
+
+    it('rests where it is until it lets go, then drops, sways and tumbles', () => {
+        expect(fall(0.5, base)).toMatchObject({ x: 500, y: 100, flip: 1, falling: false });
+        let lastY = 100;
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let edgeOn = false;
+        for (let t = 1; t < 5; t += 1 / 24) {
+            const p = fall(t, base);
+            expect(p.y).toBeGreaterThanOrEqual(lastY);
+            lastY = p.y;
+            minX = Math.min(minX, p.x);
+            maxX = Math.max(maxX, p.x);
+            expect(Math.abs(p.flip)).toBeLessThanOrEqual(1);
+            if (Math.abs(p.flip) < 0.2) edgeOn = true;
+        }
+        // It sways sideways and turns edge-on at some point.
+        expect(maxX - minX).toBeGreaterThan(40);
+        expect(edgeOn).toBe(true);
+        expect(lastY).toBeGreaterThan(400);
+    });
+
+    it('comes to rest lying flat on the floor', () => {
+        const opts = { ...base, floor: 300 };
+        const late = fall(20, opts);
+        expect(late.y).toBe(300);
+        expect(late.falling).toBe(false);
+        expect(Math.abs(late.flip)).toBe(1);
+        expect(fall(21, opts)).toEqual(late);
+    });
+
+    it('falls the same way for the same seed and another way for another', () => {
+        expect(fall(2.5, base)).toEqual(fall(2.5, base));
+        expect(fall(2.5, base)).not.toEqual(fall(2.5, { ...base, seed: 'leaf' }));
     });
 });
 
