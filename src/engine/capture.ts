@@ -17,9 +17,9 @@ export interface RecyclePolicy {
     everyFrames: number;
     /** Also reopen a page whose JS heap or DOM keeps growing. */
     watchMemory: boolean;
-    /** JS heap growth that reopens the page. Default HEAP_GROWTH_LIMIT. */
+    /** JS heap growth that reopens a page. Default: pageLimit(HEAP_GROWTH_BUDGET). */
     heapGrowthBytes?: number;
-    /** DOM node growth that reopens the page. Default NODE_GROWTH_LIMIT. */
+    /** DOM node growth that reopens a page. Default: pageLimit(NODE_GROWTH_BUDGET). */
     nodeGrowth?: number;
 }
 
@@ -30,10 +30,20 @@ export const NO_RECYCLE: RecyclePolicy = {
 
 /** Frames between two memory readings of a page; the first reading is the baseline. */
 export const MEMORY_CHECK_FRAMES = 48;
-/** JS heap growth over the baseline, after a garbage collection, that reopens the page. */
-export const HEAP_GROWTH_LIMIT = 256 * 1024 * 1024;
-/** DOM node growth over the baseline, after a garbage collection, that reopens the page. */
-export const NODE_GROWTH_LIMIT = 20_000;
+/**
+ * JS heap growth over the baselines, after a garbage collection, that all
+ * pages together may reach: each page gets its share, and reopens past it.
+ */
+export const HEAP_GROWTH_BUDGET = 512 * 1024 * 1024;
+export const MIN_PAGE_HEAP_GROWTH = 64 * 1024 * 1024;
+/** DOM node growth all pages together may reach, shared the same way. */
+export const NODE_GROWTH_BUDGET = 40_000;
+export const MIN_PAGE_NODE_GROWTH = 5_000;
+
+/** One page's share of a growth budget when `jobs` pages render at once. */
+export function pageLimit(budget: number, floor: number, jobs: number): number {
+    return Math.max(floor, Math.floor(budget / Math.max(1, jobs)));
+}
 /** Frames a page renders at 1920x1080 before it is reopened; larger frames reopen sooner. */
 export const PAGE_FRAMES_1080P = 2400;
 export const MIN_PAGE_FRAMES = 600;
@@ -251,8 +261,10 @@ export async function captureFrames(options: CaptureOptions): Promise<CaptureOut
             return null;
         }
         const base = state.base;
-        const heapLimit = recycle.heapGrowthBytes ?? HEAP_GROWTH_LIMIT;
-        const nodeLimit = recycle.nodeGrowth ?? NODE_GROWTH_LIMIT;
+        const heapLimit =
+            recycle.heapGrowthBytes ?? pageLimit(HEAP_GROWTH_BUDGET, MIN_PAGE_HEAP_GROWTH, jobs);
+        const nodeLimit =
+            recycle.nodeGrowth ?? pageLimit(NODE_GROWTH_BUDGET, MIN_PAGE_NODE_GROWTH, jobs);
         const grown = (m: { heapBytes: number; nodes: number }) =>
             m.heapBytes - base.heapBytes >= heapLimit
                 ? 'heap'

@@ -8,8 +8,11 @@ import { runRender } from '../src/cli/render.ts';
 import { saveReport } from '../src/cli/report.ts';
 import {
     autoRecycle,
+    HEAP_GROWTH_BUDGET,
     MIN_PAGE_FRAMES,
+    MIN_PAGE_HEAP_GROWTH,
     PAGE_FRAMES_1080P,
+    pageLimit,
     planJobs,
 } from '../src/engine/capture.ts';
 import { closeSession, session } from './browser.ts';
@@ -60,6 +63,14 @@ describe('autoRecycle', () => {
         });
         expect(autoRecycle(3840 * 2160).everyFrames).toBe(MIN_PAGE_FRAMES);
         expect(autoRecycle(640 * 360).everyFrames).toBe(PAGE_FRAMES_1080P);
+    });
+});
+
+describe('pageLimit', () => {
+    it('splits a growth budget between the pages, down to a floor', () => {
+        expect(pageLimit(HEAP_GROWTH_BUDGET, MIN_PAGE_HEAP_GROWTH, 1)).toBe(HEAP_GROWTH_BUDGET);
+        expect(pageLimit(HEAP_GROWTH_BUDGET, MIN_PAGE_HEAP_GROWTH, 4)).toBe(HEAP_GROWTH_BUDGET / 4);
+        expect(pageLimit(HEAP_GROWTH_BUDGET, MIN_PAGE_HEAP_GROWTH, 16)).toBe(MIN_PAGE_HEAP_GROWTH);
     });
 });
 
