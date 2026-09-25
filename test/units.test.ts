@@ -1,6 +1,7 @@
 import { execSync, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { pathToFileURL } from 'url';
 import { describe, expect, it } from 'vitest';
 import { ENV_CODES, FINDING_CODES } from '../src/cli/codes.ts';
 import { LIMITS, recordCheck, recordRender } from '../src/engine/attempts.ts';
@@ -129,7 +130,7 @@ describe('render lock', () => {
         const go = path.join(dir, 'go');
         const script = [
             `import { existsSync } from 'node:fs';`,
-            `import { acquireLock } from ${JSON.stringify(path.join(repoRoot, 'src/engine/workspace.ts'))};`,
+            `import { acquireLock } from ${JSON.stringify(pathToFileURL(path.join(repoRoot, 'src/engine/workspace.ts')).href)};`,
             `while (!existsSync(${JSON.stringify(go)})) await new Promise((r) => setTimeout(r, 2));`,
             `const release = acquireLock(${JSON.stringify(dir)});`,
             `process.stdout.write(release ? 'got' : 'busy');`,
@@ -183,14 +184,18 @@ describe('finding programs on PATH', () => {
         expect(findOnPath('ffprobe', env, 'win32')).toBeNull();
     });
 
-    it('keeps the exact name and the PATH key on other platforms', () => {
-        const dir = binDir('ffmpeg');
-        expect(findOnPath('ffmpeg', { PATH: `/nowhere:${dir}` }, 'linux')).toBe(
-            path.join(dir, 'ffmpeg'),
-        );
-        expect(findOnPath('ffmpeg', { Path: dir }, 'linux')).toBeNull();
-        expect(findOnPath('ffmpeg', { PATH: binDir('ffmpeg.exe') }, 'darwin')).toBeNull();
-    });
+    // A Windows path has a drive colon, which the POSIX PATH split would cut.
+    it.skipIf(process.platform === 'win32')(
+        'keeps the exact name and the PATH key on other platforms',
+        () => {
+            const dir = binDir('ffmpeg');
+            expect(findOnPath('ffmpeg', { PATH: `/nowhere:${dir}` }, 'linux')).toBe(
+                path.join(dir, 'ffmpeg'),
+            );
+            expect(findOnPath('ffmpeg', { Path: dir }, 'linux')).toBeNull();
+            expect(findOnPath('ffmpeg', { PATH: binDir('ffmpeg.exe') }, 'darwin')).toBeNull();
+        },
+    );
 });
 
 describe('pixel math', () => {
