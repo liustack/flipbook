@@ -85,6 +85,8 @@ read_when:
 | `index-missing` | 全部 | 目录里没有 index.html | 建 index.html |
 | `timeline-missing` | 全部 | 目录里没有 timeline.json | 按 docs/timeline-schema.zh-CN.md 写 |
 | `timeline-invalid` | 全部 | timeline.json 不合 v1 schema，`detail.path` 给出 JSON 路径 | 改 `detail.path` 指的字段 |
+| `brand-invalid` | 全部 | timeline.json 的 `brand` 指的 brand.json 不存在、不是合法 JSON 或不合 brand schema，或者它写的 logo 和字体文件不在 brand.json 所在目录里、不是本地文件、没写许可证、不是能用的 .ttf 或 .otf。`detail.file` 是 brand.json 的路径，`detail.path` 是出错字段的 JSON 路径 | 按 message 改 `detail.path` 指的字段，见 references/brand.md |
+| `font-invalid` | 全部 | assets/fonts/ 里的字体文件没在 assets/SOURCES.json 写许可证、读不出（不是 .ttf 或 .otf、是字体集或 WOFF、没有 Unicode 字符表）、没有字体族名、字体族名和 flipbook 字体或 CSS 通用名撞了，或者两个文件是同一字体族同一字重同一字形。`detail.file` 是出错的文件 | 按 message 补许可证、换文件或改名 |
 | `protocol-missing` | 全部 | 页面没定义 `window.__flipbook`，或读它时抛错 | 调运行时库的 `composition({ seek })` |
 | `protocol-mismatch` | 全部 | `window.__flipbook.protocol` 不是 1 | 设成 1 |
 | `ready-timeout` | 全部 | `ready` 60 秒内没结束（从开始加载页面算）。读 `window.__flipbook` 时页面不再应答（脚本或 getter 里死循环）也算在这 60 秒里，超时报这个码并关掉页面 | ready 里不等定时器和 rAF |
@@ -105,8 +107,8 @@ read_when:
 | `late-paint` | check | 同一个 t 不重新 seek 连截两张不一样，有迟到的绘制 | seek 里画完，图片解码放 ready |
 | `blank-frame` | check、render | 画面是一整块纯色：缩到 320×180 灰度后，偏离中位灰度超过 16 灰阶的像素不到 0.05%。check 里全部抽样帧都空才是 error，部分空报 warning。render 里连续 1.5 秒以上才是 error | 查 seek 在这些时刻有没有画 |
 | `paper-only` | check、render | 画面和只开纸底层的基线一样：缩到 320×180 灰度后，和最近一张基线相差超过 16 灰阶的像素不到 0.05%。check 和 render 的判定规则同 `blank-frame`。render 每秒截一张基线。render 里空白帧和只剩纸底的帧合起来按「没有内容」连续计时，两类交替出现也不会被切断，类型码取两类里帧数多的那个，`detail` 里有 `blankFrames` 和 `paperFrames` | 查内容层是否因报错没画 |
-| `missing-glyph` | check、render | 文字里有 flipbook 字体都没有的字，`detail.chars` 列出 | 换掉这些字 |
-| `font-fallback` | check、render | 文字用了系统字体而不是 flipbook 字体。DOM 字看 Chromium 实际用的字体。Canvas 字按 `ctx.font` 的字体链逐字核：某个字在找到含它的 flipbook 字体之前先碰到别的字体名（系统字体或 `serif` 这类通用名），或者整条链都不含它，就报，`detail.chars` 列出这些字 | font-family 用 "Noto Serif SC" 或 "LXGW WenKai" |
+| `missing-glyph` | check、render | 文字里有 flipbook 字体和这条片子自带的字体都没有的字，`detail.chars` 列出 | 换掉这些字 |
+| `font-fallback` | check、render | 文字用了系统字体而不是 flipbook 字体或自带字体。自带字体指 brand.json 的 `fonts.files` 和 assets/fonts/ 里写了许可证的字体，按它们各自的码位表核。DOM 字看 Chromium 实际用的字体。Canvas 字按 `ctx.font` 的字体链逐字核：某个字在找到含它的 flipbook 字体或自带字体之前先碰到别的字体名（系统字体或 `serif` 这类通用名），或者整条链都不含它，就报，`detail.chars` 列出这些字 | font-family 用 "Noto Serif SC"、"LXGW WenKai" 或自带字体，自带字体缺字时在它后面接 "Noto Serif SC" |
 | `text-offstage` | check | 文字完全出来的时刻（cue 的 settle 时刻），有一行越过画面边缘。每一行用 `Range.getClientRects` 取框，已含 transform。整段落在画面外的字也报，只有 `display: none`、`visibility: hidden` 或 `opacity: 0` 的字不算。运行时 `fillText` 登记的 canvas 字，框是字形四个角经画布当前变换（含旋转、倾斜、翻转）和 `maxWidth` 压缩后的包围框，再按画布的布局尺寸换成页面像素。画布元素自己的 CSS 旋转不计入 | 把字挪进画面或缩小，故意出画的字加 `data-flipbook-allow-overflow` |
 | `text-safe-area` | check | 同一时刻，有一行落进画面外沿 5% 的边距里，只报 warning | 离四边至少留宽高的 5%，或加 `data-flipbook-allow-overflow` |
 | `low-contrast` | check | 同一时刻，文字和背后画面的对比度低于 3:1（大字标准），只报 warning。量法：同一帧截两张，第二张把 DOM 文字设成透明，变了的像素就是字形，字色取变化最大的三成像素在第一张里的均值，背景取同一批像素在第二张里的均值，按 WCAG 相对亮度算比值，`detail.measured` 为 true。字和背后分不开时（藏起来前后变化超过 6 个色阶的像素不到 12 个，多半是同色字）也报这个 warning，`detail.measured` 为 false。Canvas 里画的字不量，列在 `check.contrastSkipped` 里（`frame`、`element`、`reason`） | 加深或调亮文字或背景，或在字下垫一块实色底 |

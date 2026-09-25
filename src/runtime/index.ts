@@ -1,5 +1,7 @@
 // flipbook browser runtime, served at /__flipbook/runtime.js.
 
+export type { Brand, BrandRole } from './brand.ts';
+export { brand } from './brand.ts';
 export type { Rgb } from './color.ts';
 export { hex, mix, rgb, rgba, shade } from './color.ts';
 export type { CompositionOptions, FlipbookProtocol } from './core/composition.ts';

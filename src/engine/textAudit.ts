@@ -1,5 +1,5 @@
 import { type Finding, finding } from '../cli/report.ts';
-import { covered, fontIdForFamily, ignorable, uncoveredChars } from './fonts.ts';
+import { type FaceRef, FontSet, ignorable } from './fonts.ts';
 import type { RegisteredText } from './host.ts';
 import type { CompositionPage, DomText } from './page.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
@@ -7,14 +7,15 @@ import type { ResolvedTimeline } from './timelineResolve.ts';
 /** Glyph coverage of the text cues in timeline.json; needs no browser. */
 export function auditCueText(timeline: ResolvedTimeline): Finding[] {
     const out: Finding[] = [];
+    const fonts = new FontSet(timeline.fonts);
     for (const cue of timeline.cues) {
         if (!cue.text) continue;
-        const missing = uncoveredChars(cue.text);
+        const missing = fonts.uncovered(cue.text);
         if (missing.length > 0) {
             out.push(
                 finding(
                     'missing-glyph',
-                    `Cue "${cue.id}" uses characters no flipbook font has: ${missing.join(' ')}`,
+                    `Cue "${cue.id}" uses characters no flipbook font or supplied font has: ${missing.join(' ')}`,
                     {
                         time: cue.time,
                         frame: cue.frame,
@@ -62,14 +63,21 @@ export function fontFamilies(fontShorthand: string): string[] {
 
 /**
  * Canvas text against the fonts it is drawn with. For each character the
- * families are tried in order, as Chromium does: the first flipbook font that
- * has the glyph draws it. A character reaching a family that is not a flipbook
- * font (or the end of the list) is drawn with a system font: font-fallback,
- * or missing-glyph when no flipbook font has it at all.
+ * families are tried in order, as Chromium does: the first font of the set
+ * (flipbook's own and the composition's supplied fonts) that has the glyph
+ * draws it. A character reaching a family outside the set (or the end of the
+ * list) is drawn with a system font: font-fallback, or missing-glyph when no
+ * font of the set has it at all.
  */
-export function auditCanvasText(entries: RegisteredText[], frame: number, fps: number): Finding[] {
+export function auditCanvasText(
+    entries: RegisteredText[],
+    frame: number,
+    fps: number,
+    supplied: readonly FaceRef[] = [],
+): Finding[] {
     const out: Finding[] = [];
     const time = frame / fps;
+    const fonts = new FontSet(supplied);
     for (const entry of entries) {
         const label = entry.id
             ? `canvas text "${entry.id}"`
@@ -82,22 +90,22 @@ export function auditCanvasText(entries: RegisteredText[], frame: number, fps: n
             if (ignorable(cp)) continue;
             let drawn = false;
             for (const family of families) {
-                const id = fontIdForFamily(family);
-                if (!id) break;
-                if (covered(cp, id)) {
+                const has = fonts.familyCovers(family, cp);
+                if (has === null) break;
+                if (has) {
                     drawn = true;
                     break;
                 }
             }
             if (drawn) continue;
-            if (covered(cp)) fallback.add(ch);
+            if (fonts.covers(cp)) fallback.add(ch);
             else missing.add(ch);
         }
         if (missing.size > 0) {
             out.push(
                 finding(
                     'missing-glyph',
-                    `${label} uses characters no flipbook font has: ${[...missing].join(' ')}`,
+                    `${label} uses characters no flipbook font or supplied font has: ${[...missing].join(' ')}`,
                     {
                         time,
                         frame,
@@ -137,15 +145,16 @@ export async function auditFrameText(
 ): Promise<Finding[]> {
     const out: Finding[] = [];
     const time = frame / page.timeline.fps;
+    const available = new FontSet(page.timeline.fonts);
     const dom = domTexts ?? (await page.domTexts());
     const used = dom.length > 0 ? await page.platformFonts() : new Map();
     for (const entry of dom) {
-        const missing = uncoveredChars(entry.text);
+        const missing = available.uncovered(entry.text);
         if (missing.length > 0) {
             out.push(
                 finding(
                     'missing-glyph',
-                    `${entry.selector} shows characters no flipbook font has: ${missing.join(' ')}`,
+                    `${entry.selector} shows characters no flipbook font or supplied font has: ${missing.join(' ')}`,
                     {
                         time,
                         frame,
@@ -176,7 +185,14 @@ export async function auditFrameText(
             );
         }
     }
-    out.push(...auditCanvasText(await page.registeredTexts(), frame, page.timeline.fps));
+    out.push(
+        ...auditCanvasText(
+            await page.registeredTexts(),
+            frame,
+            page.timeline.fps,
+            page.timeline.fonts,
+        ),
+    );
     return out;
 }
 

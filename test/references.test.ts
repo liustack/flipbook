@@ -7,7 +7,8 @@
 //   <!-- check: timeline -->          a timeline.json that must validate
 // A ```js block is wrapped into a 640x360 page with <canvas id="stage">; a
 // ```html block is the whole page. Both run against the block marked
-// <!-- snippet-timeline --> in the same file.
+// <!-- snippet-timeline --> in the same file, next to every block marked
+// <!-- snippet-file: <path> --> (written to that path in the composition).
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -32,19 +33,27 @@ interface Snippet {
     code: string;
 }
 
-function snippets(file: string): { timeline: string | null; items: Snippet[] } {
+function snippets(file: string): {
+    timeline: string | null;
+    files: Record<string, string>;
+    items: Snippet[];
+} {
     const text = fs.readFileSync(file, 'utf-8');
     const lines = text.split('\n');
     const items: Snippet[] = [];
+    const files: Record<string, string> = {};
     let timeline: string | null = null;
     for (let i = 0; i < lines.length; i++) {
-        const marker = /^<!-- (check: [^>]+|snippet-timeline) -->$/.exec(lines[i].trim());
+        const marker = /^<!-- (check: [^>]+|snippet-timeline|snippet-file: [^>]+) -->$/.exec(
+            lines[i].trim(),
+        );
         if (!marker) continue;
         const open = /^```(\w+)/.exec(lines[i + 1] ?? '');
         if (!open) throw new Error(`${file}:${i + 1}: marker not followed by a code fence`);
         const end = lines.indexOf('```', i + 2);
         const code = lines.slice(i + 2, end).join('\n');
         if (marker[1] === 'snippet-timeline') timeline = code;
+        else if (marker[1].startsWith('snippet-file: ')) files[marker[1].slice(14).trim()] = code;
         else
             items.push({
                 file,
@@ -55,7 +64,7 @@ function snippets(file: string): { timeline: string | null; items: Snippet[] } {
             });
         i = end;
     }
-    return { timeline, items };
+    return { timeline, files, items };
 }
 
 function page(code: string): string {
@@ -85,7 +94,7 @@ const files = fs
 
 describe.concurrent('reference snippets pass check as marked', () => {
     for (const file of files) {
-        const { timeline, items } = snippets(file);
+        const { timeline, files: extra, items } = snippets(file);
         for (const snippet of items) {
             const label = `${path.basename(file)}:${snippet.line} ${snippet.expect}`;
             it(label, async () => {
@@ -99,6 +108,10 @@ describe.concurrent('reference snippets pass check as marked', () => {
                 ).not.toBeNull();
                 const dir = tempDir('snippet');
                 fs.writeFileSync(path.join(dir, 'timeline.json'), timeline as string);
+                for (const [name, content] of Object.entries(extra)) {
+                    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+                    fs.writeFileSync(path.join(dir, name), content);
+                }
                 fs.writeFileSync(
                     path.join(dir, 'index.html'),
                     snippet.lang === 'html' ? snippet.code : page(snippet.code),

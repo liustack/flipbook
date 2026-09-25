@@ -48,6 +48,7 @@ timeline.json is the only source of time for both picture and sound. Every time 
 | `scenes` | yes | at least one | Scenes, played back to back in order |
 | `cues` | no | | Text, sound effects and markers |
 | `audio` | no | | Music settings. Leaving it out equals `{ "mode": "none" }` |
+| `brand` | no | relative path ending in `.json`, from the composition directory | The brand.json this video uses. Write `"brand.json"` when it sits in the composition directory, `"../brand.json"` when it sits at the workspace root. Fields and validation are in the skill's references/brand.md. A missing or invalid file reports `brand-invalid` |
 | `$schema` | no | string | For editor hints, not validated |
 
 Any other field is an error, so a misspelled field is never silently ignored.
@@ -157,3 +158,5 @@ What the CLI writes after conversion, and the object the page gets from `timelin
 | `scenes[]` | Adds `index`, `startBeat`, `beats`, `start`, `end` (seconds), `startFrame`, `endFrame`, `hold` |
 | `cues[]` | Adds `absBeat`, `time`, `frame`, `settleBeats`, `settleTime`, `settleFrame` |
 | `audio` | Copied as is, `{ "mode": "none" }` when left out |
+| `brand` | null when `brand` is not set. Otherwise the validated brand: `name`, `tagline` (null when not set), `colors` (`primary`, `secondary`, `ink`, `paper`, lowercase, null when not set), `logo` (`src` is an inline `data:` URL and `type` its MIME type, null without a logo), `fonts` (the `title` and `text` family names). The runtime's `brand()` reads from here |
+| `fonts` | The fonts bundled with this video, an empty array when there are none. They come from brand.json's `fonts.files` and the licensed .ttf and .otf files in the composition's `assets/fonts/`. Each entry has `id` (`user-` plus the first 16 hex digits of the file's SHA-256), `family`, `url` (`/__flipbook/fonts/user/<hash>.<ext>`), `weight`, `style` and `source` (the path as written in brand.json or relative to the composition directory). They load together with flipbook's own fonts before the page loads, and check's code point tables and font fallback check accept them |

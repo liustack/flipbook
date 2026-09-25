@@ -47,6 +47,31 @@ export interface TimelineV1 {
     scenes: SceneV1[];
     cues?: CueV1[];
     audio?: AudioV1;
+    /** Path of a brand.json, relative to the composition directory. */
+    brand?: string;
+}
+
+/** A font the user supplied, as the page installs it from /__flipbook/fonts/. */
+export interface UserFontFace {
+    /** Registry id, `user-` plus the start of the file's SHA-256. */
+    id: string;
+    family: string;
+    url: string;
+    weight: string;
+    style: string;
+    /** Where it came from, as written in brand.json or under assets/fonts/. */
+    source: string;
+}
+
+/** brand.json checked and resolved for the page. */
+export interface ResolvedBrand {
+    name: string;
+    tagline: string | null;
+    colors: { primary: string; secondary: string | null; ink: string | null; paper: string | null };
+    /** The logo inlined as a data: URL, so it loads wherever brand.json lives. */
+    logo: { src: string; type: string } | null;
+    /** Family names for titles and running text. */
+    fonts: { title: string; text: string };
 }
 
 export interface ResolvedScene {
@@ -93,6 +118,10 @@ export interface ResolvedTimeline {
     scenes: ResolvedScene[];
     cues: ResolvedCue[];
     audio: AudioV1;
+    /** The brand from timeline.json's `brand`, or null. */
+    brand: ResolvedBrand | null;
+    /** Fonts the user supplied, installed next to flipbook's own. */
+    fonts: UserFontFace[];
 }
 
 /** Frame index for a time, on the frame grid. */
@@ -184,6 +213,9 @@ export function resolveTimeline(timeline: TimelineV1): ResolvedTimeline {
         scenes,
         cues,
         audio: timeline.audio ?? { mode: 'none' },
+        // Filled from the composition's files by loadTimeline.
+        brand: null,
+        fonts: [],
     };
 }
 

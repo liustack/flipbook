@@ -7,6 +7,7 @@ import lxgwLicense from '../fonts/licenses/lxgw-wenkai.OFL.txt';
 import notoLicense from '../fonts/licenses/noto-serif-sc.OFL.txt';
 import manifest from '../fonts/manifest.json' with { type: 'json' };
 import { fontsDir, isWritable } from './cache.ts';
+import { type FontFileInfo, readFontFile } from './fontFile.ts';
 import { findOnPath, run } from './proc.ts';
 
 export interface FontEntry {
@@ -164,10 +165,49 @@ export async function ensureFonts(env: NodeJS.ProcessEnv = process.env): Promise
     }
 }
 
-/** The cached file behind /__flipbook/fonts/<name>, or null. */
+/**
+ * A font file the user supplied (named in brand.json or dropped in
+ * assets/fonts/), registered under its content hash. The registry only grows:
+ * the same bytes always get the same id, so compositions never clash.
+ */
+export interface UserFontFile extends FontFileInfo {
+    /** `user-<first 16 hex of the SHA-256>`. */
+    id: string;
+    /** The file with links resolved. */
+    file: string;
+    /** Path under /__flipbook/fonts/ that serves it. */
+    name: string;
+}
+
+const userFonts = new Map<string, UserFontFile>();
+const userFontsByPath = new Map<string, { size: number; mtimeMs: number; font: UserFontFile }>();
+
+/** Read a user font file and register it for serving and for the glyph checks. Throws FontFileError. */
+export function readUserFont(file: string): UserFontFile {
+    const real = fs.realpathSync(file);
+    const stat = fs.statSync(real);
+    const known = userFontsByPath.get(real);
+    if (known && known.size === stat.size && known.mtimeMs === stat.mtimeMs) return known.font;
+    const bytes = fs.readFileSync(real);
+    const info = readFontFile(bytes);
+    const sha = createHash('sha256').update(bytes).digest('hex').slice(0, 16);
+    const font: UserFontFile = {
+        ...info,
+        id: `user-${sha}`,
+        file: real,
+        name: `user/${sha}${path.extname(real).toLowerCase()}`,
+    };
+    userFonts.set(font.id, font);
+    userFontsByPath.set(real, { size: stat.size, mtimeMs: stat.mtimeMs, font });
+    return font;
+}
+
+/** The file behind /__flipbook/fonts/<name>: a cached flipbook font or a registered user font. */
 export function fontFileFor(name: string, env: NodeJS.ProcessEnv = process.env): string | null {
     const font = FONTS.find((f) => f.file === name);
-    return font ? fontPath(font, env) : null;
+    if (font) return fontPath(font, env);
+    for (const user of userFonts.values()) if (user.name === name) return user.file;
+    return null;
 }
 
 export interface FontFaceSpec {
@@ -219,10 +259,10 @@ function inRanges(ranges: Ranges, cp: number): boolean {
     return false;
 }
 
-/** True when some flipbook font (or the named one) has a glyph for `cp`. */
+/** True when some flipbook font (or the named one, flipbook or user font) has a glyph for `cp`. */
 export function covered(cp: number, fontId?: string): boolean {
     if (fontId) {
-        const ranges = coverage.get(fontId);
+        const ranges = coverage.get(fontId) ?? userFonts.get(fontId)?.ranges;
         return ranges ? inRanges(ranges, cp) : false;
     }
     for (const ranges of coverage.values()) {
@@ -247,21 +287,94 @@ export function ignorable(cp: number): boolean {
     );
 }
 
+function cleanFamily(family: string): string {
+    return family
+        .trim()
+        .replace(/^["']|["']$/g, '')
+        .toLowerCase();
+}
+
+/** A user font face as a composition declares it: which registered file, under which family. */
+export interface FaceRef {
+    id: string;
+    family: string;
+}
+
+/**
+ * The fonts one composition can draw with: flipbook's own plus the user
+ * fonts its timeline carries. The glyph and fallback checks ask it.
+ */
+export class FontSet {
+    private readonly families = new Map<string, string[]>();
+
+    constructor(user: readonly FaceRef[] = []) {
+        for (const font of FONTS) this.families.set(font.family.toLowerCase(), [font.id]);
+        for (const face of user) {
+            if (!userFonts.has(face.id)) {
+                throw new Error(`User font ${face.id} (${face.family}) was never read`);
+            }
+            const key = face.family.toLowerCase();
+            this.families.set(key, [...(this.families.get(key) ?? []), face.id]);
+        }
+    }
+
+    /** Font ids behind a CSS family name, or null when it is not one of this set's families. */
+    ids(family: string): string[] | null {
+        return this.families.get(cleanFamily(family)) ?? null;
+    }
+
+    /** True, false, or null when `family` is not one of this set's families. */
+    familyCovers(family: string, cp: number): boolean | null {
+        const ids = this.ids(family);
+        return ids ? ids.some((id) => covered(cp, id)) : null;
+    }
+
+    /** True when any font of the set has a glyph for `cp`. */
+    covers(cp: number): boolean {
+        for (const ids of this.families.values()) {
+            if (ids.some((id) => covered(cp, id))) return true;
+        }
+        return false;
+    }
+
+    /** Distinct characters in `text` that no font of the set covers. */
+    uncovered(text: string): string[] {
+        const missing = new Set<string>();
+        for (const ch of text) {
+            const cp = ch.codePointAt(0) as number;
+            if (!ignorable(cp) && !this.covers(cp)) missing.add(ch);
+        }
+        return [...missing];
+    }
+}
+
 /** Distinct characters in `text` that no flipbook font covers. */
 export function uncoveredChars(text: string): string[] {
-    const missing = new Set<string>();
-    for (const ch of text) {
-        const cp = ch.codePointAt(0) as number;
-        if (!ignorable(cp) && !covered(cp)) missing.add(ch);
-    }
-    return [...missing];
+    return new FontSet().uncovered(text);
 }
 
 /** Font id for a CSS family name, if it is a flipbook font. */
 export function fontIdForFamily(family: string): string | null {
-    const clean = family
-        .trim()
-        .replace(/^["']|["']$/g, '')
-        .toLowerCase();
+    const clean = cleanFamily(family);
     return FONTS.find((f) => f.family.toLowerCase() === clean)?.id ?? null;
 }
+
+/** CSS generic family keywords: never a name for a user font. */
+export const GENERIC_FAMILIES = [
+    'serif',
+    'sans-serif',
+    'monospace',
+    'cursive',
+    'fantasy',
+    'system-ui',
+    'ui-serif',
+    'ui-sans-serif',
+    'ui-monospace',
+    'ui-rounded',
+    'math',
+    'emoji',
+    'fangsong',
+    'inherit',
+    'initial',
+    'unset',
+];

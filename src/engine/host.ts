@@ -301,7 +301,8 @@ export function installHost(config: HostConfig): void {
         }
     };
 
-    for (const face of config.fonts) {
+    // flipbook's fonts, then the fonts this composition supplied (brand.json, assets/fonts/).
+    for (const face of [...config.fonts, ...config.timeline.fonts]) {
         const font = new FontFace(face.family, `url(${face.url})`, {
             weight: face.weight,
             style: face.style,

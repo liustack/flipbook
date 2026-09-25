@@ -150,15 +150,27 @@ Fix: Check that seek draws content at these times and that no script error stopp
 
 ### `missing-glyph`
 
-Text uses characters that no flipbook font covers.
+Text uses characters that no flipbook font or supplied font covers.
 
 Fix: Replace the characters listed in `detail.chars`, or drop them.
 
 ### `font-fallback`
 
-Text rendered with a system font instead of a flipbook font.
+Text rendered with a system font instead of a flipbook font or a supplied font.
 
-Fix: Set font-family to "Noto Serif SC" or "LXGW WenKai", the fonts flipbook serves.
+Fix: Set font-family to "Noto Serif SC" or "LXGW WenKai", the fonts flipbook serves, or to a font supplied in brand.json or assets/fonts/. List "Noto Serif SC" after a supplied font that lacks some characters.
+
+### `brand-invalid`
+
+The brand.json that timeline.json's `brand` names is missing or breaks the brand schema, or a file it names is not local or has no license.
+
+Fix: Fix the field at `detail.path` in `detail.file` as the message says. See references/brand.md.
+
+### `font-invalid`
+
+A font file in assets/fonts/ has no license, is not a readable .ttf or .otf, or clashes with another font.
+
+Fix: Write the license in assets/SOURCES.json, replace the file with its .ttf or .otf, or rename the family, as the message says. See references/brand.md.
 
 ### `text-offstage`
 

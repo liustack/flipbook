@@ -40,6 +40,7 @@ The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage
 | `scenes` | yes | at least one | scenes play in order, back to back |
 | `cues` | no | | text, sound effect and marker events |
 | `audio` | no | | soundtrack, default `{ "mode": "none" }` |
+| `brand` | no | a relative path ending in `.json` | the brand.json of this film, from the composition directory: `"brand.json"` or `"../brand.json"`. See `brand.md` |
 
 Any other field is an error, so a typo never passes silently.
 

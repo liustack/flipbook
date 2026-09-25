@@ -11,6 +11,7 @@ import {
     SFX_NAMES,
     type SfxName,
 } from './audioScore.ts';
+import { loadAssets } from './brand.ts';
 import {
     type ResolvedScene,
     type ResolvedTimeline,
@@ -120,7 +121,16 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
         'scenes',
         'cues',
         'audio',
+        'brand',
     ]);
+    if (input.brand !== undefined) {
+        c.str(
+            input.brand,
+            '$.brand',
+            /^(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?![\\/]).*\.json$/,
+            'a relative path to a brand.json, such as "brand.json" or "../brand.json"',
+        );
+    }
     if (input.version !== TIMELINE_VERSION) {
         c.fail('$.version', `must be ${TIMELINE_VERSION} (got ${describe(input.version)})`);
     }
@@ -434,7 +444,13 @@ export function loadTimeline(dir: string, write = true): LoadedTimeline {
             };
         }
     }
-    const resolved = resolveTimeline(timeline);
+    const assets = loadAssets(dir, timeline.brand);
+    if (assets.findings.length > 0) return { timeline, findings: assets.findings };
+    const resolved: ResolvedTimeline = {
+        ...resolveTimeline(timeline),
+        brand: assets.brand,
+        fonts: assets.fonts,
+    };
     if (write) {
         const ws = Workspace.open(dir);
         ws.writeFile(

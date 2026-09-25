@@ -48,6 +48,7 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `scenes` | 是 | 至少一个 | 分场，按顺序首尾相接 |
 | `cues` | 否 | | 文字、音效和标记 |
 | `audio` | 否 | | 配乐设置，缺省等于 `{ "mode": "none" }` |
+| `brand` | 否 | 以 `.json` 结尾的相对路径，从合成目录算起 | 这条片子用的 brand.json，放合成目录写 `"brand.json"`，放工作区根写 `"../brand.json"`。字段和校验见 skill 的 references/brand.md，文件不存在或不合规时报 `brand-invalid` |
 | `$schema` | 否 | 字符串 | 编辑器提示用，不参与校验 |
 
 其他字段一律报错，免得拼错的字段被静默忽略。
@@ -157,3 +158,5 @@ CLI 写出的换算结果，也是页面里 `timeline()` 拿到的对象：
 | `scenes[]` | 加上 `index`、`startBeat`、`beats`、`start`、`end`（秒）、`startFrame`、`endFrame`、`hold` |
 | `cues[]` | 加上 `absBeat`、`time`、`frame`、`settleBeats`、`settleTime`、`settleFrame` |
 | `audio` | 照抄，缺省 `{ "mode": "none" }` |
+| `brand` | 没写 `brand` 时是 null。写了就是校验过的品牌：`name`、`tagline`（没写是 null）、`colors`（`primary`、`secondary`、`ink`、`paper`，小写，没写的是 null）、`logo`（`src` 是内联的 `data:` 地址、`type` 是 MIME 类型，没有 logo 是 null）、`fonts`（`title` 和 `text` 两个字体族名）。运行时的 `brand()` 从这里取 |
+| `fonts` | 这条片子自带的字体，没有就是空数组。来自 brand.json 的 `fonts.files` 和合成目录 `assets/fonts/` 里写了许可证的 .ttf、.otf。每项有 `id`（`user-` 加文件 SHA-256 的前 16 位）、`family`、`url`（`/__flipbook/fonts/user/<哈希>.<扩展名>`）、`weight`、`style`、`source`（brand.json 或合成目录里写的路径）。页面加载前和 flipbook 自己的字体一起装好，check 的码位表和字体回退检查也认它们 |
