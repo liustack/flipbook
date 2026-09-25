@@ -29,6 +29,8 @@ export const SEEK_TIMEOUT_MS = 10_000;
 export const READY_TIMEOUT_MS = 60_000;
 /** Longest wait for a page's context to close. */
 export const CLOSE_TIMEOUT_MS = 10_000;
+/** Longest wait in close() for a renderer that stopped answering to report a crash. */
+export const CRASH_WAIT_MS = 3000;
 
 const MIME: Record<string, string> = {
     '.html': 'text/html; charset=utf-8',
@@ -661,6 +663,13 @@ export class CompositionPage {
                 1000,
             );
             if (!alive.ok && !alive.timedOut) this.crashed = true;
+            // No answer from a page not known to hang: Chromium can hear late of a
+            // renderer that is gone (a core dump handler holds a crashed one, a busy
+            // machine delays a kill), so wait for the crash.
+            const deadline = Date.now() + CRASH_WAIT_MS;
+            while (!alive.ok && !this.broken && !this.crashed && Date.now() < deadline) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
         }
         const lost = await this.watch.systemExit(this.crashed);
         await this.watch.stop();

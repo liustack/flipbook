@@ -1,4 +1,5 @@
 import * as dgram from 'dgram';
+import type { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as http from 'http';
 import type { AddressInfo } from 'net';
@@ -315,6 +316,31 @@ describe('a renderer the system takes away', () => {
         await crash;
         await crashed.page.close();
         expect(crashed.page.issues.map((f) => f.code)).toContain('page-error');
+    });
+
+    it('waits in close() for the crash of a renderer that stopped answering', async () => {
+        const s = await session();
+        const dir = copyFixture('hello', 'examples');
+        const timeline = loadTimeline(dir).resolved;
+        if (!timeline) throw new Error('hello has no timeline');
+        const { page } = await openPage(s, { dir, timeline });
+        // A renderer that never answers again, and Chromium's crash report 1.5 s
+        // into close(): how a crash looks while systemd-coredump writes the dump.
+        page.page
+            .evaluate(() => {
+                for (;;) {}
+            })
+            .catch(() => undefined);
+        let closedAt = 0;
+        const closing = page.close().then(() => {
+            closedAt = Date.now();
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const crashedAt = Date.now();
+        (page.page as unknown as EventEmitter).emit('crash', page.page);
+        await closing;
+        expect(closedAt).toBeGreaterThanOrEqual(crashedAt);
+        expect(page.issues.map((f) => f.code)).toContain('page-error');
     });
 });
 
