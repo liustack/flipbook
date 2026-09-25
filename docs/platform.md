@@ -137,7 +137,7 @@ stress 的 GPU 各次之间差得很小：灰度最大差 2 级，PSNR 不低于
 - 认出 `chrome-headless-shell-win64\chrome-headless-shell.exe`。playwright-core 没有 Windows arm64 的 headless shell。
 - 缺 Chromium 时给的安装命令是 PowerShell 写法（`$env:PLAYWRIGHT_BROWSERS_PATH="..."; npx ...`）。
 - 装 Chromium 的子进程带 `windowsHide`。
-- CI 加 windows-latest 一列，lint、typecheck、build 和平台无关的测试必须过。渲染相关的测试和只认 POSIX 的测试（run.sh 启动器、评测脚本的 sh 垫片）允许失败，报告存成 `windows-tests-node-*` 附件。这一列还没跑过。
+- CI 加 windows-latest 一列，lint、typecheck、build 和平台无关的测试必须过。渲染相关的测试和只认 POSIX 的测试（run.sh 启动器、评测脚本的 sh 垫片、编码器测试里冒充 ffmpeg 的 sh 脚本和 `/bin/sleep`、`pgrep`）允许失败，报告存成 `windows-tests-node-*` 附件。这一列还没跑过。
 
 run.ps1 按 modlens 在 Windows 上踩过的坑逐条查过：
 

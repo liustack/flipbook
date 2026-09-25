@@ -60,8 +60,9 @@ jobs:
         if: runner.os != 'Windows'
         run: pnpm test
       # Windows is not supported yet. The suites that render, and the ones that
-      # drive POSIX-only tools (run.sh, the eval runner's sh shim), may fail
-      # there; their report is kept as an artifact. Everything else must pass.
+      # drive POSIX-only tools (run.sh, the eval runner's sh shim, the encoder's
+      # sh stand-ins for ffmpeg, /bin/sleep and pgrep), may fail there; their
+      # report is kept as an artifact. Everything else must pass.
       - name: Build for the Windows tests
         if: runner.os == 'Windows'
         run: pnpm build
@@ -74,7 +75,7 @@ jobs:
           --exclude test/corpus.test.ts --exclude test/doctor.test.ts
           --exclude test/page.test.ts --exclude test/references.test.ts
           --exclude test/render.test.ts --exclude test/launcher.test.ts
-          --exclude test/eval.test.ts
+          --exclude test/eval.test.ts --exclude test/encode.test.ts
       - name: Test on Windows, rendering and POSIX-only suites (allowed to fail)
         if: runner.os == 'Windows'
         continue-on-error: true
@@ -84,7 +85,7 @@ jobs:
           pnpm exec vitest run
           test/corpus.test.ts test/doctor.test.ts test/page.test.ts
           test/references.test.ts test/render.test.ts test/launcher.test.ts
-          test/eval.test.ts
+          test/eval.test.ts test/encode.test.ts
           --reporter=default --reporter=github-actions --reporter=junit
           --outputFile.junit=vitest-windows.xml
       - name: Keep the Windows test report
