@@ -34,7 +34,7 @@ For `sandbox-blocked` and `tmp-unwritable`, `detail.signature` names the row of 
 | `exitCode` | 0, 1, 2, 78 | Same as the process exit code |
 | `flipbook.version` | string | CLI version |
 | `environment` | object | `platform` (such as `darwin-arm64`), `node`, `chromium` (`version`, `revision`, `launchMode`: `normal` or `single-process`), `ffmpeg` |
-| `composition` | object | `dir`, `hash` (hash of the composition directory, starting with `sha256:`, excluding `out/` and `.flipbook/`), `width`, `height`, `fps`, `frames`, `durationSec` |
+| `composition` | object | `dir`, `hash` (hash of the composition directory, starting with `sha256:`, excluding `out/` and `.flipbook/`), `width`, `height` (the stage in CSS pixels, the replaced size when `--size` is given), `fps`, `frames`, `durationSec` |
 | `failures` | Finding[] | Errors. Any one of them makes the exit code 1 |
 | `warnings` | Finding[] | Hints. They do not change the exit code |
 | `artifacts` | object | Output paths: `video`, `contactSheet`, `rejectedVideo`, `zoom1` and so on. `report` is where this report was saved |
@@ -44,7 +44,17 @@ For `sandbox-blocked` and `tmp-unwritable`, `detail.signature` names the row of 
 | `stopReason` | string | When `stop` is true, where it is stuck |
 | `timing` | object | `startedAt`, `durationMs` |
 
-Each command adds a field named after itself: `check` (`seed`, the sampled frames, the order of the two seek passes, the evidence directory, `contrastSkipped` for canvas text whose contrast was not measured), `snapshot` (`layout`, `tiles` with each tile's frame, time and scene, `zooms`), `render` (`frames`, `fps`, `digest` summarizing the raw frame hashes, `captureMs`, `encodeMs`, `verifyMs`, `totalMs`, `captureFps`, `probe`, `audio`, `contactSheetTiles`, `parallel`, `pages`, see [Parallel rendering](#parallel-rendering)), `audio` (see [Audio](#audio)). `render` also has `metadata`, the same content written into the mp4 comment tag.
+Each command adds a field named after itself: `check` (`seed`, the sampled frames, the order of the two seek passes, the evidence directory, `contrastSkipped` for canvas text whose contrast was not measured), `snapshot` (`layout`, `tiles` with each tile's frame, time and scene, `zooms`), `render` (`frames`, `fps`, `digest` summarizing the raw frame hashes, `captureMs`, `encodeMs`, `verifyMs`, `totalMs`, `captureFps`, `probe`, `audio`, `contactSheetTiles`, `output`, `parallel`, `pages`, `recycle`, the last four described under [Frame size and resolution](#frame-size-and-resolution) and [Parallel rendering](#parallel-rendering)), `audio` (see [Audio](#audio)). `render` also has `metadata`, the same content written into the mp4 comment tag, where `stage` is the stage size (such as `1080x1920`) and `scale` is `--scale`.
+
+### Frame size and resolution
+
+`--size` on `render` and `snapshot` replaces the timeline's `width` and `height`. A ratio such as `9:16`, `1:1` or `4:5` keeps the original short side (1920×1080 becomes 1080×1920, 1080×1080 or 1080×1350), and a value such as `1080x1920` gives the pixels directly. Both sides must be even, the width 16 to 7680 and the height 16 to 4320, otherwise the command exits 2. The composition reads the replaced size from `timeline()`.
+
+`--scale` on `render` is how many pixels each CSS pixel becomes (Chromium's deviceScaleFactor), 1 to 4. `--scale 2` renders 1920×1080 as 3840×2160. Both output sides must be even integers, no larger than 7680×4320. The page's `devicePixelRatio` follows it, and `setupCanvas` sizes the canvas backing store by it.
+
+| Field | Meaning |
+|---|---|
+| `render.output` | The video's `width`, `height` and `scale` |
 
 ### Parallel rendering
 

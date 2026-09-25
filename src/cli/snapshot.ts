@@ -9,6 +9,7 @@ import {
     outputLinksFinding,
     type Session,
 } from '../engine/session.ts';
+import { applySize, type SizeSpec } from '../engine/size.ts';
 import { loadTimeline } from '../engine/timeline.ts';
 import { type ResolvedTimeline, sceneAtFrame } from '../engine/timelineResolve.ts';
 import { compositionHash, Workspace } from '../engine/workspace.ts';
@@ -23,6 +24,8 @@ export interface Region {
 
 export interface SnapshotOptions {
     dir: string;
+    /** Stage size in place of the timeline's width and height. */
+    size?: SizeSpec;
     /** Evenly spaced frames on top of one per scene. */
     count?: number;
     /** Region (CSS px) to capture enlarged at each `at` time. */
@@ -74,8 +77,8 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
     if (missingIndex) rb.add(missingIndex);
     const loaded = loadTimeline(dir);
     rb.addAll(loaded.findings);
-    const timeline = loaded.resolved;
-    if (!timeline || missingIndex) return rb.finish();
+    if (!loaded.resolved || missingIndex) return rb.finish();
+    const timeline = applySize(loaded.resolved, options.size);
     rb.report.composition = {
         dir,
         hash: compositionHash(dir),

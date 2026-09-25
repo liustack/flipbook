@@ -31,6 +31,7 @@ import {
     pageSlot,
     type Session,
 } from '../engine/session.ts';
+import { applySize, outputSize, type SizeSpec } from '../engine/size.ts';
 import { dedupe } from '../engine/textAudit.ts';
 import { audioSource, loadTimeline } from '../engine/timeline.ts';
 import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
@@ -41,6 +42,10 @@ import { finding, platformId, progress, type Report, ReportBuilder } from './rep
 
 export interface RenderOptions {
     dir: string;
+    /** Stage size in place of the timeline's width and height. */
+    size?: SizeSpec;
+    /** Device scale factor: output pixels per CSS pixel. Default 1. */
+    scale?: number;
     /** Pages rendering at once. Default: planJobs. More than 1 needs a passing check. */
     jobs?: number;
     /** Frames per page before it is reopened; 0 never reopens. Default: autoRecycle. */
@@ -92,8 +97,10 @@ export async function runRender(options: RenderOptions): Promise<Report> {
     if (missingIndex) rb.add(missingIndex);
     const loaded = loadTimeline(dir);
     rb.addAll(loaded.findings);
-    const timeline = loaded.resolved;
-    if (!timeline || missingIndex) return finish();
+    if (!loaded.resolved || missingIndex) return finish();
+    const timeline = applySize(loaded.resolved, options.size);
+    const scale = options.scale ?? 1;
+    const output = outputSize(timeline, scale);
     const hash = compositionHash(dir);
     rb.report.composition = {
         dir,
@@ -131,6 +138,8 @@ export async function runRender(options: RenderOptions): Promise<Report> {
                     ws,
                     dir,
                     timeline,
+                    scale,
+                    output,
                     hash,
                     session,
                     tmp,
@@ -154,7 +163,10 @@ interface RenderContext {
     rb: ReportBuilder;
     ws: Workspace;
     dir: string;
+    /** The timeline with --size applied. */
     timeline: ResolvedTimeline;
+    scale: number;
+    output: { width: number; height: number };
     hash: string;
     session: Session;
     tmp: string;
@@ -208,8 +220,8 @@ async function encodeFrames(
     ctx: RenderContext,
     video: string,
 ): Promise<{ captured: CaptureOutput; encodeMs: number } | null> {
-    const { options, rb, session, timeline } = ctx;
-    const pixels = timeline.width * timeline.height;
+    const { options, rb, session, timeline, output } = ctx;
+    const pixels = output.width * output.height;
     const plan: JobsPlan = planJobs(timeline.frameCount, pixels, options.jobs);
     const requested = plan.jobs;
     let gate: ParallelGate = { allowed: true };
@@ -229,6 +241,7 @@ async function encodeFrames(
               : { everyFrames: options.recycleFrames, watchMemory: false });
     // Filled in again with the rest of the render section once the video passes through.
     rb.report.render = {
+        output: { ...output, scale: ctx.scale },
         parallel: {
             jobs: plan.jobs,
             requested: options.jobs ?? 'auto',
@@ -248,6 +261,8 @@ async function encodeFrames(
         launchMode: session.mode,
         platform: platformId(),
         composition: ctx.hash,
+        stage: `${timeline.width}x${timeline.height}`,
+        scale: ctx.scale,
     };
     rb.report.metadata = metadata;
     const encoder = Encoder.start(session.ffmpeg.ffmpeg, {
@@ -265,7 +280,7 @@ async function encodeFrames(
             ]),
         ];
         progress(
-            `render: ${timeline.frameCount} frames at ${timeline.fps} fps, ${plan.jobs} page${plan.jobs === 1 ? '' : 's'}`,
+            `render: ${timeline.frameCount} frames at ${timeline.fps} fps, ${output.width}x${output.height}, ${plan.jobs} page${plan.jobs === 1 ? '' : 's'}`,
         );
         const captured = await captureFrames({
             open: (worker) => {
@@ -277,6 +292,7 @@ async function encodeFrames(
                 return slot.open({
                     dir: ctx.dir,
                     timeline,
+                    deviceScaleFactor: ctx.scale,
                     readyTimeoutMs: options.readyTimeoutMs,
                     env: options.env,
                 });

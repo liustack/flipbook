@@ -34,7 +34,7 @@ read_when:
 | `exitCode` | 0、1、2、78 | 和进程退出码一致 |
 | `flipbook.version` | string | CLI 版本 |
 | `environment` | object | `platform`（如 `darwin-arm64`）、`node`、`chromium`（`version`、`revision`、`launchMode`：`normal` 或 `single-process`）、`ffmpeg` |
-| `composition` | object | `dir`、`hash`（合成目录哈希，`sha256:` 开头，不含 `out/` 和 `.flipbook/`）、`width`、`height`、`fps`、`frames`、`durationSec` |
+| `composition` | object | `dir`、`hash`（合成目录哈希，`sha256:` 开头，不含 `out/` 和 `.flipbook/`）、`width`、`height`（舞台的 CSS 像素，给了 `--size` 时是换过的尺寸）、`fps`、`frames`、`durationSec` |
 | `failures` | Finding[] | 错误，任何一条都让退出码变 1 |
 | `warnings` | Finding[] | 提示，不影响退出码 |
 | `artifacts` | object | 产物路径：`video`、`contactSheet`、`rejectedVideo`、`zoom1` 等，`report` 是这份报告存盘的路径 |
@@ -44,7 +44,17 @@ read_when:
 | `stopReason` | string | `stop` 为 true 时说明卡在哪 |
 | `timing` | object | `startedAt`、`durationMs` |
 
-各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`、`parallel`、`pages`，见「并行渲染」一节），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同。
+各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`、`output`、`parallel`、`pages`、`recycle`，后四个见「画幅和分辨率」「并行渲染」两节），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同，其中 `stage` 是舞台尺寸（如 `1080x1920`），`scale` 是 `--scale`。
+
+### 画幅和分辨率
+
+`render` 和 `snapshot` 的 `--size` 换掉 timeline 的 `width`、`height`：`9:16`、`1:1`、`4:5` 这类比例保留原来的短边（1920×1080 换成 1080×1920、1080×1080、1080×1350），`1080x1920` 这样的写法直接给像素。两条边都要是偶数，宽 16 到 7680，高 16 到 4320，不合要求退 2。合成从 `timeline()` 读到的是换过的尺寸。
+
+`render` 的 `--scale` 是每个 CSS 像素出几个像素（Chromium 的 deviceScaleFactor），1 到 4，`--scale 2` 把 1920×1080 渲成 3840×2160。输出两边要是偶数整数，且不超过 7680×4320。页面的 `devicePixelRatio` 跟着变，`setupCanvas` 按它建 canvas 的底层像素。
+
+| 字段 | 含义 |
+|---|---|
+| `render.output` | 成片的 `width`、`height` 和 `scale` |
 
 ### 并行渲染
 

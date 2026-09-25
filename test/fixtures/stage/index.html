@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script type="module">
+// Lays out from the stage size, so --size changes the shape, and draws a
+// half-pixel line at x = 100 that only a 2x backing store keeps sharp.
+import { composition, timeline, setupCanvas } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const ctx = setupCanvas(document.getElementById('stage'), W, H);
+
+composition({
+  seek(t) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(100, 0, 0.5, H);
+    const s = Math.min(W, H) * 0.2;
+    ctx.fillStyle = '#2f5d7c';
+    ctx.fillRect(W / 2 - s / 2 + Math.sin(t * 3) * W * 0.3, H - s * 1.5, s, s);
+    ctx.fillStyle = '#c8452d';
+    ctx.fillRect(W / 2 - s / 2, s * 0.5 + (t / tl.durationSec) * (H - s * 2.5), s, s);
+  },
+});
+</script>
+</body>
+</html>

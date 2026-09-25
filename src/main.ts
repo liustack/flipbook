@@ -20,6 +20,7 @@ import { parseRegion, runSnapshot } from './cli/snapshot.ts';
 import { win32Allowed } from './engine/browser.ts';
 import { pruneCache } from './engine/prune.ts';
 import { workspaceFinding } from './engine/session.ts';
+import { parseSize } from './engine/size.ts';
 import { WorkspaceError } from './engine/workspace.ts';
 import { COMMAND_NAME } from './names.ts';
 import { appVersion } from './paths.ts';
@@ -191,14 +192,16 @@ program
     .option('--zoom <x,y,w,h>', 'also capture this region (CSS px) enlarged')
     .option('--at <seconds>', 'comma-separated times for --zoom (default: each scene middle)')
     .option('--scale <n>', 'enlargement for --zoom', '2')
+    .option('--size <size>', 'stage size in place of the timeline: 9:16, 1:1, 4:5 or WxH')
     .action(
         async (
             dir: string,
-            options: { count: string; zoom?: string; at?: string; scale: string },
+            options: { count: string; zoom?: string; at?: string; scale: string; size?: string },
         ) => {
             await execute('snapshot', dir, () =>
                 runSnapshot({
                     dir,
+                    size: options.size ? parseSize(options.size) : undefined,
                     count: parseInteger(options.count, '--count', 1, 48),
                     zoom: options.zoom ? parseRegion(options.zoom) : undefined,
                     at: options.at
@@ -223,6 +226,8 @@ program
     .description('Render the composition to out/video.mp4 and verify it')
     .argument('<dir>', 'composition directory')
     .option('--seek-timeout <ms>', 'time limit for one seek', '10000')
+    .option('--size <size>', 'stage size in place of the timeline: 9:16, 1:1, 4:5 or WxH')
+    .option('--scale <n>', 'output pixels per CSS pixel, 2 turns 1920x1080 into 3840x2160', '1')
     .option('--jobs <n>', 'pages rendering at once (default: CPU cores - 1, within memory)')
     .option('--recycle <frames>', 'frames per page before it is reopened, 0 for never')
     .action(
@@ -230,6 +235,8 @@ program
             dir: string,
             options: {
                 seekTimeout: string;
+                size?: string;
+                scale: string;
                 jobs?: string;
                 recycle?: string;
             },
@@ -243,6 +250,8 @@ program
                         100,
                         600_000,
                     ),
+                    size: options.size ? parseSize(options.size) : undefined,
+                    scale: parseNumber(options.scale, '--scale', 1, 4),
                     jobs: options.jobs ? parseInteger(options.jobs, '--jobs', 1, 64) : undefined,
                     recycleFrames: options.recycle
                         ? parseInteger(options.recycle, '--recycle', 0, 1_000_000)

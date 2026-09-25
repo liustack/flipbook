@@ -153,6 +153,8 @@ export class CompositionPage {
         readonly timeline: ResolvedTimeline,
         private readonly realDir: string,
         private readonly watch: RendererWatch,
+        /** Output pixels per CSS pixel. */
+        readonly scale: number,
         private readonly onClose?: () => Promise<void>,
     ) {}
 
@@ -186,6 +188,7 @@ export class CompositionPage {
                 timeline,
                 realDir,
                 watch,
+                options.deviceScaleFactor ?? 1,
                 options.onClose,
             );
             await context.route('**/*', (route) => cp.handle(route, options.env ?? process.env));
@@ -485,7 +488,11 @@ export class CompositionPage {
         });
     }
 
-    /** PNG of the viewport as it is now. */
+    /**
+     * PNG of the viewport as it is now, at the device scale factor: without a
+     * clip Chromium captures CSS pixels, so a scaled page passes the whole
+     * viewport as the clip at its scale.
+     */
     async capture(clip?: {
         x: number;
         y: number;
@@ -493,12 +500,23 @@ export class CompositionPage {
         height: number;
         scale: number;
     }): Promise<Buffer> {
+        const region =
+            clip ??
+            (this.scale !== 1
+                ? {
+                      x: 0,
+                      y: 0,
+                      width: this.timeline.width,
+                      height: this.timeline.height,
+                      scale: this.scale,
+                  }
+                : undefined);
         const { data } = await this.cdp.send('Page.captureScreenshot', {
             format: 'png',
             optimizeForSpeed: true,
             captureBeyondViewport: false,
             fromSurface: true,
-            ...(clip ? { clip } : {}),
+            ...(region ? { clip: region } : {}),
         });
         return Buffer.from(data, 'base64');
     }
