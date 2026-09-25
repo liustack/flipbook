@@ -144,6 +144,15 @@ describe('bad composition corpus', () => {
         expect(rendered.artifacts.video).toBeUndefined();
     });
 
+    it('audio-silent: music that starts past the end of its file', async () => {
+        const rendered = await render('audio-silent');
+        expect(codes(rendered)).toEqual(['audio-silent']);
+        const silent = rendered.failures[0];
+        expect(silent.detail).toMatchObject({ file: 'assets/tune.wav', offsetSec: 5 });
+        expect((silent.detail?.fileDurationSec as number) ?? 0).toBeCloseTo(1, 1);
+        expect(rendered.artifacts.video).toBeUndefined();
+    });
+
     it('random: drawing from Math.random', async () => {
         const checked = await check('random');
         expect(codes(checked)).toContain('random-dependent');

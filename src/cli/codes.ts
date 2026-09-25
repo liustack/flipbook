@@ -204,6 +204,11 @@ export const FINDING_CODES = {
         meaning: 'The soundtrack with music is not within 1 LU of -14 LUFS integrated loudness.',
         fix: 'Render again. If it repeats, report it with this JSON. With your own music, check that the file is not silent or clipped at the first beat you gave.',
     },
+    'audio-silent': {
+        meaning:
+            'timeline.json asks for music, but the soundtrack measures as silence: most often audio.offset starts past the end of the file, or the file itself is silent.',
+        fix: 'Lower audio.offset below the length in `detail.fileDurationSec`, or pick a file that has sound where the film uses it.',
+    },
     'audio-peak': {
         meaning: 'The soundtrack true peak is above -1 dBTP.',
         fix: 'Render again. If it repeats, report it with this JSON.',

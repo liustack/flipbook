@@ -538,7 +538,8 @@ export interface AudioVerifyOptions {
  * for sound (music or sfx cues):
  * - an audio stream exists and its length matches the picture within one
  *   frame or one AAC packet, whichever is longer;
- * - with music, integrated loudness is TARGET_LUFS within LUFS_TOLERANCE;
+ * - with music, the soundtrack is not silent, and its integrated loudness is
+ *   TARGET_LUFS within LUFS_TOLERANCE;
  * - the true peak stays at or under TRUE_PEAK_MAX_DBTP;
  * - every effect peaks within one frame of its cue frame.
  */
@@ -572,6 +573,32 @@ export async function verifyAudio(
         );
     }
     const loudness = await measureLoudness(ffmpeg.ffmpeg, video);
+    // Music that measures no loudness at all is silence: a file cut past its
+    // end, a silent file, a stem that never made it into the mix.
+    if (hasMusic(timeline) && loudness.integrated === null) {
+        const music = options.mix?.music;
+        const user = music?.user ? music : null;
+        const fileDurationSec = user
+            ? ((await probeAudio(ffmpeg.ffprobe, user.file))?.durationSec ?? null)
+            : null;
+        const shown = timeline.audio.mode === 'file' ? timeline.audio.file : null;
+        const past = user !== null && fileDurationSec !== null && user.offsetSec >= fileDurationSec;
+        findings.push(
+            finding(
+                'audio-silent',
+                past
+                    ? `The music is silent: audio.offset starts it at ${user.offsetSec} s, but ${shown} lasts ${fileDurationSec.toFixed(2)} s.`
+                    : 'The soundtrack has music, but it measures as silence.',
+                {
+                    detail: {
+                        file: shown,
+                        offsetSec: user?.offsetSec ?? null,
+                        fileDurationSec,
+                    },
+                },
+            ),
+        );
+    }
     const loudnessChecked = hasMusic(timeline) && loudness.integrated !== null;
     if (
         loudnessChecked &&

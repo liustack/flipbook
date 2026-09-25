@@ -153,6 +153,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `audio-skipped` | audio | `audio` 命令没东西可合成：`audio.mode` 既不是 `preset` 也不是 `score`，也没有 sfx cue，只报 warning | 片子本来就不要合成的声音时不用改，要配乐就写 `"mode": "preset"` |
 | `audio-missing` | render | timeline 要声音（`preset`、`score`、`file` 或有 sfx cue），成片却没有音轨 | 重渲一次，还出现就带 JSON 报 issue |
 | `audio-loudness` | render | 有配乐的音轨整合响度不在 -14 LUFS 上下 1 LU 内 | 重渲一次，还出现就带 JSON 报 issue。自带音乐先确认 `bpmOffset` 之后不是静音 |
+| `audio-silent` | render | timeline 要配乐，音轨却量出来是静音。`audio.mode: "file"` 时 `detail` 给出 `file`、`offsetSec` 和 `fileDurationSec`，最常见的是 offset 超过了文件长度 | 把 `audio.offset` 调到文件长度以内，或换一个在片子用到的那段有声音的文件 |
 | `audio-peak` | render | 音轨真峰值高于 -1 dBTP | 重渲一次，还出现就带 JSON 报 issue |
 | `audio-unlicensed` | check、snapshot、audio、render | timeline 用到的音频文件（`audio.file` 或 sfx cue 的 `file`）在 `assets/SOURCES.json` 里没有 `source` 或没有 `license`，或者这个文件不是读得出的 JSON 对象。`element` 是那个文件，`detail.path` 是 timeline 里的字段，`detail.lacking` 是缺了什么 | 声音用 `stock search --audio` 和 `stock fetch` 找，两样都会记下。用户自己的文件按用户说的写来源和许可 |
 | `audio-cue-offset` | render | 某个音效的峰值离它的 cue 帧超过一帧，或在音轨里找不到，`element` 是 `cue <id>` | sfx cue 之间至少隔 1/8 拍。隔开了还报就重渲一次，再出现带 JSON 报 issue |
