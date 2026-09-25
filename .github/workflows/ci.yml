@@ -46,7 +46,7 @@ jobs:
             macOS) echo "FLIPBOOK_CACHE=$HOME/Library/Caches/liustack/flipbook" >> "$GITHUB_ENV" ;;
             Windows) echo "FLIPBOOK_CACHE=${LOCALAPPDATA}\\liustack\\flipbook" >> "$GITHUB_ENV" ;;
           esac
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ${{ env.FLIPBOOK_CACHE }}
           key: flipbook-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'src/fonts/manifest.json') }}
