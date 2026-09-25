@@ -10,7 +10,7 @@ import { hex, rgb } from './color.ts';
 import { hash32, rand } from './core/random.ts';
 import { ihash, vnoise } from './hash.ts';
 
-export type CutoutMode = 'auto' | 'alpha' | 'paper' | 'none';
+export type CutoutMode = 'auto' | 'alpha' | 'paper' | 'ink' | 'none';
 
 /** A region of the file, each value a fraction of its width or height. */
 export interface PhotoCrop {
@@ -71,6 +71,11 @@ export interface PhotoOptions {
      * Default 0 (off): on light paper an enclosed patch is usually a highlight.
      */
     holes?: number;
+    /**
+     * 'paper' and 'ink': follow paper whose tone drifts across the scan
+     * (yellowing, shadow near the gutter) instead of one color. Default true.
+     */
+    flatten?: boolean;
     /** Border, tilt, shadow and grain, or false for the bare cutout. */
     sticker?: StickerOptions | false;
 }
@@ -89,7 +94,7 @@ export interface DrawPhotoOptions {
 export interface Photo {
     readonly src: string;
     /** How the background went: 'alpha', 'paper' or 'none'. */
-    readonly cutout: 'alpha' | 'paper' | 'none';
+    readonly cutout: 'alpha' | 'paper' | 'ink' | 'none';
     /** The paper color removed, or null. */
     readonly paper: string | null;
     /** Size in CSS px at scale 1, border included, before the tilt. */
@@ -164,6 +169,279 @@ function edgeMedian(data: Uint8ClampedArray, w: number, h: number): [number, num
     }) as [number, number, number];
 }
 
+/** Largest channel difference of every pixel from the paper under it. */
+function distances(data: Uint8ClampedArray, field: Float32Array, n: number): Float32Array {
+    const dist = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+        const j = i * 4;
+        const k = i * 3;
+        dist[i] =
+            data[j + 3] < 8
+                ? 0
+                : Math.max(
+                      Math.abs(data[j] - field[k]),
+                      Math.abs(data[j + 1] - field[k + 1]),
+                      Math.abs(data[j + 2] - field[k + 2]),
+                  );
+    }
+    return dist;
+}
+
+/**
+ * The paper color under every pixel. With `flatten`, paper that drifts in tone
+ * across the scan is followed: the picture is cut into cells, each takes the
+ * mean of its pixels loosely near the overall paper color, cells without
+ * enough paper borrow from their neighbours, and the grid is smoothed and
+ * spread back over the pixels. Without it every pixel gets `paper`.
+ */
+function paperField(
+    data: Uint8ClampedArray,
+    w: number,
+    h: number,
+    paper: [number, number, number],
+    threshold: number,
+    flatten: boolean,
+): Float32Array {
+    const n = w * h;
+    const field = new Float32Array(n * 3);
+    if (!flatten) {
+        for (let i = 0; i < n; i++) field.set(paper, i * 3);
+        return field;
+    }
+    const cell = Math.max(8, Math.round(Math.max(w, h) / 40));
+    const gw = Math.ceil(w / cell);
+    const gh = Math.ceil(h / cell);
+    for (let i = 0; i < n; i++) field.set(paper, i * 3);
+    // Three rounds: a cell's paper is the mean of its pixels within `threshold`
+    // of the paper found so far under them, so a slow drift is followed round
+    // by round while a pale subject, a jump away, never joins in.
+    for (let round = 0; round < 3; round++) {
+        const grid = new Float32Array(gw * gh * 3);
+        const known = new Uint8Array(gw * gh);
+        for (let gy = 0; gy < gh; gy++) {
+            for (let gx = 0; gx < gw; gx++) {
+                let r = 0;
+                let g = 0;
+                let b = 0;
+                let count = 0;
+                let total = 0;
+                for (let y = gy * cell; y < Math.min(h, (gy + 1) * cell); y++) {
+                    for (let x = gx * cell; x < Math.min(w, (gx + 1) * cell); x++) {
+                        const i = y * w + x;
+                        const j = i * 4;
+                        total++;
+                        if (data[j + 3] < 8) continue;
+                        const d = Math.max(
+                            Math.abs(data[j] - field[i * 3]),
+                            Math.abs(data[j + 1] - field[i * 3 + 1]),
+                            Math.abs(data[j + 2] - field[i * 3 + 2]),
+                        );
+                        if (d >= threshold) continue;
+                        r += data[j];
+                        g += data[j + 1];
+                        b += data[j + 2];
+                        count++;
+                    }
+                }
+                const c = gy * gw + gx;
+                if (count >= Math.max(4, total * 0.15)) {
+                    grid[c * 3] = r / count;
+                    grid[c * 3 + 1] = g / count;
+                    grid[c * 3 + 2] = b / count;
+                    known[c] = 1;
+                }
+            }
+        }
+        if (!known.some((v) => v === 1)) return field;
+        spreadGrid(grid, known, gw, gh, cell, w, h, field);
+    }
+    return field;
+}
+
+/** Fill cells without paper from known neighbours, smooth, and spread the grid bilinearly over `field`. */
+function spreadGrid(
+    grid: Float32Array,
+    known: Uint8Array,
+    gw: number,
+    gh: number,
+    cell: number,
+    w: number,
+    h: number,
+    field: Float32Array,
+): void {
+    // Cells without paper borrow from known neighbours, ring by ring.
+    for (let pass = 0; pass < gw + gh && known.some((v) => v === 0); pass++) {
+        const next = known.slice();
+        for (let c = 0; c < gw * gh; c++) {
+            if (known[c]) continue;
+            const cx = c % gw;
+            const cy = (c - cx) / gw;
+            let r = 0;
+            let g = 0;
+            let b = 0;
+            let count = 0;
+            for (const [dx, dy] of [
+                [1, 0],
+                [-1, 0],
+                [0, 1],
+                [0, -1],
+            ]) {
+                const x = cx + dx;
+                const y = cy + dy;
+                if (x < 0 || y < 0 || x >= gw || y >= gh || !known[y * gw + x]) continue;
+                const k = (y * gw + x) * 3;
+                r += grid[k];
+                g += grid[k + 1];
+                b += grid[k + 2];
+                count++;
+            }
+            if (count > 0) {
+                grid[c * 3] = r / count;
+                grid[c * 3 + 1] = g / count;
+                grid[c * 3 + 2] = b / count;
+                next[c] = 1;
+            }
+        }
+        known.set(next);
+    }
+    // One 3x3 smoothing pass, then bilinear spread over the pixels.
+    const smooth = new Float32Array(grid.length);
+    for (let cy = 0; cy < gh; cy++) {
+        for (let cx = 0; cx < gw; cx++) {
+            for (let ch = 0; ch < 3; ch++) {
+                let sum = 0;
+                let count = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const x = cx + dx;
+                        const y = cy + dy;
+                        if (x < 0 || y < 0 || x >= gw || y >= gh) continue;
+                        sum += grid[(y * gw + x) * 3 + ch];
+                        count++;
+                    }
+                }
+                smooth[(cy * gw + cx) * 3 + ch] = sum / count;
+            }
+        }
+    }
+    for (let y = 0; y < h; y++) {
+        const fy = Math.min(gh - 1, Math.max(0, (y + 0.5) / cell - 0.5));
+        const y0 = Math.floor(fy);
+        const y1 = Math.min(gh - 1, y0 + 1);
+        const ty = fy - y0;
+        for (let x = 0; x < w; x++) {
+            const fx = Math.min(gw - 1, Math.max(0, (x + 0.5) / cell - 0.5));
+            const x0 = Math.floor(fx);
+            const x1 = Math.min(gw - 1, x0 + 1);
+            const tx = fx - x0;
+            for (let ch = 0; ch < 3; ch++) {
+                const a = smooth[(y0 * gw + x0) * 3 + ch];
+                const b = smooth[(y0 * gw + x1) * 3 + ch];
+                const c = smooth[(y1 * gw + x0) * 3 + ch];
+                const d = smooth[(y1 * gw + x1) * 3 + ch];
+                field[(y * w + x) * 3 + ch] =
+                    (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+            }
+        }
+    }
+}
+
+/**
+ * Measure how much of each soft-edge pixel is subject: its color lies on the
+ * line from the paper under it to the subject beside it (the mean of opaque
+ * pixels within two steps), and its place along that line is its opacity.
+ * The ramp from the paper distance only guesses that.
+ */
+function edgeAlpha(
+    data: Uint8ClampedArray,
+    alpha: Uint8Array,
+    field: Float32Array,
+    w: number,
+    h: number,
+): void {
+    const out = alpha.slice();
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const i = y * w + x;
+            if (alpha[i] === 0 || alpha[i] === 255) continue;
+            let r = 0;
+            let g = 0;
+            let b = 0;
+            let count = 0;
+            for (let dy = -2; dy <= 2; dy++) {
+                for (let dx = -2; dx <= 2; dx++) {
+                    const xx = x + dx;
+                    const yy = y + dy;
+                    if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+                    const k = yy * w + xx;
+                    if (alpha[k] !== 255) continue;
+                    r += data[k * 4];
+                    g += data[k * 4 + 1];
+                    b += data[k * 4 + 2];
+                    count++;
+                }
+            }
+            if (count === 0) continue;
+            const f = [r / count, g / count, b / count];
+            const p = [field[i * 3], field[i * 3 + 1], field[i * 3 + 2]];
+            let num = 0;
+            let den = 0;
+            for (let ch = 0; ch < 3; ch++) {
+                const fp = f[ch] - p[ch];
+                num += (data[i * 4 + ch] - p[ch]) * fp;
+                den += fp * fp;
+            }
+            if (den < 64) continue;
+            out[i] = Math.round(255 * Math.min(1, Math.max(0, num / den)));
+        }
+    }
+    alpha.set(out);
+}
+
+/**
+ * Take the paper back out of pixels that are part paper: a pixel of opacity a
+ * shows a * subject + (1 - a) * paper, so subject = (pixel - (1 - a) * paper) / a.
+ * Without this a soft edge keeps a pale rim of the old paper wherever it goes.
+ */
+function unmix(data: Uint8ClampedArray, alpha: Uint8Array, field: Float32Array, n: number): void {
+    for (let i = 0; i < n; i++) {
+        const a = alpha[i] / 255;
+        if (a <= 0 || a >= 1) continue;
+        const a2 = Math.max(a, 0.12);
+        for (let ch = 0; ch < 3; ch++) {
+            const v = (data[i * 4 + ch] - (1 - a2) * field[i * 3 + ch]) / a2;
+            data[i * 4 + ch] = Math.max(0, Math.min(255, Math.round(v)));
+        }
+    }
+}
+
+/**
+ * Line art as transparent ink: opacity follows how much darker a pixel is
+ * than the paper under it, on a scale from the paper to the darkest ink on
+ * the page, so hatching keeps its weight and a gray wash stays half through.
+ */
+function inkAlpha(data: Uint8ClampedArray, field: Float32Array, n: number): Uint8Array {
+    const lum = new Float32Array(n);
+    const sorted = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+        const j = i * 4;
+        lum[i] = 0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2];
+        sorted[i] = lum[i];
+    }
+    sorted.sort();
+    const ink = sorted[Math.floor(n * 0.005)];
+    const alpha = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+        const k = i * 3;
+        const paper = 0.299 * field[k] + 0.587 * field[k + 1] + 0.114 * field[k + 2];
+        const span = Math.max(24, paper - ink);
+        const a = (paper - lum[i]) / span;
+        // Grain in the paper is not ink.
+        alpha[i] = a < 0.08 ? 0 : Math.round(255 * Math.min(1, a));
+    }
+    return alpha;
+}
+
 /** Pixels of the soft rim: this many steps out from the removed paper. */
 const RIM = 2;
 
@@ -178,23 +456,12 @@ function paperAlpha(
     data: Uint8ClampedArray,
     w: number,
     h: number,
-    paper: [number, number, number],
+    field: Float32Array,
     threshold: number,
     softness: number,
 ): { alpha: Uint8Array; dist: Float32Array } {
     const n = w * h;
-    const dist = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-        const j = i * 4;
-        dist[i] =
-            data[j + 3] < 8
-                ? 0
-                : Math.max(
-                      Math.abs(data[j] - paper[0]),
-                      Math.abs(data[j + 1] - paper[1]),
-                      Math.abs(data[j + 2] - paper[2]),
-                  );
-    }
+    const dist = distances(data, field, n);
     // 0: kept, 1: paper, 2 and up: rim steps away from the paper.
     const state = new Uint8Array(n);
     const queue = new Int32Array(n);
@@ -496,18 +763,27 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
     }
     let paper: string | null = null;
     let alpha: Uint8Array;
-    if (mode === 'paper') {
+    if (mode === 'paper' || mode === 'ink') {
         const color = options.paper ? rgb(options.paper) : edgeMedian(data, w, h);
         paper = hex(color);
         const threshold = options.threshold ?? 36;
-        const cut = paperAlpha(data, w, h, color, threshold, options.softness ?? 24);
-        alpha = cut.alpha;
-        despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
-        if (options.keep === 'largest') keepLargest(alpha, w, h);
-        if (options.holes) {
-            clearHoles(alpha, cut.dist, w, h, threshold, options.holes);
+        const field = paperField(data, w, h, color, threshold, options.flatten ?? true);
+        if (mode === 'ink') {
+            alpha = inkAlpha(data, field, w * h);
             despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
+            if (options.keep === 'largest') keepLargest(alpha, w, h);
+        } else {
+            const cut = paperAlpha(data, w, h, field, threshold, options.softness ?? 24);
+            alpha = cut.alpha;
+            despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
+            if (options.keep === 'largest') keepLargest(alpha, w, h);
+            if (options.holes) {
+                clearHoles(alpha, cut.dist, w, h, threshold, options.holes);
+                despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
+            }
+            edgeAlpha(data, alpha, field, w, h);
         }
+        unmix(data, alpha, field, w * h);
     } else {
         alpha = new Uint8Array(w * h);
         for (let i = 0; i < w * h; i++) alpha[i] = mode === 'alpha' ? data[i * 4 + 3] : 255;
@@ -770,16 +1046,10 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
     // edge. What touches the edge is that margin, its caption or the scan's
     // own border, never a specimen, and is dropped below.
     const threshold = options.threshold ?? 36;
+    const paperUnder = paperField(data, w, h, color, threshold, true);
+    const dist = distances(data, paperUnder, w * h);
     const alpha = new Uint8Array(w * h);
-    for (let i = 0; i < w * h; i++) {
-        const j = i * 4;
-        const d = Math.max(
-            Math.abs(data[j] - color[0]),
-            Math.abs(data[j + 1] - color[1]),
-            Math.abs(data[j + 2] - color[2]),
-        );
-        alpha[i] = d >= threshold ? 255 : 0;
-    }
+    for (let i = 0; i < w * h; i++) alpha[i] = dist[i] >= threshold ? 255 : 0;
     // The printed field is the bounding box of the largest stretch of ground.
     // Everything outside it (the page margin, the caption, the scan's border)
     // counts as ground, so a specimen near the field's edge does not join it.

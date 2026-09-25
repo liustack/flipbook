@@ -79,11 +79,12 @@ composition({
 |---|---|---|
 | `crop` | the whole file | `{ x, y, width, height }` as fractions of the file: one specimen out of a plate of several |
 | `size` | its size in the file, at most 1200 | long edge of the cut subject in CSS px, border not included. Pick the size it will be drawn at, so the border keeps its width |
-| `cutout` | `'auto'` | `'alpha'` keeps the file's transparency, `'paper'` removes light paper, `'none'` keeps the whole rectangle (a print with a border). `'auto'` is `'alpha'` for a file with transparent pixels, `'paper'` otherwise |
+| `cutout` | `'auto'` | `'alpha'` keeps the file's transparency, `'paper'` removes the paper around the subject, `'ink'` turns line art (engravings, pen drawings) into transparent ink: the paper goes, lines keep their weight and a gray wash stays half through, `'none'` keeps the whole rectangle. `'auto'` is `'alpha'` for a file with transparent pixels, `'paper'` otherwise. Use `'ink'` for anything drawn in lines, never `'paper'`: a paper cutout of an engraving falls apart into its hatching |
 | `threshold` | `36` | `'paper'`: how far (0 to 255, largest channel difference) a color may be from the paper and still count as paper. Raise it for stained or uneven paper, lower it for a pale subject |
 | `softness` | `24` | `'paper'`: width of the soft edge above `threshold` |
 | `paper` | measured | `'paper'`: the paper color, measured along the edge of the picture unless given |
 | `despeckle` | `0.002` | `'paper'`: islands smaller than this share of the picture are dropped (dust, plate numbers, captions) |
+| `flatten` | `true` | `'paper'` and `'ink'`: follow paper whose tone drifts across the scan (yellowing, a darker gutter, a stain) instead of one color. Soft edges are also measured against the paper under them and the paper is taken back out of them, so no pale rim of the old page travels with the sticker |
 | `keep` | `'all'` | `'largest'` keeps only the biggest piece and drops parts of neighbours that came in with the crop |
 | `holes` | `0` (off) | `'paper'`: also clear ground enclosed by the subject when a patch covers at least this share of it, such as dark water between a jellyfish's tentacles. Leave it off on light paper, where an enclosed pale patch is usually a highlight |
 | `sticker` | on | `false` for the bare cutout, or the options below |

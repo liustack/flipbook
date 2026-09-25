@@ -96,6 +96,38 @@ window.framedPlate = () => {
         inner.src = window.specimenPlate();
     });
 };
+// A scan whose paper yellows from left to right, with a pale sage leaf that is
+// lighter than the paper on the dark side: one paper color cannot cut it.
+window.unevenPlate = () => {
+    const c = document.createElement('canvas');
+    c.width = 400;
+    c.height = 200;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 400, 0);
+    g.addColorStop(0, '#f4ecd8');
+    g.addColorStop(1, '#c9ae78');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 400, 200);
+    ctx.fillStyle = '#7d9a6a';
+    ctx.beginPath();
+    ctx.ellipse(300, 100, 50, 30, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    return c.toDataURL('image/png');
+};
+// An engraving: black hatching and a mid-gray wash on warm paper.
+window.engraving = () => {
+    const c = document.createElement('canvas');
+    c.width = 200;
+    c.height = 120;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#efe4c8';
+    ctx.fillRect(0, 0, 200, 120);
+    ctx.fillStyle = '#141008';
+    for (let x = 20; x < 90; x += 6) ctx.fillRect(x, 20, 2, 80);
+    ctx.fillStyle = '#7f7664';
+    ctx.fillRect(120, 20, 60, 80);
+    return c.toDataURL('image/png');
+};
 window.alphaAt = (canvas, x, y) =>
     canvas.getContext('2d').getImageData(x, y, 1, 1).data[3];
 window.rgbaAt = (canvas, x, y) =>
@@ -116,6 +148,8 @@ type Win = {
     plate(): string;
     specimenPlate(): string;
     framedPlate(): Promise<string>;
+    unevenPlate(): string;
+    engraving(): string;
     cutPng(): string;
     alphaAt(canvas: HTMLCanvasElement, x: number, y: number): number;
     rgbaAt(canvas: HTMLCanvasElement, x: number, y: number): number[];
@@ -421,5 +455,55 @@ describe('photo on a crowded plate', () => {
         expect(out.largestWidth).toBeLessThanOrEqual(120);
         expect(out.filledCenter).toBe(255);
         expect(out.hollowCenter).toBe(0);
+    });
+});
+
+describe('photo on real scans', () => {
+    it('follows paper that yellows across the page', async () => {
+        const out = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            const p = await w.rt.photo(w.unevenPlate(), { sticker: false });
+            return { width: p.width, height: p.height };
+        });
+        // Only the leaf is left: 100 x 60 turned a little, not the yellow half of the page.
+        expect(out.width).toBeLessThan(130);
+        expect(out.height).toBeLessThan(100);
+    });
+
+    it('takes the paper out of the soft edge, so no pale rim is left', async () => {
+        const out = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            const p = await w.rt.photo(w.plate(), { sticker: false, threshold: 20, softness: 60 });
+            const data = p.canvas
+                .getContext('2d')
+                ?.getImageData(0, 0, p.canvas.width, p.canvas.height).data as Uint8ClampedArray;
+            // The palest half-transparent edge pixel.
+            let palest = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                const a = data[i + 3];
+                if (a > 20 && a < 235)
+                    palest = Math.max(palest, (data[i] + data[i + 1] + data[i + 2]) / 3);
+            }
+            return palest;
+        });
+        // The egg is #6b4a2e (about 73 on average). Edge pixels still mixed with the
+        // paper (#efe6d2, about 226) come out much paler than the egg.
+        expect(out).toBeLessThanOrEqual(110);
+    });
+
+    it("turns line art into transparent ink with cutout: 'ink'", async () => {
+        const out = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            const p = await w.rt.photo(w.engraving(), { sticker: false, cutout: 'ink' });
+            const ctx = p.canvas.getContext('2d') as CanvasRenderingContext2D;
+            const at = (x: number, y: number) => Array.from(ctx.getImageData(x, y, 1, 1).data);
+            // Trimmed to the ink: the page corner at (20, 20) becomes (0, 0).
+            return { line: at(1, 40), between: at(4, 40), wash: at(130, 40), cutout: p.cutout };
+        });
+        expect(out.cutout).toBe('ink');
+        expect(out.line[3]).toBeGreaterThan(230);
+        expect(out.between[3]).toBeLessThan(20);
+        expect(out.wash[3]).toBeGreaterThan(80);
+        expect(out.wash[3]).toBeLessThan(180);
     });
 });
