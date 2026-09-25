@@ -52,7 +52,7 @@ The runtime is an ES module at `/__flipbook/runtime.js`. Import it from a `<scri
 
 ## Stage and layers
 
-- Size `html` and `body` to the timeline `width` and `height` in CSS pixels, with `overflow: hidden`.
+- Size `html` and `body` to the stage, `100vw` by `100vh` or the timeline `width` and `height` in CSS pixels, with `overflow: hidden`.
 - Three layers, bottom to top: a paper layer (background, texture), the content (canvas drawing, DOM text, SVG), a grain layer. Mark the paper and grain layers with `data-flipbook-layer="paper"`. check and render hide everything else to capture a paper-only baseline and to catch frames where the content never drew.
 - Draw anything that does not change (paper, grain, a background illustration) once in `setup()` with `staticLayer()` and blit it. Redraw only what moves in `seek()`.
 
@@ -115,7 +115,9 @@ composition({
 
 ## Size and resolution
 
-Write the composition in CSS pixels equal to the timeline `width` and `height`. Create every canvas with `setupCanvas(canvas, width, height)`: it sizes the backing store for the device pixel ratio and returns a context that draws in CSS pixels, so the same code serves any output scale.
+Write the composition in CSS pixels equal to the timeline `width` and `height`. Create every canvas with `setupCanvas(canvas, width, height)`: it sizes the backing store for the device pixel ratio and returns a context that draws in CSS pixels, so the same code serves any output scale (`render --scale 2`).
+
+Place things from `tl.width` and `tl.height` rather than fixed pixels, so `render --size 9:16` (or `1:1`, `4:5`, `1080x1920`) gives the same film in another shape: the page then gets the new size from `timeline()`. A unit such as `Math.min(tl.width, tl.height) / 1080` keeps text and strokes in proportion. Look at the new shape first with `snapshot --size 9:16`.
 
 ## Time comes from t and the timeline
 

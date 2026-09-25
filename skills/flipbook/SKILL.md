@@ -19,7 +19,11 @@ bash <skill-dir>/scripts/run.sh check <dir>                     # test the compo
 bash <skill-dir>/scripts/run.sh snapshot <dir>                  # contact sheet of frames
 bash <skill-dir>/scripts/run.sh snapshot <dir> --zoom x,y,w,h --at 3.5
 bash <skill-dir>/scripts/run.sh render <dir>                    # MP4 plus acceptance checks
+bash <skill-dir>/scripts/run.sh render <dir> --size 9:16        # another shape: 1:1, 4:5 or WxH too
+bash <skill-dir>/scripts/run.sh render <dir> --scale 2          # 3840x2160 from a 1920x1080 stage
 ```
+
+After a passing check, render draws on several pages at once (CPU cores minus one, fewer for short films or big frames). `--jobs <n>` sets the count. `snapshot` takes `--size` too.
 
 `<dir>` is the composition directory. stdout carries one JSON report, progress goes to stderr. Each report is also saved to `<dir>/.flipbook/reports/<command>.json`, whose path is in `artifacts.report`. When the report has `reportSaveError` instead, nothing was saved: the stdout JSON is the report to hand over.
 
@@ -73,7 +77,7 @@ Defaults:
 - `seek(t)` draws the frame for `t` from `t` alone. No CSS animation or transition, timers, `requestAnimationFrame`, `Date.now()`, `new Date()`, `performance.now()`, `Math.random()`, `crypto` random, state carried between frames, or network. Use `rng(seed)`, `rand(seed, ...)`, `ease`, `cueProgress` and the other runtime helpers.
 - `seek(t)` must not await frames, timers or events.
 - check samples a few frames under a moved clock and seed and counts clock and random calls. It catches most slips, not all of them: keep these rules even when check passes.
-- Size `html` and `body` to the timeline width and height with `overflow: hidden`. Mark paper and grain layers `data-flipbook-layer="paper"`. Draw static layers once in `setup()`.
+- Size `html` and `body` to the stage (`100vw` by `100vh`) with `overflow: hidden`, and place things from `tl.width` and `tl.height`, not fixed pixels, so `--size` works. Mark paper and grain layers `data-flipbook-layer="paper"`. Draw static layers once in `setup()`.
 - Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"`, or font files the user supplied with their license in brand.json or `assets/fonts/` (`references/brand.md`). Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1 (check measures DOM text only: judge canvas text on the contact sheet). Mark deliberate bleeds `data-flipbook-allow-overflow`.
 - Scenes where the picture stands still for more than 1.5 s need `"hold": true`.
 - Images go in `assets/` with their source and license in `assets/SOURCES.json`.
