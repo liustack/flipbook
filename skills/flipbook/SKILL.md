@@ -1,6 +1,6 @@
 ---
 name: flipbook
-description: "Make short animated videos as MP4: motion graphics, explainers, animated titles, data stories, kinetic text, beat-synced clips. You write one HTML composition plus timeline.json, flipbook renders it frame by frame and checks the result before delivery. Use when the user asks for a video, an animation exported to MP4, or a clip built with HTML, CSS, canvas or SVG. Hard rules: the picture is a pure function of t (no CSS animation or transition, timers, requestAnimationFrame, Date.now, performance.now, unseeded Math.random, network), text uses only the fonts \"Noto Serif SC\" and \"LXGW WenKai\", every command runs through this skill's scripts/run.sh, and a video is delivered only after flipbook render exits 0."
+description: "Make short animated videos as MP4: motion graphics, explainers, animated titles, data stories, kinetic text, beat-synced clips. You write one HTML composition plus timeline.json, flipbook renders it frame by frame and checks the result before delivery. Use when the user asks for a video, an animation exported to MP4, or a clip built with HTML, CSS, canvas or SVG. Hard rules: the picture is a pure function of t (no CSS animation or transition, timers, requestAnimationFrame, Date.now, performance.now, unseeded Math.random, network), text uses only the fonts \"Noto Serif SC\" and \"LXGW WenKai\" or font files the user supplied with a license, every command runs through this skill's scripts/run.sh, and a video is delivered only after flipbook render exits 0."
 metadata:
   compatibility: "Node 22.19+ (or Bun) and ffmpeg with libx264. macOS arm64 or Linux x64, Windows through WSL2. The first check or render downloads Chromium (about 95 MB) and two fonts (about 50 MB)."
 ---
@@ -49,7 +49,7 @@ If scripts cannot run, use the first line that works (the pinned version is 0.3.
 
 ## The six steps
 
-1. **Spec.** Settle size, duration, frame rate, look, text and music. Use the defaults for anything the user did not say.
+1. **Spec.** Settle size, duration, frame rate, look, text and music. Use the defaults for anything the user did not say. When the request is about a product or a brand, first search the workspace for its assets (logo files, theme color variables, design tokens, color values in the README) and list them for the user to confirm. When none turn up, ask for them instead of guessing. Then write `brand.json` as `references/brand.md` describes.
 2. **timeline.json.** Scenes in bars, text and marker cues in beats. Read `references/timeline.md` before writing the first one.
 3. **index.html.** One composition that calls `composition({ setup, seek })` from `/__flipbook/runtime.js`. Read `references/rules.md` before writing the first one.
 4. **Check and look.** Run `check`, fix every failure, repeat until it exits 0. Then run `snapshot`, open `out/snapshot/contact-sheet.png` and fix what looks wrong. Rerun `check` after every edit.
@@ -74,7 +74,7 @@ Defaults:
 - `seek(t)` must not await frames, timers or events.
 - check samples a few frames under a moved clock and seed and counts clock and random calls. It catches most slips, not all of them: keep these rules even when check passes.
 - Size `html` and `body` to the timeline width and height with `overflow: hidden`. Mark paper and grain layers `data-flipbook-layer="paper"`. Draw static layers once in `setup()`.
-- Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"` only. Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1 (check measures DOM text only: judge canvas text on the contact sheet). Mark deliberate bleeds `data-flipbook-allow-overflow`. Never animate `transform: scale()` on DOM text (two renders of it differ): text that grows or shrinks goes through `fillText()` on a canvas.
+- Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"`, or font files the user supplied with their license in brand.json or `assets/fonts/` (`references/brand.md`). Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1 (check measures DOM text only: judge canvas text on the contact sheet). Mark deliberate bleeds `data-flipbook-allow-overflow`. Never animate `transform: scale()` on DOM text (two renders of it differ): text that grows or shrinks goes through `fillText()` on a canvas.
 - Scenes where the picture stands still for more than 1.5 s need `"hold": true`.
 - Images go in `assets/` with their source and license in `assets/SOURCES.json`.
 - Never edit `.flipbook/` or `out/`.
@@ -96,4 +96,5 @@ Defaults:
 | `references/paper.md` | before the first index.html, for the paper and grain layers of the default look |
 | `references/materials.md` | when a picture needs pencil lines, hatching, halftone, stipple or torn paper |
 | `references/text.md` | when text goes on a canvas: handwriting, words appearing one by one, text along a curve |
-| `references/templates.md` | when objects should assemble a digit, a letter or a Chinese character |
+| `references/templates.md` | when the film needs one device throughout: objects assembling a glyph, a page turn or a book opening, a lens montage, an arc match cut |
+| `references/brand.md` | when the film is about a product or a brand, and before using a font file the user supplies |
