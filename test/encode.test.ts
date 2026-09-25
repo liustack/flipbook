@@ -1,20 +1,39 @@
 // The encoder pipe must never hang render: every wait on ffmpeg has a limit,
 // and a stuck ffmpeg is killed and reaped before the error comes back.
+import type { SpawnOptions } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { Encoder } from '../src/engine/encode.ts';
 import { run } from '../src/engine/proc.ts';
 import { cleanTemps, tempDir } from './helpers.ts';
 
+// The stand-ins for ffmpeg are Node scripts (*.mjs) that this Node runs, so
+// they behave the same on every platform. Every other command spawns as is.
+vi.mock('child_process', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('child_process')>();
+    const spawn = (command: string, args: readonly string[], options: SpawnOptions) =>
+        command.endsWith('.mjs')
+            ? actual.spawn(process.execPath, [command, ...args], options)
+            : actual.spawn(command, args, options);
+    return { ...actual, spawn };
+});
+
 afterAll(() => cleanTemps());
+
+/** A stand-in for ffmpeg: a Node script with this body. */
+function fakeFfmpeg(prefix: string, body: string): string {
+    const file = path.join(tempDir(prefix), 'ffmpeg.mjs');
+    fs.writeFileSync(file, body);
+    return file;
+}
 
 /** An "ffmpeg" that stays alive, never reads stdin and ignores SIGTERM. */
 function stuckFfmpeg(): string {
-    const dir = tempDir('stuck-ffmpeg');
-    const file = path.join(dir, 'ffmpeg');
-    fs.writeFileSync(file, "#!/bin/sh\ntrap '' TERM\nwhile :; do sleep 1; done\n", { mode: 0o755 });
-    return file;
+    return fakeFfmpeg(
+        'stuck-ffmpeg',
+        "process.on('SIGTERM', () => undefined);\nsetInterval(() => undefined, 1000);\n",
+    );
 }
 
 function alive(pid: number | undefined): boolean {
@@ -66,13 +85,13 @@ describe('encoder pipe limits', () => {
 
 /** An "ffmpeg" that reads stdin until it is killed. */
 function readingFfmpeg(): string {
-    const dir = tempDir('reading-ffmpeg');
-    const file = path.join(dir, 'ffmpeg');
-    fs.writeFileSync(file, '#!/bin/sh\nexec cat > /dev/null\n', { mode: 0o755 });
-    return file;
+    return fakeFfmpeg('reading-ffmpeg', "process.stdin.on('data', () => undefined);\n");
 }
 
-describe('a helper process the system kills', () => {
+// Windows has no signals. A process ended from outside (TerminateProcess)
+// leaves only an exit code, and flipbook tells a system kill by SIGKILL, so
+// these cases have nothing to observe there.
+describe.skipIf(process.platform === 'win32')('a helper process the system kills', () => {
     it('fails the next encoder write at once with resource-exhausted', async () => {
         const encoder = Encoder.start(readingFfmpeg(), {
             fps: 12,
