@@ -60,9 +60,19 @@ Running it again overwrites the earlier copy in place.
 
 ### Path B: the skills CLI (third party)
 
+Claude Code:
+
 ```bash
-npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global
+npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global --agent claude-code -y
 ```
+
+Codex:
+
+```bash
+npx -y skills add liustack/flipbook#v0.3.0 --skill flipbook --global --agent codex -y
+```
+
+`--agent` names the harness and `-y` answers the confirmation prompts, so the command runs to the end without waiting for input. For Codex the skills CLI puts the folder in `~/.agents/skills/flipbook`, which Codex reads too: use `~/.agents/skills/` as `TARGET` from here on. For other harnesses, use Path A.
 
 **If it fails**, or the folder does not appear under your `TARGET`, use Path A.
 
