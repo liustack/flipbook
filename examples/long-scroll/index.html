@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>long-scroll</title>
+<style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #e8dcc4; }
+  canvas { position: absolute; left: 0; top: 0; }
+  #caption { position: absolute; margin: 0; color: #231d17; background: #f3ead7; opacity: 0;
+             white-space: nowrap; border-radius: 6px; box-shadow: 0 2px 0 rgba(35, 29, 23, 0.25); }
+  #num { font-family: "Noto Serif SC"; font-weight: 600; }
+  #name { font-family: "LXGW WenKai"; font-weight: 400; }
+</style>
+</head>
+<body>
+<canvas id="ink"></canvas>
+<p id="caption"><span id="num"></span> <span id="name"></span></p>
+<script type="module">
+// Three minutes of paper scrolling upward: rows of marks drawn from the row
+// number alone, a ruler, a progress line and one caption per scene. Every
+// size comes from the stage, so --size gives the same film in any shape.
+import {
+  composition, timeline, setupCanvas, paperLayer, PAPER, rand,
+  ease, lerp, cueProgress, transitionOut, sceneAt,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const U = Math.min(W, H) / 1080;
+const ink = setupCanvas(document.getElementById('ink'), W, H);
+const caption = document.getElementById('caption');
+const num = document.getElementById('num');
+const name = document.getElementById('name');
+const TAU = Math.PI * 2;
+const INK = '#231d17';
+const ACCENT = ['#b5432a', '#2f5d7c', '#6b7d3a', '#8a4f7d', '#c07a1e', '#3b6f63'];
+const ROW = 150 * U;
+const SPEED = 90 * U;
+const MARGIN = 0.07;
+
+caption.style.left = `${W * MARGIN}px`;
+caption.style.bottom = `${H * MARGIN}px`;
+caption.style.padding = `${10 * U}px ${28 * U}px`;
+num.style.fontSize = `${72 * U}px`;
+name.style.fontSize = `${60 * U}px`;
+
+/** The scene whose rows sit at the middle of the frame when row r passes it. */
+function rowScene(r) {
+  const t = (r * ROW - H / 2) / SPEED;
+  return sceneAt(tl, Math.min(Math.max(t, 0), tl.durationSec - 1e-6)).index;
+}
+
+function mark(kind, x, y, s, r, c) {
+  const k = (...keys) => rand(tl.seed, r, c, ...keys);
+  ink.beginPath();
+  switch (kind) {
+    case 0:
+      ink.arc(x, y, s * (0.25 + k(1) * 0.2), 0, TAU);
+      ink.fill();
+      break;
+    case 1:
+      ink.lineWidth = 5 * U;
+      ink.arc(x, y, s * (0.3 + k(1) * 0.15), 0, TAU);
+      ink.stroke();
+      break;
+    case 2:
+      ink.lineWidth = 4 * U;
+      for (let i = -2; i <= 2; i++) {
+        const o = i * s * 0.16;
+        ink.moveTo(x - s * 0.4 + o, y + s * 0.4);
+        ink.lineTo(x + s * 0.4 + o, y - s * 0.4);
+      }
+      ink.stroke();
+      break;
+    case 3:
+      ink.lineWidth = 5 * U;
+      for (let i = 0; i <= 16; i++) {
+        const u = i / 16;
+        const px = x - s * 0.45 + u * s * 0.9;
+        const py = y + Math.sin(u * TAU + k(1) * TAU) * s * 0.18;
+        if (i === 0) ink.moveTo(px, py);
+        else ink.lineTo(px, py);
+      }
+      ink.stroke();
+      break;
+    case 4:
+      ink.rect(x - s * 0.3, y - s * 0.3, s * 0.6, s * 0.6);
+      ink.fill();
+      break;
+    default:
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU - Math.PI / 2;
+        const rad = i % 2 === 0 ? s * 0.42 : s * 0.18;
+        const px = x + Math.cos(a) * rad;
+        const py = y + Math.sin(a) * rad;
+        if (i === 0) ink.moveTo(px, py);
+        else ink.lineTo(px, py);
+      }
+      ink.closePath();
+      ink.fill();
+  }
+}
+
+composition({
+  setup() {
+    paperLayer(W, H, { seed: tl.seed, color: PAPER.beige, grain: 0 });
+  },
+  seek(t) {
+    ink.clearRect(0, 0, W, H);
+    const offset = t * SPEED;
+    const left = W * MARGIN + 60 * U;
+    const cols = Math.max(2, Math.floor((W - left - W * MARGIN) / ROW));
+    const step = (W - left - W * MARGIN) / cols;
+    const first = Math.floor(offset / ROW) - 1;
+    const last = Math.ceil((offset + H) / ROW) + 1;
+    for (let r = first; r <= last; r++) {
+      const y = r * ROW - offset + ROW / 2;
+      const kind = rowScene(r);
+      for (let c = 0; c < cols; c++) {
+        if (rand(tl.seed, r, c, 'skip') < 0.18) continue;
+        const x = left + (c + 0.5) * step + (rand(tl.seed, r, c, 'x') - 0.5) * step * 0.3;
+        ink.fillStyle = rand(tl.seed, r, c, 'hue') < 0.3 ? ACCENT[kind] : INK;
+        ink.strokeStyle = ink.fillStyle;
+        mark(kind, x, y, ROW * 0.8, r, c);
+      }
+    }
+
+    // Ruler: a tick every quarter row, a long one every row.
+    ink.fillStyle = INK;
+    const q = ROW / 4;
+    for (let i = Math.floor(offset / q) - 1; i * q - offset < H + q; i++) {
+      const y = i * q - offset;
+      const long = i % 4 === 0;
+      ink.fillRect(W * MARGIN, y, (long ? 36 : 16) * U, 3 * U);
+    }
+
+    // Progress along the top, and a pen that swings over it.
+    const p = t / tl.durationSec;
+    const top = H * MARGIN;
+    ink.fillRect(W * MARGIN, top, (W - 2 * W * MARGIN) * p, 4 * U);
+    const pen = W * MARGIN + (W - 2 * W * MARGIN) * p;
+    ink.beginPath();
+    ink.arc(pen, top + 2 * U + Math.sin(t * TAU * 0.5) * 10 * U, 9 * U, 0, TAU);
+    ink.fillStyle = ACCENT[sceneAt(tl, t).index];
+    ink.fill();
+
+    // One caption per scene: in on its cue, out on the last beat.
+    const scene = sceneAt(tl, t).scene;
+    const text = tl.cues.find((c) => c.id === scene.id).text;
+    const [n, label] = text.split(' ');
+    num.textContent = n;
+    name.textContent = label;
+    const a = ease.outCubic(cueProgress(tl, t, scene.id)) * (1 - transitionOut(tl, t, scene.id, 1));
+    caption.style.opacity = String(a);
+    caption.style.transform = `translateY(${lerp(24, 0, a) * U}px)`;
+  },
+});
+</script>
+</body>
+</html>

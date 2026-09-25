@@ -1,0 +1,9 @@
+{
+    "frames": 4320,
+    "durationSec": 180,
+    "fps": 24,
+    "width": 1920,
+    "height": 1080,
+    "check": "pass",
+    "render": "pass"
+}

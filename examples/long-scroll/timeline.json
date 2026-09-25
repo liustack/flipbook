@@ -1,0 +1,26 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 20260926,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "dots", "bars": 15 },
+        { "id": "rings", "bars": 15 },
+        { "id": "hatch", "bars": 15 },
+        { "id": "waves", "bars": 15 },
+        { "id": "tiles", "bars": 15 },
+        { "id": "stars", "bars": 15 }
+    ],
+    "cues": [
+        { "id": "dots", "scene": "dots", "beat": 0, "kind": "text", "text": "01 点", "settleBeats": 2 },
+        { "id": "rings", "scene": "rings", "beat": 0, "kind": "text", "text": "02 圈", "settleBeats": 2 },
+        { "id": "hatch", "scene": "hatch", "beat": 0, "kind": "text", "text": "03 线", "settleBeats": 2 },
+        { "id": "waves", "scene": "waves", "beat": 0, "kind": "text", "text": "04 波", "settleBeats": 2 },
+        { "id": "tiles", "scene": "tiles", "beat": 0, "kind": "text", "text": "05 格", "settleBeats": 2 },
+        { "id": "stars", "scene": "stars", "beat": 0, "kind": "text", "text": "06 星", "settleBeats": 2 }
+    ],
+    "audio": { "mode": "none" }
+}
