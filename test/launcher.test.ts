@@ -8,7 +8,30 @@ const launcher = path.join(repoRoot, 'skills', 'flipbook', 'scripts', 'run.sh');
 const pinned = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf-8')).version;
 const [, minor, patch] = pinned.split('.').map(Number);
 
-/** A directory of fake executables, each a shell script body. */
+/**
+ * The sh that runs the launcher and the directories of the POSIX tools it
+ * calls (sed, head, uname). On Windows that is Git for Windows' usr\bin, the
+ * sh.exe next to sed.exe on PATH, which is how Git Bash runs run.sh.
+ */
+function posixShell(): { sh: string; toolDirs: string[] } | null {
+    if (process.platform !== 'win32') return { sh: 'sh', toolDirs: ['/usr/bin', '/bin'] };
+    const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH');
+    for (const dir of (key ? (process.env[key] ?? '') : '').split(path.delimiter)) {
+        const sh = path.join(dir, 'sh.exe');
+        if (dir && fs.existsSync(sh) && fs.existsSync(path.join(dir, 'sed.exe'))) {
+            return { sh, toolDirs: [dir] };
+        }
+    }
+    return null;
+}
+
+const shell = posixShell();
+
+/**
+ * A directory of fake executables, each a shell script body. Git Bash runs an
+ * extensionless file that starts with #! too, the same as the sh shims npm
+ * installs next to its .cmd shims.
+ */
 function fakeBin(scripts: Record<string, string>): string {
     const bin = tempDir('fakebin');
     for (const [name, body] of Object.entries(scripts)) {
@@ -18,8 +41,14 @@ function fakeBin(scripts: Record<string, string>): string {
 }
 
 function launch(args: string[], bin?: string) {
-    return spawnSync('sh', [launcher, ...args], {
-        env: { PATH: bin ? `${bin}:/usr/bin:/bin` : '/usr/bin:/bin' },
+    if (!shell) throw new Error('no POSIX sh');
+    const dirs = bin ? [bin, ...shell.toolDirs] : shell.toolDirs;
+    return spawnSync(shell.sh, [launcher, ...args], {
+        env: {
+            PATH: dirs.join(path.delimiter),
+            // Windows programs expect SYSTEMROOT in any environment they get.
+            ...(process.platform === 'win32' ? { SYSTEMROOT: process.env.SYSTEMROOT } : {}),
+        },
         encoding: 'utf-8',
     });
 }
@@ -29,7 +58,7 @@ function selectWith(version: string): string {
     return launch(['where'], fakeBin({ flipbook: `echo "${version}"` })).stdout.trim();
 }
 
-describe('skill launcher picks a compatible CLI', () => {
+describe.runIf(shell)('skill launcher picks a compatible CLI', () => {
     it('accepts the same major.minor at or above the pin while below 1.0', () => {
         expect(pinned.split('.')[0]).toBe('0');
         expect(selectWith(pinned)).toBe('path');
@@ -57,7 +86,7 @@ describe('skill launcher picks a compatible CLI', () => {
     });
 });
 
-describe('skill launcher when nothing can run the CLI', () => {
+describe.runIf(shell)('skill launcher when nothing can run the CLI', () => {
     it('exits 78 with a JSON diagnosis carrying fix on stderr', () => {
         const result = launch(['check', '.']);
         expect(result.status).toBe(78);
@@ -85,7 +114,7 @@ describe('skill launcher when nothing can run the CLI', () => {
     });
 });
 
-describe('skill launcher doctor prints one JSON object on stdout', () => {
+describe.runIf(shell)('skill launcher doctor prints one JSON object on stdout', () => {
     it('with no runtime: fix at the top level, exit 78, with or without --json', () => {
         for (const args of [['doctor'], ['doctor', '--json']]) {
             const result = launch(args);
