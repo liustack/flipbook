@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### 找现成的声音
+
+三套合成预设和四个内置音效撑不起所有故事：翻书就该有真的翻页声，讲巴赫就该有巴赫。agent 自己从 Openverse 找公有领域的音效和曲子，下到合成目录，timeline 里直接用。
+
+- **`stock search --audio`**：只问 Openverse 的音频库，只要 cc0 和 pdm。短音效多来自 Freesound 的 CC0 录音，整首曲子来自 Wikimedia Commons。`--length` 按时长档筛（`shortest` 30 秒以内到 `long` 10 分钟以上），`--source` 限定馆藏。模型听不了声音，结果带时长、标题、标签、来源，照这些挑。Openverse 的音频搜索要每个词都命中，所以用一到三个词。
+- **`stock fetch openverse-audio:<id>`**：按文件内容认 mp3、ogg、flac、wav，ffprobe 读得了才存，原样存成 `assets/<name>.<ext>`，不转 WAV（整首转出来要大十倍，渲染时反正统一成 48 kHz 立体声）。来源和许可写进 `assets/SOURCES.json`，和图片同一个文件。下载沿用只走 HTTPS、逐跳核对、拒内网的防护。
+- **音效用文件**：sfx cue 写 `file` 代替 `sfx`，文件里最响的那一下对准 cue 那一帧，音量缩到和内置音效差不多。和合成的音效叠成一条轨混音、对帧验收。只用文件音效时不开浏览器合成。
+- **文件配乐**：`audio.mode: "file"` 加 `offset`（从文件第几秒开始用，给不跟节拍走的曲子）、`fadeIn`、`fadeOut`。`bpmOffset` 照旧给用户自带、跟着节拍走的歌，两者只能写一个。
+- **许可（会拦下旧合成）**：timeline 用到的每个音频文件都要在 `assets/SOURCES.json` 里有来源和许可，否则 check 和 render 报新类型码 `audio-unlicensed`。原来用 `mode: "file"` 却没写这条的合成要补上。
+- **样片**：`examples/page-turn/` 的翻页声和八音盒旋律换成 Freesound 上的 CC0 录音，画面不变。
+- **skill**：`references/audio.md` 写清什么时候用预设、什么时候找录音，怎么搜、怎么挑、文件音效怎么对帧，片段真跑 check。SKILL.md 加 `stock search --audio`，声音和图片一样只经 `stock fetch` 或用户提供。
+
 ## 0.5.2 - 2026-09-26
 
 ### 定格手感
