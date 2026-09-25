@@ -1,4 +1,4 @@
-// JSON requests to the image services, with retries on HTTP 429 and every
+// JSON requests to the image and sound services, with retries on HTTP 429 and every
 // known key scrubbed from anything that can reach a report.
 import { appVersion } from '../paths.ts';
 
@@ -10,6 +10,7 @@ export type StockErrorReason =
     | 'license'
     | 'unsafe-url'
     | 'not-image'
+    | 'not-audio'
     | 'too-large';
 
 export class StockError extends Error {
@@ -102,7 +103,7 @@ export async function fetchJson(
             );
         }
         if (res.status === 404) {
-            throw new StockError('not-found', `${service} has no such image (HTTP 404)`, {
+            throw new StockError('not-found', `${service} has no such item (HTTP 404)`, {
                 service,
                 status: 404,
             });

@@ -77,14 +77,14 @@ More than one page requires that this composition's last check passed its three 
 
 ## Output directory
 
-Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`, and `stock fetch` also writes its image and `assets/SOURCES.json` under `assets/`. Before writing it checks the path one level at a time: if either of them, or any level below, is a symlink, the command reports `unsafe-output` and exits 1 right at the start, writing and deleting nothing. Files are written under a new name in the same directory and then renamed into place, so a write never follows an existing symlink or hard link out of the directory:
+Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`, and `stock fetch` also writes its image or sound and `assets/SOURCES.json` under `assets/`. Before writing it checks the path one level at a time: if either of them, or any level below, is a symlink, the command reports `unsafe-output` and exits 1 right at the start, writing and deleting nothing. Files are written under a new name in the same directory and then renamed into place, so a write never follows an existing symlink or hard link out of the directory:
 
 | Path | Written by | Contents |
 |---|---|---|
 | `out/video.mp4`, `out/contact-sheet.png` | render | The video that passed acceptance and its contact sheet. `out/` is left alone when acceptance fails |
 | `out/snapshot/contact-sheet.png`, `out/snapshot/zoom-f<frame>.png` | snapshot | Preview contact sheet and zoomed crops |
 | `out/stock/contact-sheet.png` | stock search | The thumbnails of the latest search, see [Stock images](#stock-images) |
-| `assets/<name>.<ext>`, `assets/SOURCES.json` | stock fetch | The fetched image and its source and license |
+| `assets/<name>.<ext>`, `assets/SOURCES.json` | stock fetch | The fetched image or sound and its source and license |
 | `.flipbook/rejected/` | render | The video and contact sheet that failed acceptance, pointed to by `artifacts.rejectedVideo` |
 | `.flipbook/evidence/<command>/` | check, render | Evidence images, cleared before each run |
 | `.flipbook/timeline.resolved.json` | all | The resolved timeline |
@@ -155,9 +155,9 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `audio-loudness` | render | A track with music has integrated loudness outside -14 LUFS ±1 LU | Render again. If it happens again, open an issue with the JSON. With your own music, first make sure it is not silent after `bpmOffset` |
 | `audio-peak` | render | The track's true peak is above -1 dBTP | Render again. If it happens again, open an issue with the JSON |
 | `audio-cue-offset` | render | A sound effect's peak is more than one frame away from its cue frame, or cannot be found in the track. `element` is `cue <id>` | Keep sfx cues at least 1/8 beat apart. If they are and it still happens, render again, and if it happens again open an issue with the JSON |
-| `stock-no-results` | stock search | No service found an image for the query. Warning only | Search again with two to four other concrete English words, or with `--source`. When nothing fits, leave the picture out and tell the user |
-| `stock-rejected` | stock fetch | The image was not saved: the id is unknown, its license is not `cc0` or `pdm` (Openverse), its address is not a public HTTPS address, the file is not an image or is over 40 MB. `detail.reason` is `not-found`, `license`, `unsafe-url`, `not-image` or `too-large` | Pick another result from stock search |
-| `asset-conflict` | stock fetch | The image was not saved: another file in `assets/` already has that name (`detail.reason` `name-taken`), or `assets/SOURCES.json` is not a readable JSON object (`sources-invalid`) | Pass another `--as` name, or fix `assets/SOURCES.json` |
+| `stock-no-results` | stock search | No service found an image (or, with `--audio`, a sound) for the query. Warning only | Search again with two to four other concrete English words, or with `--source`. When nothing fits, leave the picture or sound out and tell the user |
+| `stock-rejected` | stock fetch | The file was not saved: the id is unknown, its license is not `cc0` or `pdm` (Openverse), its address is not a public HTTPS address, the file is not an image (over 40 MB) or not an mp3, Ogg, FLAC or WAV sound ffmpeg can read (over 60 MB). `detail.reason` is `not-found`, `license`, `unsafe-url`, `not-image`, `not-audio` or `too-large` | Pick another result from stock search |
+| `asset-conflict` | stock fetch | The file was not saved: another image (or, for a sound, another sound) in `assets/` already has that name (`detail.reason` `name-taken`), or `assets/SOURCES.json` is not a readable JSON object (`sources-invalid`) | Pass another `--as` name, or fix `assets/SOURCES.json` |
 | `cutout-invalid` | cutout | Nothing was cut: the image is missing, lies outside the composition or outside `assets/`, or has no source and license in `assets/SOURCES.json` (or that file is not valid JSON) | Pass an image `stock fetch` saved, or add its source and license first |
 | `cutout-none` | cutout | No specimen on the plate stands apart: they touch one another (tentacles, spines), or the ground color is wrong. `detail.found` is how many groups were found before the rest were refused | Use the plate whole with `cutout: 'none'` and move the camera over it, pass `--paper`, or pick another plate |
 | `cutout-clipped` | cutout, warning | A specimen reaches past its crop and was left out: its cutout would have a straight edge. `detail.index` and `detail.sides` say which and where | Nothing when enough were kept. Otherwise raise `--gap`, or use the plate whole |
@@ -205,16 +205,17 @@ Audio checks (`audio-missing`, `audio-loudness`, `audio-peak`, `audio-cue-offset
 
 ## Stock images
 
-`flipbook stock search <dir> <query...>` and `flipbook stock fetch <dir> <id> --as <name>` find images for a composition and save one into `assets/`. The `stock` field holds what they found or saved.
+`flipbook stock search <dir> <query...>` and `flipbook stock fetch <dir> <id> --as <name>` find images (or, with `--audio`, sounds and music) for a composition and save one into `assets/`. The `stock` field holds what they found or saved, and `stock.kind` says which: `image` or `audio`.
 
 The services are asked in this order: Pexels (with `PEXELS_API_KEY`), Pixabay (with `PIXABAY_API_KEY`), then Openverse, which needs no key and is asked for `cc0` and `pdm` only. The first one with results wins. A service without its key is skipped. `--provider` asks one service alone, and `--source` asks only one Openverse collection (such as `wikimedia`, `smithsonian`, `bio_diversity`). `OPENVERSE_CLIENT_ID` and `OPENVERSE_CLIENT_SECRET` are used when both are set, for a higher Openverse quota. Keys never appear in reports, messages or `assets/SOURCES.json`.
 
-Images are downloaded only over HTTPS, from hosts that resolve to public addresses. The connection is pinned to the checked address, and every redirect is checked again. Loopback, private, link-local, CGNAT and multicast addresses are refused. The 198.18.0.0/15 range stays open because proxy tools in fake-IP mode answer DNS with it.
+Images and sounds are downloaded only over HTTPS, from hosts that resolve to public addresses. The connection is pinned to the checked address, and every redirect is checked again. Loopback, private, link-local, CGNAT and multicast addresses are refused. The 198.18.0.0/15 range stays open because proxy tools in fake-IP mode answer DNS with it.
 
 ### stock search
 
 | Field | Description |
 |---|---|
+| `stock.kind` | `image` |
 | `stock.query`, `stock.provider`, `stock.source` | The query and the two options as given, `null` when not given |
 | `stock.providers[]` | Each service in order: `provider`, `status` (`ok` with `count`, `no-key`, or `failed` with `message`) |
 | `stock.results[]` | `id` (what `stock fetch` takes, such as `openverse:<id>`), `provider`, `title`, `width`, `height`, `license`, `licenseUrl`, `creator`, `source` (the Openverse collection), `pageUrl`, `thumbnail`, and `tile`: the result's place on the contact sheet, from 1, left to right and top to bottom, `null` when its thumbnail could not be downloaded |
@@ -222,6 +223,19 @@ Images are downloaded only over HTTPS, from hosts that resolve to public address
 | `artifacts.contactSheet` | `out/stock/contact-sheet.png`: every thumbnail fitted into a square tile, in result order. Absent when there are no results |
 
 No results is the warning `stock-no-results` with exit 0. Every service failing is `stock-unreachable` with exit 78. `--provider` naming a service without its key is `stock-key-missing` with exit 78.
+
+### stock search --audio
+
+`--audio` asks only Openverse's audio search (`/v1/audio/`), for `cc0` and `pdm` only, whatever keys are set. Most short effects come from Freesound's CC0 recordings, and whole pieces from `wikimedia_audio`. `--source` picks one collection (`freesound`, `wikimedia_audio`, `jamendo` and others), and `--length` one of Openverse's length buckets: `shortest` (under 30 seconds), `short` (30 seconds to 2 minutes), `medium` (2 to 10 minutes), `long` (over 10 minutes). `--length` without `--audio`, or `--audio` with `--orientation` or with `--provider` other than `openverse`, exits 2. There is no contact sheet: a model cannot listen, so it picks by length, title, tags and source.
+
+| Field | Description |
+|---|---|
+| `stock.kind` | `audio` |
+| `stock.query`, `stock.source`, `stock.length` | The query and the options as given, `null` when not given. `stock.provider` is always `openverse` |
+| `stock.providers[]` | One entry: `{ "provider": "openverse", "status": "ok", "count": n }` |
+| `stock.results[]` | `id` (what `stock fetch` takes: `openverse-audio:<id>`), `provider`, `title`, `durationSec` (`null` when Openverse lists none), `license`, `licenseUrl`, `creator`, `source` (the collection), `pageUrl`, `filetype` (as Openverse lists it), `tags` (at most 12), `preview` (the file stock fetch downloads) and `waveform` (Openverse's waveform endpoint for it, `null` when not listed) |
+
+No results is the warning `stock-no-results`. A failed request is `stock-unreachable` with exit 78.
 
 ### stock fetch
 
@@ -254,6 +268,22 @@ The image is saved as `assets/<name>.<ext>`, the extension from the file's forma
 | `artifacts.image`, `artifacts.sources` | The image and `assets/SOURCES.json` |
 
 A malformed id or `--as` name exits 2 before anything is downloaded. A Pexels or Pixabay id without its key exits 78 with `stock-key-missing`.
+
+### stock fetch of a sound
+
+An `openverse-audio:<id>` is looked up, downloaded under the same guard as images (60 MB at most), and saved as it came: the format comes from the first bytes, not from the URL or Openverse's `filetype`, and becomes the extension (`.mp3`, `.ogg`, `.flac`, `.wav`). Anything else is `stock-rejected` with `detail.reason` `not-audio`, and so is a file ffprobe cannot read through that one format. Compressed files stay compressed: a WAV of a whole piece would be ten times larger, and render decodes and resamples every audio file to 48 kHz stereo anyway. The entry in `assets/SOURCES.json` has the same fields as an image's, with `id` `openverse-audio:<id>` and `url` the downloaded file.
+
+| Field | Description |
+|---|---|
+| `stock.kind` | `audio` |
+| `stock.id`, `stock.provider` | The sound fetched |
+| `stock.file` | Its path in the composition, such as `assets/page-turn.mp3` |
+| `stock.format`, `stock.codec`, `stock.durationSec`, `stock.sampleRate`, `stock.channels`, `stock.bytes` | The saved file, as ffprobe reads it |
+| `stock.license`, `stock.licenseUrl`, `stock.source`, `stock.title`, `stock.creator` | As written to `assets/SOURCES.json` |
+| `stock.skipped` | true when `assets/SOURCES.json` already records this id for that name and the file is there |
+| `artifacts.audio`, `artifacts.sources` | The sound and `assets/SOURCES.json` |
+
+Image reports carry `stock.kind` `image` and `artifacts.image`.
 
 ### cutout
 
@@ -292,7 +322,7 @@ It exits 0 when at least one cutout was written and 1 with `cutout-invalid` or `
 | `font-download-failed` | A font download failed or did not verify |
 | `cache-unwritable` | The cache directory cannot be written (common on a first run inside a sandbox) |
 | `stock-key-missing` | The image service asked for needs an API key that is not set (`PEXELS_API_KEY`, `PIXABAY_API_KEY`), or it turned the key down. `detail.env` names the variable |
-| `stock-unreachable` | An image service or image host could not be reached, or answered with a server error, a rate limit that outlasted two retries, or no JSON. `detail.host` names the sandbox host as for the codes above |
+| `stock-unreachable` | An image or sound service, or the host of the file, could not be reached, or answered with a server error, a rate limit that outlasted two retries, or no JSON. `detail.host` names the sandbox host as for the codes above |
 
 ## Retry counts
 

@@ -9,6 +9,7 @@ import { runStockFetch, runStockSearch, type StockDeps } from '../src/cli/stock.
 import { download, type HttpGet } from '../src/stock/download.ts';
 import { imageInfo } from '../src/stock/image.ts';
 import { redactSecrets } from '../src/stock/net.ts';
+import { audioFormat } from '../src/stock/sound.ts';
 import { cleanTemps, codes, runCli, tempDir, warningCodes } from './helpers.ts';
 
 afterAll(() => cleanTemps());
@@ -504,6 +505,286 @@ describe('stock fetch', () => {
     });
 });
 
+/** A real 16-bit PCM WAV: a quiet sine with one loud click at `clickSec`. */
+function wav(seconds: number, rate = 8000, clickSec = seconds / 2): Buffer {
+    const frames = Math.round(seconds * rate);
+    const data = Buffer.alloc(frames * 2);
+    for (let i = 0; i < frames; i++) {
+        const click = Math.abs(i - Math.round(clickSec * rate)) < 4 ? 0.9 : 0;
+        const v = 0.05 * Math.sin((2 * Math.PI * 440 * i) / rate) + click;
+        data.writeInt16LE(Math.round(Math.max(-1, Math.min(1, v)) * 32767), i * 2);
+    }
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0, 'ascii');
+    header.writeUInt32LE(36 + data.length, 4);
+    header.write('WAVE', 8, 'ascii');
+    header.write('fmt ', 12, 'ascii');
+    header.writeUInt32LE(16, 16);
+    header.writeUInt16LE(1, 20);
+    header.writeUInt16LE(1, 22);
+    header.writeUInt32LE(rate, 24);
+    header.writeUInt32LE(rate * 2, 28);
+    header.writeUInt16LE(2, 32);
+    header.writeUInt16LE(16, 34);
+    header.write('data', 36, 'ascii');
+    header.writeUInt32LE(data.length, 40);
+    return Buffer.concat([header, data]);
+}
+
+const TAP = wav(1.2);
+
+const AUDIO_RESULTS = {
+    results: [
+        {
+            id: 'au-1',
+            title: 'Page Turn',
+            url: 'https://cdn.example.org/previews/au-1-hq.mp3',
+            foreign_landing_url: 'https://freesound.org/people/someone/sounds/1',
+            creator: 'someone',
+            license: 'cc0',
+            license_url: 'https://creativecommons.org/publicdomain/zero/1.0/',
+            provider: 'freesound',
+            source: 'freesound',
+            filetype: 'mp3',
+            duration: 1975,
+            tags: [{ name: 'page' }, { name: 'paper' }, { name: 'turn' }],
+            waveform: 'https://api.openverse.org/v1/audio/au-1/waveform/',
+        },
+        {
+            id: 'au-2',
+            title: 'Attribution required',
+            url: 'https://cdn.example.org/au-2.mp3',
+            foreign_landing_url: 'https://freesound.org/people/other/sounds/2',
+            license: 'by',
+            source: 'freesound',
+            duration: 3000,
+        },
+        {
+            id: 'au-3',
+            title: 'Gymnopedie No. 1',
+            url: 'https://upload.example.org/Gymnopedie.ogg',
+            foreign_landing_url: 'https://commons.wikimedia.org/w/index.php?curid=1',
+            creator: 'Pianist',
+            license: 'pdm',
+            source: 'wikimedia_audio',
+            filetype: 'ogg',
+            duration: 204799,
+            tags: [],
+        },
+    ],
+};
+
+describe('stock audio', () => {
+    it('searches Openverse audio for cc0 and pdm only, even with image keys set', async () => {
+        const { deps, calls } = fake(
+            { 'api.openverse.org': () => json(AUDIO_RESULTS) },
+            {},
+            { PEXELS_API_KEY: 'pexels-secret-key', PIXABAY_API_KEY: 'pixabay-secret-key' },
+        );
+        const dir = tempDir('stock');
+        const report = await runStockSearch(
+            { dir, query: 'page turn', audio: true, length: 'shortest' },
+            deps,
+        );
+        expect(report.exitCode).toBe(0);
+        expect(calls).toHaveLength(1);
+        expect(calls[0]).toContain('api api.openverse.org/v1/audio/?');
+        expect(calls[0]).toContain('license=cc0%2Cpdm');
+        expect(calls[0]).toContain('q=page+turn');
+        expect(calls[0]).toContain('length=shortest');
+        const stock = report.stock as {
+            kind: string;
+            providers: unknown[];
+            results: Record<string, unknown>[];
+        };
+        expect(stock.kind).toBe('audio');
+        expect(stock.providers).toEqual([{ provider: 'openverse', status: 'ok', count: 2 }]);
+        expect(stock.results.map((r) => r.id)).toEqual([
+            'openverse-audio:au-1',
+            'openverse-audio:au-3',
+        ]);
+        expect(stock.results[0]).toEqual({
+            id: 'openverse-audio:au-1',
+            provider: 'openverse',
+            title: 'Page Turn',
+            durationSec: 1.975,
+            license: 'cc0',
+            licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+            creator: 'someone',
+            source: 'freesound',
+            pageUrl: 'https://freesound.org/people/someone/sounds/1',
+            filetype: 'mp3',
+            tags: ['page', 'paper', 'turn'],
+            preview: 'https://cdn.example.org/previews/au-1-hq.mp3',
+            waveform: 'https://api.openverse.org/v1/audio/au-1/waveform/',
+        });
+        expect(stock.results[1]).toMatchObject({ durationSec: 204.799, waveform: null });
+        expect(report.artifacts.contactSheet).toBeUndefined();
+    });
+
+    it('reports no sound found as a warning', async () => {
+        const { deps } = fake({ 'api.openverse.org': () => json({ results: [] }) });
+        const report = await runStockSearch(
+            { dir: tempDir('stock'), query: 'zzqx', audio: true },
+            deps,
+        );
+        expect(warningCodes(report)).toEqual(['stock-no-results']);
+        expect(report.warnings[0].message).toContain('No sound');
+    });
+
+    it('refuses image-only options with --audio and --length without it', async () => {
+        const { deps, calls } = fake({});
+        const dir = tempDir('stock');
+        for (const options of [
+            { audio: true, provider: 'pexels' as const },
+            { audio: true, orientation: 'square' as const },
+            { length: 'short' as const },
+        ]) {
+            await expect(
+                runStockSearch({ dir, query: 'harpsichord', ...options }, deps),
+            ).rejects.toMatchObject({ name: 'UsageError' });
+        }
+        expect(calls).toEqual([]);
+    });
+
+    const audioDetail = (detail: Record<string, unknown>, bytes: Buffer | null) =>
+        fake(
+            { 'api.openverse.org': () => json(detail) },
+            bytes ? { [String(detail.url)]: bytes } : {},
+        );
+
+    it('saves a sound under the extension its bytes show and records it in SOURCES.json', async () => {
+        const dir = tempDir('stock');
+        fs.mkdirSync(path.join(dir, 'assets'));
+        fs.writeFileSync(
+            path.join(dir, 'assets', 'SOURCES.json'),
+            `${JSON.stringify({ 'eggs.png': { source: 'x', license: 'pdm' } }, null, 4)}\n`,
+        );
+        const { deps, calls } = audioDetail(AUDIO_RESULTS.results[0], TAP);
+        const report = await runStockFetch(
+            { dir, id: 'openverse-audio:au-1', as: 'page-turn' },
+            deps,
+        );
+        expect(report.failures).toEqual([]);
+        expect(calls[0]).toBe('api api.openverse.org/v1/audio/au-1/');
+        // The URL says mp3, the bytes are a WAV: the bytes win.
+        const file = path.join(dir, 'assets', 'page-turn.wav');
+        expect(fs.readFileSync(file).equals(TAP)).toBe(true);
+        expect(report.artifacts.audio).toBe(file);
+        expect(report.stock).toMatchObject({
+            id: 'openverse-audio:au-1',
+            kind: 'audio',
+            file: 'assets/page-turn.wav',
+            format: 'wav',
+            sampleRate: 8000,
+            channels: 1,
+            license: 'cc0',
+            skipped: false,
+        });
+        expect(Math.abs((report.stock as { durationSec: number }).durationSec - 1.2)).toBeLessThan(
+            0.01,
+        );
+        const sources = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets', 'SOURCES.json'), 'utf-8'),
+        );
+        expect(Object.keys(sources)).toEqual(['eggs.png', 'page-turn.wav']);
+        expect(sources['page-turn.wav']).toEqual({
+            source: 'https://freesound.org/people/someone/sounds/1',
+            license: 'cc0',
+            licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+            id: 'openverse-audio:au-1',
+            title: 'Page Turn',
+            creator: 'someone',
+            url: 'https://cdn.example.org/previews/au-1-hq.mp3',
+        });
+
+        const again = audioDetail(AUDIO_RESULTS.results[0], TAP);
+        const second = await runStockFetch(
+            { dir, id: 'openverse-audio:au-1', as: 'page-turn' },
+            again.deps,
+        );
+        expect((second.stock as { skipped: boolean }).skipped).toBe(true);
+        expect(again.calls).toEqual([]);
+    });
+
+    it('keeps a compressed file as it came', async () => {
+        const dir = tempDir('stock');
+        const source = path.join(dir, 'made.flac');
+        const { run } = await import('../src/engine/proc.ts');
+        const made = await run('ffmpeg', [
+            '-v',
+            'error',
+            '-f',
+            'lavfi',
+            '-i',
+            'sine=frequency=220:sample_rate=44100:duration=2',
+            source,
+        ]);
+        expect(made.code).toBe(0);
+        const bytes = fs.readFileSync(source);
+        const { deps } = audioDetail(AUDIO_RESULTS.results[2], bytes);
+        const report = await runStockFetch(
+            { dir, id: 'openverse-audio:au-3', as: 'gymnopedie' },
+            deps,
+        );
+        expect(report.failures).toEqual([]);
+        const saved = fs.readFileSync(path.join(dir, 'assets', 'gymnopedie.flac'));
+        expect(saved.equals(bytes)).toBe(true);
+        expect(report.stock).toMatchObject({ format: 'flac', sampleRate: 44100, license: 'pdm' });
+    });
+
+    it('refuses bytes that are not a sound, and a license that is not cc0 or pdm', async () => {
+        const html = audioDetail(AUDIO_RESULTS.results[0], Buffer.from('<html>login</html>'));
+        const notAudio = await runStockFetch(
+            { dir: tempDir('stock'), id: 'openverse-audio:au-1', as: 'tap' },
+            html.deps,
+        );
+        expect(codes(notAudio)).toEqual(['stock-rejected']);
+        expect(notAudio.failures[0].detail?.reason).toBe('not-audio');
+
+        const byLicense = audioDetail(AUDIO_RESULTS.results[1], TAP);
+        const dir = tempDir('stock');
+        const refused = await runStockFetch(
+            { dir, id: 'openverse-audio:au-2', as: 'tap' },
+            byLicense.deps,
+        );
+        expect(codes(refused)).toEqual(['stock-rejected']);
+        expect(refused.failures[0].detail?.reason).toBe('license');
+        expect(fs.existsSync(path.join(dir, 'assets'))).toBe(false);
+    });
+
+    it('refuses a sound whose download address is private', async () => {
+        const { deps } = audioDetail(
+            { ...AUDIO_RESULTS.results[0], url: 'https://internal.example.org/a.wav' },
+            TAP,
+        );
+        const report = await runStockFetch(
+            { dir: tempDir('stock'), id: 'openverse-audio:au-1', as: 'tap' },
+            deps,
+        );
+        expect(report.failures[0].detail?.reason).toBe('unsafe-url');
+    });
+});
+
+describe('audio sniffing', () => {
+    it('tells mp3, ogg, flac and wav apart by their first bytes', () => {
+        const pad = (head: number[] | string) =>
+            Buffer.concat([
+                typeof head === 'string' ? Buffer.from(head, 'latin1') : Buffer.from(head),
+                Buffer.alloc(32),
+            ]);
+        expect(audioFormat(TAP)).toBe('wav');
+        expect(audioFormat(pad('ID3\u0004\u0000'))).toBe('mp3');
+        expect(audioFormat(pad([0xff, 0xfb, 0x90, 0x64]))).toBe('mp3');
+        expect(audioFormat(pad('OggS\u0000\u0002'))).toBe('ogg');
+        expect(audioFormat(pad('fLaC\u0000\u0000\u0000"'))).toBe('flac');
+        // ADTS AAC shares the sync word with mp3 but has layer bits 00.
+        expect(audioFormat(pad([0xff, 0xf1, 0x50, 0x80]))).toBeNull();
+        expect(audioFormat(RED)).toBeNull();
+        expect(audioFormat(Buffer.from('<html>'))).toBeNull();
+    });
+});
+
 describe('download guard', () => {
     const get: HttpGet = async (url) => {
         if (url.hostname === 'hop.example.org') {
@@ -578,6 +859,10 @@ describe('stock command line', () => {
         expect(badName.status).toBe(2);
         const noQuery = runCli(['stock', 'search', dir, '  ']);
         expect(noQuery.status).toBe(2);
+        const badAudio = runCli(['stock', 'fetch', dir, 'openverse-audio:a/b', '--as', 'x']);
+        expect(badAudio.status).toBe(2);
+        const lengthAlone = runCli(['stock', 'search', dir, 'harp', '--length', 'short']);
+        expect(lengthAlone.status).toBe(2);
     });
 
     it('exits 78 for a Pexels id without PEXELS_API_KEY', () => {

@@ -1,6 +1,7 @@
 // flipbook stock search and stock fetch: find public domain or free images
 // for a composition, look at them on one contact sheet, and save the chosen
 // one under assets/ with its source and license in assets/SOURCES.json.
+// With --audio the same two commands find and save public domain sounds.
 import * as fs from 'fs';
 import * as path from 'path';
 import { SOURCES_FILE } from '../engine/brand.ts';
@@ -14,8 +15,12 @@ import { type DnsLookup, download, type HttpGet } from '../stock/download.ts';
 import { EXTENSION, type ImageInfo, imageInfo } from '../stock/image.ts';
 import { type Net, type SleepFn, StockError } from '../stock/net.ts';
 import {
+    AUDIO_ID_PREFIX,
+    type AudioHit,
+    type AudioLength,
     KEY_ENV,
     keysFromEnv,
+    lookupAudio,
     lookupImage,
     needsKey,
     type Orientation,
@@ -25,9 +30,12 @@ import {
     type StockHit,
     type StockImage,
     type StockKeys,
+    type StockRef,
+    searchOpenverseAudio,
     searchProvider,
     secretsOf,
 } from '../stock/providers.ts';
+import { AUDIO_DEMUXER, AUDIO_EXTENSION, type AudioFormat, audioFormat } from '../stock/sound.ts';
 import {
     EnvError,
     type Finding,
@@ -49,6 +57,8 @@ export interface StockDeps {
 
 /** Largest image file downloaded. */
 export const MAX_IMAGE_BYTES = 40 * 1024 * 1024;
+/** Largest sound file downloaded. */
+export const MAX_AUDIO_BYTES = 60 * 1024 * 1024;
 const MAX_THUMB_BYTES = 5 * 1024 * 1024;
 /** Longer edges are scaled down to this on fetch. */
 export const MAX_EDGE = 3200;
@@ -64,6 +74,7 @@ const IMAGE_EXTENSIONS = [
     '.svg',
     '.avif',
 ];
+const AUDIO_EXTENSIONS = ['.mp3', '.ogg', '.oga', '.opus', '.flac', '.wav', '.m4a', '.aac'];
 
 function netFor(deps: StockDeps, keys: StockKeys): Net {
     return {
@@ -131,6 +142,10 @@ export interface StockSearchOptions {
     source?: string;
     orientation?: Orientation;
     count?: number;
+    /** Search Openverse for sounds instead of images. */
+    audio?: boolean;
+    /** Sounds only: Openverse's length bucket. */
+    length?: AudioLength;
 }
 
 type ProviderStatus =
@@ -151,6 +166,15 @@ export async function runStockSearch(
     const query = options.query.trim().replace(/\s+/g, ' ');
     if (query === '')
         throw new UsageError('stock search needs a query: two to four English words.');
+    if (options.length && !options.audio) {
+        throw new UsageError('--length sorts sounds by length: add --audio, or drop --length.');
+    }
+    if (options.audio && options.provider && options.provider !== 'openverse') {
+        throw new UsageError('--audio searches Openverse alone: drop --provider.');
+    }
+    if (options.audio && options.orientation) {
+        throw new UsageError('--orientation is for images: drop it with --audio.');
+    }
     if (options.source && options.provider && options.provider !== 'openverse') {
         throw new UsageError(
             '--source picks an Openverse collection: drop --provider or use openverse.',
@@ -165,6 +189,10 @@ export async function runStockSearch(
     const unsafe = outputLinksFinding(ws);
     if (unsafe) {
         rb.add(unsafe);
+        return rb.finish();
+    }
+    if (options.audio) {
+        await searchAudio(rb, { ...options, query, count }, keys, net, env);
         return rb.finish();
     }
 
@@ -212,6 +240,7 @@ export async function runStockSearch(
         return { ...shown, tile: null };
     });
     rb.report.stock = {
+        kind: 'image',
         query,
         provider: options.provider ?? null,
         source: options.source ?? null,
@@ -277,6 +306,51 @@ export async function runStockSearch(
     return rb.finish();
 }
 
+/** Sounds from Openverse, public domain only. No contact sheet: the results carry length, title and tags. */
+async function searchAudio(
+    rb: ReportBuilder,
+    options: StockSearchOptions & { count: number },
+    keys: StockKeys,
+    net: Net,
+    env: NodeJS.ProcessEnv,
+): Promise<void> {
+    progress(`searching Openverse audio for "${options.query}"`);
+    let results: AudioHit[];
+    try {
+        results = await searchOpenverseAudio(
+            {
+                query: options.query,
+                count: options.count,
+                source: options.source,
+                length: options.length,
+            },
+            keys.openverse,
+            net,
+        );
+    } catch (error) {
+        if (!(error instanceof StockError)) throw error;
+        if (error.reason === 'key') throw keyMissing('openverse', error.message);
+        throw unreachable(error, env);
+    }
+    rb.report.stock = {
+        kind: 'audio',
+        query: options.query,
+        provider: 'openverse',
+        source: options.source ?? null,
+        length: options.length ?? null,
+        providers: [{ provider: 'openverse', status: 'ok', count: results.length }],
+        results,
+    };
+    if (results.length === 0) {
+        rb.add(
+            finding('stock-no-results', `No sound found for "${options.query}".`, {
+                severity: 'warning',
+                detail: { query: options.query },
+            }),
+        );
+    }
+}
+
 /** Thumbnails of any shape, each fitted into a square tile, row by row. */
 async function tileSheet(ffmpeg: string, files: string[], out: string): Promise<void> {
     const layout = sheetLayout(files.length, 1, 1, 1568);
@@ -338,8 +412,8 @@ function readSources(ws: Workspace): { sources: SourcesFile } | { problem: strin
     return { sources: parsed as SourcesFile };
 }
 
-/** Image files already under assets/ named `<name>.<extension>`. */
-function taken(dir: string, name: string): string[] {
+/** Files of one kind already under assets/ named `<name>.<extension>`. */
+function taken(dir: string, name: string, extensions: string[]): string[] {
     const folder = path.join(dir, 'assets');
     let entries: string[];
     try {
@@ -351,7 +425,7 @@ function taken(dir: string, name: string): string[] {
         .filter((file) => {
             const ext = path.extname(file);
             return (
-                IMAGE_EXTENSIONS.includes(ext.toLowerCase()) &&
+                extensions.includes(ext.toLowerCase()) &&
                 file.slice(0, -ext.length).toLowerCase() === name.toLowerCase()
             );
         })
@@ -422,7 +496,7 @@ export async function runStockFetch(
     const ref = parseStockId(options.id);
     if (!ref) {
         throw new UsageError(
-            `"${options.id}" is not a stock id. Pass one from stock search: openverse:<id>, pexels:<id> or pixabay:<id>.`,
+            `"${options.id}" is not a stock id. Pass one from stock search: openverse:<id>, openverse-audio:<id>, pexels:<id> or pixabay:<id>.`,
         );
     }
     if (!NAME.test(options.as)) {
@@ -433,7 +507,7 @@ export async function runStockFetch(
     const env = deps.env ?? process.env;
     const keys = keysFromEnv(env);
     if (needsKey(ref.provider) && !keys[ref.provider]) throw keyMissing(ref.provider);
-    const id = `${ref.provider}:${ref.id}`;
+    const id = ref.kind === 'audio' ? `${AUDIO_ID_PREFIX}:${ref.id}` : `${ref.provider}:${ref.id}`;
     const rb = new ReportBuilder('stock-fetch', dir);
     const ws = Workspace.open(dir);
     const sourcesShown = SOURCES_FILE.split(path.sep).join('/');
@@ -449,7 +523,11 @@ export async function runStockFetch(
         return rb.finish();
     }
     const sources = read.sources;
-    const existing = taken(dir, options.as);
+    const existing = taken(
+        dir,
+        options.as,
+        ref.kind === 'audio' ? AUDIO_EXTENSIONS : IMAGE_EXTENSIONS,
+    );
     if (existing.length > 0) {
         const same = existing.find((file) => {
             const entry = sources[file];
@@ -459,6 +537,29 @@ export async function runStockFetch(
                 (entry as Record<string, unknown>).id === id
             );
         });
+        if (same && ref.kind === 'audio') {
+            const file = path.join(dir, 'assets', same);
+            const entry = sources[same] as Record<string, unknown>;
+            const bytes = fs.readFileSync(file);
+            const format = audioFormat(bytes);
+            const probe = format ? await probeSound(ws, bytes, format, env) : null;
+            rb.report.stock = {
+                id,
+                provider: ref.provider,
+                kind: 'audio',
+                file: `assets/${same}`,
+                format,
+                durationSec: probe?.durationSec ?? null,
+                sampleRate: probe?.sampleRate ?? null,
+                channels: probe?.channels ?? null,
+                license: entry.license ?? null,
+                source: entry.source ?? null,
+                skipped: true,
+            };
+            rb.report.artifacts.audio = file;
+            rb.report.artifacts.sources = ws.path(SOURCES_FILE);
+            return rb.finish();
+        }
         if (same) {
             const file = path.join(dir, 'assets', same);
             const info = imageInfo(fs.readFileSync(file));
@@ -466,6 +567,7 @@ export async function runStockFetch(
             rb.report.stock = {
                 id,
                 provider: ref.provider,
+                kind: 'image',
                 file: `assets/${same}`,
                 width: info?.width ?? null,
                 height: info?.height ?? null,
@@ -491,6 +593,10 @@ export async function runStockFetch(
     }
 
     const net = netFor(deps, keys);
+    if (ref.kind === 'audio') {
+        await fetchAudio(rb, ws, { ref, id, as: options.as, sources }, deps, net, env);
+        return rb.finish();
+    }
     let image: StockImage;
     try {
         progress(`looking up ${id}`);
@@ -566,6 +672,7 @@ export async function runStockFetch(
     rb.report.stock = {
         id,
         provider: ref.provider,
+        kind: 'image',
         file: `assets/${fileName}`,
         format: normalized.info.format,
         width: normalized.info.width,
@@ -582,4 +689,142 @@ export async function runStockFetch(
     rb.report.artifacts.image = target;
     rb.report.artifacts.sources = sourcesPath;
     return rb.finish();
+}
+
+// ---------------------------------------------------------------- sounds
+
+interface SoundProbe {
+    codec: string;
+    sampleRate: number;
+    channels: number;
+    durationSec: number | null;
+}
+
+/**
+ * Read a downloaded sound with ffprobe, through the one demuxer its first
+ * bytes name and as a local file only. Null when ffprobe cannot read it.
+ */
+async function probeSound(
+    ws: Workspace,
+    bytes: Buffer,
+    format: AudioFormat,
+    env: NodeJS.ProcessEnv,
+): Promise<SoundProbe | null> {
+    const { ffprobe } = await requireFfmpeg([], env);
+    const work = ws.fresh(ws.path('.flipbook', 'tmp', 'stock'));
+    try {
+        const input = path.join(work, `in${AUDIO_EXTENSION[format]}`);
+        ws.writeFile(input, bytes);
+        const result = await run(
+            ffprobe,
+            [
+                '-v',
+                'error',
+                '-protocol_whitelist',
+                'file',
+                '-f',
+                AUDIO_DEMUXER[format],
+                '-select_streams',
+                'a:0',
+                '-show_entries',
+                'stream=codec_name,sample_rate,channels,duration:format=duration',
+                '-of',
+                'json',
+                input,
+            ],
+            { timeoutMs: 120_000 },
+        );
+        if (result.code !== 0) return null;
+        const parsed = JSON.parse(result.stdout.toString('utf-8')) as {
+            streams?: Record<string, string | number>[];
+            format?: Record<string, string | number>;
+        };
+        const stream = parsed.streams?.[0];
+        if (!stream) return null;
+        const duration = Number(stream.duration ?? parsed.format?.duration);
+        return {
+            codec: String(stream.codec_name ?? ''),
+            sampleRate: Number(stream.sample_rate ?? 0),
+            channels: Number(stream.channels ?? 0),
+            durationSec: Number.isFinite(duration) && duration > 0 ? duration : null,
+        };
+    } finally {
+        ws.remove(work);
+    }
+}
+
+/**
+ * Save one Openverse sound as it came: mp3, Ogg and FLAC stay compressed
+ * (a WAV of a whole piece runs ten times larger), and render decodes and
+ * resamples every file to 48 kHz stereo anyway.
+ */
+async function fetchAudio(
+    rb: ReportBuilder,
+    ws: Workspace,
+    target: { ref: StockRef; id: string; as: string; sources: SourcesFile },
+    deps: StockDeps,
+    net: Net,
+    env: NodeJS.ProcessEnv,
+): Promise<void> {
+    const { ref, id, sources } = target;
+    const keys = keysFromEnv(env);
+    let sound: AudioHit;
+    let bytes: Buffer;
+    try {
+        progress(`looking up ${id}`);
+        sound = await lookupAudio(ref.id, keys.openverse, net);
+        progress(`downloading ${sound.preview}`);
+        bytes = (
+            await download(sound.preview, {
+                lookup: deps.lookup,
+                get: deps.get,
+                maxBytes: MAX_AUDIO_BYTES,
+            })
+        ).bytes;
+    } catch (error) {
+        rb.add(asOutcome(error, env));
+        return;
+    }
+    const format = audioFormat(bytes);
+    const probe = format ? await probeSound(ws, bytes, format, env) : null;
+    if (!format || !probe) {
+        const why = format
+            ? `ffmpeg could not read ${sound.preview} as ${format}`
+            : `${sound.preview} is not an mp3, Ogg, FLAC or WAV file`;
+        rb.add(asOutcome(new StockError('not-audio', why, { url: sound.preview }), env));
+        return;
+    }
+    const fileName = `${target.as}${AUDIO_EXTENSION[format]}`;
+    const file = ws.writeFile(ws.path('assets', fileName), bytes);
+    const entry: Record<string, string> = { source: sound.pageUrl, license: sound.license };
+    if (sound.licenseUrl) entry.licenseUrl = sound.licenseUrl;
+    entry.id = id;
+    if (sound.title) entry.title = sound.title;
+    if (sound.creator) entry.creator = sound.creator;
+    entry.url = sound.preview;
+    sources[fileName] = entry;
+    const sourcesPath = ws.writeFile(
+        ws.path(SOURCES_FILE),
+        `${JSON.stringify(sources, null, 4)}\n`,
+    );
+    rb.report.stock = {
+        id,
+        provider: ref.provider,
+        kind: 'audio',
+        file: `assets/${fileName}`,
+        format,
+        codec: probe.codec,
+        durationSec: probe.durationSec,
+        sampleRate: probe.sampleRate,
+        channels: probe.channels,
+        bytes: bytes.length,
+        license: sound.license,
+        licenseUrl: sound.licenseUrl,
+        source: sound.pageUrl,
+        title: sound.title,
+        creator: sound.creator,
+        skipped: false,
+    };
+    rb.report.artifacts.audio = file;
+    rb.report.artifacts.sources = sourcesPath;
 }

@@ -26,7 +26,13 @@ import { parseSize } from './engine/size.ts';
 import { WorkspaceError } from './engine/workspace.ts';
 import { COMMAND_NAME } from './names.ts';
 import { appVersion } from './paths.ts';
-import { type Orientation, PROVIDERS, type Provider } from './stock/providers.ts';
+import {
+    AUDIO_LENGTHS,
+    type AudioLength,
+    type Orientation,
+    PROVIDERS,
+    type Provider,
+} from './stock/providers.ts';
 
 /** Strict integer parse: "10oops" is a typo, not 10. */
 function parseInteger(
@@ -291,7 +297,7 @@ const stock = program
 stock
     .command('search')
     .description(
-        'Search Pexels, then Pixabay (with keys), then Openverse (cc0 and pdm only), and tile the thumbnails into out/stock/contact-sheet.png',
+        'Search Pexels, then Pixabay (with keys), then Openverse (cc0 and pdm only), and tile the thumbnails into out/stock/contact-sheet.png. With --audio, search Openverse for cc0 and pdm sounds',
     )
     .argument('<dir>', 'composition directory')
     .argument('<query...>', 'two to four concrete English words')
@@ -299,11 +305,20 @@ stock
     .option('--source <name>', 'Openverse collection only, such as wikimedia or smithsonian')
     .option('--orientation <shape>', 'landscape, portrait or square')
     .option('--count <n>', 'results to show', '8')
+    .option('--audio', 'search sounds and music on Openverse instead of images')
+    .option('--length <bucket>', 'sounds only: shortest (<30 s), short, medium or long (>10 min)')
     .action(
         async (
             dir: string,
             query: string[],
-            options: { provider?: string; source?: string; orientation?: string; count: string },
+            options: {
+                provider?: string;
+                source?: string;
+                orientation?: string;
+                count: string;
+                audio?: boolean;
+                length?: string;
+            },
         ) => {
             await execute('stock-search', dir, () =>
                 runStockSearch({
@@ -321,6 +336,10 @@ stock
                           ])
                         : undefined,
                     count: parseInteger(options.count, '--count', 1, 20),
+                    audio: options.audio === true,
+                    length: options.length
+                        ? parseChoice<AudioLength>(options.length, '--length', AUDIO_LENGTHS)
+                        : undefined,
                 }),
             );
         },
@@ -329,10 +348,10 @@ stock
 stock
     .command('fetch')
     .description(
-        'Save one search result as assets/<name>.<ext> and record it in assets/SOURCES.json',
+        'Save one search result (image or sound) as assets/<name>.<ext> and record it in assets/SOURCES.json',
     )
     .argument('<dir>', 'composition directory')
-    .argument('<id>', 'an id from stock search, such as openverse:<id>')
+    .argument('<id>', 'an id from stock search, such as openverse:<id> or openverse-audio:<id>')
     .requiredOption('--as <name>', 'file name under assets/, without the extension')
     .action(async (dir: string, id: string, options: { as: string }) => {
         await execute('stock-fetch', dir, () => runStockFetch({ dir, id, as: options.as }));

@@ -77,14 +77,14 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 
 ## 输出目录
 
-合成目录里只有 `out/` 和 `.flipbook/` 两处是 flipbook 写的，另外 `stock fetch` 会在 `assets/` 下写图片和 `assets/SOURCES.json`。写入前逐级核对路径：这两处或它们下面任何一级是软链，命令一开始就报 `unsafe-output` 退 1，什么都不写、不删。文件先写到同目录的新文件名再改名替换，不会顺着已有的软链或硬链写到外面：
+合成目录里只有 `out/` 和 `.flipbook/` 两处是 flipbook 写的，另外 `stock fetch` 会在 `assets/` 下写图片或声音和 `assets/SOURCES.json`。写入前逐级核对路径：这两处或它们下面任何一级是软链，命令一开始就报 `unsafe-output` 退 1，什么都不写、不删。文件先写到同目录的新文件名再改名替换，不会顺着已有的软链或硬链写到外面：
 
 | 路径 | 谁写 | 内容 |
 |---|---|---|
 | `out/video.mp4`、`out/contact-sheet.png` | render | 通过验收的成片和成片联系表。没通过时不动 `out/` |
 | `out/snapshot/contact-sheet.png`、`out/snapshot/zoom-f<帧号>.png` | snapshot | 预检联系表和局部放大图 |
 | `out/stock/contact-sheet.png` | stock search | 最近一次搜索的缩略图，见[找图](#找图) |
-| `assets/<name>.<扩展名>`、`assets/SOURCES.json` | stock fetch | 下下来的图片和它的来源、许可 |
+| `assets/<name>.<扩展名>`、`assets/SOURCES.json` | stock fetch | 下下来的图片或声音和它的来源、许可 |
 | `.flipbook/rejected/` | render | 没通过验收的成片和联系表，`artifacts.rejectedVideo` 指向它 |
 | `.flipbook/evidence/<命令>/` | check、render | 证据图，每次运行前清空 |
 | `.flipbook/timeline.resolved.json` | 全部 | 换算后的 timeline |
@@ -155,9 +155,9 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `audio-loudness` | render | 有配乐的音轨整合响度不在 -14 LUFS 上下 1 LU 内 | 重渲一次，还出现就带 JSON 报 issue。自带音乐先确认 `bpmOffset` 之后不是静音 |
 | `audio-peak` | render | 音轨真峰值高于 -1 dBTP | 重渲一次，还出现就带 JSON 报 issue |
 | `audio-cue-offset` | render | 某个音效的峰值离它的 cue 帧超过一帧，或在音轨里找不到，`element` 是 `cue <id>` | sfx cue 之间至少隔 1/8 拍。隔开了还报就重渲一次，再出现带 JSON 报 issue |
-| `stock-no-results` | stock search | 哪家都没找到图，只报 warning | 换两到四个别的具体英文词再搜，或加 `--source`。都不合适就不用图，告诉用户 |
-| `stock-rejected` | stock fetch | 图没存：id 不存在、许可不是 `cc0` 或 `pdm`（Openverse）、地址不是公网 HTTPS、文件不是图片或超过 40 MB。`detail.reason` 是 `not-found`、`license`、`unsafe-url`、`not-image` 或 `too-large` | 从 stock search 的结果里另挑一张 |
-| `asset-conflict` | stock fetch | 图没存：`assets/` 里已有别的文件用了这个名字（`detail.reason` 为 `name-taken`），或 `assets/SOURCES.json` 不是读得出的 JSON 对象（`sources-invalid`） | 换个 `--as` 名字，或修好 `assets/SOURCES.json` |
+| `stock-no-results` | stock search | 哪家都没找到图（带 `--audio` 时是没找到声音），只报 warning | 换两到四个别的具体英文词再搜，或加 `--source`。都不合适就不用图或声音，告诉用户 |
+| `stock-rejected` | stock fetch | 文件没存：id 不存在、许可不是 `cc0` 或 `pdm`（Openverse）、地址不是公网 HTTPS、文件不是图片（上限 40 MB）或不是 ffmpeg 读得了的 mp3、Ogg、FLAC、WAV 声音（上限 60 MB）。`detail.reason` 是 `not-found`、`license`、`unsafe-url`、`not-image`、`not-audio` 或 `too-large` | 从 stock search 的结果里另挑一个 |
+| `asset-conflict` | stock fetch | 文件没存：`assets/` 里已有别的图（存声音时是别的声音）用了这个名字（`detail.reason` 为 `name-taken`），或 `assets/SOURCES.json` 不是读得出的 JSON 对象（`sources-invalid`） | 换个 `--as` 名字，或修好 `assets/SOURCES.json` |
 | `cutout-invalid` | cutout | 一张都没抠：图不存在、在合成目录外或不在 `assets/` 下，或 `assets/SOURCES.json` 里没有它的来源和许可（或这个文件不是合法 JSON） | 用 `stock fetch` 存下的图，或先补上来源和许可 |
 | `cutout-none` | cutout | 图版上没有一个标本是单独分得开的：彼此连着（触手、长刺），或底色给错了。`detail.found` 是被整组拒掉之前找到的组数 | 整张图版用 `cutout: 'none'` 靠镜头动，或给 `--paper`，或换一张图版 |
 | `cutout-clipped` | cutout，警告 | 有个标本超出了它的裁剪框，没收：抠出来会有一条直边。`detail.index` 和 `detail.sides` 说是哪个、哪边 | 收下的够用就不用管。不够就调大 `--gap`，或整张用 |
@@ -205,16 +205,17 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 
 ## 找图
 
-`flipbook stock search <dir> <query...>` 和 `flipbook stock fetch <dir> <id> --as <name>` 给合成找图，把选中的一张存进 `assets/`。报告的 `stock` 字段写找到或存下了什么。
+`flipbook stock search <dir> <query...>` 和 `flipbook stock fetch <dir> <id> --as <name>` 给合成找图（带 `--audio` 时找音效和音乐），把选中的一个存进 `assets/`。报告的 `stock` 字段写找到或存下了什么，`stock.kind` 说是哪种：`image` 或 `audio`。
 
 按顺序问：Pexels（配了 `PEXELS_API_KEY`）、Pixabay（配了 `PIXABAY_API_KEY`）、Openverse（不要 key，只要 `cc0` 和 `pdm`）。哪家先有结果就用哪家，没配 key 的跳过。`--provider` 只问一家，`--source` 只问 Openverse 的一个馆藏（如 `wikimedia`、`smithsonian`、`bio_diversity`）。`OPENVERSE_CLIENT_ID` 和 `OPENVERSE_CLIENT_SECRET` 都设了就带上，Openverse 的额度更高。key 不会出现在报告、消息和 `assets/SOURCES.json` 里。
 
-图片只走 HTTPS 下载，主机要解析到公网地址。连接钉在核对过的地址上，每一跳重定向重新核对。回环、内网、链路本地、运营商级 NAT 和组播地址都拒绝。198.18.0.0/15 不拦，因为代理工具的 fake-IP 模式拿这一段回 DNS。
+图片和声音只走 HTTPS 下载，主机要解析到公网地址。连接钉在核对过的地址上，每一跳重定向重新核对。回环、内网、链路本地、运营商级 NAT 和组播地址都拒绝。198.18.0.0/15 不拦，因为代理工具的 fake-IP 模式拿这一段回 DNS。
 
 ### stock search
 
 | 字段 | 说明 |
 |---|---|
+| `stock.kind` | `image` |
 | `stock.query`、`stock.provider`、`stock.source` | 查询词和两个选项，没给是 `null` |
 | `stock.providers[]` | 按顺序每家的情况：`provider`、`status`（`ok` 带 `count`，`no-key`，或 `failed` 带 `message`） |
 | `stock.results[]` | `id`（`stock fetch` 收的写法，如 `openverse:<id>`）、`provider`、`title`、`width`、`height`、`license`、`licenseUrl`、`creator`、`source`（Openverse 的馆藏）、`pageUrl`、`thumbnail`，以及 `tile`：它在联系表上的位置，从 1 起，从左到右、从上到下，缩略图下不来时是 `null` |
@@ -222,6 +223,19 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `artifacts.contactSheet` | `out/stock/contact-sheet.png`：所有缩略图按结果顺序各放进一个方格。没有结果时不给 |
 
 没结果报 warning `stock-no-results`，退 0。每家都失败报 `stock-unreachable`，退 78。`--provider` 点了一家却没配它的 key，报 `stock-key-missing`，退 78。
+
+### stock search --audio
+
+`--audio` 只问 Openverse 的音频搜索（`/v1/audio/`），不管配了哪些 key，都只要 `cc0` 和 `pdm`。短音效多半来自 Freesound 的 CC0 录音，整首曲子来自 `wikimedia_audio`。`--source` 只问一个馆藏（`freesound`、`wikimedia_audio`、`jamendo` 等），`--length` 按 Openverse 的时长档筛：`shortest`（30 秒以内）、`short`（30 秒到 2 分钟）、`medium`（2 到 10 分钟）、`long`（10 分钟以上）。`--length` 不带 `--audio`，或 `--audio` 配 `--orientation`、配 `openverse` 以外的 `--provider`，退 2。没有联系表：模型听不了声音，靠时长、标题、标签和来源挑。
+
+| 字段 | 说明 |
+|---|---|
+| `stock.kind` | `audio` |
+| `stock.query`、`stock.source`、`stock.length` | 查询词和选项，没给是 `null`。`stock.provider` 总是 `openverse` |
+| `stock.providers[]` | 只有一条：`{ "provider": "openverse", "status": "ok", "count": n }` |
+| `stock.results[]` | `id`（`stock fetch` 收的写法：`openverse-audio:<id>`）、`provider`、`title`、`durationSec`（Openverse 没给时是 `null`）、`license`、`licenseUrl`、`creator`、`source`（馆藏）、`pageUrl`、`filetype`（Openverse 列的）、`tags`（最多 12 个）、`preview`（stock fetch 下载的文件）和 `waveform`（Openverse 给它的波形接口，没列时是 `null`） |
+
+没结果报 warning `stock-no-results`。请求失败报 `stock-unreachable`，退 78。
 
 ### stock fetch
 
@@ -254,6 +268,22 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `artifacts.image`、`artifacts.sources` | 图片和 `assets/SOURCES.json` |
 
 id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 的 id 没配对应的 key，退 78 报 `stock-key-missing`。
+
+### stock fetch 存声音
+
+`openverse-audio:<id>` 先查详情，再按图片同样的防护下载（上限 60 MB），原样存下：格式看文件开头的字节，不看 URL 也不看 Openverse 的 `filetype`，扩展名随格式定（`.mp3`、`.ogg`、`.flac`、`.wav`）。别的格式报 `stock-rejected`，`detail.reason` 为 `not-audio`，ffprobe 按这个格式读不了的文件也一样。压缩格式不转：整首曲子转成 WAV 要大十倍，render 反正会把每个音频文件解码、重采样成 48 kHz 立体声。`assets/SOURCES.json` 里的条目和图片的字段相同，`id` 是 `openverse-audio:<id>`，`url` 是下载的文件。
+
+| 字段 | 说明 |
+|---|---|
+| `stock.kind` | `audio` |
+| `stock.id`、`stock.provider` | 下的是哪个声音 |
+| `stock.file` | 它在合成里的路径，如 `assets/page-turn.mp3` |
+| `stock.format`、`stock.codec`、`stock.durationSec`、`stock.sampleRate`、`stock.channels`、`stock.bytes` | 存下的文件，ffprobe 读出来的 |
+| `stock.license`、`stock.licenseUrl`、`stock.source`、`stock.title`、`stock.creator` | 和写进 `assets/SOURCES.json` 的一样 |
+| `stock.skipped` | `assets/SOURCES.json` 已经给这个名字记了同一个 id 且文件还在时为 true |
+| `artifacts.audio`、`artifacts.sources` | 声音文件和 `assets/SOURCES.json` |
+
+图片的报告带 `stock.kind` 为 `image` 和 `artifacts.image`。
 
 ### cutout
 
@@ -292,7 +322,7 @@ id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 
 | `font-download-failed` | 字体下载失败或校验不过 |
 | `cache-unwritable` | 缓存目录写不进（常见于沙箱内首次运行） |
 | `stock-key-missing` | 点名要的图库需要 API key 却没设（`PEXELS_API_KEY`、`PIXABAY_API_KEY`），或者 key 被拒。`detail.env` 是变量名 |
-| `stock-unreachable` | 图库或图片主机连不上，或回了服务端错误、重试两次仍限流、不是 JSON。`detail.host` 和上面几个类型码一样写沙箱宿主 |
+| `stock-unreachable` | 图库、音频库或文件所在的主机连不上，或回了服务端错误、重试两次仍限流、不是 JSON。`detail.host` 和上面几个类型码一样写沙箱宿主 |
 
 ## 重试计数
 

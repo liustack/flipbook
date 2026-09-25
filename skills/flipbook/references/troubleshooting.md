@@ -174,13 +174,13 @@ Fix: Write the license in assets/SOURCES.json, replace the file with its .ttf or
 
 ### `stock-no-results`
 
-stock search found no image for the query.
+stock search found no image or sound for the query.
 
-Fix: Search again with two to four other concrete English words, or with --source for one collection. When nothing fits, leave the picture out and tell the user.
+Fix: Search again with two to four other concrete English words, or with --source for one collection. When nothing fits, leave the picture or sound out and tell the user.
 
 ### `stock-rejected`
 
-stock fetch did not save the image: the id is unknown, its license is not public domain, its address is not a public HTTPS address, or the file is not an image or is too large.
+stock fetch did not save the file: the id is unknown, its license is not public domain, its address is not a public HTTPS address, or the file is not an image or sound it can read, or is too large.
 
 Fix: Pick another result from stock search. `detail.reason` says why this one was refused.
 
@@ -204,7 +204,7 @@ Fix: Nothing to do when enough specimens were kept. Otherwise raise --gap so its
 
 ### `asset-conflict`
 
-stock fetch did not save the image: another file already has that name in assets/, or assets/SOURCES.json is not a readable JSON object.
+stock fetch did not save the file: another file of the same kind already has that name in assets/, or assets/SOURCES.json is not a readable JSON object.
 
 Fix: Pass another --as name, or fix assets/SOURCES.json as the message says.
 
@@ -392,6 +392,6 @@ Fix: Ask the user for the key and set PEXELS_API_KEY or PIXABAY_API_KEY, or sear
 
 ### `stock-unreachable`
 
-The image service or the image host could not be reached, or answered with a server error or rate limit.
+The image or sound service, or the host of the file, could not be reached, or answered with a server error or rate limit.
 
 Fix: Check the network or HTTPS_PROXY and run the command again. Inside a sandbox, run the same stock command outside it once the user approves.

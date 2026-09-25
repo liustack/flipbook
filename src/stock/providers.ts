@@ -330,12 +330,135 @@ async function openverseImage(
     return hit;
 }
 
+// ---------------------------------------------------------------- Openverse audio
+
+export const OPENVERSE_AUDIO_API = 'https://api.openverse.org/v1/audio/';
+/** Openverse's length buckets: under 30 s, 30 s to 2 min, 2 to 10 min, over 10 min. */
+export const AUDIO_LENGTHS = ['shortest', 'short', 'medium', 'long'] as const;
+export type AudioLength = (typeof AUDIO_LENGTHS)[number];
+/** Prefix of the ids of sounds, so `stock fetch` tells them from images. */
+export const AUDIO_ID_PREFIX = 'openverse-audio';
+
+/** One sound from Openverse. The model cannot listen, so it picks by length, title, tags and source. */
+export interface AudioHit {
+    /** `openverse-audio:<id>`, what `stock fetch` takes. */
+    id: string;
+    provider: 'openverse';
+    title: string | null;
+    durationSec: number | null;
+    license: string;
+    licenseUrl: string | null;
+    creator: string | null;
+    /** The collection, such as `freesound` or `wikimedia_audio`. */
+    source: string | null;
+    pageUrl: string;
+    /** The file type Openverse lists; stock fetch goes by the bytes instead. */
+    filetype: string | null;
+    tags: string[];
+    /** The file itself, which stock fetch downloads. */
+    preview: string;
+    /** Openverse's waveform endpoint for the file, when it lists one. */
+    waveform: string | null;
+}
+
+function openverseAudioHit(raw: unknown): AudioHit | null {
+    const sound = asRecord(raw);
+    if (!sound) return null;
+    const id = asString(sound.id);
+    const url = asString(sound.url);
+    const license = (asString(sound.license) ?? '').toLowerCase();
+    if (!id || !url || !isPublicDomain(license)) return null;
+    const ms = asNumber(sound.duration);
+    const tags = Array.isArray(sound.tags)
+        ? sound.tags
+              .map((tag) => asString(asRecord(tag)?.name))
+              .filter((name): name is string => name !== undefined)
+              .slice(0, 12)
+        : [];
+    return {
+        id: `${AUDIO_ID_PREFIX}:${id}`,
+        provider: 'openverse',
+        title: asString(sound.title) ?? null,
+        durationSec: ms !== undefined && ms > 0 ? ms / 1000 : null,
+        license,
+        licenseUrl: asString(sound.license_url) ?? null,
+        creator: asString(sound.creator) ?? null,
+        source: asString(sound.source) ?? asString(sound.provider) ?? null,
+        pageUrl: asString(sound.foreign_landing_url) ?? url,
+        filetype: asString(sound.filetype) ?? null,
+        tags,
+        preview: url,
+        waveform: asString(sound.waveform) ?? null,
+    };
+}
+
+export interface AudioSearchOptions {
+    query: string;
+    count: number;
+    source?: string;
+    length?: AudioLength;
+}
+
+export async function searchOpenverseAudio(
+    options: AudioSearchOptions,
+    credentials: StockKeys['openverse'],
+    net: Net,
+): Promise<AudioHit[]> {
+    const url = new URL(OPENVERSE_AUDIO_API);
+    url.searchParams.set('q', options.query);
+    url.searchParams.set('license', 'cc0,pdm');
+    url.searchParams.set('page_size', String(Math.min(20, options.count * 2)));
+    url.searchParams.set('mature', 'false');
+    if (options.source) url.searchParams.set('source', options.source);
+    if (options.length) url.searchParams.set('length', options.length);
+    const headers = await openverseHeaders(credentials, net);
+    const json = await fetchJson('Openverse', url.toString(), { headers }, net);
+    const results = asRecord(json)?.results;
+    return (Array.isArray(results) ? results : [])
+        .map(openverseAudioHit)
+        .filter((hit): hit is AudioHit => hit !== null)
+        .slice(0, options.count);
+}
+
+export async function lookupAudio(
+    soundId: string,
+    credentials: StockKeys['openverse'],
+    net: Net,
+): Promise<AudioHit> {
+    const headers = await openverseHeaders(credentials, net);
+    const json = await fetchJson(
+        'Openverse',
+        `${OPENVERSE_AUDIO_API}${encodeURIComponent(soundId)}/`,
+        { headers },
+        net,
+    );
+    const license = asString(asRecord(json)?.license);
+    if (!isPublicDomain(license)) {
+        throw new StockError(
+            'license',
+            `Openverse sound ${soundId} is licensed "${license ?? 'unknown'}", not cc0 or pdm`,
+            { license: license ?? null },
+        );
+    }
+    const hit = openverseAudioHit(json);
+    if (!hit) throw new StockError('not-found', `Openverse has no sound ${soundId}`);
+    return hit;
+}
+
 // ---------------------------------------------------------------- dispatch
 
-/** `pexels:123` into its parts, or null when malformed. */
-export function parseStockId(ref: string): { provider: Provider; id: string } | null {
-    const m = /^(pexels|pixabay|openverse):([A-Za-z0-9_-]{1,80})$/.exec(ref.trim());
-    return m ? { provider: m[1] as Provider, id: m[2] } : null;
+export interface StockRef {
+    provider: Provider;
+    id: string;
+    kind: 'image' | 'audio';
+}
+
+/** `pexels:123` or `openverse-audio:<id>` into its parts, or null when malformed. */
+export function parseStockId(ref: string): StockRef | null {
+    const m = /^(pexels|pixabay|openverse|openverse-audio):([A-Za-z0-9_-]{1,80})$/.exec(ref.trim());
+    if (!m) return null;
+    if (m[1] === AUDIO_ID_PREFIX) return { provider: 'openverse', id: m[2], kind: 'audio' };
+    return { provider: m[1] as Provider, id: m[2], kind: 'image' };
 }
 
 export function needsKey(provider: Provider): provider is 'pexels' | 'pixabay' {
