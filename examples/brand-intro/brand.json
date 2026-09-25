@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "name": "青柿文具",
+    "tagline": "写字的人，值得一张好纸。",
+    "logo": {
+        "file": "assets/logo.svg",
+        "license": "MIT, a made-up brand drawn for this example",
+        "source": "hand-written SVG in examples/brand-intro/assets/logo.svg"
+    },
+    "colors": {
+        "primary": "#d9632b",
+        "secondary": "#2f4a3a",
+        "ink": "#2a211b",
+        "paper": "#f3ebdd"
+    },
+    "fonts": {
+        "title": "Noto Serif SC",
+        "text": "LXGW WenKai"
+    }
+}

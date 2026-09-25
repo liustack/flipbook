@@ -1,0 +1,29 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 20260926,
+    "bpm": 96,
+    "beatsPerBar": 4,
+    "brand": "brand.json",
+    "scenes": [
+        { "id": "mark", "bars": 2 },
+        { "id": "line", "bars": 2 },
+        { "id": "lockup", "bars": 2 }
+    ],
+    "cues": [
+        { "id": "pop", "scene": "mark", "beat": 3, "kind": "sfx", "sfx": "ding" },
+        { "id": "name", "scene": "mark", "beat": 4.5, "kind": "text", "text": "青柿文具", "settleBeats": 1.5 },
+        { "id": "tagline", "scene": "line", "beat": 1, "kind": "text", "text": "写字的人，值得一张好纸。", "settleBeats": 4 },
+        { "id": "close", "scene": "lockup", "beat": 1, "kind": "text", "text": "青柿文具", "settleBeats": 1.5 },
+        { "id": "sign", "scene": "lockup", "beat": 3, "kind": "text", "text": "写字的人，值得一张好纸。", "settleBeats": 1 }
+    ],
+    "audio": {
+        "mode": "preset",
+        "preset": "marimba",
+        "key": "G",
+        "progression": 0,
+        "dynamics": { "mark": "soft", "line": "medium", "lockup": "soft" }
+    }
+}
