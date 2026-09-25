@@ -20,11 +20,28 @@ export interface TextEntry {
     allowOverflow?: boolean;
 }
 
+let muted = 0;
+
+/**
+ * Run `draw` without registering its text. Templates use it for copies of a
+ * picture that are not the text itself: an offscreen buffer, a mirrored
+ * show-through, a reflection.
+ */
+export function withoutTextRegistry<T>(draw: () => T): T {
+    muted++;
+    try {
+        return draw();
+    } finally {
+        muted--;
+    }
+}
+
 /**
  * Report text drawn outside the DOM (canvas, WebGL) so check can verify its
  * glyphs and font. Call it from seek for every visible piece of such text.
  */
 export function registerText(entry: TextEntry): void {
+    if (muted > 0) return;
     host()?.registerText(entry);
 }
 

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>page-turn: 月相手翻书</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #cfbd9f; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script type="module">
+import {
+  beatTimes,
+  clamp,
+  composition,
+  cueProgress,
+  drawPaper,
+  ease,
+  fillText,
+  FONTS,
+  grainLayer,
+  hatch,
+  moveCamera,
+  PAPER,
+  pageTurn,
+  paperLayer,
+  progress,
+  setupCanvas,
+  staticLayer,
+  timeline,
+} from '/__flipbook/runtime.js';
+import { drawMoon, INK, moonDiscs } from './moon.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const stage = { x: 0, y: 0, width: W, height: H };
+const ctx = setupCanvas(document.getElementById('stage'), W, H);
+const beat = tl.secondsPerBeat;
+
+// A lunar month in twelve pages, one per drawing.
+const DAYS = [2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15];
+const LABELS = ['初二', '初三', '初四', '初五', '初七', '初八', '初九', '初十', '十一', '十二', '十四', '十五'];
+const GOLD = '#d2b06a';
+
+// The closed book on the desk, then open, then the right page filling the frame.
+const box = { x: 960, y: 342, width: 704, height: 396 };
+const closed = { x: 960 + 352 - 704, y: 540 - 396, width: 1408, height: 792 };
+const COVER_TURN = 1 * beat;
+const COVER_TIME = 2 * beat;
+
+let paper;
+let cloth;
+let endpaper;
+let desk;
+let discs;
+
+function moonPage(c, i) {
+  c.drawImage(paper.canvas, 0, 0, W, H);
+  drawMoon(c, discs, 960, 540, 330, DAYS[i]);
+  c.fillStyle = INK;
+  c.textAlign = 'left';
+  c.font = `400 76px "${FONTS.hand}"`;
+  fillText(c, LABELS[i], 176, 250);
+  c.textAlign = 'center';
+  c.font = `500 30px "${FONTS.serif}"`;
+  fillText(c, String(i + 1), 960, 968);
+}
+
+function cover(c) {
+  c.drawImage(cloth.canvas, 0, 0, W, H);
+  c.fillStyle = GOLD;
+  c.textAlign = 'center';
+  c.font = `700 150px "${FONTS.serif}"`;
+  fillText(c, '月相', 960, 790);
+  c.font = `400 56px "${FONTS.hand}"`;
+  fillText(c, '手翻书', 960, 890);
+}
+
+function titleCard(c, t) {
+  c.drawImage(paper.canvas, 0, 0, W, H);
+  drawMoon(c, discs, 960, 300, 92, 14.8);
+  c.fillStyle = INK;
+  c.textAlign = 'center';
+  const a = ease.outCubic(cueProgress(tl, t, 'title'));
+  if (a > 0) {
+    c.globalAlpha = a;
+    c.font = `600 108px "${FONTS.serif}"`;
+    fillText(c, '月有阴晴圆缺', 960, 610 + (1 - a) * 16, { id: 'title' });
+  }
+  const b = ease.outCubic(cueProgress(tl, t, 'credit'));
+  if (b > 0) {
+    c.globalAlpha = b;
+    c.font = `400 46px "${FONTS.hand}"`;
+    fillText(c, '苏轼《水调歌头》', 960, 730, { id: 'credit' });
+  }
+  c.globalAlpha = 1;
+}
+
+// Scene "open": a cloth-bound book; the cover swings open on the beat.
+const book = pageTurn({
+  box,
+  page: { width: W, height: H },
+  turns: [COVER_TURN],
+  duration: COVER_TIME,
+  rigid: [0],
+  spread: true,
+  front: (c, i) => (i === 0 ? cover(c) : moonPage(c, 0)),
+  back: (c) => c.drawImage(endpaper.canvas, 0, 0, W, H),
+});
+
+// Scenes "flip" and "title": the pad fills the frame, a page every half beat,
+// then one slow turn onto the title card.
+const flipStart = tl.scenes[1].startBeat;
+const fast = beatTimes(tl, { from: flipStart + 0.5, count: DAYS.length - 1, every: 0.5 });
+const lastTurn = tl.scenes[2].start;
+const pad = pageTurn({
+  box: stage,
+  turns: [...fast, lastTurn],
+  duration: [...fast.map(() => 0.55), 1.5 * beat],
+  paper: '#f4eee0',
+  showThrough: 0.16,
+  front: (c, i, t) => (i < DAYS.length ? moonPage(c, i) : titleCard(c, t)),
+});
+const landed = lastTurn + 1.5 * beat;
+
+function drawBook(c, t) {
+  c.drawImage(desk.canvas, -240, -160, W + 480, H + 320);
+  c.save();
+  c.shadowColor = 'rgba(40, 26, 12, 0.45)';
+  c.shadowBlur = 28;
+  c.shadowOffsetY = 12;
+  c.fillStyle = '#efe7d4';
+  c.fillRect(box.x, box.y, box.width + 7, box.height + 8);
+  // The cover lying open on the left casts its own shadow once it lands.
+  if (t >= COVER_TURN + COVER_TIME) c.fillRect(box.x - box.width, box.y, box.width, box.height);
+  c.restore();
+  // The page block's edges.
+  c.strokeStyle = 'rgba(80, 60, 40, 0.28)';
+  c.lineWidth = 0.8;
+  for (let i = 1; i <= 5; i++) {
+    c.strokeRect(box.x + i * 1.3, box.y + i * 1.5, box.width, box.height);
+  }
+  book.draw(c, t);
+  // The gutter where the pages bend into the spine.
+  const g = c.createLinearGradient(box.x, 0, box.x + 46, 0);
+  g.addColorStop(0, 'rgba(60, 40, 20, 0.28)');
+  g.addColorStop(1, 'rgba(60, 40, 20, 0)');
+  c.fillStyle = g;
+  c.globalAlpha = 1 - ease.inOutCubic(progress(t, 4 * beat, 8 * beat));
+  c.fillRect(box.x, box.y, 46, box.height);
+  c.globalAlpha = 1;
+}
+
+composition({
+  setup() {
+    paperLayer(W, H, { seed: tl.seed, color: PAPER.beige });
+    paper = staticLayer(W, H, (c) => {
+      drawPaper(c, W, H, { seed: tl.seed + 1, color: '#f4eee0', mottle: 0.6, fibers: 0.8, specks: 0.6 });
+      c.strokeStyle = INK;
+      c.lineWidth = 2.4;
+      c.strokeRect(96, 86, W - 192, H - 172);
+      c.lineWidth = 0.9;
+      c.strokeRect(110, 100, W - 220, H - 200);
+    });
+    cloth = staticLayer(W, H, (c) => {
+      c.fillStyle = '#1f3a4b';
+      c.fillRect(0, 0, W, H);
+      hatch(c, { x: 0, y: 0, width: W, height: H }, { seed: 5, spacing: 5, length: 14, angle: 0, tone: 0.6, color: '#0f2230', opacity: 0.5 });
+      hatch(c, { x: 0, y: 0, width: W, height: H }, { seed: 6, spacing: 5, length: 14, angle: Math.PI / 2, tone: 0.5, color: '#3b5a6c', opacity: 0.35 });
+      c.strokeStyle = GOLD;
+      c.lineWidth = 6;
+      c.strokeRect(90, 80, W - 180, H - 160);
+      c.lineWidth = 2;
+      c.strokeRect(112, 102, W - 224, H - 204);
+      const moon = new Path2D();
+      moon.arc(960, 400, 150, 0, Math.PI * 2);
+      moon.arc(1026, 364, 124, 0, Math.PI * 2);
+      c.fillStyle = GOLD;
+      c.fill(moon, 'evenodd');
+    });
+    endpaper = staticLayer(W, H, (c) => {
+      c.fillStyle = '#d9dfdf';
+      c.fillRect(0, 0, W, H);
+      c.fillStyle = '#9fb1b6';
+      for (let y = 60; y < H; y += 120) {
+        for (let x = (y / 120) % 2 ? 60 : 120; x < W; x += 120) {
+          const m = new Path2D();
+          m.arc(x, y, 18, 0, Math.PI * 2);
+          m.arc(x + 7, y - 5, 16, 0, Math.PI * 2);
+          c.fill(m, 'evenodd');
+        }
+      }
+    });
+    desk = staticLayer(W + 480, H + 320, (c) => {
+      drawPaper(c, W + 480, H + 320, { seed: tl.seed + 2, color: PAPER.beige, vignette: 0.5 });
+    });
+    discs = moonDiscs(660, tl.seed);
+    grainLayer(W, H, { seed: tl.seed, amount: 0.6 });
+  },
+  seek(t) {
+    ctx.clearRect(0, 0, W, H);
+    if (t < tl.scenes[1].start) {
+      ctx.save();
+      if (t < 4 * beat) {
+        moveCamera(ctx, tl, closed, stage, ease.inOutCubic(progress(t, 0.5 * beat, 3.5 * beat)));
+      } else {
+        moveCamera(ctx, tl, stage, box, ease.inOutCubic(progress(t, 4 * beat, 8 * beat)));
+      }
+      drawBook(ctx, t);
+      ctx.restore();
+      return;
+    }
+    ctx.save();
+    const push = 1 + 0.04 * ease.inOutSine(progress(t, landed, tl.durationSec));
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(push, push);
+    ctx.translate(-W / 2, -H / 2);
+    pad.draw(ctx, t);
+    ctx.restore();
+  },
+});
+</script>
+</body>
+</html>

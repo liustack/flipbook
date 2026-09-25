@@ -1,5 +1,12 @@
 # Templates
 
+A template carries one device through a whole film. Pick at most one per film:
+
+| Template | Use it when |
+|---|---|
+| [Objects assemble a glyph](#objects-assemble-a-glyph) | objects land one by one and build a digit, a letter or a Chinese character |
+| [Page turn](#page-turn) | a book opens into the first scene, a page turns between two scenes, or pages flip on the beat into an animation |
+
 ## Objects assemble a glyph
 
 N objects fly in one after another and land on slots packed inside a digit, a letter or a Chinese character, each landing on a mark cue. The camera eases in while the finished glyph rests, then the film cuts to a title.
@@ -36,7 +43,7 @@ The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage
 }
 ```
 
-## Steps
+### Steps
 
 1. In `timeline.json`, write one `mark` cue per object. Give the ids a shared prefix (`egg-01`, `egg-02` ...) and rising beats: sparse at first, closer toward the end, the last landing one or two bars before the scene ends. This prints such cues for 34 objects landing from beat 0 to beat 5.25 of scene `gather`:
 
@@ -55,7 +62,7 @@ The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage
 
 Without sound effects, skip the cues and use `paceTimes(tl, { count, from, to })` for the times (beats from the composition start).
 
-## The object drawer
+### The object drawer
 
 `draw` is `(ctx, piece) => void`, or an array of them (picked per object by seed). It runs once per object in `setup()`:
 
@@ -64,7 +71,7 @@ Without sound effects, skip the cues and use `paceTimes(tl, { count, from, to })
 - `piece.light` is the unit vector toward the light in the object's own coordinates. Put highlights toward it and shading away from it.
 - Draw anything: fills, gradients, `stipple`, `halftone`, `pencil`, images from `assets/`.
 
-## Options
+### Options
 
 | Call | Option (default) | Meaning |
 |---|---|---|
@@ -85,7 +92,7 @@ Without sound effects, skip the cues and use `paceTimes(tl, { count, from, to })
 
 `assembly.at(t)` returns each object's `{ index, x, y, angle, scale, lift, landed }` for custom drawing. `assembly.landed(t)` counts the landed objects.
 
-## Sizes that read
+### Sizes that read
 
 For a glyph about 900 px tall on a 1920x1080 stage:
 
@@ -143,3 +150,128 @@ composition({
   },
 });
 ```
+
+## Page turn
+
+A page curls up from its corner, rolls over and lands on the other side of the spine. The back of the turning page shows the front through the paper, mirrored and faint. The page underneath takes a shadow that deepens as the page rises. Three uses:
+
+- **Transition**: the page fills the stage, page 0 draws scene A, page 1 draws scene B, one turn at the cut.
+- **Opening**: a book on a desk. The cover swings open as a stiff board, the camera pushes into the right-hand page until it fills the frame, and the first scene goes on full frame.
+- **Flipbook**: a turn every beat or half beat, each page one drawing. Turns longer than the gap between them keep several pages in the air at once, and the drawings play as an animation.
+
+Sample image: `docs/samples/page-turn.png` in the flipbook repository. Full example with all three uses: `examples/page-turn/`.
+
+### Steps
+
+1. Turn times, in seconds: `beatTimes(tl, { from, count, every })` for one turn every `every` beats from beat `from` (counted from the composition start), or `markTimes(tl, prefix)` for one turn per mark cue.
+2. Build it once, at module level or in `setup()`: `pageTurn({ box, turns, front, back, ... })`. Page 0 lies on top. Turn i turns page i over, so there are `turns.length + 1` pages.
+3. In `seek(t)`, call `book.draw(ctx, t)`.
+
+### The page drawers
+
+`front` and `back` are `(ctx, index, t) => void`:
+
+- Draw in page units: `(0, 0)` is the page's top left and the page is `page.width` by `page.height` (the box size when `page` is not given). Give `page` the stage size when a page shows a whole scene, as in the opening.
+- Paint the whole page, background first.
+- Keep the transform you are given: no `setTransform` or `resetTransform`.
+- A drawer runs up to three times per frame for a turning page. Draw heavy pictures once in `setup()` with `staticLayer()` and blit them.
+- `back` draws a page's back as it reads once turned, left to right. Without it the back is plain `paper`.
+- Canvas text from the runtime's `fillText()` in a drawer is registered with check as usual. The mirrored copy on the back is not. Settle text cues at a moment when no page is turning over that text.
+
+<!-- check: pass -->
+```js
+import { beatTimes, composition, fillText, FONTS, pageTurn, setupCanvas, timeline } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
+const colors = ['#efe5d0', '#d9e2cf', '#e8d3c9', '#d6dde6'];
+const book = pageTurn({
+  box: { x: 0, y: 0, width: tl.width, height: tl.height },
+  turns: beatTimes(tl, { from: 1, count: 3, every: 2 }),
+  duration: 0.9,
+  front(c, i) {
+    c.fillStyle = colors[i];
+    c.fillRect(0, 0, tl.width, tl.height);
+    c.fillStyle = '#2b2622';
+    c.font = `600 72px "${FONTS.serif}"`;
+    c.textAlign = 'center';
+    fillText(c, `第${i + 1}页`, tl.width / 2, 205);
+  },
+});
+
+composition({
+  seek(t) {
+    ctx.clearRect(0, 0, tl.width, tl.height);
+    book.draw(ctx, t);
+  },
+});
+```
+
+### Opening a book
+
+Give the right-hand page a `box` with the stage's proportions and `page` the stage size, so page 1 draws the first scene exactly as it will look full frame. `spread: true` keeps the opened cover lying on the left, `rigid: [0]` swings the cover as a board, `back` draws the endpaper. Then push the camera with `moveCamera(ctx, stage, from, to, amount)`: at amount 1 the box fills the frame, and the next scene takes over at full size with no jump.
+
+<!-- check: pass -->
+```js
+import { composition, ease, moveCamera, pageTurn, progress, setupCanvas, timeline } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
+const stage = { x: 0, y: 0, width: tl.width, height: tl.height };
+const box = { x: 320, y: 101, width: 280, height: 158 };
+const book = pageTurn({
+  box,
+  page: { width: tl.width, height: tl.height },
+  turns: [0.7],
+  duration: 1.2,
+  rigid: [0],
+  spread: true,
+  front(c, i) {
+    c.fillStyle = i === 0 ? '#1f3a4b' : '#f4eee0';
+    c.fillRect(0, 0, tl.width, tl.height);
+    c.fillStyle = i === 0 ? '#d2b06a' : '#c8452d';
+    c.beginPath();
+    c.arc(tl.width / 2, tl.height / 2, 90, 0, Math.PI * 2);
+    c.fill();
+  },
+  back(c) {
+    c.fillStyle = '#d9dfdf';
+    c.fillRect(0, 0, tl.width, tl.height);
+  },
+});
+
+composition({
+  seek(t) {
+    ctx.fillStyle = '#cfbd9f';
+    ctx.fillRect(0, 0, tl.width, tl.height);
+    ctx.save();
+    moveCamera(ctx, tl, stage, box, ease.inOutCubic(progress(t, 2.5, tl.durationSec)));
+    book.draw(ctx, t);
+    ctx.restore();
+  },
+});
+```
+
+### Options
+
+| Option (default) | Meaning |
+|---|---|
+| `box` | where the page lies on the stage, its left edge is the spine |
+| `turns` | start of each turn in seconds, rising |
+| `duration` (0.6) | seconds per turn, one number or one per turn |
+| `page` (the box size) | drawing units of a page |
+| `corner` (`'bottom'`) | the corner that leads, `'bottom'` or `'top'` |
+| `ease` (`ease.inOutCubic`) | pace of a turn |
+| `tilt` (0.45) | slant of the fold when the corner first lifts, radians |
+| `curl` (0.08) | radius of the roll at mid-turn, as a share of the page height |
+| `spread` (false) | turned pages stay on the left of the spine, as in an open book |
+| `rigid` (none) | indexes of pages that swing as stiff boards, such as a cover |
+| `paper` (`'#f5f0e5'`) | color of a plain back |
+| `showThrough` (0.14) | opacity of the mirrored front on the back |
+| `shadow` (0.6) | strength of the shadows, 0 to 1 |
+
+`book.turning(t)` lists the pages in the air with their `progress`, top page first. `book.top(t)` is the page lying flat on top of the unturned stack.
+
+## Camera moves
+
+`moveCamera(ctx, stage, from, to, amount)` multiplies the context's transform so the stage shows rectangle `from` at amount 0 and rectangle `to` at amount 1, each fitted and centered. In between it zooms at a steady rate about one fixed point, or pans when the two rectangles have the same size. Pass the stage rectangle as `from` to push in and as `to` to pull out. Wrap it in `ctx.save()` and `ctx.restore()`.

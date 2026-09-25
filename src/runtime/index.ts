@@ -92,6 +92,16 @@ export {
     packSlots,
     shapeMask,
 } from './templates/assemble.ts';
+export { moveCamera } from './templates/camera.ts';
+export type {
+    PageDrawer,
+    PageTurn,
+    PageTurnOptions,
+    TurningPage,
+} from './templates/flipbook.ts';
+export { pageTurn } from './templates/flipbook.ts';
+export type { AccelerateOptions, BeatTimesOptions } from './templates/timing.ts';
+export { accelerate, beatTimes } from './templates/timing.ts';
 export type {
     PathTextOptions,
     PlacedWord,
