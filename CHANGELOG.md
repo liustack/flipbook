@@ -17,6 +17,18 @@
 - **skill**：第一步定规格时，涉及产品或品牌先在工作区找现成的 logo、主题色变量、设计 token、README 里的色值给用户确认，找不到就问。硬规矩里的字体放开到用户带许可证的自带字体。新增 `references/brand.md`，`templates.md` 加手翻书、镜筒蒙太奇、弧线匹配剪辑和运镜各一节，片段都真跑 check。reference 片段的测试支持 `snippet-file` 标记，把 brand.json 这类附带文件一起写进合成目录。
 - **评测**：新增弧线剪辑科学奇观串、翻页开场的书摘、按 brand.json 做品牌片三条用例。工作区预置文件多了 `copy` 生成器，`--dry-run` 会把每条用例的预置文件都摆一遍。
 
+### 快和长
+
+大片子不用干等：截帧提速、多页并行、页面定期重开、竖版和 4K、三分钟长片。实测数字见 `docs/platform.zh-CN.md` 的「渲染性能」。
+
+- **截帧提速**：启动参数加 `--disable-frame-rate-limit`，截图不再等 60 Hz 的合成节拍。hello 这类简单画面单页截帧快一倍，带纹理纸底的快一成多。截图格式试了 WebP 无损、JPEG、屏幕推流和并行页面，WebP 无损慢九倍，JPEG 质量 100 也只有 48 到 49 dB，其余没有更快，保持 PNG。
+- **多页并行**：check 通过后，render 按 CPU 核数减一开浏览器，每个一页，谁空下来谁接下一帧，帧按顺序送进同一个 ffmpeg，逐帧哈希和单页相同。页数再按内存和片长封顶，`--jobs` 可改。合成最近一次 check 没退 0、或之后改过文件，就只用一页，`render.parallel.reason` 写明原因。
+- **页面定期重开**：一页默认最多画 2400 帧（1920×1080，像素越多越早，最少 600 帧），JS 堆或 DOM 涨过线也提前重开，线是所有页合起来 512 MB 堆、4 万个节点，平分给同时在画的页。`--recycle <帧数>` 改成固定间隔，`--recycle 0` 不重开。三分钟片的内存全程不涨。
+- **画幅和分辨率**：`render` 和 `snapshot` 加 `--size`，收 `9:16`、`1:1`、`4:5` 这类比例（保留短边）或 `1080x1920` 这样的像素。`render` 加 `--scale`，`--scale 2` 把 1920×1080 渲成 3840×2160，canvas 按 dpr 建底层像素，截图拿设备像素。顺手修了 `snapshot --zoom` 截过一次之后页面的 `screen` 变成 800×600 的问题。hello 和 eggs-five 改成按舞台宽高排版，能直接出竖版，1920×1080 下的帧和改之前一样。
+- **长片样例**：新增 `examples/long-scroll`，三分钟纸面一直往上滚，测试里整条过 check 和成片验收。
+- **DOM 文字可以逐帧缩放**：两次渲染有十来帧不一致，根因是 60 Hz 限帧下截图抢在合成器按新缩放重画之前，不是字形缓存。上面的启动参数一并修好，rules.md 和 SKILL.md 里那条硬规矩删掉，`dom-scale-drift` 语料钉住。
+- **报告**：`render` 多了 `output`、`parallel`、`pages`、`recycle`，mp4 标签多了 `stage` 和 `scale`。
+
 ### 修复
 
 - **自己崩溃的页面不再漏报**：close() 探测页面 1 秒没回应时，再等最多 3 秒的崩溃报告。装了 systemd-coredump 的 Linux 上，Chromium 要等 core dump 处理完才知道渲染进程崩了（GitHub 的 Ubuntu runner 上 0.3 到 1.5 秒），原来这时页面已经关了，`page-error` 就丢了。
