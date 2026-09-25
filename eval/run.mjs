@@ -23,7 +23,7 @@ import {
     writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative } from 'node:path';
+import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
@@ -210,6 +210,41 @@ function makeClicks(file, { bpm, offsetSec, seconds }) {
     if (result.status !== 0) throw new Error(`ffmpeg could not make ${file}: ${result.stderr}`);
 }
 
+const isWindows = process.platform === 'win32';
+
+/**
+ * `flipbook` shims that run this checkout's CLI: a sh script for POSIX shells
+ * (Git Bash included) and, on Windows, a .cmd for everything else.
+ */
+function writeShims(bin) {
+    writeFileSync(join(bin, 'flipbook'), `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`);
+    chmodSync(join(bin, 'flipbook'), 0o755);
+    if (isWindows) {
+        writeFileSync(join(bin, 'flipbook.cmd'), `@"${process.execPath}" "${cli}" %*\r\n`);
+    }
+}
+
+/** What `flipbook --version` prints through the shim this platform starts, or ''. */
+function shimVersion(bin) {
+    const result = isWindows
+        ? // Node starts a .cmd only through a shell.
+          spawnSync(`"${join(bin, 'flipbook.cmd')}" --version`, { shell: true, encoding: 'utf-8' })
+        : spawnSync(join(bin, 'flipbook'), ['--version'], { encoding: 'utf-8' });
+    return result.status === 0 ? result.stdout.trim() : '';
+}
+
+/** process.env with `dir` first on PATH, whatever case the PATH key has. */
+function envWithBin(dir) {
+    const env = {};
+    let current = '';
+    for (const [key, value] of Object.entries(process.env)) {
+        if (key.toUpperCase() === 'PATH') current = value ?? '';
+        else env[key] = value;
+    }
+    env.PATH = `${dir}${delimiter}${current}`;
+    return env;
+}
+
 /** A fresh workspace with the repository's skill and a `flipbook` shim on PATH. */
 function prepareWorkspace(entry, host) {
     const ws = mkdtempSync(join(tmpdir(), `flipbook-eval-${entry.name}-`));
@@ -220,8 +255,7 @@ function prepareWorkspace(entry, host) {
     if (HOSTS[host].agentsNote) writeFileSync(join(ws, 'AGENTS.md'), HOSTS[host].agentsNote);
     const bin = join(ws, '.eval-bin');
     mkdirSync(bin, { recursive: true });
-    writeFileSync(join(bin, 'flipbook'), `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`);
-    chmodSync(join(bin, 'flipbook'), 0o755);
+    writeShims(bin);
     for (const [rel, spec] of Object.entries(entry.spec.workspace ?? {})) {
         const file = join(ws, rel);
         mkdirSync(dirname(file), { recursive: true });
@@ -361,7 +395,7 @@ function runHost(target, prompt, ws, bin, timeoutMin) {
         const started = Date.now();
         const child = spawn(host.bin, host.args(target.model, prompt, ws), {
             cwd: ws,
-            env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+            env: envWithBin(bin),
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         const out = [];
@@ -489,9 +523,7 @@ async function main() {
             const installed = HOSTS[target.host].skillDirs.every((d) =>
                 existsSync(join(ws, d, 'SKILL.md')),
             );
-            const shim = spawnSync(join(ws, '.eval-bin', 'flipbook'), ['--version'], {
-                encoding: 'utf-8',
-            }).stdout.trim();
+            const shim = shimVersion(join(ws, '.eval-bin'));
             process.stdout.write(
                 `     workspace install ${installed ? 'ok' : 'FAILED'}, flipbook shim ${shim || 'FAILED'}\n`,
             );
