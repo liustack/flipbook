@@ -6,11 +6,13 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../src/cli/check.ts';
 import { runRender } from '../src/cli/render.ts';
 import { UsageError } from '../src/cli/report.ts';
+import { runSnapshot } from '../src/cli/snapshot.ts';
 import { run } from '../src/engine/proc.ts';
 import { openPage } from '../src/engine/session.ts';
 import { outputSize, parseSize, stageSize } from '../src/engine/size.ts';
 import { loadTimeline } from '../src/engine/timeline.ts';
 import { probeVideo } from '../src/engine/verify.ts';
+import { sha256 } from '../src/engine/workspace.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, copyFixture, tempDir } from './helpers.ts';
 
@@ -177,5 +179,27 @@ describe('render in other shapes', () => {
         probe = await probeVideo(s.ffmpeg.ffprobe, sharp.artifacts.video);
         expect([probe.width, probe.height]).toEqual([1280, 720]);
         expect(JSON.parse(probe.comment ?? '{}')).toMatchObject({ stage: '640x360', scale: 2 });
+    });
+});
+
+describe('snapshot in another shape', () => {
+    it('lays a 9:16 stage out in tall tiles, with a hash per tile and one digest over them', async () => {
+        const dir = copyFixture('stage');
+        const s = await session();
+        const take = async () => {
+            const snap = await runSnapshot({ dir, session: s, size: parseSize('9:16') });
+            expect(snap.failures).toEqual([]);
+            return snap.snapshot as {
+                layout: { tileWidth: number; tileHeight: number };
+                tiles: { frame: number; sha256: string }[];
+                digest: string;
+            };
+        };
+        const first = await take();
+        expect(first.layout.tileHeight).toBeGreaterThan(first.layout.tileWidth);
+        expect(first.tiles.every((tile) => /^[0-9a-f]{64}$/.test(tile.sha256))).toBe(true);
+        expect(first.digest).toBe(sha256(first.tiles.map((tile) => tile.sha256).join('\n')));
+        const second = await take();
+        expect(second.digest).toBe(first.digest);
     });
 });

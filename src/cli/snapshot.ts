@@ -12,7 +12,7 @@ import {
 import { applySize, type SizeSpec } from '../engine/size.ts';
 import { loadTimeline } from '../engine/timeline.ts';
 import { type ResolvedTimeline, sceneAtFrame } from '../engine/timelineResolve.ts';
-import { compositionHash, Workspace } from '../engine/workspace.ts';
+import { compositionHash, sha256, Workspace } from '../engine/workspace.ts';
 import { progress, type Report, ReportBuilder, UsageError } from './report.ts';
 
 export interface Region {
@@ -161,6 +161,8 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
             await contactSheet(session.ffmpeg.ffmpeg, ['-i', pattern], layout, staged);
             const sheet = ws.move(staged, path.join(outDir, 'contact-sheet.png'));
             rb.report.artifacts.contactSheet = sheet;
+            // Hashed the way render hashes its frames, so a digest pins these exact pixels.
+            const hashes = shots.map((shot) => sha256(shot));
             rb.report.snapshot = {
                 layout,
                 tiles: frames.slice(0, shots.length).map((frame, index) => ({
@@ -170,7 +172,9 @@ export async function runSnapshot(options: SnapshotOptions): Promise<Report> {
                     frame,
                     time: Number((frame / timeline.fps).toFixed(3)),
                     scene: sceneAtFrame(timeline, frame).id,
+                    sha256: hashes[index],
                 })),
+                digest: sha256(hashes.join('\n')),
                 zooms,
             };
         }

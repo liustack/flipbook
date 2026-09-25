@@ -44,7 +44,7 @@ read_when:
 | `stopReason` | string | `stop` 为 true 时说明卡在哪 |
 | `timing` | object | `startedAt`、`durationMs` |
 
-各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字，`determinism` 是确定性三项各自的结果，见「并行渲染」一节），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`、`output`、`parallel`、`pages`、`recycle`，后四个见「画幅和分辨率」「并行渲染」两节），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同，其中 `stage` 是舞台尺寸（如 `1080x1920`），`scale` 是 `--scale`。
+各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字，`determinism` 是确定性三项各自的结果，见「并行渲染」一节），`snapshot`（`layout`、`tiles` 每格的帧号时间、场景和截图的 `sha256`、`digest` 各格哈希按顺序换行拼起来再算的 sha256、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`、`output`、`parallel`、`pages`、`recycle`，后四个见「画幅和分辨率」「并行渲染」两节），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同，其中 `stage` 是舞台尺寸（如 `1080x1920`），`scale` 是 `--scale`。
 
 ### 画幅和分辨率
 

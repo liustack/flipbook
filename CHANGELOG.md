@@ -28,7 +28,7 @@
 - **画幅和分辨率**：`check`、`render` 和 `snapshot` 加 `--size`（竖版的文字出画和安全区在渲染前就能查），收 `9:16`、`1:1`、`4:5` 这类比例（保留短边）或 `1080x1920` 这样的像素。`render` 加 `--scale`，`--scale 2` 把 1920×1080 渲成 3840×2160，canvas 按 dpr 建底层像素，截图拿设备像素。顺手修了 `snapshot --zoom` 截过一次之后页面的 `screen` 变成 800×600 的问题。hello 和 eggs-five 改成按舞台宽高排版，能直接出竖版，1920×1080 下的帧和改之前一样。check 和成片验收里空白、只剩纸底、定格、花屏这几项的分析图按实际画幅缩放（竖版是 180×320），不再压成 16:9。
 - **长片样例**：新增 `examples/long-scroll`，三分钟纸面一直往上滚，测试里整条过 check 和成片验收。
 - **DOM 文字可以逐帧缩放**：两次渲染有十来帧不一致，根因是 60 Hz 限帧下截图抢在合成器按新缩放重画之前，不是字形缓存。上面的启动参数一并修好，rules.md 和 SKILL.md 里那条硬规矩删掉，`dom-scale-drift` 语料钉住。
-- **报告**：`check` 多了 `determinism`，`render` 多了 `output`、`parallel`、`pages`、`recycle`，mp4 标签多了 `stage` 和 `scale`。
+- **报告**：`check` 多了 `determinism`，`snapshot` 每格多了截图的 `sha256`，另有汇总的 `digest`，`render` 多了 `output`、`parallel`、`pages`、`recycle`，mp4 标签多了 `stage` 和 `scale`。
 - **待办**：成片验收把视频解码三遍（空白和纸底一遍、定格一遍、花屏抽帧一遍），三分钟长片上要合成一遍。beat-title 还没改成按舞台宽高排版。
 
 ### 修复
