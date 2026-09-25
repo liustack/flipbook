@@ -1,14 +1,16 @@
 // Adapted from liustack/modlens scripts/stamp.test.mjs.
 // Copyright (c) 2026 Leon Liu (liustack). MIT License.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
     docTargets,
     readPackageVersion,
     readStampedVersions,
     repoRoot,
+    stampLaunchers,
     stampTargets,
     unpinnedInstalls,
     unpinnedSkillAdds,
@@ -40,6 +42,38 @@ describe('launcher version stamping', () => {
         expect(stamped.length).toBeGreaterThanOrEqual(2);
         for (const entry of stamped) {
             expect(entry.version, `${entry.name} is not stamped to ${version}`).toBe(version);
+        }
+    });
+
+    it('leaves no copy of the old version in SKILL.md and the install docs', () => {
+        const version = readPackageVersion();
+        const base = mkdtempSync(join(tmpdir(), 'flipbook-stamp-'));
+        const docs = ['README.md', 'INSTALL.md', join('skills', 'flipbook', 'SKILL.md')];
+        const launchers = ['run.sh', 'run.ps1'].map((name) =>
+            join('skills', 'flipbook', 'scripts', name),
+        );
+        try {
+            for (const file of ['package.json', ...docs, ...launchers]) {
+                mkdirSync(dirname(join(base, file)), { recursive: true });
+                copyFileSync(join(repoRoot, file), join(base, file));
+            }
+            const pkgFile = join(base, 'package.json');
+            writeFileSync(
+                pkgFile,
+                readFileSync(pkgFile, 'utf-8').replace(
+                    `"version": "${version}"`,
+                    '"version": "9.9.9"',
+                ),
+            );
+            stampLaunchers(base);
+            for (const file of docs) {
+                const stale = readFileSync(join(base, file), 'utf-8')
+                    .split('\n')
+                    .filter((line) => line.includes(version));
+                expect(stale, file).toEqual([]);
+            }
+        } finally {
+            rmSync(base, { recursive: true, force: true });
         }
     });
 

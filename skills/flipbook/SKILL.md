@@ -32,7 +32,7 @@ bash <skill-dir>/scripts/run.sh render <dir>                    # MP4 plus accep
 
 If scripts cannot run, use the first line that works (the pinned version is 0.1.0):
 
-1. A `flipbook` on PATH with the same major.minor as 0.1.0 and at least 0.1.0: `flipbook <args>`.
+1. A `flipbook` on PATH with the same major.minor as the pinned version and not older than it: `flipbook <args>`.
 2. `npx --yes --package @liustack/flipbook@0.1.0 flipbook <args>`.
 3. `bunx --bun @liustack/flipbook@0.1.0 <args>`.
 4. None: tell the user to install Node 22.19+ from https://nodejs.org.
