@@ -47,17 +47,20 @@ export interface FontStatus {
     present: boolean;
 }
 
-/** Which fonts are in the cache. Size only; the hash was checked when the file arrived. */
+/** Size only: the hash was checked when the file arrived. */
+function hasSize(file: string, size: number): boolean {
+    try {
+        return fs.statSync(file).size === size;
+    } catch {
+        return false;
+    }
+}
+
+/** Which fonts are in the cache. */
 export function fontStatus(env: NodeJS.ProcessEnv = process.env): FontStatus[] {
     return FONTS.map((font) => {
         const file = fontPath(font, env);
-        let present = false;
-        try {
-            present = fs.statSync(file).size === font.size;
-        } catch {
-            present = false;
-        }
-        return { id: font.id, family: font.family, path: file, present };
+        return { id: font.id, family: font.family, path: file, present: hasSize(file, font.size) };
     });
 }
 
@@ -127,9 +130,10 @@ export async function downloadFont(
         );
     }
     fs.mkdirSync(dir, { recursive: true });
+    const part = `${target}.${process.pid}.part`;
     const errors: string[] = [];
+    let fetched = false;
     for (const url of candidateUrls(font, env)) {
-        const part = `${target}.${process.pid}.part`;
         progress(`downloading ${font.family} (${(font.size / 1e6).toFixed(1)} MB) from ${url}`);
         try {
             await downloadTo(url, part);
@@ -138,23 +142,35 @@ export async function downloadFont(
             const digest = sha256File(part);
             if (digest !== font.sha256)
                 throw new Error(`sha256 ${digest}, expected ${font.sha256}`);
-            fs.renameSync(part, target);
-            fs.writeFileSync(path.join(dir, 'OFL.txt'), LICENSES[font.licenseFile]);
-            return target;
+            fetched = true;
+            break;
         } catch (error) {
             errors.push(`${url}: ${(error as Error).message}`);
             fs.rmSync(part, { force: true });
         }
     }
-    throw new EnvError(
-        'font-download-failed',
-        `Could not download ${font.family}.`,
-        [
-            'Check the network or HTTPS_PROXY, then run the command again',
-            `Or set FLIPBOOK_FONT_BASE_URL to a mirror serving ${font.file} (sha256 ${font.sha256})`,
-        ],
-        { errors },
-    );
+    if (!fetched) {
+        throw new EnvError(
+            'font-download-failed',
+            `Could not download ${font.family}.`,
+            [
+                'Check the network or HTTPS_PROXY, then run the command again',
+                `Or set FLIPBOOK_FONT_BASE_URL to a mirror serving ${font.file} (sha256 ${font.sha256})`,
+            ],
+            { errors },
+        );
+    }
+    try {
+        fs.renameSync(part, target);
+    } catch (error) {
+        // Another flipbook process got the same font into place first. Windows
+        // refuses to replace a file that process still holds open, and its copy
+        // passed the same checks, so keep it.
+        fs.rmSync(part, { force: true });
+        if (!hasSize(target, font.size)) throw error;
+    }
+    fs.writeFileSync(path.join(dir, 'OFL.txt'), LICENSES[font.licenseFile]);
+    return target;
 }
 
 /** Every manifest font in the cache, downloading the missing ones. */

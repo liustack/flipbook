@@ -37,6 +37,7 @@
 - **Windows 上的测试全部要过**：CI 的 windows-latest 列不再有允许失败的一组。编码器测试冒充 ffmpeg 的改成 Node 脚本，run.sh 的测试用 Git for Windows 的 sh 跑，评测工作区在 Windows 上另写 `flipbook.cmd` 垫片。靠信号认出系统杀进程的两条和靠 chmod 造删不掉目录的两条在 Windows 上跳过。chrome://kill 那条先等 Chromium 报出崩溃再关页面，机器忙时这个报告最晚 16 秒才到。原生 Windows 仍不支持。
 - **macOS CI 偶发 seek-timeout**：vitest 进程数改成 CPU 数减 1，最少 1，最多 4。3 核的 macOS runner 上原来 4 个进程各开 Chromium，一帧 seek 能等过 10 秒。
 - **Dependabot 更新 npm 依赖失败**：本地 pnpm 和 Dependabot 用同一个 3 天发布冷静期（`pnpm-workspace.yaml` 的 `minimumReleaseAge`，`dependabot.yml` 的 `cooldown`），锁文件里不再有发布不满 3 天的版本，Dependabot 不再报 `ERR_PNPM_NO_MATURE_MATCHING_VERSION`。
+- **Windows 上几个进程同时首次下载字体不再失败**：先装好的进程已经打开了字体文件，Windows 不让后到的进程改名覆盖它，原来这个错误被当成下载失败，换镜像重下一遍后报 `font-download-failed`。现在改名失败时，如果正式文件已经在而且大小对，就用它。改名挪到了换下载地址的循环外面，别的原因的改名失败照原样报出来，不再算成网络问题。
 - **doctor 认出 Codex 装的 skill**：`~/.agents/skills` 下的副本原来报成 pi/opencode 的，`skills add --agent codex` 装的就落在这里，Codex 也从这里加载，现在报成 `codex / pi / opencode`。
 
 ### 文档
