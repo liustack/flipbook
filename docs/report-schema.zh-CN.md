@@ -134,16 +134,16 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `random-dependent` | check | 换随机底层种子画面就变，用了 Math.random 或 crypto | 用运行时库的 `rng` 或 `rand` |
 | `forbidden-api-call` | check | 页面调用了规矩禁用的时钟或随机函数，按函数各报一条，`detail.api` 是函数名，`detail.count` 是次数，`element` 是第一次调用的 `文件:行号`。计数覆盖基准页从加载到最后一次 seek 的全过程，被数的有 `Date.now()`、`new Date()`、`Date()`、`performance.now()`、`performance.timeOrigin`、`document.timeline.currentTime`、不带日期的 `Intl.DateTimeFormat`、`Temporal.Now.*`、`Math.random()`、`crypto.getRandomValues()`、`crypto.randomUUID()`。这些调用拿到的仍是虚拟时钟和固定种子的值，所以画面不一定变，但一律报错。Worker 和 iframe 里的调用数不到 | 换成 seek 传进来的 t，随机数用 `rng` 或 `rand` |
 | `late-paint` | check | 同一个 t 不重新 seek 连截两张不一样，有迟到的绘制 | seek 里画完，图片解码放 ready |
-| `blank-frame` | check、render | 画面是一整块纯色：缩到 320×180 灰度后，偏离中位灰度超过 16 灰阶的像素不到 0.05%。check 里全部抽样帧都空才是 error，部分空报 warning。render 里连续 1.5 秒以上才是 error | 查 seek 在这些时刻有没有画 |
-| `paper-only` | check、render | 画面和只开纸底层的基线一样：缩到 320×180 灰度后，和最近一张基线相差超过 16 灰阶的像素不到 0.05%。check 和 render 的判定规则同 `blank-frame`。render 每秒截一张基线。render 里空白帧和只剩纸底的帧合起来按「没有内容」连续计时，两类交替出现也不会被切断，类型码取两类里帧数多的那个，`detail` 里有 `blankFrames` 和 `paperFrames` | 查内容层是否因报错没画 |
+| `blank-frame` | check、render | 画面是一整块纯色：缩成 320×180 那么多像素、保持画幅的灰度图后（16:9 是 320×180，竖版 180×320），偏离中位灰度超过 16 灰阶的像素不到 0.05%。check 里全部抽样帧都空才是 error，部分空报 warning。render 里连续 1.5 秒以上才是 error | 查 seek 在这些时刻有没有画 |
+| `paper-only` | check、render | 画面和只开纸底层的基线一样：缩成 320×180 那么多像素、保持画幅的灰度图后（16:9 是 320×180，竖版 180×320），和最近一张基线相差超过 16 灰阶的像素不到 0.05%。check 和 render 的判定规则同 `blank-frame`。render 每秒截一张基线。render 里空白帧和只剩纸底的帧合起来按「没有内容」连续计时，两类交替出现也不会被切断，类型码取两类里帧数多的那个，`detail` 里有 `blankFrames` 和 `paperFrames` | 查内容层是否因报错没画 |
 | `missing-glyph` | check、render | 文字里有 flipbook 字体和这条片子自带的字体都没有的字，`detail.chars` 列出 | 换掉这些字 |
 | `font-fallback` | check、render | 文字用了系统字体而不是 flipbook 字体或自带字体。自带字体指 brand.json 的 `fonts.files` 和 assets/fonts/ 里写了许可证的字体，按它们各自的码位表核。DOM 字看 Chromium 实际用的字体。Canvas 字按 `ctx.font` 的字体链逐字核：某个字在找到含它的 flipbook 字体或自带字体之前先碰到别的字体名（系统字体或 `serif` 这类通用名），或者整条链都不含它，就报，`detail.chars` 列出这些字 | font-family 用 "Noto Serif SC"、"LXGW WenKai" 或自带字体，自带字体缺字时在它后面接 "Noto Serif SC" |
 | `text-offstage` | check | 文字完全出来的时刻（cue 的 settle 时刻），有一行越过画面边缘。每一行用 `Range.getClientRects` 取框，已含 transform。整段落在画面外的字也报，只有 `display: none`、`visibility: hidden` 或 `opacity: 0` 的字不算。运行时 `fillText` 登记的 canvas 字，框是字形四个角经画布当前变换（含旋转、倾斜、翻转）和 `maxWidth` 压缩后的包围框，再按画布的布局尺寸换成页面像素。画布元素自己的 CSS 旋转不计入 | 把字挪进画面或缩小，故意出画的字加 `data-flipbook-allow-overflow` |
 | `text-safe-area` | check | 同一时刻，有一行落进画面外沿 5% 的边距里，只报 warning | 离四边至少留宽高的 5%，或加 `data-flipbook-allow-overflow` |
 | `low-contrast` | check | 同一时刻，文字和背后画面的对比度低于 3:1（大字标准），只报 warning。量法：同一帧截两张，第二张把 DOM 文字设成透明，变了的像素就是字形，字色取变化最大的三成像素在第一张里的均值，背景取同一批像素在第二张里的均值，按 WCAG 相对亮度算比值，`detail.measured` 为 true。字和背后分不开时（藏起来前后变化超过 6 个色阶的像素不到 12 个，多半是同色字）也报这个 warning，`detail.measured` 为 false。Canvas 里画的字不量，列在 `check.contrastSkipped` 里（`frame`、`element`、`reason`） | 加深或调亮文字或背景，或在字下垫一块实色底 |
 | `stage-size` | check | html 或 body 的布局尺寸比 timeline 的宽高大，只报 warning。被 `overflow: hidden` 裁掉的出画内容不算 | 舞台按 timeline 尺寸写，隐藏溢出 |
-| `freeze` | render | 没声明 hold 的场景里画面 1.5 秒以上不动：成片缩到 320×180、高斯模糊（sigma 1.5）后用 ffmpeg freezedetect（`n=-60dB`）判定，只算落在没声明 hold 的场景里的部分。相邻的非 hold 场景连起来算，场景边界不切断定格，跨了几场时 `element` 是 `scenes <id>, <id>` | 让画面动起来，或给场景加 `"hold": true` |
-| `glitch` | render | 成片均匀抽 8 帧解码，和截图原帧在 480×270 上比 PSNR，低于 30 dB 就报，证据是最差那一帧的截图原帧和成片解码帧（`glitch-f<帧号>-captured.png`、`-decoded.png`）。送帧管道断了也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
+| `freeze` | render | 没声明 hold 的场景里画面 1.5 秒以上不动：成片缩成 320×180 那么多像素、保持画幅（竖版 180×320）、高斯模糊（sigma 1.5）后用 ffmpeg freezedetect（`n=-60dB`）判定，只算落在没声明 hold 的场景里的部分。相邻的非 hold 场景连起来算，场景边界不切断定格，跨了几场时 `element` 是 `scenes <id>, <id>` | 让画面动起来，或给场景加 `"hold": true` |
+| `glitch` | render | 成片均匀抽 8 帧解码，和截图原帧缩成 480×270 那么多像素、保持画幅（竖版 270×480）后比 PSNR，低于 30 dB 就报，证据是最差那一帧的截图原帧和成片解码帧（`glitch-f<帧号>-captured.png`、`-decoded.png`）。送帧管道断了也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
 | `frame-count` | render | 成片帧数和 timeline 不符 | 重渲一次，还出现就带 JSON 报 issue |
 | `duration-mismatch` | render | 成片时长和 timeline 不符（容差一帧）。有音轨时，音轨时长和画面差超过一帧和一个 AAC 包（1024 个采样）中较大者也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
 | `color-tags` | render | 成片不是 yuv420p 或缺 bt709 色彩标记 | 带 JSON 报 issue |

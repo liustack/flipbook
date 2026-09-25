@@ -2,7 +2,13 @@ import * as path from 'path';
 import { recordCheck } from '../engine/attempts.ts';
 import { auditContrast, auditSafeArea } from '../engine/layoutAudit.ts';
 import { type ClockConfig, defaultClock } from '../engine/page.ts';
-import { decodeGray, isFlat, matchesBaseline, writeSequence } from '../engine/pixels.ts';
+import {
+    analysisSize,
+    decodeGray,
+    isFlat,
+    matchesBaseline,
+    writeSequence,
+} from '../engine/pixels.ts';
 import { scanComposition } from '../engine/scan.ts';
 import {
     compositionDir,
@@ -455,22 +461,33 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
         // Blank and paper-only samples.
         if (shots.size > 0) {
             const order = [...shots.keys()].sort((a, b) => a - b);
-            const content = await decodeGray(session.ffmpeg.ffmpeg, [
-                '-i',
-                writeSequence(
-                    ws,
-                    scratch('frames'),
-                    order.map((f) => shots.get(f) as Buffer),
-                ),
-            ]);
-            const paper = await decodeGray(session.ffmpeg.ffmpeg, [
-                '-i',
-                writeSequence(
-                    ws,
-                    scratch('baseline'),
-                    order.map((f) => baselines.get(f) as Buffer),
-                ),
-            ]);
+            const gray = analysisSize(timeline.width, timeline.height);
+            const content = await decodeGray(
+                session.ffmpeg.ffmpeg,
+                [
+                    '-i',
+                    writeSequence(
+                        ws,
+                        scratch('frames'),
+                        order.map((f) => shots.get(f) as Buffer),
+                    ),
+                ],
+                gray.width,
+                gray.height,
+            );
+            const paper = await decodeGray(
+                session.ffmpeg.ffmpeg,
+                [
+                    '-i',
+                    writeSequence(
+                        ws,
+                        scratch('baseline'),
+                        order.map((f) => baselines.get(f) as Buffer),
+                    ),
+                ],
+                gray.width,
+                gray.height,
+            );
             const blank: number[] = [];
             const paperOnly: number[] = [];
             order.forEach((frame, i) => {

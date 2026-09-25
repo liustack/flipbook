@@ -5,12 +5,28 @@ import * as path from 'path';
 import { killedBySystem, run, tail, terminate } from './proc.ts';
 import type { Workspace } from './workspace.ts';
 
-/** Analysis size for blank, paper-only and freeze checks. */
+/** Analysis size of a 16:9 frame for blank, paper-only and freeze checks. */
 export const GRAY_W = 320;
 export const GRAY_H = 180;
-/** Analysis size for PSNR against captured frames. */
+/** Analysis size of a 16:9 frame for PSNR against captured frames. */
 export const RGB_W = 480;
 export const RGB_H = 270;
+
+/**
+ * Analysis size for a width x height frame: the pixel count of `base` in the
+ * frame's own shape, both sides even. A 1080x1920 video is analysed at
+ * 180x320 instead of being squeezed into 320x180.
+ */
+export function analysisSize(
+    width: number,
+    height: number,
+    base: { width: number; height: number } = { width: GRAY_W, height: GRAY_H },
+): { width: number; height: number } {
+    const area = base.width * base.height;
+    const w = Math.sqrt((area * width) / height);
+    const even = (v: number) => Math.max(2, 2 * Math.round(v / 2));
+    return { width: even(w), height: even(area / w) };
+}
 
 /** A pixel differs when its gray level moves by more than this. */
 export const DIFF_LEVEL = 16;
@@ -30,12 +46,12 @@ function grayFilter(width: number, height: number): string {
     return `scale=${width}:${height}:flags=area,format=gray`;
 }
 
-/** Decode an image sequence or a video into gray frames of width x height. */
+/** Decode an image sequence or a video into gray frames of width x height (see analysisSize). */
 export async function decodeGray(
     ffmpeg: string,
     input: string[],
-    width = GRAY_W,
-    height = GRAY_H,
+    width: number,
+    height: number,
     filterPrefix = '',
 ): Promise<Uint8Array[]> {
     const vf = `${filterPrefix}${grayFilter(width, height)}`;
@@ -61,12 +77,12 @@ export async function decodeGray(
     return split(result.stdout, width * height);
 }
 
-/** Decode to RGB frames of width x height. */
+/** Decode to RGB frames of width x height (see analysisSize). */
 export async function decodeRgb(
     ffmpeg: string,
     input: string[],
-    width = RGB_W,
-    height = RGB_H,
+    width: number,
+    height: number,
     filterPrefix = '',
 ): Promise<Uint8Array[]> {
     const vf = `${filterPrefix}scale=${width}:${height}:flags=area,format=rgb24`;
@@ -108,8 +124,8 @@ export function streamGray(
     ffmpeg: string,
     video: string,
     onFrame: (index: number, pixels: Uint8Array) => void,
-    width = GRAY_W,
-    height = GRAY_H,
+    width: number,
+    height: number,
 ): Promise<number> {
     return new Promise((resolve, reject) => {
         const size = width * height;

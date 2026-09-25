@@ -20,12 +20,15 @@ import {
 import { sequencePattern } from './capture.ts';
 import type { Ffmpeg } from './ffmpeg.ts';
 import {
+    analysisSize,
     decodeGray,
     decodeRgb,
     extractFrame,
     isFlat,
     matchesBaseline,
     psnr,
+    RGB_H,
+    RGB_W,
     selectExpr,
     streamGray,
 } from './pixels.ts';
@@ -148,11 +151,12 @@ export function freezePieces(
     return pieces.filter((piece) => piece.end - piece.start >= STILL_LIMIT_SEC - 1e-6);
 }
 
-/** Frozen spans reported by ffmpeg freezedetect on the downscaled, blurred video. */
+/** Frozen spans reported by ffmpeg freezedetect on the video scaled to `size` and blurred. */
 export async function freezeSpans(
     ffmpeg: string,
     video: string,
     durationSec: number,
+    size: { width: number; height: number },
 ): Promise<{ start: number; end: number }[]> {
     const result = await run(
         ffmpeg,
@@ -162,7 +166,7 @@ export async function freezeSpans(
             '-i',
             video,
             '-vf',
-            `scale=320:180:flags=area,gblur=sigma=1.5,freezedetect=n=-60dB:d=${STILL_LIMIT_SEC}`,
+            `scale=${size.width}:${size.height}:flags=area,gblur=sigma=1.5,freezedetect=n=-60dB:d=${STILL_LIMIT_SEC}`,
             '-map',
             '0:v',
             '-f',
@@ -193,6 +197,9 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     const findings: Finding[] = [];
     const fps = timeline.fps;
     const probe = await probeVideo(ffmpeg.ffprobe, video);
+    // Analyse every frame in the video's own shape, not squeezed to 16:9.
+    const gray = analysisSize(probe.width, probe.height);
+    const rgb = analysisSize(probe.width, probe.height, { width: RGB_W, height: RGB_H });
 
     if (probe.frames !== timeline.frameCount) {
         findings.push(
@@ -234,10 +241,17 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     const baselineFrames = [...options.baselines.keys()].sort((a, b) => a - b);
     const baselineGray =
         baselineFrames.length > 0
-            ? await decodeGray(ffmpeg.ffmpeg, [
-                  '-i',
-                  sequencePattern(path.dirname(options.baselines.get(baselineFrames[0]) as string)),
-              ])
+            ? await decodeGray(
+                  ffmpeg.ffmpeg,
+                  [
+                      '-i',
+                      sequencePattern(
+                          path.dirname(options.baselines.get(baselineFrames[0]) as string),
+                      ),
+                  ],
+                  gray.width,
+                  gray.height,
+              )
             : [];
     const byFrame = new Map<number, Uint8Array>();
     baselineFrames.forEach((frame, i) => {
@@ -253,22 +267,28 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     };
     const runs: EmptyRun[] = [];
     let current: EmptyRun | null = null;
-    await streamGray(ffmpeg.ffmpeg, video, (index, pixels) => {
-        let kind: 'blank' | 'paper' | 'content' = 'content';
-        if (isFlat(pixels)) kind = 'blank';
-        else {
-            const base = nearestBaseline(index);
-            if (base && matchesBaseline(pixels, base)) kind = 'paper';
-        }
-        if (kind === 'content') {
-            if (current) runs.push(current);
-            current = null;
-            return;
-        }
-        current ??= { from: index, to: index, blank: 0, paper: 0 };
-        current.to = index;
-        current[kind] += 1;
-    });
+    await streamGray(
+        ffmpeg.ffmpeg,
+        video,
+        (index, pixels) => {
+            let kind: 'blank' | 'paper' | 'content' = 'content';
+            if (isFlat(pixels)) kind = 'blank';
+            else {
+                const base = nearestBaseline(index);
+                if (base && matchesBaseline(pixels, base)) kind = 'paper';
+            }
+            if (kind === 'content') {
+                if (current) runs.push(current);
+                current = null;
+                return;
+            }
+            current ??= { from: index, to: index, blank: 0, paper: 0 };
+            current.to = index;
+            current[kind] += 1;
+        },
+        gray.width,
+        gray.height,
+    );
     if (current) runs.push(current);
     const minFrames = Math.ceil(STILL_LIMIT_SEC * fps);
     for (const r of runs) {
@@ -305,7 +325,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     }
 
     // Freezes longer than the limit, outside scenes marked hold.
-    for (const span of await freezeSpans(ffmpeg.ffmpeg, video, probe.durationSec)) {
+    for (const span of await freezeSpans(ffmpeg.ffmpeg, video, probe.durationSec, gray)) {
         for (const piece of freezePieces(span, timeline.scenes)) {
             const seconds = piece.end - piece.start;
             const frame = Math.round(piece.start * fps);
@@ -351,14 +371,16 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
         const decoded = await decodeRgb(
             ffmpeg.ffmpeg,
             ['-i', video],
-            undefined,
-            undefined,
+            rgb.width,
+            rgb.height,
             selectExpr(sampleFrames),
         );
-        const captured = await decodeRgb(ffmpeg.ffmpeg, [
-            '-i',
-            sequencePattern(path.dirname(options.samples.get(sampleFrames[0]) as string)),
-        ]);
+        const captured = await decodeRgb(
+            ffmpeg.ffmpeg,
+            ['-i', sequencePattern(path.dirname(options.samples.get(sampleFrames[0]) as string))],
+            rgb.width,
+            rgb.height,
+        );
         const worst: { frame: number; db: number }[] = [];
         sampleFrames.forEach((frame, i) => {
             const a = decoded[i];

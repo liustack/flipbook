@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { ENV_CODES, FINDING_CODES } from '../src/cli/codes.ts';
 import { LIMITS, recordCheck, recordRender } from '../src/engine/attempts.ts';
 import { covered, uncoveredChars } from '../src/engine/fonts.ts';
-import { psnr, sheetLayout } from '../src/engine/pixels.ts';
+import { analysisSize, psnr, RGB_H, RGB_W, sheetLayout } from '../src/engine/pixels.ts';
 import { findOnPath } from '../src/engine/proc.ts';
 import { auditCanvasText } from '../src/engine/textAudit.ts';
 import { acquireLock } from '../src/engine/workspace.ts';
@@ -206,6 +206,17 @@ describe('pixel math', () => {
         const layout = sheetLayout(12, 1920, 1080);
         expect(layout.cols * layout.rows).toBeGreaterThanOrEqual(12);
         expect(layout.cols * (layout.tileWidth + 8) + 8).toBeLessThanOrEqual(1568);
+    });
+
+    it('analyses a frame in its own shape, with the pixel count of 320x180 or 480x270', () => {
+        expect(analysisSize(1920, 1080)).toEqual({ width: 320, height: 180 });
+        expect(analysisSize(640, 360)).toEqual({ width: 320, height: 180 });
+        expect(analysisSize(1080, 1920)).toEqual({ width: 180, height: 320 });
+        expect(analysisSize(1080, 1080)).toEqual({ width: 240, height: 240 });
+        expect(analysisSize(1080, 1350)).toEqual({ width: 214, height: 268 });
+        const rgb = { width: RGB_W, height: RGB_H };
+        expect(analysisSize(3840, 2160, rgb)).toEqual({ width: 480, height: 270 });
+        expect(analysisSize(1080, 1920, rgb)).toEqual({ width: 270, height: 480 });
     });
 });
 
