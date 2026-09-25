@@ -137,7 +137,7 @@ stress 的 GPU 各次之间差得很小：灰度最大差 2 级，PSNR 不低于
 - 认出 `chrome-headless-shell-win64\chrome-headless-shell.exe`。playwright-core 没有 Windows arm64 的 headless shell。
 - 缺 Chromium 时给的安装命令是 PowerShell 写法（`$env:PLAYWRIGHT_BROWSERS_PATH="..."; npx ...`）。
 - 装 Chromium 的子进程带 `windowsHide`。
-- CI 加 windows-latest 一列，lint、typecheck、build 和平台无关的测试必须过。渲染相关的测试和只认 POSIX 的测试（run.sh 启动器、评测脚本的 sh 垫片、编码器测试里冒充 ffmpeg 的 sh 脚本和 `/bin/sleep`、`pgrep`）允许失败，报告存成 `windows-tests-node-*` 附件。
+- CI 加 windows-latest 一列，和其他列一样跑全部测试，没有允许失败的一组。run.sh 的测试用 Git for Windows 的 sh 跑，跟 Git Bash 里一样。编码器测试冒充 ffmpeg 的是 Node 脚本。评测工作区在 Windows 上另写 `flipbook.cmd` 垫片。Windows 上跳过四条，都写了原因：编码器测试里系统杀进程的两条（Windows 没有信号，flipbook 靠 SIGKILL 认出系统杀的进程），page 里靠 chmod 造删不掉目录的两条（Windows 不按权限位管目录）。chrome://kill 那条两列都偶发过：和别的测试一起跑时，Chromium 要 5 毫秒到 16 秒才发现渲染进程没了，比 close() 等的久，现在这条先等崩溃报告再关页面。
 - 第一次跑（2026-09-25，Node 22.19 和 24 各一列）：必过的一组 22 个文件全过。允许失败的一组里 corpus、doctor、references、render 四个文件也过了，Windows 上能渲出片子。没过的是 encode（sh 冒充的 ffmpeg、`/bin/sleep`、`pgrep` 在 Windows 上起不来）、launcher（run.sh 在 Git Bash 里调不起假的 flipbook、npx、bunx）、eval（评测脚本的 sh 垫片）、page 里靠 chmod 做出删不掉的目录的两条（Windows 不认这个权限，render 和 snapshot 照常成功）。Node 24 那列另有一次 `chrome://kill` 之后 close() 没报 resource-exhausted，Node 22.19 那列同一条过了。
 
 run.ps1 按 Windows 上启动器常踩的四个坑逐条查过：

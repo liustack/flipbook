@@ -56,45 +56,8 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH="$FLIPBOOK_CACHE/browsers" pnpm exec playwright-core install $deps chromium-headless-shell
       - run: pnpm lint
       - run: pnpm typecheck
-      - name: Test
-        if: runner.os != 'Windows'
-        run: pnpm test
-      # Windows is not supported yet. The suites that render, and the ones that
-      # drive POSIX-only tools (run.sh, the eval runner's sh shim, the encoder's
-      # sh stand-ins for ffmpeg, /bin/sleep and pgrep), may fail there; their
-      # report is kept as an artifact. Everything else must pass.
-      - name: Build for the Windows tests
-        if: runner.os == 'Windows'
-        run: pnpm build
-      - name: Test on Windows, platform-neutral suites
-        if: runner.os == 'Windows'
-        env:
-          FLIPBOOK_TEST_SKIP_BUILD: '1'
-        run: >-
-          pnpm exec vitest run
-          --exclude test/corpus.test.ts --exclude test/doctor.test.ts
-          --exclude test/page.test.ts --exclude test/references.test.ts
-          --exclude test/render.test.ts --exclude test/launcher.test.ts
-          --exclude test/eval.test.ts --exclude test/encode.test.ts
-      - name: Test on Windows, rendering and POSIX-only suites (allowed to fail)
-        if: runner.os == 'Windows'
-        continue-on-error: true
-        env:
-          FLIPBOOK_TEST_SKIP_BUILD: '1'
-        run: >-
-          pnpm exec vitest run
-          test/corpus.test.ts test/doctor.test.ts test/page.test.ts
-          test/references.test.ts test/render.test.ts test/launcher.test.ts
-          test/eval.test.ts test/encode.test.ts
-          --reporter=default --reporter=github-actions --reporter=junit
-          --outputFile.junit=vitest-windows.xml
-      - name: Keep the Windows test report
-        if: always() && runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-tests-node-${{ matrix.node-version }}
-          path: vitest-windows.xml
-          if-no-files-found: ignore
+      # Windows too. A case that cannot run there skips itself and says why.
+      - run: pnpm test
       - run: pnpm build
 
   install:
