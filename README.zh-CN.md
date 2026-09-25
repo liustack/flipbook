@@ -149,6 +149,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 | [时间轴](skills/flipbook/references/timeline.md) | 写 timeline.json，凑片长 |
 | [配乐和音效](skills/flipbook/references/audio.md) | 挑预设、调和强弱，放音效，用自己的音乐 |
 | [纸](skills/flipbook/references/paper.md)、[材质](skills/flipbook/references/materials.md)、[画布文字](skills/flipbook/references/text.md)、[构图模板](skills/flipbook/references/templates.md) | 纸感画面的各个部件，样张在 [docs/samples](docs/samples) |
+| [图片](skills/flipbook/references/photo.md) | 找公有领域的图鉴、标本照和古地图，抠成纸贴纸 |
 | [排错](skills/flipbook/references/troubleshooting.md) | 每个类型码的含义和改法 |
 | [报告格式](docs/report-schema.zh-CN.md) | 解析 JSON 报告、判定阈值、输出目录 |
 | [timeline.json 格式](docs/timeline-schema.zh-CN.md) | timeline 的每个字段、取值范围、拍怎么换算成帧 |

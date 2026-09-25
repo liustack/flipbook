@@ -38,7 +38,7 @@ src/
   stock/           找图：Pexels、Pixabay、Openverse 三家的搜索和详情、下载防护（只走 HTTPS、拒内网地址、连接钉在核对过的地址上）、图片格式嗅探
   fonts/           字体清单、码位表、OFL 全文
 scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）、examples-baseline.mjs（记样例的帧摘要）
-skills/flipbook/   SKILL.md（英文）、references/（rules、timeline、audio、paper、materials、text、templates、brand、troubleshooting）、scripts/run.sh 和 run.ps1
+skills/flipbook/   SKILL.md（英文）、references/（rules、timeline、audio、paper、materials、text、templates、brand、photo、troubleshooting）、scripts/run.sh 和 run.ps1
 docs/              report-schema.md、timeline-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
 docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
 examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro、long-scroll（三分钟长片），每个例子一份源码加 expected.json，不提交 mp4

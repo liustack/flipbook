@@ -149,6 +149,7 @@ What each platform was tested on, the sandbox settings and the memory a containe
 | [Timeline](skills/flipbook/references/timeline.md) | Writing timeline.json and hitting a target duration |
 | [Music and sound effects](skills/flipbook/references/audio.md) | Picking a preset, setting dynamics, placing effects, using your own music |
 | [Paper](skills/flipbook/references/paper.md), [materials](skills/flipbook/references/materials.md), [canvas text](skills/flipbook/references/text.md), [templates](skills/flipbook/references/templates.md) | Using the parts of the paper look. Sample sheets are in [docs/samples](docs/samples) |
+| [Photos](skills/flipbook/references/photo.md) | Finding public domain plates, specimen photos and maps, and turning them into paper stickers |
 | [Troubleshooting](skills/flipbook/references/troubleshooting.md) | Looking up what a code means and how to fix it |
 | [Report format](docs/report-schema.md) | Parsing the JSON report, its thresholds and the output directory |
 | [timeline.json format](docs/timeline-schema.md) | Looking up every timeline field, its allowed values and how beats become frames |

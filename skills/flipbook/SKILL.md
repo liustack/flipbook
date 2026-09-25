@@ -21,6 +21,8 @@ bash <skill-dir>/scripts/run.sh snapshot <dir> --zoom x,y,w,h --at 3.5
 bash <skill-dir>/scripts/run.sh render <dir>                    # MP4 plus acceptance checks
 bash <skill-dir>/scripts/run.sh render <dir> --size 9:16        # another shape: 1:1, 4:5 or WxH too
 bash <skill-dir>/scripts/run.sh render <dir> --scale 2          # 3840x2160 from a 1920x1080 stage
+bash <skill-dir>/scripts/run.sh stock search <dir> beetle plate  # public domain images, see references/photo.md
+bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse:<id> --as beetle
 ```
 
 Once check has passed its determinism checks (seek order, shifted clock and seed, late paint), render draws on several pages at once (CPU cores minus one, at most 6, fewer for short films or big frames). `--jobs <n>` sets the count. `check` and `snapshot` take `--size` too, and `check` takes `--scale`: check at the size and scale you will render, so text and the safe area are checked in that shape, and render gets parallel pages only after a check at the same size and scale.
@@ -49,6 +51,7 @@ If scripts cannot run, use the first line that works (the pinned version is 0.5.
   - Claude Code, `~/.claude/settings.json`: the cache directory in `sandbox.filesystem.allowWrite` plus `cdn.playwright.dev`, `storage.googleapis.com`, `github.com` and `*.githubusercontent.com` in `sandbox.network.allowedDomains`. Or the launcher command in `sandbox.excludedCommands`.
   - Codex, `~/.codex/config.toml` under `[sandbox_workspace_write]`: the cache directory in `writable_roots` and `network_access = true`. Codex on Linux needs `network_access = true` for every run.
 - Codex `read-only` cannot run flipbook: ask the user for `workspace-write`.
+- `stock search` and `stock fetch` reach image services every time. Inside a sandbox that blocks them they exit 78 with `stock-unreachable`: run that command outside the sandbox after the user approves.
 - Exit 78 with `sandbox-blocked` or `tmp-unwritable`: relay its `fix` lines.
 
 ## The six steps
@@ -70,7 +73,8 @@ Defaults:
 | look | the paper skin: `paperLayer()` and `grainLayer()` from `references/paper.md`, dark ink, one or two accent colors, serif type |
 | music | preset `pluck` (`"audio": { "mode": "preset", "preset": "pluck" }`), silent only when the user asks |
 | the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
-| characters, photos | none unless asked |
+| characters | none unless asked |
+| photos | none unless asked, or the film calls for real specimens, plates, micrographs or maps: `references/photo.md` |
 
 ## Hard rules
 
@@ -80,7 +84,7 @@ Defaults:
 - Size `html` and `body` to the stage (`100vw` by `100vh`) with `overflow: hidden`, and place things from `tl.width` and `tl.height`, not fixed pixels, so `--size` works. Mark paper and grain layers `data-flipbook-layer="paper"`. Draw static layers once in `setup()`.
 - Text lives in the DOM or goes through the runtime's `fillText()`. Fonts: `"Noto Serif SC"` or `"LXGW WenKai"`, or font files the user supplied with their license in brand.json or `assets/fonts/` (`references/brand.md`). Keep text inside the frame and away from the outer 5% margin when it settles, with contrast of at least 3:1 (check measures DOM text only: judge canvas text on the contact sheet). Mark deliberate bleeds `data-flipbook-allow-overflow`. Never animate `transform: scale()` on DOM text (on Linux and Windows two renders of it can differ): text that grows or shrinks goes through `fillText()` on a canvas.
 - Scenes where the picture stands still for more than 1.5 s need `"hold": true`.
-- Images go in `assets/` with their source and license in `assets/SOURCES.json`.
+- Images go in `assets/` with their source and license in `assets/SOURCES.json`: fetch them with `stock fetch`, which writes both, or take them from the user. Never download images any other way.
 - Never edit `.flipbook/` or `out/`.
 
 ## Stopping
@@ -102,3 +106,4 @@ Defaults:
 | `references/text.md` | when text goes on a canvas: handwriting, words appearing one by one, text along a curve |
 | `references/templates.md` | when the film needs one device throughout: objects assembling a glyph, a page turn or a book opening, a lens montage, an arc match cut |
 | `references/brand.md` | when the film is about a product or a brand, and before using a font file the user supplies |
+| `references/photo.md` | before searching for images, and before putting a photo, plate or map in a film |
