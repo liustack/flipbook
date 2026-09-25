@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <title>beat-title</title>
 <style>
-  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #f3ede1; }
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #f3ede1; }
   canvas { position: absolute; left: 0; top: 0; }
-  #title { position: absolute; left: 0; top: 380px; width: 1920px; margin: 0; text-align: center;
-           font: 700 200px/1.2 "Noto Serif SC"; letter-spacing: 24px; color: #2b2622; opacity: 0; }
+  #title { position: absolute; left: 0; width: 100%; margin: 0; text-align: center; font: 700 calc(200px * var(--s, 1))/1.2 "Noto Serif SC";
+           letter-spacing: calc(24px * var(--s, 1)); color: #2b2622; opacity: 0; }
 </style>
 </head>
 <body>
@@ -24,15 +24,43 @@ const tl = await timeline();
 const W = tl.width;
 const H = tl.height;
 const beat = tl.secondsPerBeat;
+// Two layouts in design pixels: the words side by side on a wide card, or
+// stacked on a tall one when the stage is portrait. The chosen box is scaled
+// to fit the stage and centred, so any --size keeps the layout.
+const LAYOUTS = {
+  wide: {
+    box: { w: 1920, h: 1080 },
+    card: { x: 960, y: 560, hw: 800, hh: 300 },
+    words: [{ x: 380, y: 608, half: 170 }, { x: 872, y: 608, half: 170 }, { x: 1452, y: 608, half: 250 }],
+    ball: { x: 1640, y: 420 },
+    line: { x0: 220, x1: 1700, y: 690 },
+    titleTop: 380,
+    stamp: { x: 1540, y: 770 },
+  },
+  tall: {
+    box: { w: 1080, h: 1920 },
+    card: { x: 540, y: 960, hw: 450, hh: 600 },
+    words: [{ x: 540, y: 760, half: 170 }, { x: 540, y: 1040, half: 170 }, { x: 540, y: 1320, half: 250 }],
+    ball: { x: 880, y: 470 },
+    line: { x0: 270, x1: 810, y: 1400 },
+    titleTop: 840,
+    stamp: { x: 820, y: 1400 },
+  },
+};
+const L = H > W ? LAYOUTS.tall : LAYOUTS.wide;
+const S = Math.min(W / L.box.w, H / L.box.h);
+const OX = (W - L.box.w * S) / 2;
+const OY = (H - L.box.h * S) / 2;
 const ink = setupCanvas(document.getElementById('ink'), W, H);
 // Every hit lands on the frame of its cue, where the sound peaks.
 const at = (id) => cue(tl, id).frame / tl.fps;
-const words = [
-  { id: 'w1', x: 380, half: 170 },
-  { id: 'w2', x: 872, half: 170 },
-  { id: 'w3', x: 1452, half: 250 },
-].map((w) => ({ ...w, text: cue(tl, w.id).text, land: at(w.id) }));
+const words = L.words.map((w, i) => {
+  const id = `w${i + 1}`;
+  return { ...w, id, text: cue(tl, id).text, land: at(id) };
+});
 const title = document.getElementById('title');
+document.documentElement.style.setProperty('--s', String(S));
+title.style.top = `${OY + L.titleTop * S}px`;
 const PAPER = '#f3ede1';
 const RED = '#c8452d';
 
@@ -42,7 +70,8 @@ composition({
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
       const r = rng(tl.seed);
-      for (let i = 0; i < 12000; i++) {
+      const specks = Math.round((12000 * W * H) / (1920 * 1080));
+      for (let i = 0; i < specks; i++) {
         ctx.fillStyle = `rgba(90, 70, 40, ${r.range(0.02, 0.07)})`;
         ctx.fillRect(r.range(0, W), r.range(0, H), r.range(1, 3), r.range(1, 3));
       }
@@ -51,6 +80,9 @@ composition({
   },
   seek(t) {
     ink.clearRect(0, 0, W, H);
+    ink.save();
+    ink.translate(OX, OY);
+    ink.scale(S, S);
 
     // The card slides in and flips flat on the page-turn cue.
     const flip = at('flip');
@@ -58,17 +90,19 @@ composition({
     const drift = Math.sin(t * 1.3) * 6;
     const out = transitionOut(tl, t, 'words', 1);
     ink.save();
-    ink.translate(lerp(W + 700, W / 2, inP) + drift, 560 + (1 - inP) * 80);
+    // It starts with one edge showing, so the first frame is not bare paper.
+    const { card } = L;
+    ink.translate(lerp(L.box.w + card.hw - 100, card.x, inP) + drift, card.y + (1 - inP) * 80);
     ink.rotate(lerp(0.22, -0.015, inP) + Math.sin(t * 0.9) * 0.004);
     const flat = t < flip ? lerp(0.35, 1, ease.inQuad(progress(t, flip - beat, flip))) : 1;
     ink.scale(1, flat);
     ink.fillStyle = 'rgba(60, 45, 30, 0.12)';
-    ink.fillRect(-790, -290, 1600, 620);
+    ink.fillRect(-card.hw + 10, -card.hh + 10, card.hw * 2, card.hh * 2 + 20);
     ink.fillStyle = '#fbf7ef';
-    ink.fillRect(-800, -300, 1600, 600);
+    ink.fillRect(-card.hw, -card.hh, card.hw * 2, card.hh * 2);
     ink.strokeStyle = 'rgba(43, 38, 34, 0.35)';
     ink.lineWidth = 3;
-    ink.strokeRect(-800, -300, 1600, 600);
+    ink.strokeRect(-card.hw, -card.hh, card.hw * 2, card.hh * 2);
     ink.restore();
 
     // A small ink ball bounces on every beat until the end card.
@@ -77,7 +111,7 @@ composition({
       const h = 4 * b * (1 - b);
       ink.fillStyle = `rgba(43, 38, 34, ${(1 - out) * progress(inP, 0.5, 1)})`;
       ink.beginPath();
-      ink.ellipse(1640, 420 - h * 150, 26 * (1 + (1 - h) * 0.25), 26 * (1 - (1 - h) * 0.2), 0, 0, Math.PI * 2);
+      ink.ellipse(L.ball.x, L.ball.y - h * 150, 26 * (1 + (1 - h) * 0.25), 26 * (1 - (1 - h) * 0.2), 0, 0, Math.PI * 2);
       ink.fill();
     }
 
@@ -105,10 +139,10 @@ composition({
       const near = t < w.land ? progress(t, start, w.land) : 1;
       ink.fillStyle = `rgba(43, 38, 34, ${0.12 * near * (1 - out)})`;
       ink.beginPath();
-      ink.ellipse(w.x, 640, w.half * (0.5 + near * 0.5) * sx, 16, 0, 0, Math.PI * 2);
+      ink.ellipse(w.x, w.y + 32, w.half * (0.5 + near * 0.5) * sx, 16, 0, 0, Math.PI * 2);
       ink.fill();
       ink.save();
-      ink.translate(w.x, 608 + y);
+      ink.translate(w.x, w.y + y);
       ink.rotate((Math.sin(t * 1.7 + i * 2) * 1.5 * Math.PI) / 180);
       ink.scale(sx, sy);
       ink.font = `400 176px "${FONTS.hand}"`;
@@ -128,10 +162,10 @@ composition({
       ink.lineCap = 'round';
       ink.lineWidth = 14;
       ink.beginPath();
-      const x0 = 220;
-      const x1 = lerp(x0, 1700, draw);
+      const x0 = L.line.x0;
+      const x1 = lerp(x0, L.line.x1, draw);
       for (let x = x0; x <= x1; x += 20) {
-        const y = 690 + Math.sin(x * 0.012) * 8 + (rand(tl.seed, 'line', x) - 0.5) * 4;
+        const y = L.line.y + Math.sin(x * 0.012) * 8 + (rand(tl.seed, 'line', x) - 0.5) * 4;
         if (x === x0) ink.moveTo(x, y);
         else ink.lineTo(x, y);
       }
@@ -143,12 +177,12 @@ composition({
     const stamp = at('stamp');
     const tp = ease.outBack(progress(t, stamp, stamp + beat));
     title.style.opacity = String(progress(t, stamp, stamp + beat * 0.5));
-    title.style.transform = `translateY(${(1 - tp) * 36}px)`;
+    title.style.transform = `translateY(${(1 - tp) * 36 * S}px)`;
     const pop = progress(t, stamp, stamp + beat * 0.5);
     if (pop > 0) {
       const s = ease.outBack(pop);
       ink.save();
-      ink.translate(1540, 770);
+      ink.translate(L.stamp.x, L.stamp.y);
       ink.rotate(-0.2);
       ink.scale(s, s);
       ink.strokeStyle = RED;
@@ -162,6 +196,7 @@ composition({
       ink.fill();
       ink.restore();
     }
+    ink.restore();
   },
 });
 </script>
