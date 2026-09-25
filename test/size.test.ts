@@ -53,7 +53,7 @@ describe('--scale', () => {
         expect(() => outputSize({ width: 3840, height: 2160 }, 3)).toThrow(/larger/);
     });
 
-    it('captures device pixels, with a canvas backing store at the same scale', async () => {
+    it('captures device pixels, with a canvas backing store at the same scale, frame after frame', async () => {
         const dir = copyFixture('stage');
         const timeline = loadTimeline(dir, false).resolved;
         if (!timeline) throw new Error('stage fixture has no timeline');
@@ -66,8 +66,18 @@ describe('--scale', () => {
             });
             expect(findings).toEqual([]);
             await page.seek(0);
+            await page.capture();
+            // A clipped capture (snapshot --zoom) must leave the device metrics alone.
+            await page.capture({ x: 80, y: 0, width: 64, height: 36, scale: 2 });
+            await page.seek(5);
             const png = await page.capture();
+            const metrics = await page.page.evaluate(() => [
+                devicePixelRatio,
+                screen.width,
+                screen.height,
+            ]);
             await page.close();
+            expect(metrics).toEqual([scale, 640, 360]);
             expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([
                 640 * scale,
                 360 * scale,

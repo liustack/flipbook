@@ -153,8 +153,6 @@ export class CompositionPage {
         readonly timeline: ResolvedTimeline,
         private readonly realDir: string,
         private readonly watch: RendererWatch,
-        /** Output pixels per CSS pixel. */
-        readonly scale: number,
         private readonly onClose?: () => Promise<void>,
     ) {}
 
@@ -180,6 +178,21 @@ export class CompositionPage {
             await context.addInitScript(installHost, config);
             const page = await context.newPage();
             const cdp = await context.newCDPSession(page);
+            // A clipped screenshot puts back the device metrics of the session that took
+            // it. Without our own copy of Playwright's, the first one drops the page to
+            // device scale 1 and an 800x600 screen for every later frame.
+            const landscape = timeline.width >= timeline.height;
+            await cdp.send('Emulation.setDeviceMetricsOverride', {
+                width: timeline.width,
+                height: timeline.height,
+                deviceScaleFactor: options.deviceScaleFactor ?? 1,
+                mobile: false,
+                screenWidth: timeline.width,
+                screenHeight: timeline.height,
+                screenOrientation: landscape
+                    ? { angle: 90, type: 'landscapePrimary' }
+                    : { angle: 0, type: 'portraitPrimary' },
+            });
             await watch.follow(cdp);
             const cp = new CompositionPage(
                 context,
@@ -188,7 +201,6 @@ export class CompositionPage {
                 timeline,
                 realDir,
                 watch,
-                options.deviceScaleFactor ?? 1,
                 options.onClose,
             );
             await context.route('**/*', (route) => cp.handle(route, options.env ?? process.env));
@@ -489,9 +501,8 @@ export class CompositionPage {
     }
 
     /**
-     * PNG of the viewport as it is now, at the device scale factor: without a
-     * clip Chromium captures CSS pixels, so a scaled page passes the whole
-     * viewport as the clip at its scale.
+     * PNG of the viewport as it is now, in device pixels (CSS size times the
+     * scale). A clip captures that region, enlarged by its own scale.
      */
     async capture(clip?: {
         x: number;
@@ -500,23 +511,12 @@ export class CompositionPage {
         height: number;
         scale: number;
     }): Promise<Buffer> {
-        const region =
-            clip ??
-            (this.scale !== 1
-                ? {
-                      x: 0,
-                      y: 0,
-                      width: this.timeline.width,
-                      height: this.timeline.height,
-                      scale: this.scale,
-                  }
-                : undefined);
         const { data } = await this.cdp.send('Page.captureScreenshot', {
             format: 'png',
             optimizeForSpeed: true,
             captureBeyondViewport: false,
             fromSurface: true,
-            ...(region ? { clip: region } : {}),
+            ...(clip ? { clip } : {}),
         });
         return Buffer.from(data, 'base64');
     }
