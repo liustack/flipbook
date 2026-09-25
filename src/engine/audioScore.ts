@@ -1,6 +1,7 @@
 // The score: what the audio runtime plays, planned from the resolved
 // timeline. Pure data and math, no Node or DOM imports: the Node CLI and the
 // browser audio runtime both bundle this file.
+import { expandSheet, type SheetPlan, type SheetV1 } from './audioSheet.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
 
 export { placeNote, voiceChord } from './voicing.ts';
@@ -167,8 +168,10 @@ export interface Score {
     secondsPerBeat: number;
     totalBeats: number;
     seed: number;
-    /** Null when no music is synthesized (mode file or none). */
+    /** The preset to arrange, or null (mode score, file or none). */
     preset: PresetName | null;
+    /** The written score expanded into notes, or null outside mode score. */
+    sheet: SheetPlan | null;
     key: Key;
     progression: number;
     bars: ScoreBar[];
@@ -234,6 +237,7 @@ export function buildScore(tl: ResolvedTimeline, sampleRate = SAMPLE_RATE): Scor
         totalBeats: tl.totalBeats,
         seed: tl.seed,
         preset,
+        sheet: audio.mode === 'score' ? expandSheet(audio.score as SheetV1, tl) : null,
         key,
         progression,
         bars,

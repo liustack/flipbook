@@ -237,7 +237,9 @@ program
 
 program
     .command('audio')
-    .description('Synthesize the preset music and sfx cues to WAV files in .flipbook/audio/')
+    .description(
+        'Synthesize the preset or score music and sfx cues to WAV files in .flipbook/audio/',
+    )
     .argument('<dir>', 'composition directory')
     .action(async (dir: string) => {
         await execute('audio', dir, () => runAudio({ dir }));

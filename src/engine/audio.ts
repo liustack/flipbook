@@ -38,19 +38,23 @@ const PAGE_HTML =
     '<script type="module">import * as audio from "/__flipbook/audio.js"; window.__flipbookAudio = audio;</script>';
 const SYNTH_TIMEOUT_MS = 300_000;
 
+/** Music is synthesized: a preset or a written score. */
+export function synthesizesMusic(tl: ResolvedTimeline): boolean {
+    return tl.audio.mode === 'preset' || tl.audio.mode === 'score';
+}
+
 export function hasMusic(tl: ResolvedTimeline): boolean {
-    return tl.audio.mode === 'preset' || tl.audio.mode === 'file';
+    return synthesizesMusic(tl) || tl.audio.mode === 'file';
 }
 
 export function hasEffects(tl: ResolvedTimeline): boolean {
     return tl.cues.some((cue) => cue.kind === 'sfx');
 }
 
-/** Something to synthesize: preset music or built-in effect cues. Effects from files are not synthesized. */
+/** Something to synthesize: preset or score music, or built-in effect cues. Effects from files are not synthesized. */
 export function needsSynthesis(tl: ResolvedTimeline): boolean {
     return (
-        tl.audio.mode === 'preset' ||
-        tl.cues.some((cue) => cue.kind === 'sfx' && cue.sfx !== undefined)
+        synthesizesMusic(tl) || tl.cues.some((cue) => cue.kind === 'sfx' && cue.sfx !== undefined)
     );
 }
 
@@ -288,7 +292,7 @@ export interface SynthesizeOptions {
 }
 
 /**
- * Synthesize the preset music and the effect cues into .flipbook/audio/.
+ * Synthesize the preset or score music and the effect cues into .flipbook/audio/.
  * Stems whose score, runtime and browser build did not change are reused.
  */
 export async function synthesize(

@@ -8,6 +8,7 @@ import { runRender } from '../src/cli/render.ts';
 import type { Report } from '../src/cli/report.ts';
 import type { StemSet } from '../src/engine/audio.ts';
 import { PRESETS } from '../src/engine/audioScore.ts';
+import { INSTRUMENT_NAMES } from '../src/engine/audioSheet.ts';
 import { loadTimeline } from '../src/engine/timeline.ts';
 import { type AudioCheck, probeAudio } from '../src/engine/verify.ts';
 import { closeSession, session } from './browser.ts';
@@ -193,6 +194,116 @@ describe('flipbook audio', () => {
     });
 });
 
+/** A score over the audio fixture's two scenes (a and b, two bars each). */
+const SCORE = {
+    mode: 'score',
+    key: 'Am',
+    score: {
+        room: 'room',
+        instruments: {
+            keys: 'piano',
+            bed: 'strings',
+            lead: 'flute',
+            low: 'bass',
+            beat: 'drums',
+        },
+        scenes: {
+            a: {
+                level: 'soft',
+                chords: ['Am', 'F'],
+                play: { keys: 'arpeggio', bed: 'hold', low: 'root' },
+            },
+            b: {
+                level: 'full',
+                chords: ['C G', 'Am'],
+                play: {
+                    keys: 'broken',
+                    low: 'root-fifth',
+                    lead: ['E5 D5 C5:2', 'A4:4'],
+                    beat: { kick: 'x...x...', hat: '..x...x.', clap: '....x...' },
+                },
+            },
+        },
+    },
+};
+
+describe('flipbook audio with a written score', () => {
+    it('writes the same WAV bytes on every run', async () => {
+        const dir = copyFixture('audio');
+        editTimeline(dir, (t) => {
+            t.audio = SCORE;
+        });
+        const s = await session();
+        const first = await runAudio({ dir, session: s });
+        expect(first.failures).toEqual([]);
+        expect((first.audio as { mode: string; preset: unknown }).mode).toBe('score');
+        const hash = sha256(first.artifacts.music);
+        const second = await runAudio({ dir, session: s });
+        expect(sha256(second.artifacts.music)).toBe(hash);
+        const music = readStem(first.artifacts.music);
+        expect(music.L.length).toBe(8 * 48000);
+        const loudest = music.L.reduce((max, v) => Math.max(max, Math.abs(v)), 0);
+        expect(loudest).toBeGreaterThan(0.05);
+    });
+
+    it('plays every instrument, well above the tail of the one before', async () => {
+        const s = await session();
+        // At most 8 parts per score: two runs of seven.
+        for (const batch of [INSTRUMENT_NAMES.slice(0, 7), INSTRUMENT_NAMES.slice(7)]) {
+            const dir = copyFixture('audio');
+            editTimeline(dir, (t) => {
+                t.bpm = 240;
+                t.cues = [];
+                // Each instrument gets a bar, then two bars of rest for its tail to fall.
+                t.scenes = batch.flatMap((name) => [
+                    { id: name, bars: 1 },
+                    { id: `${name}-rest`, bars: 2 },
+                ]);
+                const scenes: Record<string, unknown> = {};
+                for (const name of batch) {
+                    scenes[name] =
+                        name === 'drums'
+                            ? {
+                                  play: {
+                                      drums: {
+                                          kick: 'x...',
+                                          snare: '.x..',
+                                          hat: '..x.',
+                                          clap: '...x',
+                                      },
+                                  },
+                              }
+                            : { chords: ['C'], play: { [name]: 'hold' } };
+                }
+                t.audio = {
+                    mode: 'score',
+                    score: {
+                        room: 'dry',
+                        instruments: Object.fromEntries(batch.map((n) => [n, n])),
+                        scenes,
+                    },
+                };
+            });
+            const report = await runAudio({ dir, session: s });
+            expect(report.failures).toEqual([]);
+            const music = readStem(report.artifacts.music);
+            const bar = 48000; // one 4-beat bar at 240 bpm
+            const rms = (from: number, to: number) => {
+                let e = 0;
+                for (let i = from; i < to; i++)
+                    e += music.L[i] * music.L[i] + music.R[i] * music.R[i];
+                return Math.sqrt(e / (2 * (to - from)));
+            };
+            batch.forEach((name, i) => {
+                const at = 3 * i * bar;
+                const own = rms(at + 2400, at + bar / 2);
+                expect(own, name).toBeGreaterThan(0.005);
+                if (i > 0) expect(own, name).toBeGreaterThan(1.5 * rms(at - 4800, at));
+            });
+        }
+    });
+});
+
 describe('soundtrack', () => {
     for (const preset of PRESETS) {
         it(`${preset}: -14 LUFS, true peak under -1 dBTP, effects on their frames`, async () => {
@@ -217,6 +328,23 @@ describe('soundtrack', () => {
             }
         });
     }
+
+    it('score: -14 LUFS, true peak under -1 dBTP, effects on their frames', async () => {
+        const dir = copyFixture('audio');
+        editTimeline(dir, (t) => {
+            t.audio = SCORE;
+        });
+        const rendered = await runRender({ dir, session: await session(), recordAttempts: false });
+        expect(rendered.failures).toEqual([]);
+        const audio = audioOf(rendered);
+        expect(audio.loudnessChecked).toBe(true);
+        expect(Math.abs((audio.integratedLufs as number) + 14)).toBeLessThanOrEqual(0.5);
+        expect(audio.truePeakDbtp as number).toBeLessThanOrEqual(-1);
+        expect(audio.cues).toHaveLength(4);
+        for (const cue of audio.cues) {
+            expect(Math.abs(cue.offsetMs as number), cue.id).toBeLessThanOrEqual(1);
+        }
+    });
 
     it('effects alone: no loudness target, true peak checked', async () => {
         const dir = copyFixture('audio');

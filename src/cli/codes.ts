@@ -193,7 +193,7 @@ export const FINDING_CODES = {
     },
     'audio-skipped': {
         meaning:
-            'flipbook audio found nothing to synthesize: audio.mode is not "preset" and there are no sfx cues.',
+            'flipbook audio found nothing to synthesize: audio.mode is not "preset" or "score" and there are no sfx cues.',
         fix: 'Nothing to fix when the video should have no synthesized sound. For music, set "audio": { "mode": "preset", "preset": "pluck" }, see references/audio.md.',
     },
     'audio-missing': {

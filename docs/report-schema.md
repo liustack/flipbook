@@ -150,8 +150,8 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `frame-count` | render | The video's frame count does not match the timeline | Render again. If it happens again, open an issue with the JSON |
 | `duration-mismatch` | render | The video's duration does not match the timeline (one frame of tolerance). With an audio track, this code also covers a track whose duration differs from the picture by more than the larger of one frame and one AAC packet (1024 samples) | Render again. If it happens again, open an issue with the JSON |
 | `color-tags` | render | The video is not yuv420p or lacks the bt709 color tags | Open an issue with the JSON |
-| `audio-skipped` | audio | The `audio` command has nothing to synthesize: `audio.mode` is not `preset` and there are no sfx cues. Warning only | Nothing to change when the video needs no synthesized sound. For music, write `"mode": "preset"` |
-| `audio-missing` | render | The timeline asks for sound (`preset`, `file`, or sfx cues) but the video has no audio track | Render again. If it happens again, open an issue with the JSON |
+| `audio-skipped` | audio | The `audio` command has nothing to synthesize: `audio.mode` is neither `preset` nor `score` and there are no sfx cues. Warning only | Nothing to change when the video needs no synthesized sound. For music, write `"mode": "preset"` |
+| `audio-missing` | render | The timeline asks for sound (`preset`, `score`, `file`, or sfx cues) but the video has no audio track | Render again. If it happens again, open an issue with the JSON |
 | `audio-loudness` | render | A track with music has integrated loudness outside -14 LUFS ±1 LU | Render again. If it happens again, open an issue with the JSON. With your own music, first make sure it is not silent after `bpmOffset` |
 | `audio-peak` | render | The track's true peak is above -1 dBTP | Render again. If it happens again, open an issue with the JSON |
 | `audio-unlicensed` | check, snapshot, audio, render | An audio file the timeline names (`audio.file` or an sfx cue's `file`) has no `source` or no `license` in `assets/SOURCES.json`, or that file is not a readable JSON object. `element` is the file, `detail.path` the timeline field, `detail.lacking` what is missing | Fetch sounds with `stock search --audio` and `stock fetch`, which record both. For the user's own file, write its source and license from what the user says |
@@ -179,8 +179,8 @@ Audio checks (`audio-missing`, `audio-loudness`, `audio-peak`, `audio-cue-offset
 
 `flipbook audio <dir>` synthesizes the music and sound effects from the timeline into `.flipbook/audio/`, and the report's `command` is `audio`. render calls it on its own: run it separately to listen first. It synthesizes afresh every time, with no cache.
 
-- `artifacts`: `music` (with preset music) and `sfx` (with sfx cues), both WAV paths.
-- `audio`: `mode`, `preset`, `key`, `progression`, `sampleRate` (48000), `samples`, `durationSec`, `synthMs`. `music` and `sfx` each have `file`, `sha256`, `peakDb`. Each item in `sfx.cues[]` has `id`, `sfx`, `frame`, `target` (the cue frame's sample position at 48 kHz) and `peakSample` (the sample position near the cue where the synthesized effect track actually peaks).
+- `artifacts`: `music` (with preset or score music) and `sfx` (with sfx cues), both WAV paths.
+- `audio`: `mode`, `preset` (null outside `preset` mode), `key`, `progression`, `sampleRate` (48000), `samples`, `durationSec`, `synthMs`. `music` and `sfx` each have `file`, `sha256`, `peakDb`. Each item in `sfx.cues[]` has `id`, `sfx`, `frame`, `target` (the cue frame's sample position at 48 kHz) and `peakSample` (the sample position near the cue where the synthesized effect track actually peaks).
 - With sfx cues that play files, it also writes `effects.wav` and reports it as `sfx` and `artifacts.sfx`: the synthesized effects (if any) with each file's loudest sample on its cue. There each item in `sfx.cues[]` has the file path in `sfx` for a file cue, and `peakSample` is measured on this track. With file cues only, nothing is synthesized: `preset`, `key`, `progression`, `synthMs` and `music` are `null`.
 - With nothing to synthesize and no file cues it reports an `audio-skipped` warning and exits 0.
 
@@ -202,7 +202,7 @@ Audio checks (`audio-missing`, `audio-loudness`, `audio-peak`, `audio-cue-offset
 ### How it is measured
 
 - Track duration: the tolerance against the picture is the larger of one frame and one AAC packet (1024 / 48000 seconds). Beyond that is `duration-mismatch`.
-- Loudness: with music (`preset` or `file`), integrated loudness must be within -14 LUFS ±1 LU, otherwise `audio-loudness`. With only sound effects, integrated loudness is not checked. Every track gets a true-peak check: above -1 dBTP is `audio-peak`.
+- Loudness: with music (`preset`, `score` or `file`), integrated loudness must be within -14 LUFS ±1 LU, otherwise `audio-loudness`. With only sound effects, integrated loudness is not checked. Every track gets a true-peak check: above -1 dBTP is `audio-peak`.
 - Effects on their frames: the effect track and the video are both brought down to 8 kHz mono. With music, the music alone is first rendered through the same mix chain, located in the video along with its gain, and subtracted, which leaves mostly the effects. For each effect, the span from 0.35 seconds before its peak to 30 milliseconds after, trimmed to the part holding 90% of the energy, is differenced once and slid within ±0.25 seconds to find the offset that correlates best with the video. One offset is found for all effects together. Each effect's actual peak is `peakSample` plus that offset, and more than one frame from the cue frame's time is `audio-cue-offset`. A correlation below 0.12 counts as not found and is reported under the same code.
 
 ## Stock images

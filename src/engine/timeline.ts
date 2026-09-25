@@ -11,6 +11,7 @@ import {
     SFX_NAMES,
     type SfxName,
 } from './audioScore.ts';
+import { readSheet } from './audioSheet.ts';
 import { loadAssets, SOURCES_FILE } from './brand.ts';
 import {
     type ResolvedScene,
@@ -284,6 +285,7 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
                 'key',
                 'progression',
                 'dynamics',
+                'score',
                 'file',
                 'bpmOffset',
                 'offset',
@@ -291,10 +293,10 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
                 'fadeOut',
             ]);
             const mode = audio.mode;
-            if (mode !== 'preset' && mode !== 'file' && mode !== 'none') {
+            if (mode !== 'preset' && mode !== 'score' && mode !== 'file' && mode !== 'none') {
                 c.fail(
                     '$.audio.mode',
-                    `must be "preset", "file" or "none" (got ${describe(mode)})`,
+                    `must be "preset", "score", "file" or "none" (got ${describe(mode)})`,
                 );
             }
             const onlyWith = (field: string, needed: string) => {
@@ -349,6 +351,23 @@ export function validateTimeline(input: Json): { errors: SchemaError[]; timeline
                         }
                     }
                 }
+            }
+            if (mode === 'score') {
+                if (beatsPerBar > 0) {
+                    let startBeat = 0;
+                    const scenes = [...sceneBeats].map(([id, beats]) => {
+                        const scene = { id, startBeat, beats };
+                        startBeat += beats;
+                        return scene;
+                    });
+                    const bpm = isNum(input.bpm) && input.bpm > 0 ? input.bpm : 120;
+                    for (const error of readSheet(audio.score, scenes, beatsPerBar, 60 / bpm)
+                        .errors) {
+                        c.fail(error.path, error.message);
+                    }
+                }
+            } else {
+                onlyWith('score', 'score');
             }
             if (mode === 'file') {
                 c.localFile(audio.file, '$.audio.file');

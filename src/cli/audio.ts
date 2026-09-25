@@ -19,7 +19,7 @@ export interface AudioOptions {
 }
 
 /**
- * Synthesize the preset music and effect cues to WAV files under
+ * Synthesize the preset or score music and effect cues to WAV files under
  * .flipbook/audio/, and lay effects from files over them into effects.wav.
  */
 export async function runAudio(options: AudioOptions): Promise<Report> {

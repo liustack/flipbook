@@ -264,7 +264,7 @@ Fix: Report it with this JSON and the output of ffmpeg -version.
 
 ### `audio-skipped`
 
-flipbook audio found nothing to synthesize: audio.mode is not "preset" and there are no sfx cues.
+flipbook audio found nothing to synthesize: audio.mode is not "preset" or "score" and there are no sfx cues.
 
 Fix: Nothing to fix when the video should have no synthesized sound. For music, set "audio": { "mode": "preset", "preset": "pluck" }, see references/audio.md.
 

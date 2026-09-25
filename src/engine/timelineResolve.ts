@@ -1,11 +1,12 @@
 // Pure timeline math, shared by the Node CLI and the browser runtime. No Node
 // or DOM imports here: the runtime bundles this file as is.
+import type { SheetV1 } from './audioSheet.ts';
 
 export const TIMELINE_VERSION = 1;
 export const PROTOCOL_VERSION = 1;
 
 export type CueKind = 'text' | 'sfx' | 'mark';
-export type AudioMode = 'preset' | 'file' | 'none';
+export type AudioMode = 'preset' | 'score' | 'file' | 'none';
 
 export interface SceneV1 {
     id: string;
@@ -34,6 +35,8 @@ export interface AudioV1 {
     progression?: number;
     /** Scene id to level, for preset music. */
     dynamics?: Record<string, AudioLevel>;
+    /** The written score, for mode score. */
+    score?: SheetV1;
     file?: string;
     bpmOffset?: number;
     /** Mode file: the second of the file the video starts at, for files without a beat grid. */

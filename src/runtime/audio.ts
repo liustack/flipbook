@@ -5,8 +5,9 @@
 import type { Score, SfxName } from '../engine/audioScore.ts';
 import { addBus, peakOf } from './audio/dsp.ts';
 import { audioBus, runChain } from './audio/master.ts';
-import { arrange, MASTER } from './audio/presets.ts';
+import { arrange, MASTER, type MasterSettings } from './audio/presets.ts';
 import { renderSfx, SFX_GAIN } from './audio/sfx.ts';
+import { perform, ROOM_MASTER } from './audio/sheet.ts';
 import { hash32 } from './core/random.ts';
 
 export const AUDIO_PROTOCOL = 1;
@@ -50,11 +51,19 @@ function stemInfo(buffer: AudioBuffer): StemInfo {
 }
 
 async function renderMusic(score: Score): Promise<AudioBuffer | null> {
-    if (!score.preset) return null;
+    if (!score.preset && !score.sheet) return null;
     const sr = score.sampleRate;
     const main = audioBus(score.length, sr);
     const air = audioBus(score.length, sr);
-    arrange(score, score.preset, { main: main.bus, air: air.bus }, sr);
+    let settings: MasterSettings;
+    if (score.preset) {
+        arrange(score, score.preset, { main: main.bus, air: air.bus }, sr);
+        settings = MASTER[score.preset];
+    } else {
+        const sheet = score.sheet as NonNullable<Score['sheet']>;
+        perform(score, sheet, { main: main.bus, air: air.bus }, sr);
+        settings = ROOM_MASTER[sheet.room];
+    }
     let energy = 0;
     for (let i = 0; i < score.length; i++) {
         const l = main.bus.L[i] + air.bus.L[i];
@@ -71,7 +80,6 @@ async function renderMusic(score: Score): Promise<AudioBuffer | null> {
             }
         }
     }
-    const settings = MASTER[score.preset];
     return runChain(main.buffer, air.buffer, {
         ...settings,
         highpass: 40,

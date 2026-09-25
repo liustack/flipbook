@@ -150,8 +150,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `frame-count` | render | 成片帧数和 timeline 不符 | 重渲一次，还出现就带 JSON 报 issue |
 | `duration-mismatch` | render | 成片时长和 timeline 不符（容差一帧）。有音轨时，音轨时长和画面差超过一帧和一个 AAC 包（1024 个采样）中较大者也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
 | `color-tags` | render | 成片不是 yuv420p 或缺 bt709 色彩标记 | 带 JSON 报 issue |
-| `audio-skipped` | audio | `audio` 命令没东西可合成：`audio.mode` 不是 `preset`，也没有 sfx cue，只报 warning | 片子本来就不要合成的声音时不用改，要配乐就写 `"mode": "preset"` |
-| `audio-missing` | render | timeline 要声音（`preset`、`file` 或有 sfx cue），成片却没有音轨 | 重渲一次，还出现就带 JSON 报 issue |
+| `audio-skipped` | audio | `audio` 命令没东西可合成：`audio.mode` 既不是 `preset` 也不是 `score`，也没有 sfx cue，只报 warning | 片子本来就不要合成的声音时不用改，要配乐就写 `"mode": "preset"` |
+| `audio-missing` | render | timeline 要声音（`preset`、`score`、`file` 或有 sfx cue），成片却没有音轨 | 重渲一次，还出现就带 JSON 报 issue |
 | `audio-loudness` | render | 有配乐的音轨整合响度不在 -14 LUFS 上下 1 LU 内 | 重渲一次，还出现就带 JSON 报 issue。自带音乐先确认 `bpmOffset` 之后不是静音 |
 | `audio-peak` | render | 音轨真峰值高于 -1 dBTP | 重渲一次，还出现就带 JSON 报 issue |
 | `audio-unlicensed` | check、snapshot、audio、render | timeline 用到的音频文件（`audio.file` 或 sfx cue 的 `file`）在 `assets/SOURCES.json` 里没有 `source` 或没有 `license`，或者这个文件不是读得出的 JSON 对象。`element` 是那个文件，`detail.path` 是 timeline 里的字段，`detail.lacking` 是缺了什么 | 声音用 `stock search --audio` 和 `stock fetch` 找，两样都会记下。用户自己的文件按用户说的写来源和许可 |
@@ -179,8 +179,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 
 `flipbook audio <dir>` 按 timeline 合成配乐和音效，写到 `.flipbook/audio/`，报告的 `command` 是 `audio`。render 会自己调用它，单独跑是为了先听。每次都重新合成，不用缓存。
 
-- `artifacts`：`music`（有预设配乐时）、`sfx`（有 sfx cue 时），都是 WAV 路径。
-- `audio`：`mode`、`preset`、`key`、`progression`、`sampleRate`（48000）、`samples`、`durationSec`、`synthMs`，`music` 和 `sfx` 各有 `file`、`sha256`、`peakDb`，`sfx.cues[]` 每项有 `id`、`sfx`、`frame`、`target`（cue 帧在 48 kHz 上的采样位置）、`peakSample`（合成后音效轨在 cue 附近实际最大的采样位置）。
+- `artifacts`：`music`（有预设或乐谱配乐时）、`sfx`（有 sfx cue 时），都是 WAV 路径。
+- `audio`：`mode`、`preset`（不是 `preset` 模式时为 null）、`key`、`progression`、`sampleRate`（48000）、`samples`、`durationSec`、`synthMs`，`music` 和 `sfx` 各有 `file`、`sha256`、`peakDb`，`sfx.cues[]` 每项有 `id`、`sfx`、`frame`、`target`（cue 帧在 48 kHz 上的采样位置）、`peakSample`（合成后音效轨在 cue 附近实际最大的采样位置）。
 - 有用音效文件的 sfx cue 时还写 `effects.wav`，在 `sfx` 和 `artifacts.sfx` 里给的就是它：合成的音效（如果有）加上每个文件，最响的采样对准各自的 cue。这时 `sfx.cues[]` 里文件 cue 的 `sfx` 是文件路径，`peakSample` 在这条轨上量。只有文件 cue 时什么都不合成，`preset`、`key`、`progression`、`synthMs`、`music` 为 `null`。
 - 没东西可合成、也没有文件 cue 时报 `audio-skipped` warning，退 0。
 
@@ -202,7 +202,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 ### 量法
 
 - 音轨时长：和画面差的容差取一帧和一个 AAC 包（1024 / 48000 秒）中较大者，超过报 `duration-mismatch`。
-- 响度：有配乐（`preset` 或 `file`）时整合响度要在 -14 LUFS 上下 1 LU 内，否则 `audio-loudness`。只有音效时不查整合响度。凡有音轨都查真峰值，高于 -1 dBTP 报 `audio-peak`。
+- 响度：有配乐（`preset`、`score` 或 `file`）时整合响度要在 -14 LUFS 上下 1 LU 内，否则 `audio-loudness`。只有音效时不查整合响度。凡有音轨都查真峰值，高于 -1 dBTP 报 `audio-peak`。
 - 音效对帧：音效轨和成片都降到 8 kHz 单声道。有配乐时先用同一条混音链单独渲一遍配乐，在成片里找它的位置和增益，减掉，剩下的基本只有音效。每个音效取峰值前 0.35 秒到峰值后 30 毫秒、再裁到九成能量的一段，一阶差分后在 ±0.25 秒内找和成片最相关的偏移，所有音效合起来找一个偏移。每个音效的实际峰值 = `peakSample` 加这个偏移，和 cue 帧的时刻差超过一帧报 `audio-cue-offset`。相关系数低于 0.12 算找不到，也报这个码。
 
 ## 找图
