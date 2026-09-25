@@ -45,7 +45,7 @@ The skill is the `skills/flipbook` folder of the repository: `SKILL.md`, `refere
 
 ```bash
 rm -rf /tmp/flipbook-src
-git clone --depth 1 --branch v0.5.3 https://github.com/liustack/flipbook.git /tmp/flipbook-src
+git clone --depth 1 --branch v0.5.4 https://github.com/liustack/flipbook.git /tmp/flipbook-src
 mkdir -p ~/.claude/skills/flipbook          # replace with your TARGET
 cp -R /tmp/flipbook-src/skills/flipbook/. ~/.claude/skills/flipbook/
 ```
@@ -65,13 +65,13 @@ Running it again overwrites the earlier copy in place.
 Claude Code:
 
 ```bash
-npx -y skills add liustack/flipbook#v0.5.3 --skill flipbook --global --agent claude-code -y
+npx -y skills add liustack/flipbook#v0.5.4 --skill flipbook --global --agent claude-code -y
 ```
 
 Codex:
 
 ```bash
-npx -y skills add liustack/flipbook#v0.5.3 --skill flipbook --global --agent codex -y
+npx -y skills add liustack/flipbook#v0.5.4 --skill flipbook --global --agent codex -y
 ```
 
 `--agent` names the harness and `-y` answers the confirmation prompts, so the command runs to the end without waiting for input. For Codex the skills CLI puts the folder in `~/.agents/skills/flipbook`, which Codex reads too: use `~/.agents/skills/` as `TARGET` from here on. For other harnesses, use Path A.
@@ -88,7 +88,7 @@ npx -y skills add liustack/flipbook#v0.5.3 --skill flipbook --global --agent cod
 node --version
 ```
 
-Below v22.19, or `command not found`: install Node 22 LTS or newer from https://nodejs.org (or the user's version manager). The launcher finds the CLI through `npx`, so nothing else from npm has to be installed. Optional, to skip the npx download on every run: `npm install -g @liustack/flipbook@0.5.3`.
+Below v22.19, or `command not found`: install Node 22 LTS or newer from https://nodejs.org (or the user's version manager). The launcher finds the CLI through `npx`, so nothing else from npm has to be installed. Optional, to skip the npx download on every run: `npm install -g @liustack/flipbook@0.5.4`.
 
 ### 3b. ffmpeg with libx264
 

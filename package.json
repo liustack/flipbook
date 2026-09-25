@@ -1,6 +1,6 @@
 {
     "name": "@liustack/flipbook",
-    "version": "0.5.3",
+    "version": "0.5.4",
     "description": "Renderer for the flipbook agent skill: deterministic HTML-to-MP4 with built-in acceptance checks",
     "type": "module",
     "bin": {

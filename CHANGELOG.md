@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.4 - 2026-09-26
 
 ### 自己写乐谱
 
