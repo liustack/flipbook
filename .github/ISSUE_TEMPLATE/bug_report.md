@@ -6,7 +6,7 @@ labels: bug
 assignees: ''
 ---
 
-提交前先看 [docs/report-schema.md](../../docs/report-schema.md)，里面列了每个类型码的含义和修法。
+提交前先看 [docs/report-schema.zh-CN.md](../../docs/report-schema.zh-CN.md)，里面列了每个类型码的含义和修法。
 
 ## 发生了什么
 

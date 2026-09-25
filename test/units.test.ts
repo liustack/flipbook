@@ -237,10 +237,13 @@ describe('package contract', () => {
 });
 
 describe('report contract', () => {
-    it('documents every finding and environment code in docs/report-schema.md', () => {
-        const doc = fs.readFileSync(path.join(repoRoot, 'docs', 'report-schema.md'), 'utf-8');
-        for (const code of [...Object.keys(FINDING_CODES), ...Object.keys(ENV_CODES)]) {
-            expect(doc, code).toContain(`\`${code}\``);
-        }
-    });
+    it.each(['report-schema.md', 'report-schema.zh-CN.md'])(
+        'documents every finding and environment code in docs/%s',
+        (name) => {
+            const doc = fs.readFileSync(path.join(repoRoot, 'docs', name), 'utf-8');
+            for (const code of [...Object.keys(FINDING_CODES), ...Object.keys(ENV_CODES)]) {
+                expect(doc, code).toContain(`\`${code}\``);
+            }
+        },
+    );
 });

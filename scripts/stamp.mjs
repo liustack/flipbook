@@ -72,7 +72,13 @@ export function docTargets(root, pkgName, slug) {
         'README.zh-CN.md',
         'INSTALL.md',
         join('skills', pkgName.split('/').pop(), 'SKILL.md'),
-        join('docs', 'troubleshooting.md'),
+        join('docs', 'report-schema.md'),
+        join('docs', 'report-schema.zh-CN.md'),
+        join('docs', 'timeline-schema.md'),
+        join('docs', 'timeline-schema.zh-CN.md'),
+        join('docs', 'eval.md'),
+        join('docs', 'eval.zh-CN.md'),
+        join('docs', 'platform.md'),
     ];
     return files.flatMap((relative) => [
         {

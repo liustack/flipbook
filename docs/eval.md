@@ -1,87 +1,89 @@
 ---
-summary: '评测怎么跑、「一次跑通」怎么判、「会动的 PPT」细则、超时和人工复核'
+summary: 'How the eval runs, how a one-shot pass is judged, the moving-slides criteria, timeouts and human review'
 read_when:
-  - 跑 B 级或 C 级评测
-  - 加或改评测用例
-  - 判一条评测片过没过
+  - Running a B-level or C-level eval
+  - Adding or changing eval cases
+  - Judging whether an eval video passed
 ---
 
-# 评测
+# Eval
 
-评测测的是 agent 从一句话到 mp4 的全程：宿主（Claude Code 或 Codex）照 SKILL.md 写合成、跑 check、看联系表、渲染、交付。评测花真实额度，只在本地按需跑，不进 CI。CI 只跑 `--dry-run`。
+English | [中文](eval.zh-CN.md)
 
-## 跑法
+The eval covers an agent's whole path from one sentence to an mp4: the host (Claude Code or Codex) follows SKILL.md to write the composition, run check, look at the contact sheet, render and deliver. It spends real money, so it runs locally on demand and never in CI. CI runs only `--dry-run`.
+
+## Running it
 
 ```bash
 pnpm build
-node eval/run.mjs --dry-run                                   # 校验用例、宿主 CLI、工作区安装
-node eval/run.mjs --target flagship --runs 2                  # B 级：旗舰模型，每条两次
-node eval/run.mjs --target flagship --target floor --runs 3   # C 级：旗舰加最低
-node eval/run.mjs --model claude-code:claude-opus-5 countdown  # 指定宿主和模型，只跑一条
+node eval/run.mjs --dry-run                                   # validate cases, host CLIs, workspace install
+node eval/run.mjs --target flagship --runs 2                  # B level: flagship model, two runs per case
+node eval/run.mjs --target flagship --target floor --runs 3   # C level: flagship plus floor
+node eval/run.mjs --model claude-code:claude-opus-5 countdown  # one case on a given host and model
 ```
 
-- 目标在 `eval/models.json`：`flagship`（Claude Code 加 Opus 5.5）、`floor`（Claude Code 加 Opus 5）、`astra`（Codex 加 GPT-6 Astra，只公开数字不设线）。
-- 每次每条在一个全新的临时目录里跑：把工作区的 `skills/flipbook` 拷进宿主读 skill 的目录（Claude Code 是 `.claude/skills/`，Codex 是 `.agents/skills/` 和 `.codex/skills/` 再加一份指向它的 AGENTS.md），再放一个 `flipbook` 小脚本在 PATH 最前面，指向工作区的 `dist/main.js`。启动器优先用 PATH 上兼容的 CLI，所以评测的是工作区的代码，不是 npm 上的版本。
-- 提示词是用例的 `prompt` 加一句固定的无人值守说明（不要提问，没说的按默认值，做完就交付），证据里记完整提示词。
-- 宿主用评测机当前用户的登录和全局配置。证据里记宿主版本，宿主版本变了单独标注，不和旧结果直接比。
-- 超时：单次 30 分钟墙钟（`--timeout-min` 可改），到点杀掉宿主，这次记失败，`host.timedOut` 为 true。
-- 通过的那次删掉临时工作区，没通过的保留，路径记在证据里。成片和联系表都拷到 `eval/results/<日期>/films/`。
+- Targets live in `eval/models.json`: `flagship` (Claude Code with Opus 5.5), `floor` (Claude Code with Opus 5), `astra` (Codex with GPT-6 Astra, numbers published but no gate).
+- Every run of every case happens in a fresh temp directory. The workspace's `skills/flipbook` is copied to where the host reads skills (`.claude/skills/` for Claude Code, and for Codex `.agents/skills/` and `.codex/skills/` plus an AGENTS.md pointing at it), and a small `flipbook` script that points at the workspace's `dist/main.js` goes first on PATH. The launcher prefers a compatible CLI on PATH, so the eval tests the workspace code, not the version on npm.
+- The prompt is the case's `prompt` plus a fixed note for running unattended (ask no questions, use the defaults for anything unstated, deliver when done). The evidence records the full prompt.
+- The host uses the eval machine's current login and global config. The evidence records the host version. Results from a different host version are marked as such and not compared directly with older ones.
+- Timeout: 30 minutes of wall-clock time per run (change it with `--timeout-min`). At the limit the host is killed, the run counts as failed, and `host.timedOut` is true.
+- A passing run's temp workspace is deleted. A failing one is kept, with its path in the evidence. All videos and contact sheets are copied to `eval/results/<date>/films/`.
 
-## 证据
+## Evidence
 
-`eval/results/<日期>/<用例>--<目标>--run<N>.json`，每次每条一份（目录不入库）：
+`eval/results/<date>/<case>--<target>--run<N>.json`, one per run per case (the directory is not committed):
 
-| 字段 | 内容 |
+| Field | Contents |
 |---|---|
-| `prompt`、`target`、`run` | 完整提示词、宿主和模型、第几次 |
-| `flipbook` | 版本、提交号、工作区是否有未提交改动 |
-| `hostVersion`、`node`、`ffmpeg` | 环境 |
-| `host` | 退出码、是否超时、耗时、宿主报的花费和用量、stdout 和 stderr 末尾 |
-| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、评测器在副本上独立重跑的 check |
-| `verdict` | `oneShot`、没过的原因、留给人工复核的字段 |
+| `prompt`, `target`, `run` | The full prompt, host and model, run number |
+| `flipbook` | Version, commit, whether the workspace had uncommitted changes |
+| `hostVersion`, `node`, `ffmpeg` | Environment |
+| `host` | Exit code, whether it timed out, duration, cost and usage as the host reported them, the tail of stdout and stderr |
+| `compositions[]` | Every composition found in the workspace: `video` and its sha256, `contactSheet`, `frameDigest` (summary of the raw frame hashes), `probe` (duration, size, frame count, audio track), the agent's last check, snapshot and render reports, `attempts`, and the check the evaluator reran on its own copy |
+| `verdict` | `oneShot`, the reasons a run failed, the fields left for human review |
 
-## 「一次跑通」怎么判
+## How a one-shot pass is judged
 
-自动判定，下面全部满足才算一次跑通：
+Automatically. A run is a one-shot pass only when all of these hold:
 
-1. 宿主在超时内正常结束，退出码 0。
-2. 工作区里恰好一个合成目录，`out/video.mp4` 存在。
-3. agent 最后一次 render 报告 `ok: true`，check 和 render 报告里都没有 `stop: true`。
-4. 评测器把合成拷到新目录独立跑 check，退出码 0。
-5. 成片时长落在用例的 `durationSec` 区间里，尺寸对，用例要求的文字都出现在 index.html 或 timeline.json 里。用例要求预设配乐或自带音乐时，timeline 的 `audio.mode` 和要求一致，成片有音轨。
-6. 人没有改过任何文件。评测器全程无人值守，这条自动满足。
+1. The host finishes within the timeout with exit code 0.
+2. The workspace holds exactly one composition directory, and `out/video.mp4` exists.
+3. The agent's last render report says `ok: true`, and no check or render report has `stop: true`.
+4. The evaluator copies the composition to a new directory and runs check on it independently, with exit code 0.
+5. The video's duration falls inside the case's `durationSec` range, the size is right, and every text the case requires appears in index.html or timeline.json. When the case asks for preset music or the user's own music, the timeline's `audio.mode` matches and the video has an audio track.
+6. No person edited any file. The evaluator runs unattended, so this always holds.
 
-自动判过之后人工过一遍联系表和成片：自动判过但人看是坏的，记为「静默坏片」，填进证据的 `verdict.humanReview.silentBadFilm`，并把这种坏法做成一条坏片语料加进 `test/fixtures/bad/` 再修 flipbook。
+After the automatic verdict, a person goes through the contact sheets and videos. A run that passed automatically but looks broken to a person is a silent bad film. It goes into the evidence's `verdict.humanReview.silentBadFilm`, and that kind of breakage becomes a bad-film fixture in `test/fixtures/bad/` before flipbook gets fixed.
 
-## 「会动的 PPT」细则
+## Moving-slides criteria
 
-三条里占两条就算「会动的 PPT」。片长不到 20 秒的片子不计第 3 条（短片本来少有运镜），只看前两条，两条都中才算：
+A video is "moving slides" (a slide deck with entrance animations, not an animation) when it hits two of the three items below. Videos shorter than 20 seconds skip item 3 (short videos rarely move the camera anyway) and count only when both of the first two hit:
 
-1. **画面主体只有文字和方块**：除了文字，画面里只有矩形、圆角矩形、直线这类几何块，没有插画、图表、物件、图示或角色。纸纹和颗粒不算主体。
-2. **每场只有入场，没有持续运动**：每个场景里元素到位以后，到场景结束前不再动。只看场景后半段的抽帧，除了纸纹颗粒，画面基本一样就算中。
-3. **镜头不动超过全片一半**：没有推拉、摇移、缩放、视差或整体构图变化的时间加起来超过片长一半。
+1. **The subject is only text and boxes**: apart from text, the picture holds only geometric blocks such as rectangles, rounded rectangles and straight lines. No illustration, chart, object, diagram or character. Paper texture and grain do not count as a subject.
+2. **Each scene has entrances only, no ongoing motion**: once the elements are in place, they stay still until the scene ends. Look only at frames sampled from the second half of each scene: if the picture is essentially the same apart from paper grain, it hits.
+3. **The camera stays still for more than half the video**: the time without a push, pull, pan, zoom, parallax or overall change of composition adds up to more than half the duration.
 
-盲看规则：隐去模型、宿主和版本，打乱顺序，只看成片和联系表，一条一条填三格再下结论，结果填进 `verdict.humanReview.movingSlides`。
+Blind review: hide the model, host and version, shuffle the order, look only at the videos and contact sheets, fill in the three items one at a time before deciding, and record the result in `verdict.humanReview.movingSlides`.
 
-## 门槛
+## Gates
 
-门槛按 design.md 第 10 节：B 级每个 0.x 次版本，旗舰模型乘 10 条乘 1 次，出片数不低于上一版减 1 条，静默坏片为零，会动的 PPT 不超过 2 条。v0.1 用 5 条用例乘 2 次，至少 6 次一次跑通，报实际数字。C 级在 1.0、大版本和支持模型换代时跑。
+B level, for every 0.x minor version: the flagship model on 10 cases, one run each. Delivered videos must not drop by more than 1 from the previous version, silent bad films must be zero, and moving slides must be at most 2. v0.1 used 5 cases with 2 runs each, needed at least 6 one-shot passes, and reports the actual number. C level runs for 1.0, for major versions and when a supported model gets a new generation.
 
-## 用例
+## Cases
 
-`eval/cases/<id>/case.json`：
+`eval/cases/<id>/case.json`:
 
-| 字段 | 内容 |
+| Field | Contents |
 |---|---|
-| `id`、`title` | 和目录名相同的 id，中文标题 |
-| `prompt` | 用户的一句话 |
-| `workspace` | 可选，评测开始前放进工作区的文件。`{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` 用 ffmpeg 生成节拍音 |
-| `expect.durationSec` | 允许的时长区间 `[最短, 最长]` |
-| `expect.width`、`expect.height` | 画幅 |
-| `expect.textInSource` | 必须出现在合成源码里的文字 |
-| `expect.audio` | `none`（不查声音）、`preset`（timeline 用预设配乐，成片有音轨）或 `file`（timeline 用自带音乐，成片有音轨） |
-| `expect.notes` | 给人工复核看的重点 |
+| `id`, `title` | An id matching the directory name, and a Chinese title |
+| `prompt` | The user's one sentence |
+| `workspace` | Optional files placed in the workspace before the run. `{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` generates a click track with ffmpeg |
+| `expect.durationSec` | The allowed duration range `[min, max]` |
+| `expect.width`, `expect.height` | Frame size |
+| `expect.textInSource` | Text that must appear in the composition source |
+| `expect.audio` | `none` (sound not checked), `preset` (the timeline uses preset music and the video has an audio track) or `file` (the timeline uses the user's music and the video has an audio track) |
+| `expect.notes` | What human review should look at |
 
-v0.1 的 5 条：新年倒计时（大字数字和定格）、四城人口柱状图（数据图表）、确定性渲染科普（概念图示）、书摘短片（逐字出现）、跟着用户音乐打点（自带音乐和拍点）。都用中文，不依赖纸感材质。
+The 5 cases from v0.1: a New Year countdown (big numbers and a hold), population bars for four cities (a data chart), an explainer on deterministic rendering (a concept diagram), a book quote (text appearing character by character), and hits on the user's own music (bring-your-own music and beat points). All in Chinese, none relying on the paper materials.
 
-纸感和配乐上线后加的 3 条插画和故事类：种子长成树（20 秒，连续生长）、纸船过三种天气（25 秒，场景转换）、蝴蝶的一生（30 秒，四个阶段配小标题）。都要求纸感画面和预设配乐，不要旁白。
+The 3 illustration and story cases added once the paper look and music shipped: a seed growing into a tree (20 seconds, continuous growth), a paper boat through three kinds of weather (25 seconds, scene changes), the life of a butterfly (30 seconds, four stages with small titles). All require the paper look and preset music, and no voice-over.

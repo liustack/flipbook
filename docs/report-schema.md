@@ -1,200 +1,202 @@
 ---
-summary: 'check、snapshot、render 的 JSON 报告格式、退出码、每个类型码的含义和修法'
+summary: 'The JSON report from check, snapshot, render and audio: exit codes, fields, what each code means and how to fix it'
 read_when:
-  - 解析 flipbook 的输出
-  - 新增或修改类型码
+  - Parsing flipbook output
+  - Adding or changing a code
 ---
 
-# 报告格式 flipbook.report/1
+# Report format flipbook.report/1
 
-`check`、`snapshot`、`render`、`audio` 无论成败都往 stdout 打一份 JSON 报告。进度和日志走 stderr。`doctor --json` 用自己的格式 `flipbook.doctor/1`（见文末）。
+English | [中文](report-schema.zh-CN.md)
 
-## 退出码
+`check`, `snapshot`, `render` and `audio` print one JSON report to stdout whether they pass or fail. Progress and logs go to stderr. `doctor --json` has its own format, `flipbook.doctor/1` (see the end of this page).
 
-| 码 | 含义 | 该谁动手 |
+## Exit codes
+
+| Code | Meaning | Who acts |
 |---|---|---|
-| 0 | 全过 | 无 |
-| 1 | 片子有问题 | agent 按 `failures` 改合成 |
-| 2 | 用法错（参数、目录不存在） | agent 改命令 |
-| 78 | 环境缺件（Node、ffmpeg、Chromium、字体、沙箱、系统库） | 按 stderr 里的修复命令处理机器 |
+| 0 | Everything passed | Nobody |
+| 1 | The video has problems | The agent fixes the composition according to `failures` |
+| 2 | Usage error (bad arguments, missing directory) | The agent fixes the command |
+| 78 | The environment is missing something (Node, ffmpeg, Chromium, fonts, sandbox, system libraries) | Fix the machine with the command on stderr |
 
-退出码 78 时 stderr 另打一份 JSON 诊断：`error`（环境类型码）、`message`、`meaning`、`fix`（能直接复制的命令或设置）、`detail`、`platform`、`node`。stdout 仍是报告，`environmentError` 字段放同一份诊断。
+On exit 78, stderr carries a separate JSON diagnosis: `error` (the environment code), `message`, `meaning`, `fix` (commands or settings ready to copy), `detail`, `platform`, `node`. stdout still carries the report, with the same diagnosis in its `environmentError` field.
 
-`sandbox-blocked` 和 `tmp-unwritable` 的 `detail.signature` 是命中沙箱识别表的哪一行（`tmp-unwritable` 对应 `temp-dir`，`sandbox-blocked` 对应 `linux-socket-filter`、`mach-port`、`operation-not-permitted`，见 [platform.md](platform.md)），下载被拒的 `chromium-install-failed` 带 `detail.signature: "network-blocked"`。这几个和 `cache-unwritable` 都带 `detail.host`：`claude-code`、`codex` 或 `null`，按宿主设的环境变量认。
+For `sandbox-blocked` and `tmp-unwritable`, `detail.signature` names the row of the sandbox signature table that matched (`tmp-unwritable` maps to `temp-dir`, `sandbox-blocked` to `linux-socket-filter`, `mach-port` or `operation-not-permitted`, see [platform.md](platform.md)). A refused download, `chromium-install-failed`, carries `detail.signature: "network-blocked"`. These codes and `cache-unwritable` all carry `detail.host`: `claude-code`, `codex` or `null`, identified by the environment variables the host sets.
 
-## 顶层字段
+## Top-level fields
 
-| 字段 | 类型 | 说明 |
+| Field | Type | Description |
 |---|---|---|
-| `schema` | string | 固定 `flipbook.report/1` |
-| `command` | string | `check`、`snapshot`、`render`、`audio`，用法错时是 `usage` |
-| `ok` | boolean | 退出码为 0 时为 true |
-| `exitCode` | 0、1、2、78 | 和进程退出码一致 |
-| `flipbook.version` | string | CLI 版本 |
-| `environment` | object | `platform`（如 `darwin-arm64`）、`node`、`chromium`（`version`、`revision`、`launchMode`：`normal` 或 `single-process`）、`ffmpeg` |
-| `composition` | object | `dir`、`hash`（合成目录哈希，`sha256:` 开头，不含 `out/` 和 `.flipbook/`）、`width`、`height`、`fps`、`frames`、`durationSec` |
-| `failures` | Finding[] | 错误，任何一条都让退出码变 1 |
-| `warnings` | Finding[] | 提示，不影响退出码 |
-| `artifacts` | object | 产物路径：`video`、`contactSheet`、`rejectedVideo`、`zoom1` 等，`report` 是这份报告存盘的路径 |
-| `reportSaveError` | string | 报告没能存盘时才有，写明原因（没有合成目录、写入被拒或失败），这时 stdout 上的就是唯一一份 |
-| `attempts` | object | 重试计数，见下文 |
-| `stop` | boolean | 到重试上限时为 true，agent 应停下向用户报告 |
-| `stopReason` | string | `stop` 为 true 时说明卡在哪 |
-| `timing` | object | `startedAt`、`durationMs` |
+| `schema` | string | Always `flipbook.report/1` |
+| `command` | string | `check`, `snapshot`, `render`, `audio`, or `usage` on a usage error |
+| `ok` | boolean | true when the exit code is 0 |
+| `exitCode` | 0, 1, 2, 78 | Same as the process exit code |
+| `flipbook.version` | string | CLI version |
+| `environment` | object | `platform` (such as `darwin-arm64`), `node`, `chromium` (`version`, `revision`, `launchMode`: `normal` or `single-process`), `ffmpeg` |
+| `composition` | object | `dir`, `hash` (hash of the composition directory, starting with `sha256:`, excluding `out/` and `.flipbook/`), `width`, `height`, `fps`, `frames`, `durationSec` |
+| `failures` | Finding[] | Errors. Any one of them makes the exit code 1 |
+| `warnings` | Finding[] | Hints. They do not change the exit code |
+| `artifacts` | object | Output paths: `video`, `contactSheet`, `rejectedVideo`, `zoom1` and so on. `report` is where this report was saved |
+| `reportSaveError` | string | Present only when the report could not be saved, with the reason (no composition directory, write refused or failed). The copy on stdout is then the only one |
+| `attempts` | object | Retry counts, see below |
+| `stop` | boolean | true when a retry limit is reached. The agent should stop and report to the user |
+| `stopReason` | string | When `stop` is true, where it is stuck |
+| `timing` | object | `startedAt`, `durationMs` |
 
-各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同。
+Each command adds a field named after itself: `check` (`seed`, the sampled frames, the order of the two seek passes, the evidence directory, `contrastSkipped` for canvas text whose contrast was not measured), `snapshot` (`layout`, `tiles` with each tile's frame, time and scene, `zooms`), `render` (`frames`, `fps`, `digest` summarizing the raw frame hashes, `captureMs`, `encodeMs`, `verifyMs`, `totalMs`, `captureFps`, `probe`, `audio`, `contactSheetTiles`), `audio` (see [Audio](#audio)). `render` also has `metadata`, the same content written into the mp4 comment tag.
 
-## 输出目录
+## Output directory
 
-合成目录里只有 `out/` 和 `.flipbook/` 两处是 flipbook 写的。写入前逐级核对路径：这两处或它们下面任何一级是软链，命令一开始就报 `unsafe-output` 退 1，什么都不写、不删。文件先写到同目录的新文件名再改名替换，不会顺着已有的软链或硬链写到外面：
+Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`. Before writing it checks the path one level at a time: if either of them, or any level below, is a symlink, the command reports `unsafe-output` and exits 1 right at the start, writing and deleting nothing. Files are written under a new name in the same directory and then renamed into place, so a write never follows an existing symlink or hard link out of the directory:
 
-| 路径 | 谁写 | 内容 |
+| Path | Written by | Contents |
 |---|---|---|
-| `out/video.mp4`、`out/contact-sheet.png` | render | 通过验收的成片和成片联系表。没通过时不动 `out/` |
-| `out/snapshot/contact-sheet.png`、`out/snapshot/zoom-f<帧号>.png` | snapshot | 预检联系表和局部放大图 |
-| `.flipbook/rejected/` | render | 没通过验收的成片和联系表，`artifacts.rejectedVideo` 指向它 |
-| `.flipbook/evidence/<命令>/` | check、render | 证据图，每次运行前清空 |
-| `.flipbook/timeline.resolved.json` | 全部 | 换算后的 timeline |
-| `.flipbook/frame-hashes.json` | render | 每帧原始截图的 sha256 和汇总 |
-| `.flipbook/attempts.json` | check、render | 重试计数 |
-| `.flipbook/reports/<命令>.json` | check、snapshot、audio、render | 这条命令最近一次的报告，和 stdout 上的相同。退 78、`unsafe-output`、`internal-error` 的运行也存，路径在 `artifacts.report` |
-| `.flipbook/tmp/` | render | 渲染中间件，结束后删掉 |
-| `.flipbook/render.lock` | render | 同一目录同时只跑一个 render（同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。锁用 O_EXCL 建，内容是 pid 和随机令牌。持有进程已退出，或锁里没有可读的持有者且建了超过 10 秒，才算过期被接管。释放时只删令牌仍是自己的锁 |
-| `.flipbook/audio/` | audio、render | 合成的 `music.wav`、`sfx.wav`，`score.json`（和弦、强弱、音效位置），`audio.json`（各轨哈希、峰值、音效实际峰值位置）。audio 命令也拿 `render.lock` |
+| `out/video.mp4`, `out/contact-sheet.png` | render | The video that passed acceptance and its contact sheet. `out/` is left alone when acceptance fails |
+| `out/snapshot/contact-sheet.png`, `out/snapshot/zoom-f<frame>.png` | snapshot | Preview contact sheet and zoomed crops |
+| `.flipbook/rejected/` | render | The video and contact sheet that failed acceptance, pointed to by `artifacts.rejectedVideo` |
+| `.flipbook/evidence/<command>/` | check, render | Evidence images, cleared before each run |
+| `.flipbook/timeline.resolved.json` | all | The resolved timeline |
+| `.flipbook/frame-hashes.json` | render | sha256 of every raw frame, plus the summary |
+| `.flipbook/attempts.json` | check, render | Retry counts |
+| `.flipbook/reports/<command>.json` | check, snapshot, audio, render | The latest report of that command, identical to stdout. Runs that exit 78, hit `unsafe-output` or `internal-error` are saved too, with the path in `artifacts.report` |
+| `.flipbook/tmp/` | render | Intermediate render files, deleted at the end |
+| `.flipbook/render.lock` | render | One render per directory at a time (re-entry from the same process counts). A second one gets `render-busy` and exit 1, which does not count as an attempt. The lock is created with O_EXCL and holds a pid and a random token. It counts as stale, and gets taken over, only when its holder has exited, or when it has no readable holder and is more than 10 seconds old. Releasing deletes the lock only while the token is still its own |
+| `.flipbook/audio/` | audio, render | The synthesized `music.wav` and `sfx.wav`, `score.json` (chords, dynamics, sound-effect positions), `audio.json` (hash and peak of each track, actual peak position of each sound effect). The audio command takes `render.lock` too |
 
 ## Finding
 
-| 字段 | 类型 | 说明 |
+| Field | Type | Description |
 |---|---|---|
-| `code` | string | 类型码，见下表 |
-| `severity` | `error` 或 `warning` | |
-| `message` | string | 出了什么事 |
-| `time` | number | 第几秒，可缺 |
-| `frame` | number | 帧号，可缺 |
-| `element` | string | CSS 选择器、`文件:行号` 或 `scene <id>`，可缺 |
-| `evidence` | string[] | 证据图路径，可缺 |
-| `fix` | string | 怎么改 |
-| `detail` | object | 附加数据，如 `path`、`chars`、`frames` |
+| `code` | string | The code, see the tables below |
+| `severity` | `error` or `warning` | |
+| `message` | string | What happened |
+| `time` | number | Second, optional |
+| `frame` | number | Frame number, optional |
+| `element` | string | CSS selector, `file:line` or `scene <id>`, optional |
+| `evidence` | string[] | Evidence image paths, optional |
+| `fix` | string | How to fix it |
+| `detail` | object | Extra data such as `path`, `chars`, `frames` |
 
-## 类型码：合成问题（退出码 1）
+## Codes: composition problems (exit 1)
 
-| 类型码 | 谁报 | 含义 | 修法 |
+| Code | Reported by | Meaning | Fix |
 |---|---|---|---|
-| `index-missing` | 全部 | 目录里没有 index.html | 建 index.html |
-| `timeline-missing` | 全部 | 目录里没有 timeline.json | 按 docs/timeline-schema.md 写 |
-| `timeline-invalid` | 全部 | timeline.json 不合 v1 schema，`detail.path` 给出 JSON 路径 | 改 `detail.path` 指的字段 |
-| `protocol-missing` | 全部 | 页面没定义 `window.__flipbook`，或读它时抛错 | 调运行时库的 `composition({ seek })` |
-| `protocol-mismatch` | 全部 | `window.__flipbook.protocol` 不是 1 | 设成 1 |
-| `ready-timeout` | 全部 | `ready` 60 秒内没结束（从开始加载页面算）。读 `window.__flipbook` 时页面不再应答（脚本或 getter 里死循环）也算在这 60 秒里，超时报这个码并关掉页面 | ready 里不等定时器和 rAF |
-| `ready-failed` | 全部 | `ready` 被拒，常见是字体或图片加载失败 | 按 message 修 |
-| `seek-timeout` | 全部 | 单次 seek 超过 10 秒（`--seek-timeout` 可改） | seek 里不等 rAF、定时器和事件 |
-| `seek-failed` | 全部 | seek 抛错 | 按 message 修 |
-| `page-error` | 全部 | 页面有未捕获的异常 | 按 message 修 |
-| `console-error` | 全部 | 页面往控制台打了错误 | 按 message 修 |
-| `resource-failed` | 全部 | 请求的文件在合成目录里不存在 | 补文件或改路径，图片放 assets/ |
-| `external-request` | 全部 | 页面想联网，已拦下。HTTP 请求和 WebSocket 在 Playwright 这层拦，`detail.url` 是目标地址。WebRTC 和 WebTransport 在页面里直接报错，`detail.url` 是 `webrtc:<构造函数名>` 或 `webtransport:<地址>` | 文件拷进 assets/ 用相对路径 |
-| `path-escape` | 全部 | 请求的路径解析后落在合成目录外，已拒绝 | 所有文件放合成目录内 |
-| `unsafe-output` | check、snapshot、audio、render | `.flipbook/` 或 `out/` 里有软链，或该是目录的地方是文件，这次什么都没写。`detail.paths` 列出这些路径 | 删掉这些路径（软链只删链接本身），再跑一次 |
-| `static-forbidden` | check | 源码里有禁用写法，只报 warning | 换成 t 的纯函数写法 |
-| `seek-order-dependent` | check | 同一个 t 换个 seek 顺序画面就变，有跨帧状态 | 去掉帧间累积的状态，全部由 t 算出 |
-| `clock-dependent` | check | 换虚拟时钟起点画面就变，读了 Date 或 performance.now。只抽三帧比，没变不代表没读时钟 | 只用 seek 传进来的 t |
-| `random-dependent` | check | 换随机底层种子画面就变，用了 Math.random 或 crypto | 用运行时库的 `rng` 或 `rand` |
-| `forbidden-api-call` | check | 页面调用了规矩禁用的时钟或随机函数，按函数各报一条，`detail.api` 是函数名，`detail.count` 是次数，`element` 是第一次调用的 `文件:行号`。计数覆盖基准页从加载到最后一次 seek 的全过程，被数的有 `Date.now()`、`new Date()`、`Date()`、`performance.now()`、`performance.timeOrigin`、`document.timeline.currentTime`、不带日期的 `Intl.DateTimeFormat`、`Temporal.Now.*`、`Math.random()`、`crypto.getRandomValues()`、`crypto.randomUUID()`。这些调用拿到的仍是虚拟时钟和固定种子的值，所以画面不一定变，但一律报错。Worker 和 iframe 里的调用数不到 | 换成 seek 传进来的 t，随机数用 `rng` 或 `rand` |
-| `late-paint` | check | 同一个 t 不重新 seek 连截两张不一样，有迟到的绘制 | seek 里画完，图片解码放 ready |
-| `blank-frame` | check、render | 画面是一整块纯色：缩到 320×180 灰度后，偏离中位灰度超过 16 灰阶的像素不到 0.05%。check 里全部抽样帧都空才是 error，部分空报 warning。render 里连续 1.5 秒以上才是 error | 查 seek 在这些时刻有没有画 |
-| `paper-only` | check、render | 画面和只开纸底层的基线一样：缩到 320×180 灰度后，和最近一张基线相差超过 16 灰阶的像素不到 0.05%。check 和 render 的判定规则同 `blank-frame`。render 每秒截一张基线。render 里空白帧和只剩纸底的帧合起来按「没有内容」连续计时，两类交替出现也不会被切断，类型码取两类里帧数多的那个，`detail` 里有 `blankFrames` 和 `paperFrames` | 查内容层是否因报错没画 |
-| `missing-glyph` | check、render | 文字里有 flipbook 字体都没有的字，`detail.chars` 列出 | 换掉这些字 |
-| `font-fallback` | check、render | 文字用了系统字体而不是 flipbook 字体。DOM 字看 Chromium 实际用的字体。Canvas 字按 `ctx.font` 的字体链逐字核：某个字在找到含它的 flipbook 字体之前先碰到别的字体名（系统字体或 `serif` 这类通用名），或者整条链都不含它，就报，`detail.chars` 列出这些字 | font-family 用 "Noto Serif SC" 或 "LXGW WenKai" |
-| `text-offstage` | check | 文字完全出来的时刻（cue 的 settle 时刻），有一行越过画面边缘。每一行用 `Range.getClientRects` 取框，已含 transform。整段落在画面外的字也报，只有 `display: none`、`visibility: hidden` 或 `opacity: 0` 的字不算。运行时 `fillText` 登记的 canvas 字，框是字形四个角经画布当前变换（含旋转、倾斜、翻转）和 `maxWidth` 压缩后的包围框，再按画布的布局尺寸换成页面像素。画布元素自己的 CSS 旋转不计入 | 把字挪进画面或缩小，故意出画的字加 `data-flipbook-allow-overflow` |
-| `text-safe-area` | check | 同一时刻，有一行落进画面外沿 5% 的边距里，只报 warning | 离四边至少留宽高的 5%，或加 `data-flipbook-allow-overflow` |
-| `low-contrast` | check | 同一时刻，文字和背后画面的对比度低于 3:1（大字标准），只报 warning。量法：同一帧截两张，第二张把 DOM 文字设成透明，变了的像素就是字形，字色取变化最大的三成像素在第一张里的均值，背景取同一批像素在第二张里的均值，按 WCAG 相对亮度算比值，`detail.measured` 为 true。字和背后分不开时（藏起来前后变化超过 6 个色阶的像素不到 12 个，多半是同色字）也报这个 warning，`detail.measured` 为 false。Canvas 里画的字不量，列在 `check.contrastSkipped` 里（`frame`、`element`、`reason`） | 加深或调亮文字或背景，或在字下垫一块实色底 |
-| `stage-size` | check | html 或 body 的布局尺寸比 timeline 的宽高大，只报 warning。被 `overflow: hidden` 裁掉的出画内容不算 | 舞台按 timeline 尺寸写，隐藏溢出 |
-| `freeze` | render | 没声明 hold 的场景里画面 1.5 秒以上不动：成片缩到 320×180、高斯模糊（sigma 1.5）后用 ffmpeg freezedetect（`n=-60dB`）判定，只算落在没声明 hold 的场景里的部分。相邻的非 hold 场景连起来算，场景边界不切断定格，跨了几场时 `element` 是 `scenes <id>, <id>` | 让画面动起来，或给场景加 `"hold": true` |
-| `glitch` | render | 成片均匀抽 8 帧解码，和截图原帧在 480×270 上比 PSNR，低于 30 dB 就报，证据是最差那一帧的截图原帧和成片解码帧（`glitch-f<帧号>-captured.png`、`-decoded.png`）。送帧管道断了也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
-| `frame-count` | render | 成片帧数和 timeline 不符 | 重渲一次，还出现就带 JSON 报 issue |
-| `duration-mismatch` | render | 成片时长和 timeline 不符（容差一帧）。有音轨时，音轨时长和画面差超过一帧和一个 AAC 包（1024 个采样）中较大者也报这个码 | 重渲一次，还出现就带 JSON 报 issue |
-| `color-tags` | render | 成片不是 yuv420p 或缺 bt709 色彩标记 | 带 JSON 报 issue |
-| `audio-skipped` | audio | `audio` 命令没东西可合成：`audio.mode` 不是 `preset`，也没有 sfx cue，只报 warning | 片子本来就不要合成的声音时不用改，要配乐就写 `"mode": "preset"` |
-| `audio-missing` | render | timeline 要声音（`preset`、`file` 或有 sfx cue），成片却没有音轨 | 重渲一次，还出现就带 JSON 报 issue |
-| `audio-loudness` | render | 有配乐的音轨整合响度不在 -14 LUFS 上下 1 LU 内 | 重渲一次，还出现就带 JSON 报 issue。自带音乐先确认 `bpmOffset` 之后不是静音 |
-| `audio-peak` | render | 音轨真峰值高于 -1 dBTP | 重渲一次，还出现就带 JSON 报 issue |
-| `audio-cue-offset` | render | 某个音效的峰值离它的 cue 帧超过一帧，或在音轨里找不到，`element` 是 `cue <id>` | sfx cue 之间至少隔 1/8 拍。隔开了还报就重渲一次，再出现带 JSON 报 issue |
-| `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
-| `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
+| `index-missing` | all | No index.html in the directory | Create index.html |
+| `timeline-missing` | all | No timeline.json in the directory | Write one following docs/timeline-schema.md |
+| `timeline-invalid` | all | timeline.json does not match the v1 schema. `detail.path` gives the JSON path | Fix the field `detail.path` points to |
+| `protocol-missing` | all | The page does not define `window.__flipbook`, or reading it throws | Call the runtime's `composition({ seek })` |
+| `protocol-mismatch` | all | `window.__flipbook.protocol` is not 1 | Set it to 1 |
+| `ready-timeout` | all | `ready` did not settle within 60 seconds (counted from when the page starts loading). A page that stops responding while `window.__flipbook` is read (an endless loop in a script or getter) uses up the same 60 seconds. On timeout this code is reported and the page closed | Do not wait for timers or rAF in ready |
+| `ready-failed` | all | `ready` rejected, usually because a font or image failed to load | Fix what the message says |
+| `seek-timeout` | all | One seek took longer than 10 seconds (change it with `--seek-timeout`) | Do not wait for rAF, timers or events in seek |
+| `seek-failed` | all | seek threw | Fix what the message says |
+| `page-error` | all | The page has an uncaught exception | Fix what the message says |
+| `console-error` | all | The page logged an error to the console | Fix what the message says |
+| `resource-failed` | all | A requested file does not exist in the composition directory | Add the file or fix the path. Images go in assets/ |
+| `external-request` | all | The page tried to reach the network and was blocked. HTTP requests and WebSocket are blocked at the Playwright layer, with the target in `detail.url`. WebRTC and WebTransport throw inside the page, with `detail.url` set to `webrtc:<constructor name>` or `webtransport:<address>` | Copy the file into assets/ and use a relative path |
+| `path-escape` | all | A requested path resolves outside the composition directory and was refused | Keep every file inside the composition directory |
+| `unsafe-output` | check, snapshot, audio, render | `.flipbook/` or `out/` contains a symlink, or a file sits where a directory should be. Nothing was written this time. `detail.paths` lists the paths | Delete them (for a symlink, only the link itself) and run again |
+| `static-forbidden` | check | The source uses a forbidden pattern. Warning only | Rewrite it as a pure function of t |
+| `seek-order-dependent` | check | The picture for the same t changes when frames are seeked in another order: state is carried from frame to frame | Remove state that builds up between frames and compute everything from t |
+| `clock-dependent` | check | The picture changes when the virtual clock starts elsewhere: the page reads Date or performance.now. Only three frames are compared, so no change does not prove the clock is never read | Use only the t passed to seek |
+| `random-dependent` | check | The picture changes when the underlying random seed changes: the page uses Math.random or crypto | Use the runtime's `rng` or `rand` |
+| `forbidden-api-call` | check | The page called a clock or random function the rules forbid. One finding per function, with the function name in `detail.api`, the count in `detail.count`, and the `file:line` of the first call in `element`. Counting covers the reference page from load to the last seek. Counted: `Date.now()`, `new Date()`, `Date()`, `performance.now()`, `performance.timeOrigin`, `document.timeline.currentTime`, `Intl.DateTimeFormat` without a date, `Temporal.Now.*`, `Math.random()`, `crypto.getRandomValues()`, `crypto.randomUUID()`. These calls still get values from the virtual clock and a fixed seed, so the picture may not change, but they are always an error. Calls inside Workers and iframes are not counted | Use the t passed to seek, and `rng` or `rand` for random numbers |
+| `late-paint` | check | Two captures of the same t without a new seek differ: something paints late | Finish drawing inside seek, decode images in ready |
+| `blank-frame` | check, render | The frame is one flat color: after scaling to 320×180 grayscale, fewer than 0.05% of pixels differ from the median gray by more than 16 levels. In check it is an error only when every sampled frame is blank, a warning when some are. In render it is an error from 1.5 seconds in a row | Check whether seek draws at those times |
+| `paper-only` | check, render | The frame matches the baseline with only the paper layers on: after scaling to 320×180 grayscale, fewer than 0.05% of pixels differ from the nearest baseline by more than 16 levels. check and render judge it like `blank-frame`. render captures one baseline per second. In render, blank frames and paper-only frames count together as "no content", so switching between the two does not break the run. The code is whichever of the two has more frames, and `detail` has `blankFrames` and `paperFrames` | Check whether the content layer failed to draw because of an error |
+| `missing-glyph` | check, render | The text has characters that none of the flipbook fonts contain. `detail.chars` lists them | Replace those characters |
+| `font-fallback` | check, render | Text uses a system font instead of a flipbook font. DOM text is judged by the font Chromium actually used. Canvas text is checked one character at a time along the `ctx.font` font list: a character is reported when the list reaches another font name (a system font or a generic name such as `serif`) before a flipbook font that contains it, or when no font in the list contains it. `detail.chars` lists them | Use "Noto Serif SC" or "LXGW WenKai" in font-family |
+| `text-offstage` | check | At the moment the text has fully appeared (the cue's settle time), a line crosses the edge of the frame. Each line's box comes from `Range.getClientRects`, transforms included. Text lying entirely outside the frame is reported too. Only text with `display: none`, `visibility: hidden` or `opacity: 0` is exempt. For canvas text registered by the runtime's `fillText`, the box bounds the glyph's four corners after the canvas's current transform (rotation, skew and flips included) and `maxWidth` squeezing, converted to page pixels by the canvas's layout size. CSS rotation on the canvas element itself is not included | Move the text into the frame or make it smaller. Mark deliberate bleeds `data-flipbook-allow-overflow` |
+| `text-safe-area` | check | At the same moment, a line falls into the outer 5% margin of the frame. Warning only | Keep at least 5% of the width and height from each edge, or add `data-flipbook-allow-overflow` |
+| `low-contrast` | check | At the same moment, the contrast between the text and what lies behind it is below 3:1 (the large-text standard). Warning only. How it is measured: the same frame is captured twice, the second time with DOM text made transparent, and the pixels that change are the glyphs. The text color is the mean, in the first capture, of the 30% of those pixels that changed most. The background is the mean of the same pixels in the second capture. The ratio uses WCAG relative luminance, and `detail.measured` is true. When the text cannot be told apart from what is behind it (fewer than 12 pixels change by more than 6 levels, usually text the same color as its background), the same warning is reported with `detail.measured` false. Text drawn on a canvas is not measured and is listed in `check.contrastSkipped` (`frame`, `element`, `reason`) | Darken or lighten the text or the background, or put a solid block behind the text |
+| `stage-size` | check | The layout size of html or body is larger than the timeline width and height. Warning only. Offstage content clipped by `overflow: hidden` does not count | Size the stage to the timeline and hide overflow |
+| `freeze` | render | In a scene without a declared hold, the picture stays still for 1.5 seconds or more: the video is scaled to 320×180, Gaussian-blurred (sigma 1.5) and run through ffmpeg freezedetect (`n=-60dB`). Only the part inside scenes without hold counts. Neighboring non-hold scenes are joined, so a scene boundary does not split a freeze. When it spans several scenes, `element` is `scenes <id>, <id>` | Make the picture move, or add `"hold": true` to the scene |
+| `glitch` | render | 8 evenly spaced frames are decoded from the video and compared with the captured frames at 480×270 by PSNR. Below 30 dB is reported, with the worst frame's captured and decoded images as evidence (`glitch-f<frame>-captured.png`, `-decoded.png`). A broken frame pipe is reported under this code too | Render again. If it happens again, open an issue with the JSON |
+| `frame-count` | render | The video's frame count does not match the timeline | Render again. If it happens again, open an issue with the JSON |
+| `duration-mismatch` | render | The video's duration does not match the timeline (one frame of tolerance). With an audio track, this code also covers a track whose duration differs from the picture by more than the larger of one frame and one AAC packet (1024 samples) | Render again. If it happens again, open an issue with the JSON |
+| `color-tags` | render | The video is not yuv420p or lacks the bt709 color tags | Open an issue with the JSON |
+| `audio-skipped` | audio | The `audio` command has nothing to synthesize: `audio.mode` is not `preset` and there are no sfx cues. Warning only | Nothing to change when the video needs no synthesized sound. For music, write `"mode": "preset"` |
+| `audio-missing` | render | The timeline asks for sound (`preset`, `file`, or sfx cues) but the video has no audio track | Render again. If it happens again, open an issue with the JSON |
+| `audio-loudness` | render | A track with music has integrated loudness outside -14 LUFS ±1 LU | Render again. If it happens again, open an issue with the JSON. With your own music, first make sure it is not silent after `bpmOffset` |
+| `audio-peak` | render | The track's true peak is above -1 dBTP | Render again. If it happens again, open an issue with the JSON |
+| `audio-cue-offset` | render | A sound effect's peak is more than one frame away from its cue frame, or cannot be found in the track. `element` is `cue <id>` | Keep sfx cues at least 1/8 beat apart. If they are and it still happens, render again, and if it happens again open an issue with the JSON |
+| `render-busy` | render | Another render is running in the same composition directory. Does not count as an attempt | Wait for it to finish |
+| `internal-error` | all | flipbook itself failed | Leave the composition alone and open an issue with the JSON |
 
-`clock-dependent` 和 `random-dependent` 各开一个新页面，把虚拟时钟起点推后约 34 小时或换掉随机底层种子，再取三帧和基准比。扰动页上出的任何问题（加载失败、协议、`seek-failed`、`seek-timeout`、`external-request`、`page-error` 等）只要基准页上没有，就照原类型码报成失败，`message` 末尾写明是在哪种扰动下出现的，`detail.perturbation` 给出扰动条件（`change` 为 `clock` 或 `random seed`，以及偏移量或种子）。
+`clock-dependent` and `random-dependent` each open a new page, move the virtual clock start about 34 hours later or swap the underlying random seed, and compare three frames with the reference. Any problem on a perturbed page (a load failure, protocol, `seek-failed`, `seek-timeout`, `external-request`, `page-error` and so on) that the reference page does not have is reported as a failure under its own code. The `message` ends by naming the perturbation, and `detail.perturbation` gives its conditions (`change` is `clock` or `random seed`, plus the offset or the seed).
 
-文字类检查（`missing-glyph`、`font-fallback`、`text-offstage`、`text-safe-area`、`low-contrast`）在 timeline 里每个文字 cue 的 settle 时刻取样，没有文字 cue 时取三个抽样帧。带 `data-flipbook-allow-overflow` 的元素及其子元素不做 `text-offstage` 和 `text-safe-area` 检查，运行时库 `registerText` 登记的 canvas 文字可以传 `allowOverflow: true`。
+Text checks (`missing-glyph`, `font-fallback`, `text-offstage`, `text-safe-area`, `low-contrast`) sample at the settle time of each text cue in the timeline, or at three sampled frames when there are no text cues. Elements marked `data-flipbook-allow-overflow`, and their children, skip `text-offstage` and `text-safe-area`. Canvas text registered with the runtime's `registerText` can pass `allowOverflow: true`.
 
-`blank-frame` 和 `paper-only` 在 check 里只看抽样帧：全部抽样帧都空才是 error，部分为空报 warning。在 render 里逐帧看，没有内容的画面（两类合起来）连续超过 1.5 秒才报 error。
+In check, `blank-frame` and `paper-only` look only at sampled frames: an error when every sampled frame is empty, a warning when some are. In render they look at every frame and report an error only when frames without content (both kinds together) run longer than 1.5 seconds.
 
-音频类检查（`audio-missing`、`audio-loudness`、`audio-peak`、`audio-cue-offset`）只在 timeline 要声音时跑，量法见下面的「音频」一节。
+Audio checks (`audio-missing`, `audio-loudness`, `audio-peak`, `audio-cue-offset`) run only when the timeline asks for sound. How they measure is in [Audio](#audio).
 
-## 音频
+## Audio
 
-### audio 命令
+### The audio command
 
-`flipbook audio <dir>` 按 timeline 合成配乐和音效，写到 `.flipbook/audio/`，报告的 `command` 是 `audio`。render 会自己调用它，单独跑是为了先听。每次都重新合成，不用缓存。
+`flipbook audio <dir>` synthesizes the music and sound effects from the timeline into `.flipbook/audio/`, and the report's `command` is `audio`. render calls it on its own: run it separately to listen first. It synthesizes afresh every time, with no cache.
 
-- `artifacts`：`music`（有预设配乐时）、`sfx`（有 sfx cue 时），都是 WAV 路径。
-- `audio`：`mode`、`preset`、`key`、`progression`、`sampleRate`（48000）、`samples`、`durationSec`、`synthMs`，`music` 和 `sfx` 各有 `file`、`sha256`、`peakDb`，`sfx.cues[]` 每项有 `id`、`sfx`、`frame`、`target`（cue 帧在 48 kHz 上的采样位置）、`peakSample`（合成后音效轨在 cue 附近实际最大的采样位置）。
-- 没东西可合成时报 `audio-skipped` warning，退 0。
+- `artifacts`: `music` (with preset music) and `sfx` (with sfx cues), both WAV paths.
+- `audio`: `mode`, `preset`, `key`, `progression`, `sampleRate` (48000), `samples`, `durationSec`, `synthMs`. `music` and `sfx` each have `file`, `sha256`, `peakDb`. Each item in `sfx.cues[]` has `id`, `sfx`, `frame`, `target` (the cue frame's sample position at 48 kHz) and `peakSample` (the sample position near the cue where the synthesized effect track actually peaks).
+- With nothing to synthesize it reports an `audio-skipped` warning and exits 0.
 
-### render 报告里的 audio
+### audio in the render report
 
-`render.audio` 在 timeline 不要声音时是 `null`，否则有：
+`render.audio` is `null` when the timeline asks for no sound. Otherwise it has:
 
-| 字段 | 说明 |
+| Field | Description |
 |---|---|
-| `codec`、`sampleRate`、`channels`、`durationSec` | 成片音轨，ffprobe 读 |
-| `mode`、`preset`、`key` | 照 timeline |
-| `integratedLufs`、`truePeakDbtp` | 成片音轨用 ffmpeg `ebur128`（`peak=true`）量的整合响度和真峰值。短于 0.4 秒或静音时整合响度为 `null` |
-| `loudnessChecked` | 有配乐且量得出整合响度时为 true，这时才查 -14 LUFS |
-| `effectsLagMs` | 音效轨在成片里整体晚了多少毫秒，找不到时为 `null` |
-| `cues[]` | 每个音效：`id`、`sfx`、`frame`、`expectedSec`（帧号除以 fps）、`measuredSec`、`offsetMs`、`match` |
-| `mix` | 混音参数：`musicLufs`（配乐自己的响度）、`mixLufs`（混好未增益的响度）、`sfxGainDb`、`gainDb`、`limitDb` |
-| `synthMs`、`stemsReused` | 合成耗时，是否用了已有的轨 |
+| `codec`, `sampleRate`, `channels`, `durationSec` | The video's audio track, read with ffprobe |
+| `mode`, `preset`, `key` | As in the timeline |
+| `integratedLufs`, `truePeakDbtp` | Integrated loudness and true peak of the track, measured with ffmpeg `ebur128` (`peak=true`). Integrated loudness is `null` when the track is shorter than 0.4 seconds or silent |
+| `loudnessChecked` | true when there is music and its integrated loudness could be measured. Only then is -14 LUFS checked |
+| `effectsLagMs` | How many milliseconds late the effect track sits in the video overall, `null` when it cannot be found |
+| `cues[]` | Each sound effect: `id`, `sfx`, `frame`, `expectedSec` (frame divided by fps), `measuredSec`, `offsetMs`, `match` |
+| `mix` | Mix parameters: `musicLufs` (loudness of the music alone), `mixLufs` (loudness of the mix before gain), `sfxGainDb`, `gainDb`, `limitDb` |
+| `synthMs`, `stemsReused` | Synthesis time, and whether existing tracks were reused |
 
-### 量法
+### How it is measured
 
-- 音轨时长：和画面差的容差取一帧和一个 AAC 包（1024 / 48000 秒）中较大者，超过报 `duration-mismatch`。
-- 响度：有配乐（`preset` 或 `file`）时整合响度要在 -14 LUFS 上下 1 LU 内，否则 `audio-loudness`。只有音效时不查整合响度。凡有音轨都查真峰值，高于 -1 dBTP 报 `audio-peak`。
-- 音效对帧：音效轨和成片都降到 8 kHz 单声道。有配乐时先用同一条混音链单独渲一遍配乐，在成片里找它的位置和增益，减掉，剩下的基本只有音效。每个音效取峰值前 0.35 秒到峰值后 30 毫秒、再裁到九成能量的一段，一阶差分后在 ±0.25 秒内找和成片最相关的偏移，所有音效合起来找一个偏移。每个音效的实际峰值 = `peakSample` 加这个偏移，和 cue 帧的时刻差超过一帧报 `audio-cue-offset`。相关系数低于 0.12 算找不到，也报这个码。
+- Track duration: the tolerance against the picture is the larger of one frame and one AAC packet (1024 / 48000 seconds). Beyond that is `duration-mismatch`.
+- Loudness: with music (`preset` or `file`), integrated loudness must be within -14 LUFS ±1 LU, otherwise `audio-loudness`. With only sound effects, integrated loudness is not checked. Every track gets a true-peak check: above -1 dBTP is `audio-peak`.
+- Effects on their frames: the effect track and the video are both brought down to 8 kHz mono. With music, the music alone is first rendered through the same mix chain, located in the video along with its gain, and subtracted, which leaves mostly the effects. For each effect, the span from 0.35 seconds before its peak to 30 milliseconds after, trimmed to the part holding 90% of the energy, is differenced once and slid within ±0.25 seconds to find the offset that correlates best with the video. One offset is found for all effects together. Each effect's actual peak is `peakSample` plus that offset, and more than one frame from the cue frame's time is `audio-cue-offset`. A correlation below 0.12 counts as not found and is reported under the same code.
 
-## 类型码：环境缺件（退出码 78）
+## Codes: environment (exit 78)
 
-| 类型码 | 含义 |
+| Code | Meaning |
 |---|---|
-| `platform-unsupported` | 系统不支持（Windows 请用 WSL2） |
-| `node-too-old` | Node 低于 22.19 |
-| `ffmpeg-missing` | PATH 上没有 ffmpeg 或 ffprobe |
-| `ffmpeg-feature-missing` | ffmpeg 缺 libx264 或必需的滤镜 |
-| `chromium-missing` | 钉死版本的 Chromium headless shell 没装（doctor 报，check 和 render 会自动装） |
-| `chromium-install-failed` | 安装 Chromium 失败 |
-| `browser-launch-failed` | Chromium 起不来 |
-| `sandbox-blocked` | 宿主沙箱挡住了 Chromium，正常和单进程两种方式都起不来 |
-| `tmp-unwritable` | Chromium 建不了临时目录：TMPDIR 不存在或只读（常见于只读沙箱），单进程也没用，不重试 |
-| `resource-exhausted` | 系统杀掉了 flipbook 起的 Chromium 或 ffmpeg 进程，内存或进程数不够时会这样。认法：Chromium 通过 CDP `Target.targetCrashed` 报渲染进程的终止状态是 `killed`、`oom`、`failed to launch` 或 `evicted for memory`（`detail.process` 为 `renderer`，带 `status` 和 `errorCode`），或浏览器整个退出（`detail.process` 为 `browser`，单进程模式下被杀只有这一种），或 ffmpeg 等辅助进程被 SIGKILL 且不是 flipbook 自己按时限杀的（`detail.program`、`detail.signal`）。页面自己崩溃（状态 `crashed`，把 V8 堆撑爆也是这种）仍报 `page-error` |
-| `linux-deps-missing` | Linux 缺 Chromium 需要的系统库 |
-| `font-download-failed` | 字体下载失败或校验不过 |
-| `cache-unwritable` | 缓存目录写不进（常见于沙箱内首次运行） |
+| `platform-unsupported` | Unsupported system (on Windows, use WSL2) |
+| `node-too-old` | Node is older than 22.19 |
+| `ffmpeg-missing` | No ffmpeg or ffprobe on PATH |
+| `ffmpeg-feature-missing` | ffmpeg lacks libx264 or a required filter |
+| `chromium-missing` | The pinned Chromium headless shell is not installed (doctor reports it, check and render install it on their own) |
+| `chromium-install-failed` | Installing Chromium failed |
+| `browser-launch-failed` | Chromium does not start |
+| `sandbox-blocked` | The host sandbox stops Chromium: it starts neither normally nor in single-process mode |
+| `tmp-unwritable` | Chromium cannot create its temp directory: TMPDIR does not exist or is read-only (common in read-only sandboxes). Single-process mode does not help either, so there is no retry |
+| `resource-exhausted` | The system killed a Chromium or ffmpeg process that flipbook started, which is what happens when memory or the process limit runs out. How it is recognized: Chromium reports through CDP `Target.targetCrashed` that a renderer ended with status `killed`, `oom`, `failed to launch` or `evicted for memory` (`detail.process` is `renderer`, with `status` and `errorCode`). Or the whole browser exits (`detail.process` is `browser`, the only case in single-process mode). Or ffmpeg or another helper gets a SIGKILL that flipbook did not send for a timeout (`detail.program`, `detail.signal`). A page that crashes on its own (status `crashed`, which includes blowing the V8 heap) is still `page-error` |
+| `linux-deps-missing` | Linux lacks system libraries that Chromium needs |
+| `font-download-failed` | A font download failed or did not verify |
+| `cache-unwritable` | The cache directory cannot be written (common on a first run inside a sandbox) |
 
-## 重试计数
+## Retry counts
 
-计数放在合成目录的 `.flipbook/attempts.json`，报告的 `attempts` 字段是它的摘要：
+The counts live in the composition's `.flipbook/attempts.json`. The report's `attempts` field summarizes them:
 
-| 字段 | 说明 |
+| Field | Description |
 |---|---|
-| `checkRounds` / `checkLimit` | check 跑了几轮，上限 8 |
-| `renderFailures` / `renderLimit` | render 失败几次，上限 3（首次加重来 2 次） |
-| `repeatedCodes` / `repeatLimit` | 每个类型码连续失败的次数，上限 3 |
+| `checkRounds` / `checkLimit` | Rounds of check so far, limit 8 |
+| `renderFailures` / `renderLimit` | Failed renders, limit 3 (the first try plus 2 more) |
+| `repeatedCodes` / `repeatLimit` | Consecutive failures per code, limit 3 |
 
-任何一项到上限且这次仍失败，`stop` 为 true。render 成功一次清零全部计数。
+When any count reaches its limit and this run still fails, `stop` is true. One successful render resets every count.
 
 ## doctor --json
 
-`doctor --prune` 先删掉缓存里这一版用不到的东西（别的 Chromium 构建、下载了一半的字体、清单里已经没有的字体），报告多一个 `pruned` 字段（`removed` 删掉的路径、`bytesFreed`）。除了下面说的缓存写入探测，这是 doctor 唯一会改动机器的开关，仍然不联网、不安装。
+`doctor --prune` first deletes what this version no longer uses from the cache (other Chromium builds, half-downloaded fonts, fonts no longer in the manifest), and the report gains a `pruned` field (`removed` lists the deleted paths, plus `bytesFreed`). Apart from the cache write probe described below, this is the only switch that lets doctor change the machine, and it still does not touch the network or install anything.
 
-`flipbook.doctor/1`：`ok`、`exitCode`（0 或 78）、`version`、`platform`、`node`、`ffmpeg`（路径、版本、`features` 各项功能是否可用）、`chromium`（`revision`、`browserVersion`、`playwrightCore`、`executable`、`installed`）、`launch`（`ok`、`mode`、`version`、`error`）、`cache`（`root`、`exists`、`writable` 能不能写、`fonts` 每款字体在不在。能不能写靠在缓存目录或它最近的已存在父目录里建一个空文件再立刻删掉来判断，这是 doctor 唯一的写操作，写不进就报 `cache-unwritable` 退 78）、`skillInstalls`（各宿主 skill 副本钉的版本、是否比 CLI 旧）、`problems`（环境类型码加修复命令）、`fix`（所有 `problems[].fix` 按顺序去重合并，退 78 时转给用户的就是它）、`warnings`。
+`flipbook.doctor/1`: `ok`, `exitCode` (0 or 78), `version`, `platform`, `node`, `ffmpeg` (path, version, and `features` saying which features work), `chromium` (`revision`, `browserVersion`, `playwrightCore`, `executable`, `installed`), `launch` (`ok`, `mode`, `version`, `error`), `cache` (`root`, `exists`, `writable`, and `fonts` saying whether each font is present. Writability is tested by creating an empty file in the cache directory, or in its nearest existing parent, and deleting it right away. This is doctor's only write. If it fails, doctor reports `cache-unwritable` and exits 78), `skillInstalls` (the version each host's copy of the skill pins, and whether it is older than the CLI), `problems` (environment codes with fix commands), `fix` (every `problems[].fix` merged in order without duplicates, which is what to relay to the user on exit 78), `warnings`.
 
-经 skill 启动器 `scripts/run.sh doctor` 跑时，不管带不带 `--json`，stdout 都是一个 JSON 对象：能跑 CLI 时是上面这份报告，最前面多一个 `launcher` 字段（钉死版本、找到的 flipbook、npx、bunx、node 和选中的启动方式），退出码取 CLI 的。什么都跑不了时是 `{ ok: false, exitCode: 78, error: "runtime-missing", message, fix, launcher }`，退 78。其他命令什么都跑不了时，同一份 JSON 打在 stderr 上。字体还没下载只报 warning，check 和 render 首次运行时会下载。
+When doctor runs through the skill launcher `scripts/run.sh doctor`, stdout is one JSON object with or without `--json`. When the CLI can run, it is the report above with a `launcher` field first (the pinned version, the flipbook, npx, bunx and node it found, and the launch method it picked), and the exit code is the CLI's. When nothing can run, it is `{ ok: false, exitCode: 78, error: "runtime-missing", message, fix, launcher }` with exit 78. For the other commands, when nothing can run, the same JSON goes to stderr. Fonts not downloaded yet are only a warning: check and render download them on their first run.
