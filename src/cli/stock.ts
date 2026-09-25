@@ -1,0 +1,585 @@
+// flipbook stock search and stock fetch: find public domain or free images
+// for a composition, look at them on one contact sheet, and save the chosen
+// one under assets/ with its source and license in assets/SOURCES.json.
+import * as fs from 'fs';
+import * as path from 'path';
+import { SOURCES_FILE } from '../engine/brand.ts';
+import { sandboxHost } from '../engine/browser.ts';
+import { requireFfmpeg } from '../engine/ffmpeg.ts';
+import { sheetLayout } from '../engine/pixels.ts';
+import { run, tail } from '../engine/proc.ts';
+import { compositionDir, outputLinksFinding } from '../engine/session.ts';
+import { Workspace } from '../engine/workspace.ts';
+import { type DnsLookup, download, type HttpGet } from '../stock/download.ts';
+import { EXTENSION, type ImageInfo, imageInfo } from '../stock/image.ts';
+import { type Net, type SleepFn, StockError } from '../stock/net.ts';
+import {
+    KEY_ENV,
+    keysFromEnv,
+    lookupImage,
+    needsKey,
+    type Orientation,
+    PROVIDERS,
+    type Provider,
+    parseStockId,
+    type StockHit,
+    type StockImage,
+    type StockKeys,
+    searchProvider,
+    secretsOf,
+} from '../stock/providers.ts';
+import {
+    EnvError,
+    type Finding,
+    finding,
+    progress,
+    type Report,
+    ReportBuilder,
+    UsageError,
+} from './report.ts';
+
+/** Seams for tests: every network call and timer goes through these. */
+export interface StockDeps {
+    fetch?: typeof fetch;
+    lookup?: DnsLookup;
+    get?: HttpGet;
+    sleep?: SleepFn;
+    env?: NodeJS.ProcessEnv;
+}
+
+/** Largest image file downloaded. */
+export const MAX_IMAGE_BYTES = 40 * 1024 * 1024;
+const MAX_THUMB_BYTES = 5 * 1024 * 1024;
+/** Longer edges are scaled down to this on fetch. */
+export const MAX_EDGE = 3200;
+const NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+const IMAGE_EXTENSIONS = [
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.webp',
+    '.gif',
+    '.tif',
+    '.tiff',
+    '.svg',
+    '.avif',
+];
+
+function netFor(deps: StockDeps, keys: StockKeys): Net {
+    return {
+        fetch: deps.fetch ?? fetch,
+        sleep: deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+        secrets: secretsOf(keys),
+    };
+}
+
+function keyMissing(provider: Provider, why?: string): EnvError {
+    if (provider === 'openverse') {
+        const names = `${KEY_ENV.openverseId} and ${KEY_ENV.openverseSecret}`;
+        return new EnvError(
+            'stock-key-missing',
+            why ?? 'Openverse turned the client credentials down.',
+            [`Fix or unset ${names}: Openverse also answers without them`],
+            { provider, env: names },
+        );
+    }
+    const name = KEY_ENV[provider];
+    return new EnvError(
+        'stock-key-missing',
+        why ?? `${provider} needs an API key and ${name} is not set.`,
+        [
+            `Ask the user for a ${provider} API key and set ${name}`,
+            'Or leave out --provider: Openverse needs no key',
+        ],
+        { provider, env: name },
+    );
+}
+
+function unreachable(error: StockError, env: NodeJS.ProcessEnv): EnvError {
+    return new EnvError(
+        'stock-unreachable',
+        error.message,
+        [
+            'Check the network or HTTPS_PROXY, then run the command again',
+            'Inside a sandbox: run the same flipbook stock command once outside it, after the user approves',
+        ],
+        { ...error.detail, host: sandboxHost(env) },
+    );
+}
+
+/** A StockError as the exit-78 error or the finding it stands for. */
+function asOutcome(error: unknown, env: NodeJS.ProcessEnv): Finding {
+    if (!(error instanceof StockError)) throw error;
+    if (error.reason === 'unreachable') throw unreachable(error, env);
+    if (error.reason === 'key') {
+        const service = String(error.detail.service ?? '').toLowerCase();
+        const provider = PROVIDERS.find((p) => p === service) ?? 'openverse';
+        throw keyMissing(provider, error.message);
+    }
+    return finding('stock-rejected', error.message, {
+        detail: { reason: error.reason, ...error.detail },
+    });
+}
+
+// ---------------------------------------------------------------- search
+
+export interface StockSearchOptions {
+    dir: string;
+    query: string;
+    provider?: Provider;
+    /** Openverse collection, such as wikimedia, smithsonian or bio_diversity. */
+    source?: string;
+    orientation?: Orientation;
+    count?: number;
+}
+
+type ProviderStatus =
+    | { provider: Provider; status: 'ok'; count: number }
+    | { provider: Provider; status: 'no-key' }
+    | { provider: Provider; status: 'failed'; message: string };
+
+interface SearchResult extends StockHit {
+    /** Position on the contact sheet, from 1, left to right and top to bottom. null: no thumbnail. */
+    tile: number | null;
+}
+
+export async function runStockSearch(
+    options: StockSearchOptions,
+    deps: StockDeps = {},
+): Promise<Report> {
+    const dir = compositionDir(options.dir);
+    const query = options.query.trim().replace(/\s+/g, ' ');
+    if (query === '')
+        throw new UsageError('stock search needs a query: two to four English words.');
+    if (options.source && options.provider && options.provider !== 'openverse') {
+        throw new UsageError(
+            '--source picks an Openverse collection: drop --provider or use openverse.',
+        );
+    }
+    const env = deps.env ?? process.env;
+    const keys = keysFromEnv(env);
+    const net = netFor(deps, keys);
+    const count = options.count ?? 8;
+    const rb = new ReportBuilder('stock-search', dir);
+    const ws = Workspace.open(dir);
+    const unsafe = outputLinksFinding(ws);
+    if (unsafe) {
+        rb.add(unsafe);
+        return rb.finish();
+    }
+
+    const order: Provider[] = options.source
+        ? ['openverse']
+        : options.provider
+          ? [options.provider]
+          : [...PROVIDERS];
+    const providers: ProviderStatus[] = [];
+    let hits: StockHit[] = [];
+    let lastFailure: StockError | null = null;
+    for (const provider of order) {
+        if (needsKey(provider) && !keys[provider]) {
+            if (options.provider === provider) throw keyMissing(provider);
+            providers.push({ provider, status: 'no-key' });
+            continue;
+        }
+        progress(`searching ${provider} for "${query}"`);
+        try {
+            hits = await searchProvider(
+                provider,
+                { query, count, orientation: options.orientation, source: options.source },
+                keys,
+                net,
+            );
+        } catch (error) {
+            if (!(error instanceof StockError)) throw error;
+            // A rejected key is the user's to fix, unless another service can still answer.
+            if (error.reason === 'key' && (options.provider === provider || !needsKey(provider))) {
+                throw keyMissing(provider, error.message);
+            }
+            lastFailure = error;
+            providers.push({ provider, status: 'failed', message: error.message });
+            continue;
+        }
+        providers.push({ provider, status: 'ok', count: hits.length });
+        if (hits.length > 0) break;
+    }
+    if (lastFailure && !providers.some((p) => p.status === 'ok')) {
+        throw unreachable(lastFailure, env);
+    }
+
+    const results: SearchResult[] = hits.map((hit) => {
+        const { url: _url, fallbackUrl: _fallback, ...shown } = hit as StockImage;
+        return { ...shown, tile: null };
+    });
+    rb.report.stock = {
+        query,
+        provider: options.provider ?? null,
+        source: options.source ?? null,
+        providers,
+        results,
+    };
+    if (results.length === 0) {
+        rb.add(
+            finding('stock-no-results', `No image found for "${query}".`, {
+                severity: 'warning',
+                detail: { query },
+            }),
+        );
+        return rb.finish();
+    }
+
+    // Thumbnails, then one contact sheet in result order.
+    const thumbDir = ws.fresh(ws.path('.flipbook', 'stock', 'thumbs'));
+    const thumbFailures: { id: string; message: string }[] = [];
+    const thumbs = await Promise.all(
+        results.map(async (result, i) => {
+            if (!result.thumbnail) return null;
+            try {
+                const { bytes } = await download(result.thumbnail, {
+                    lookup: deps.lookup,
+                    get: deps.get,
+                    maxBytes: MAX_THUMB_BYTES,
+                });
+                const info = imageInfo(bytes);
+                if (!info || info.format === 'tiff') {
+                    thumbFailures.push({ id: result.id, message: 'not a PNG, JPEG, WebP or GIF' });
+                    return null;
+                }
+                const file = path.join(
+                    thumbDir,
+                    `${String(i + 1).padStart(2, '0')}${EXTENSION[info.format]}`,
+                );
+                ws.writeFile(file, bytes);
+                return file;
+            } catch (error) {
+                if (!(error instanceof StockError)) throw error;
+                thumbFailures.push({ id: result.id, message: error.message });
+                return null;
+            }
+        }),
+    );
+    if (thumbFailures.length > 0) {
+        (rb.report.stock as Record<string, unknown>).thumbnailFailures = thumbFailures;
+    }
+    const tiles: string[] = [];
+    thumbs.forEach((file, i) => {
+        if (!file) return;
+        tiles.push(file);
+        results[i].tile = tiles.length;
+    });
+    if (tiles.length > 0) {
+        const { ffmpeg } = await requireFfmpeg(['tile'], env);
+        const outDir = ws.fresh(ws.path('out', 'stock'));
+        const sheet = path.join(outDir, 'contact-sheet.png');
+        await tileSheet(ffmpeg, tiles, sheet);
+        rb.report.artifacts.contactSheet = sheet;
+    }
+    return rb.finish();
+}
+
+/** Thumbnails of any shape, each fitted into a square tile, row by row. */
+async function tileSheet(ffmpeg: string, files: string[], out: string): Promise<void> {
+    const layout = sheetLayout(files.length, 1, 1, 1568);
+    const side = Math.min(layout.tileWidth, 480) - (Math.min(layout.tileWidth, 480) % 2);
+    const fit =
+        `trim=end_frame=1,scale=${side}:${side}:force_original_aspect_ratio=decrease:flags=lanczos,` +
+        `pad=${side}:${side}:(ow-iw)/2:(oh-ih)/2:color=0x303030,setsar=1,format=rgb24`;
+    const chains = files.map((_, i) => `[${i}:v]${fit}[t${i}]`);
+    const joined = files.map((_, i) => `[t${i}]`).join('');
+    const graph =
+        `${chains.join(';')};${joined}concat=n=${files.length}:v=1:a=0,` +
+        `tile=${layout.cols}x${layout.rows}:margin=8:padding=8:color=0x303030[sheet]`;
+    const result = await run(
+        ffmpeg,
+        [
+            '-v',
+            'error',
+            '-y',
+            ...files.flatMap((file) => ['-i', file]),
+            '-filter_complex',
+            graph,
+            '-map',
+            '[sheet]',
+            '-frames:v',
+            '1',
+            '-update',
+            '1',
+            out,
+        ],
+        { timeoutMs: 120_000 },
+    );
+    if (result.code !== 0) throw new Error(`ffmpeg contact sheet failed: ${tail(result.stderr)}`);
+}
+
+// ---------------------------------------------------------------- fetch
+
+export interface StockFetchOptions {
+    dir: string;
+    /** `<provider>:<id>` from stock search. */
+    id: string;
+    /** File name under assets/, without the extension. */
+    as: string;
+}
+
+type SourcesFile = Record<string, unknown>;
+
+function readSources(ws: Workspace): { sources: SourcesFile } | { problem: string } {
+    const text = ws.readText(ws.path(SOURCES_FILE));
+    if (text === null) return { sources: {} };
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(text);
+    } catch (error) {
+        return { problem: `is not valid JSON: ${(error as Error).message}` };
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        return { problem: 'must be a JSON object keyed by file path under assets/' };
+    }
+    return { sources: parsed as SourcesFile };
+}
+
+/** Image files already under assets/ named `<name>.<extension>`. */
+function taken(dir: string, name: string): string[] {
+    const folder = path.join(dir, 'assets');
+    let entries: string[];
+    try {
+        entries = fs.readdirSync(folder);
+    } catch {
+        return [];
+    }
+    return entries
+        .filter((file) => {
+            const ext = path.extname(file);
+            return (
+                IMAGE_EXTENSIONS.includes(ext.toLowerCase()) &&
+                file.slice(0, -ext.length).toLowerCase() === name.toLowerCase()
+            );
+        })
+        .sort();
+}
+
+/** Scale an image whose long edge passes MAX_EDGE, and turn TIFF into JPEG, with ffmpeg. */
+async function normalize(
+    ws: Workspace,
+    bytes: Buffer,
+    info: ImageInfo,
+    env: NodeJS.ProcessEnv,
+): Promise<{ bytes: Buffer; info: ImageInfo; resized: boolean }> {
+    const long = Math.max(info.width, info.height);
+    if (info.format !== 'tiff' && long <= MAX_EDGE) return { bytes, info, resized: false };
+    const { ffmpeg } = await requireFfmpeg([], env);
+    const work = ws.fresh(ws.path('.flipbook', 'tmp', 'stock'));
+    try {
+        const input = path.join(work, `in${EXTENSION[info.format]}`);
+        ws.writeFile(input, bytes);
+        const keepAlpha = info.format === 'png' || info.format === 'webp' || info.format === 'gif';
+        const output = path.join(work, keepAlpha ? 'out.png' : 'out.jpg');
+        const scale =
+            long > MAX_EDGE
+                ? info.width >= info.height
+                    ? `scale=${MAX_EDGE}:-2:flags=lanczos`
+                    : `scale=-2:${MAX_EDGE}:flags=lanczos`
+                : 'null';
+        const result = await run(
+            ffmpeg,
+            [
+                '-v',
+                'error',
+                '-y',
+                '-i',
+                input,
+                '-vf',
+                scale,
+                '-frames:v',
+                '1',
+                ...(keepAlpha ? [] : ['-q:v', '2']),
+                '-update',
+                '1',
+                output,
+            ],
+            { timeoutMs: 120_000 },
+        );
+        if (result.code !== 0) {
+            throw new StockError(
+                'not-image',
+                `ffmpeg could not read the image: ${tail(result.stderr, 3)}`,
+            );
+        }
+        const out = fs.readFileSync(output);
+        const outInfo = imageInfo(out);
+        if (!outInfo) throw new StockError('not-image', 'ffmpeg wrote no readable image');
+        return { bytes: out, info: outInfo, resized: true };
+    } finally {
+        ws.remove(work);
+    }
+}
+
+export async function runStockFetch(
+    options: StockFetchOptions,
+    deps: StockDeps = {},
+): Promise<Report> {
+    const dir = compositionDir(options.dir);
+    const ref = parseStockId(options.id);
+    if (!ref) {
+        throw new UsageError(
+            `"${options.id}" is not a stock id. Pass one from stock search: openverse:<id>, pexels:<id> or pixabay:<id>.`,
+        );
+    }
+    if (!NAME.test(options.as)) {
+        throw new UsageError(
+            `--as "${options.as}" is not a file name: use letters, digits, - and _, without an extension.`,
+        );
+    }
+    const env = deps.env ?? process.env;
+    const keys = keysFromEnv(env);
+    if (needsKey(ref.provider) && !keys[ref.provider]) throw keyMissing(ref.provider);
+    const id = `${ref.provider}:${ref.id}`;
+    const rb = new ReportBuilder('stock-fetch', dir);
+    const ws = Workspace.open(dir);
+    const sourcesShown = SOURCES_FILE.split(path.sep).join('/');
+
+    const read = readSources(ws);
+    if ('problem' in read) {
+        rb.add(
+            finding('asset-conflict', `${sourcesShown} ${read.problem}`, {
+                element: sourcesShown,
+                detail: { reason: 'sources-invalid', file: sourcesShown },
+            }),
+        );
+        return rb.finish();
+    }
+    const sources = read.sources;
+    const existing = taken(dir, options.as);
+    if (existing.length > 0) {
+        const same = existing.find((file) => {
+            const entry = sources[file];
+            return (
+                typeof entry === 'object' &&
+                entry !== null &&
+                (entry as Record<string, unknown>).id === id
+            );
+        });
+        if (same) {
+            const file = path.join(dir, 'assets', same);
+            const info = imageInfo(fs.readFileSync(file));
+            const entry = sources[same] as Record<string, unknown>;
+            rb.report.stock = {
+                id,
+                provider: ref.provider,
+                file: `assets/${same}`,
+                width: info?.width ?? null,
+                height: info?.height ?? null,
+                license: entry.license ?? null,
+                source: entry.source ?? null,
+                skipped: true,
+            };
+            rb.report.artifacts.image = file;
+            rb.report.artifacts.sources = ws.path(SOURCES_FILE);
+            return rb.finish();
+        }
+        rb.add(
+            finding(
+                'asset-conflict',
+                `assets/${existing[0]} already exists and is not ${id}. Pass another --as name.`,
+                {
+                    element: `assets/${existing[0]}`,
+                    detail: { reason: 'name-taken', file: `assets/${existing[0]}` },
+                },
+            ),
+        );
+        return rb.finish();
+    }
+
+    const net = netFor(deps, keys);
+    let image: StockImage;
+    try {
+        progress(`looking up ${id}`);
+        image = await lookupImage(ref.provider, ref.id, keys, net);
+    } catch (error) {
+        rb.add(asOutcome(error, env));
+        return rb.finish();
+    }
+
+    let bytes: Buffer;
+    try {
+        progress(`downloading ${image.url}`);
+        const got = await download(image.url, {
+            lookup: deps.lookup,
+            get: deps.get,
+            maxBytes: MAX_IMAGE_BYTES,
+        }).catch(async (error) => {
+            if (!image.fallbackUrl || !(error instanceof StockError)) throw error;
+            if (error.reason === 'unsafe-url') throw error;
+            return download(image.fallbackUrl, {
+                lookup: deps.lookup,
+                get: deps.get,
+                maxBytes: MAX_IMAGE_BYTES,
+            });
+        });
+        bytes = got.bytes;
+    } catch (error) {
+        rb.add(asOutcome(error, env));
+        return rb.finish();
+    }
+
+    const sniffed = imageInfo(bytes);
+    if (!sniffed) {
+        rb.add(
+            asOutcome(
+                new StockError(
+                    'not-image',
+                    `${image.url} is not a PNG, JPEG, WebP, GIF or TIFF image`,
+                    {
+                        url: image.url,
+                    },
+                ),
+                env,
+            ),
+        );
+        return rb.finish();
+    }
+    let normalized: Awaited<ReturnType<typeof normalize>>;
+    try {
+        normalized = await normalize(ws, bytes, sniffed, env);
+    } catch (error) {
+        rb.add(asOutcome(error, env));
+        return rb.finish();
+    }
+
+    const fileName = `${options.as}${EXTENSION[normalized.info.format]}`;
+    const target = ws.writeFile(ws.path('assets', fileName), normalized.bytes);
+    const entry: Record<string, string> = {
+        source: image.pageUrl,
+        license: image.license,
+    };
+    if (image.licenseUrl) entry.licenseUrl = image.licenseUrl;
+    entry.id = id;
+    if (image.title) entry.title = image.title;
+    if (image.creator) entry.creator = image.creator;
+    entry.url = image.url;
+    sources[fileName] = entry;
+    const sourcesPath = ws.writeFile(
+        ws.path(SOURCES_FILE),
+        `${JSON.stringify(sources, null, 4)}\n`,
+    );
+
+    rb.report.stock = {
+        id,
+        provider: ref.provider,
+        file: `assets/${fileName}`,
+        format: normalized.info.format,
+        width: normalized.info.width,
+        height: normalized.info.height,
+        bytes: normalized.bytes.length,
+        resized: normalized.resized,
+        license: image.license,
+        licenseUrl: image.licenseUrl,
+        source: image.pageUrl,
+        title: image.title,
+        creator: image.creator,
+        skipped: false,
+    };
+    rb.report.artifacts.image = target;
+    rb.report.artifacts.sources = sourcesPath;
+    return rb.finish();
+}

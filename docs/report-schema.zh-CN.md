@@ -1,5 +1,5 @@
 ---
-summary: 'check、snapshot、render 的 JSON 报告格式、退出码、每个类型码的含义和修法'
+summary: 'check、snapshot、render、audio、stock search、stock fetch 的 JSON 报告格式、退出码、每个类型码的含义和修法'
 read_when:
   - 解析 flipbook 的输出
   - 新增或修改类型码
@@ -9,7 +9,7 @@ read_when:
 
 [English](report-schema.md) | 中文
 
-`check`、`snapshot`、`render`、`audio` 无论成败都往 stdout 打一份 JSON 报告。进度和日志走 stderr。`doctor --json` 用自己的格式 `flipbook.doctor/1`（见文末）。
+`check`、`snapshot`、`render`、`audio`、`stock search`、`stock fetch` 无论成败都往 stdout 打一份 JSON 报告。进度和日志走 stderr。`doctor --json` 用自己的格式 `flipbook.doctor/1`（见文末）。
 
 ## 退出码
 
@@ -29,7 +29,7 @@ read_when:
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `schema` | string | 固定 `flipbook.report/1` |
-| `command` | string | `check`、`snapshot`、`render`、`audio`，用法错时是 `usage` |
+| `command` | string | `check`、`snapshot`、`render`、`audio`、`stock-search`、`stock-fetch`，用法错时是 `usage` |
 | `ok` | boolean | 退出码为 0 时为 true |
 | `exitCode` | 0、1、2、78 | 和进程退出码一致 |
 | `flipbook.version` | string | CLI 版本 |
@@ -77,19 +77,22 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 
 ## 输出目录
 
-合成目录里只有 `out/` 和 `.flipbook/` 两处是 flipbook 写的。写入前逐级核对路径：这两处或它们下面任何一级是软链，命令一开始就报 `unsafe-output` 退 1，什么都不写、不删。文件先写到同目录的新文件名再改名替换，不会顺着已有的软链或硬链写到外面：
+合成目录里只有 `out/` 和 `.flipbook/` 两处是 flipbook 写的，另外 `stock fetch` 会在 `assets/` 下写图片和 `assets/SOURCES.json`。写入前逐级核对路径：这两处或它们下面任何一级是软链，命令一开始就报 `unsafe-output` 退 1，什么都不写、不删。文件先写到同目录的新文件名再改名替换，不会顺着已有的软链或硬链写到外面：
 
 | 路径 | 谁写 | 内容 |
 |---|---|---|
 | `out/video.mp4`、`out/contact-sheet.png` | render | 通过验收的成片和成片联系表。没通过时不动 `out/` |
 | `out/snapshot/contact-sheet.png`、`out/snapshot/zoom-f<帧号>.png` | snapshot | 预检联系表和局部放大图 |
+| `out/stock/contact-sheet.png` | stock search | 最近一次搜索的缩略图，见[找图](#找图) |
+| `assets/<name>.<扩展名>`、`assets/SOURCES.json` | stock fetch | 下下来的图片和它的来源、许可 |
 | `.flipbook/rejected/` | render | 没通过验收的成片和联系表，`artifacts.rejectedVideo` 指向它 |
 | `.flipbook/evidence/<命令>/` | check、render | 证据图，每次运行前清空 |
 | `.flipbook/timeline.resolved.json` | 全部 | 换算后的 timeline |
 | `.flipbook/frame-hashes.json` | render | 每帧原始截图的 sha256 和汇总 |
 | `.flipbook/attempts.json` | check、render | 重试计数 |
-| `.flipbook/reports/<命令>.json` | check、snapshot、audio、render | 这条命令最近一次的报告，和 stdout 上的相同。退 78、`unsafe-output`、`internal-error` 的运行也存，路径在 `artifacts.report` |
-| `.flipbook/tmp/` | render | 渲染中间件，结束后删掉 |
+| `.flipbook/reports/<命令>.json` | check、snapshot、audio、render、stock search、stock fetch | 这条命令最近一次的报告，和 stdout 上的相同。退 78、`unsafe-output`、`internal-error` 的运行也存，路径在 `artifacts.report` |
+| `.flipbook/tmp/` | render、stock fetch | 中间文件，结束后删掉 |
+| `.flipbook/stock/thumbs/` | stock search | 最近一次搜索的缩略图，每次搜索前清空 |
 | `.flipbook/render.lock` | render | 同一目录同时只跑一个 render（同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。锁用 O_EXCL 建，内容是 pid 和随机令牌。持有进程已退出，或锁里没有可读的持有者且建了超过 10 秒，才算过期被接管。释放时只删令牌仍是自己的锁 |
 | `.flipbook/audio/` | audio、render | 合成的 `music.wav`、`sfx.wav`，`score.json`（和弦、强弱、音效位置），`audio.json`（各轨哈希、峰值、音效实际峰值位置）。audio 命令也拿 `render.lock` |
 
@@ -152,6 +155,9 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `audio-loudness` | render | 有配乐的音轨整合响度不在 -14 LUFS 上下 1 LU 内 | 重渲一次，还出现就带 JSON 报 issue。自带音乐先确认 `bpmOffset` 之后不是静音 |
 | `audio-peak` | render | 音轨真峰值高于 -1 dBTP | 重渲一次，还出现就带 JSON 报 issue |
 | `audio-cue-offset` | render | 某个音效的峰值离它的 cue 帧超过一帧，或在音轨里找不到，`element` 是 `cue <id>` | sfx cue 之间至少隔 1/8 拍。隔开了还报就重渲一次，再出现带 JSON 报 issue |
+| `stock-no-results` | stock search | 哪家都没找到图，只报 warning | 换两到四个别的具体英文词再搜，或加 `--source`。都不合适就不用图，告诉用户 |
+| `stock-rejected` | stock fetch | 图没存：id 不存在、许可不是 `cc0` 或 `pdm`（Openverse）、地址不是公网 HTTPS、文件不是图片或超过 40 MB。`detail.reason` 是 `not-found`、`license`、`unsafe-url`、`not-image` 或 `too-large` | 从 stock search 的结果里另挑一张 |
+| `asset-conflict` | stock fetch | 图没存：`assets/` 里已有别的文件用了这个名字（`detail.reason` 为 `name-taken`），或 `assets/SOURCES.json` 不是读得出的 JSON 对象（`sources-invalid`） | 换个 `--as` 名字，或修好 `assets/SOURCES.json` |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 
@@ -194,6 +200,58 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 - 响度：有配乐（`preset` 或 `file`）时整合响度要在 -14 LUFS 上下 1 LU 内，否则 `audio-loudness`。只有音效时不查整合响度。凡有音轨都查真峰值，高于 -1 dBTP 报 `audio-peak`。
 - 音效对帧：音效轨和成片都降到 8 kHz 单声道。有配乐时先用同一条混音链单独渲一遍配乐，在成片里找它的位置和增益，减掉，剩下的基本只有音效。每个音效取峰值前 0.35 秒到峰值后 30 毫秒、再裁到九成能量的一段，一阶差分后在 ±0.25 秒内找和成片最相关的偏移，所有音效合起来找一个偏移。每个音效的实际峰值 = `peakSample` 加这个偏移，和 cue 帧的时刻差超过一帧报 `audio-cue-offset`。相关系数低于 0.12 算找不到，也报这个码。
 
+## 找图
+
+`flipbook stock search <dir> <query...>` 和 `flipbook stock fetch <dir> <id> --as <name>` 给合成找图，把选中的一张存进 `assets/`。报告的 `stock` 字段写找到或存下了什么。
+
+按顺序问：Pexels（配了 `PEXELS_API_KEY`）、Pixabay（配了 `PIXABAY_API_KEY`）、Openverse（不要 key，只要 `cc0` 和 `pdm`）。哪家先有结果就用哪家，没配 key 的跳过。`--provider` 只问一家，`--source` 只问 Openverse 的一个馆藏（如 `wikimedia`、`smithsonian`、`bio_diversity`）。`OPENVERSE_CLIENT_ID` 和 `OPENVERSE_CLIENT_SECRET` 都设了就带上，Openverse 的额度更高。key 不会出现在报告、消息和 `assets/SOURCES.json` 里。
+
+图片只走 HTTPS 下载，主机要解析到公网地址。连接钉在核对过的地址上，每一跳重定向重新核对。回环、内网、链路本地、运营商级 NAT 和组播地址都拒绝。198.18.0.0/15 不拦，因为代理工具的 fake-IP 模式拿这一段回 DNS。
+
+### stock search
+
+| 字段 | 说明 |
+|---|---|
+| `stock.query`、`stock.provider`、`stock.source` | 查询词和两个选项，没给是 `null` |
+| `stock.providers[]` | 按顺序每家的情况：`provider`、`status`（`ok` 带 `count`，`no-key`，或 `failed` 带 `message`） |
+| `stock.results[]` | `id`（`stock fetch` 收的写法，如 `openverse:<id>`）、`provider`、`title`、`width`、`height`、`license`、`licenseUrl`、`creator`、`source`（Openverse 的馆藏）、`pageUrl`、`thumbnail`，以及 `tile`：它在联系表上的位置，从 1 起，从左到右、从上到下，缩略图下不来时是 `null` |
+| `stock.thumbnailFailures[]` | 有缩略图没下来时才有：`id`、`message` |
+| `artifacts.contactSheet` | `out/stock/contact-sheet.png`：所有缩略图按结果顺序各放进一个方格。没有结果时不给 |
+
+没结果报 warning `stock-no-results`，退 0。每家都失败报 `stock-unreachable`，退 78。`--provider` 点了一家却没配它的 key，报 `stock-key-missing`，退 78。
+
+### stock fetch
+
+图片存成 `assets/<name>.<扩展名>`，扩展名按文件格式定（`.jpg`、`.png`、`.webp`、`.gif`）。长边超过 3200 像素的用 ffmpeg 缩小，TIFF 转成 JPEG。`assets/SOURCES.json` 加一条，键是文件在 `assets/` 下的路径，和品牌字体用的是同一个文件，原有的条目保留：
+
+```json
+{
+    "eggs.jpg": {
+        "source": "https://www.flickr.com/photos/61021753@N02/5884410414",
+        "license": "pdm",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "id": "openverse:126fca91-8ab1-487a-bfe9-d8dc9a360062",
+        "title": "ostrich",
+        "creator": "BioDivLibrary",
+        "url": "https://live.staticflickr.com/5158/5884410414_bfc790513c_b.jpg"
+    }
+}
+```
+
+`source` 是这张图的介绍页，`license` 是许可：Openverse 来的是 `cc0` 或 `pdm`，另两家是 `Pexels License` 或 `Pixabay Content License`。`title` 和 `creator` 在来源给了时才有。
+
+| 字段 | 说明 |
+|---|---|
+| `stock.id`、`stock.provider` | 下的是哪张 |
+| `stock.file` | 它在合成里的路径，如 `assets/eggs.jpg` |
+| `stock.format`、`stock.width`、`stock.height`、`stock.bytes` | 存下的文件 |
+| `stock.resized` | 经 ffmpeg 缩小或转换过时为 true |
+| `stock.license`、`stock.licenseUrl`、`stock.source`、`stock.title`、`stock.creator` | 和写进 `assets/SOURCES.json` 的一样 |
+| `stock.skipped` | `assets/SOURCES.json` 已经给这个名字记了同一个 id 且文件还在时为 true，这次没下载 |
+| `artifacts.image`、`artifacts.sources` | 图片和 `assets/SOURCES.json` |
+
+id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 的 id 没配对应的 key，退 78 报 `stock-key-missing`。
+
 ## 类型码：环境缺件（退出码 78）
 
 | 类型码 | 含义 |
@@ -211,6 +269,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `linux-deps-missing` | Linux 缺 Chromium 需要的系统库 |
 | `font-download-failed` | 字体下载失败或校验不过 |
 | `cache-unwritable` | 缓存目录写不进（常见于沙箱内首次运行） |
+| `stock-key-missing` | 点名要的图库需要 API key 却没设（`PEXELS_API_KEY`、`PIXABAY_API_KEY`），或者 key 被拒。`detail.env` 是变量名 |
+| `stock-unreachable` | 图库或图片主机连不上，或回了服务端错误、重试两次仍限流、不是 JSON。`detail.host` 和上面几个类型码一样写沙箱宿主 |
 
 ## 重试计数
 

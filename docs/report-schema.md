@@ -1,5 +1,5 @@
 ---
-summary: 'The JSON report from check, snapshot, render and audio: exit codes, fields, what each code means and how to fix it'
+summary: 'The JSON report from check, snapshot, render, audio, stock search and stock fetch: exit codes, fields, what each code means and how to fix it'
 read_when:
   - Parsing flipbook output
   - Adding or changing a code
@@ -9,7 +9,7 @@ read_when:
 
 English | [中文](report-schema.zh-CN.md)
 
-`check`, `snapshot`, `render` and `audio` print one JSON report to stdout whether they pass or fail. Progress and logs go to stderr. `doctor --json` has its own format, `flipbook.doctor/1` (see the end of this page).
+`check`, `snapshot`, `render`, `audio`, `stock search` and `stock fetch` print one JSON report to stdout whether they pass or fail. Progress and logs go to stderr. `doctor --json` has its own format, `flipbook.doctor/1` (see the end of this page).
 
 ## Exit codes
 
@@ -29,7 +29,7 @@ For `sandbox-blocked` and `tmp-unwritable`, `detail.signature` names the row of 
 | Field | Type | Description |
 |---|---|---|
 | `schema` | string | Always `flipbook.report/1` |
-| `command` | string | `check`, `snapshot`, `render`, `audio`, or `usage` on a usage error |
+| `command` | string | `check`, `snapshot`, `render`, `audio`, `stock-search`, `stock-fetch`, or `usage` on a usage error |
 | `ok` | boolean | true when the exit code is 0 |
 | `exitCode` | 0, 1, 2, 78 | Same as the process exit code |
 | `flipbook.version` | string | CLI version |
@@ -77,19 +77,22 @@ More than one page requires that this composition's last check passed its three 
 
 ## Output directory
 
-Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`. Before writing it checks the path one level at a time: if either of them, or any level below, is a symlink, the command reports `unsafe-output` and exits 1 right at the start, writing and deleting nothing. Files are written under a new name in the same directory and then renamed into place, so a write never follows an existing symlink or hard link out of the directory:
+Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`, and `stock fetch` also writes its image and `assets/SOURCES.json` under `assets/`. Before writing it checks the path one level at a time: if either of them, or any level below, is a symlink, the command reports `unsafe-output` and exits 1 right at the start, writing and deleting nothing. Files are written under a new name in the same directory and then renamed into place, so a write never follows an existing symlink or hard link out of the directory:
 
 | Path | Written by | Contents |
 |---|---|---|
 | `out/video.mp4`, `out/contact-sheet.png` | render | The video that passed acceptance and its contact sheet. `out/` is left alone when acceptance fails |
 | `out/snapshot/contact-sheet.png`, `out/snapshot/zoom-f<frame>.png` | snapshot | Preview contact sheet and zoomed crops |
+| `out/stock/contact-sheet.png` | stock search | The thumbnails of the latest search, see [Stock images](#stock-images) |
+| `assets/<name>.<ext>`, `assets/SOURCES.json` | stock fetch | The fetched image and its source and license |
 | `.flipbook/rejected/` | render | The video and contact sheet that failed acceptance, pointed to by `artifacts.rejectedVideo` |
 | `.flipbook/evidence/<command>/` | check, render | Evidence images, cleared before each run |
 | `.flipbook/timeline.resolved.json` | all | The resolved timeline |
 | `.flipbook/frame-hashes.json` | render | sha256 of every raw frame, plus the summary |
 | `.flipbook/attempts.json` | check, render | Retry counts |
-| `.flipbook/reports/<command>.json` | check, snapshot, audio, render | The latest report of that command, identical to stdout. Runs that exit 78, hit `unsafe-output` or `internal-error` are saved too, with the path in `artifacts.report` |
-| `.flipbook/tmp/` | render | Intermediate render files, deleted at the end |
+| `.flipbook/reports/<command>.json` | check, snapshot, audio, render, stock search, stock fetch | The latest report of that command, identical to stdout. Runs that exit 78, hit `unsafe-output` or `internal-error` are saved too, with the path in `artifacts.report` |
+| `.flipbook/tmp/` | render, stock fetch | Intermediate files, deleted at the end |
+| `.flipbook/stock/thumbs/` | stock search | The thumbnails of the latest search, cleared before each search |
 | `.flipbook/render.lock` | render | One render per directory at a time (re-entry from the same process counts). A second one gets `render-busy` and exit 1, which does not count as an attempt. The lock is created with O_EXCL and holds a pid and a random token. It counts as stale, and gets taken over, only when its holder has exited, or when it has no readable holder and is more than 10 seconds old. Releasing deletes the lock only while the token is still its own |
 | `.flipbook/audio/` | audio, render | The synthesized `music.wav` and `sfx.wav`, `score.json` (chords, dynamics, sound-effect positions), `audio.json` (hash and peak of each track, actual peak position of each sound effect). The audio command takes `render.lock` too |
 
@@ -152,6 +155,9 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`.
 | `audio-loudness` | render | A track with music has integrated loudness outside -14 LUFS ±1 LU | Render again. If it happens again, open an issue with the JSON. With your own music, first make sure it is not silent after `bpmOffset` |
 | `audio-peak` | render | The track's true peak is above -1 dBTP | Render again. If it happens again, open an issue with the JSON |
 | `audio-cue-offset` | render | A sound effect's peak is more than one frame away from its cue frame, or cannot be found in the track. `element` is `cue <id>` | Keep sfx cues at least 1/8 beat apart. If they are and it still happens, render again, and if it happens again open an issue with the JSON |
+| `stock-no-results` | stock search | No service found an image for the query. Warning only | Search again with two to four other concrete English words, or with `--source`. When nothing fits, leave the picture out and tell the user |
+| `stock-rejected` | stock fetch | The image was not saved: the id is unknown, its license is not `cc0` or `pdm` (Openverse), its address is not a public HTTPS address, the file is not an image or is over 40 MB. `detail.reason` is `not-found`, `license`, `unsafe-url`, `not-image` or `too-large` | Pick another result from stock search |
+| `asset-conflict` | stock fetch | The image was not saved: another file in `assets/` already has that name (`detail.reason` `name-taken`), or `assets/SOURCES.json` is not a readable JSON object (`sources-invalid`) | Pass another `--as` name, or fix `assets/SOURCES.json` |
 | `render-busy` | render | Another render is running in the same composition directory. Does not count as an attempt | Wait for it to finish |
 | `internal-error` | all | flipbook itself failed | Leave the composition alone and open an issue with the JSON |
 
@@ -194,6 +200,58 @@ Audio checks (`audio-missing`, `audio-loudness`, `audio-peak`, `audio-cue-offset
 - Loudness: with music (`preset` or `file`), integrated loudness must be within -14 LUFS ±1 LU, otherwise `audio-loudness`. With only sound effects, integrated loudness is not checked. Every track gets a true-peak check: above -1 dBTP is `audio-peak`.
 - Effects on their frames: the effect track and the video are both brought down to 8 kHz mono. With music, the music alone is first rendered through the same mix chain, located in the video along with its gain, and subtracted, which leaves mostly the effects. For each effect, the span from 0.35 seconds before its peak to 30 milliseconds after, trimmed to the part holding 90% of the energy, is differenced once and slid within ±0.25 seconds to find the offset that correlates best with the video. One offset is found for all effects together. Each effect's actual peak is `peakSample` plus that offset, and more than one frame from the cue frame's time is `audio-cue-offset`. A correlation below 0.12 counts as not found and is reported under the same code.
 
+## Stock images
+
+`flipbook stock search <dir> <query...>` and `flipbook stock fetch <dir> <id> --as <name>` find images for a composition and save one into `assets/`. The `stock` field holds what they found or saved.
+
+The services are asked in this order: Pexels (with `PEXELS_API_KEY`), Pixabay (with `PIXABAY_API_KEY`), then Openverse, which needs no key and is asked for `cc0` and `pdm` only. The first one with results wins. A service without its key is skipped. `--provider` asks one service alone, and `--source` asks only one Openverse collection (such as `wikimedia`, `smithsonian`, `bio_diversity`). `OPENVERSE_CLIENT_ID` and `OPENVERSE_CLIENT_SECRET` are used when both are set, for a higher Openverse quota. Keys never appear in reports, messages or `assets/SOURCES.json`.
+
+Images are downloaded only over HTTPS, from hosts that resolve to public addresses. The connection is pinned to the checked address, and every redirect is checked again. Loopback, private, link-local, CGNAT and multicast addresses are refused. The 198.18.0.0/15 range stays open because proxy tools in fake-IP mode answer DNS with it.
+
+### stock search
+
+| Field | Description |
+|---|---|
+| `stock.query`, `stock.provider`, `stock.source` | The query and the two options as given, `null` when not given |
+| `stock.providers[]` | Each service in order: `provider`, `status` (`ok` with `count`, `no-key`, or `failed` with `message`) |
+| `stock.results[]` | `id` (what `stock fetch` takes, such as `openverse:<id>`), `provider`, `title`, `width`, `height`, `license`, `licenseUrl`, `creator`, `source` (the Openverse collection), `pageUrl`, `thumbnail`, and `tile`: the result's place on the contact sheet, from 1, left to right and top to bottom, `null` when its thumbnail could not be downloaded |
+| `stock.thumbnailFailures[]` | Present when some thumbnails failed: `id`, `message` |
+| `artifacts.contactSheet` | `out/stock/contact-sheet.png`: every thumbnail fitted into a square tile, in result order. Absent when there are no results |
+
+No results is the warning `stock-no-results` with exit 0. Every service failing is `stock-unreachable` with exit 78. `--provider` naming a service without its key is `stock-key-missing` with exit 78.
+
+### stock fetch
+
+The image is saved as `assets/<name>.<ext>`, the extension from the file's format (`.jpg`, `.png`, `.webp`, `.gif`). An image whose long edge passes 3200 pixels is scaled down, and a TIFF is turned into a JPEG, with ffmpeg. `assets/SOURCES.json` gets one entry keyed by the file's path under `assets/`, the same file brand fonts use, with earlier entries kept:
+
+```json
+{
+    "eggs.jpg": {
+        "source": "https://www.flickr.com/photos/61021753@N02/5884410414",
+        "license": "pdm",
+        "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+        "id": "openverse:126fca91-8ab1-487a-bfe9-d8dc9a360062",
+        "title": "ostrich",
+        "creator": "BioDivLibrary",
+        "url": "https://live.staticflickr.com/5158/5884410414_bfc790513c_b.jpg"
+    }
+}
+```
+
+`source` is the page about the image and `license` its license: `cc0` or `pdm` from Openverse, `Pexels License` or `Pixabay Content License`. `title` and `creator` are present when the service gives them.
+
+| Field | Description |
+|---|---|
+| `stock.id`, `stock.provider` | The image fetched |
+| `stock.file` | Its path in the composition, such as `assets/eggs.jpg` |
+| `stock.format`, `stock.width`, `stock.height`, `stock.bytes` | The saved file |
+| `stock.resized` | true when ffmpeg scaled or converted it |
+| `stock.license`, `stock.licenseUrl`, `stock.source`, `stock.title`, `stock.creator` | As written to `assets/SOURCES.json` |
+| `stock.skipped` | true when `assets/SOURCES.json` already records this id for that name and the file is there: nothing was downloaded |
+| `artifacts.image`, `artifacts.sources` | The image and `assets/SOURCES.json` |
+
+A malformed id or `--as` name exits 2 before anything is downloaded. A Pexels or Pixabay id without its key exits 78 with `stock-key-missing`.
+
 ## Codes: environment (exit 78)
 
 | Code | Meaning |
@@ -211,6 +269,8 @@ Audio checks (`audio-missing`, `audio-loudness`, `audio-peak`, `audio-cue-offset
 | `linux-deps-missing` | Linux lacks system libraries that Chromium needs |
 | `font-download-failed` | A font download failed or did not verify |
 | `cache-unwritable` | The cache directory cannot be written (common on a first run inside a sandbox) |
+| `stock-key-missing` | The image service asked for needs an API key that is not set (`PEXELS_API_KEY`, `PIXABAY_API_KEY`), or it turned the key down. `detail.env` names the variable |
+| `stock-unreachable` | An image service or image host could not be reached, or answered with a server error, a rate limit that outlasted two retries, or no JSON. `detail.host` names the sandbox host as for the codes above |
 
 ## Retry counts
 

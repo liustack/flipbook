@@ -172,6 +172,24 @@ A font file in assets/fonts/ has no license, is not a readable .ttf or .otf, or 
 
 Fix: Write the license in assets/SOURCES.json, replace the file with its .ttf or .otf, or rename the family, as the message says. See references/brand.md.
 
+### `stock-no-results`
+
+stock search found no image for the query.
+
+Fix: Search again with two to four other concrete English words, or with --source for one collection. When nothing fits, leave the picture out and tell the user.
+
+### `stock-rejected`
+
+stock fetch did not save the image: the id is unknown, its license is not public domain, its address is not a public HTTPS address, or the file is not an image or is too large.
+
+Fix: Pick another result from stock search. `detail.reason` says why this one was refused.
+
+### `asset-conflict`
+
+stock fetch did not save the image: another file already has that name in assets/, or assets/SOURCES.json is not a readable JSON object.
+
+Fix: Pass another --as name, or fix assets/SOURCES.json as the message says.
+
 ### `text-offstage`
 
 A line of text runs past the edge of the frame at the moment it settles.
@@ -347,3 +365,15 @@ Fix: Check the network or proxy, or set FLIPBOOK_FONT_BASE_URL to a mirror that 
 The flipbook cache directory cannot be written.
 
 Fix: Run the flipbook check or render that needs the download once more outside the sandbox (Claude Code: rerun it with dangerouslyDisableSandbox). The user approves once, and every later run works inside the sandbox with no settings to change and no restart. Or set FLIPBOOK_CACHE_DIR to a writable directory.
+
+### `stock-key-missing`
+
+The image service asked for needs an API key that is not set, or it turned the key down.
+
+Fix: Ask the user for the key and set PEXELS_API_KEY or PIXABAY_API_KEY, or search without --provider to use Openverse, which needs no key.
+
+### `stock-unreachable`
+
+The image service or the image host could not be reached, or answered with a server error or rate limit.
+
+Fix: Check the network or HTTPS_PROXY and run the command again. Inside a sandbox, run the same stock command outside it once the user approves.

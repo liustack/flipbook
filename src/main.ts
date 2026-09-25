@@ -17,6 +17,7 @@ import {
     writeJson,
 } from './cli/report.ts';
 import { parseRegion, runSnapshot } from './cli/snapshot.ts';
+import { runStockFetch, runStockSearch } from './cli/stock.ts';
 import { win32Allowed } from './engine/browser.ts';
 import { pruneCache } from './engine/prune.ts';
 import { workspaceFinding } from './engine/session.ts';
@@ -24,6 +25,7 @@ import { parseSize } from './engine/size.ts';
 import { WorkspaceError } from './engine/workspace.ts';
 import { COMMAND_NAME } from './names.ts';
 import { appVersion } from './paths.ts';
+import { type Orientation, PROVIDERS, type Provider } from './stock/providers.ts';
 
 /** Strict integer parse: "10oops" is a typo, not 10. */
 function parseInteger(
@@ -273,6 +275,67 @@ program
             );
         },
     );
+
+function parseChoice<T extends string>(raw: string, flag: string, choices: readonly T[]): T {
+    if (!(choices as readonly string[]).includes(raw)) {
+        throw new UsageError(`Invalid ${flag} "${raw}". Use one of: ${choices.join(', ')}.`);
+    }
+    return raw as T;
+}
+
+const stock = program
+    .command('stock')
+    .description('Find public domain and free images and save one into assets/ with its license');
+
+stock
+    .command('search')
+    .description(
+        'Search Pexels, then Pixabay (with keys), then Openverse (cc0 and pdm only), and tile the thumbnails into out/stock/contact-sheet.png',
+    )
+    .argument('<dir>', 'composition directory')
+    .argument('<query...>', 'two to four concrete English words')
+    .option('--provider <name>', 'ask only this service: pexels, pixabay or openverse')
+    .option('--source <name>', 'Openverse collection only, such as wikimedia or smithsonian')
+    .option('--orientation <shape>', 'landscape, portrait or square')
+    .option('--count <n>', 'results to show', '8')
+    .action(
+        async (
+            dir: string,
+            query: string[],
+            options: { provider?: string; source?: string; orientation?: string; count: string },
+        ) => {
+            await execute('stock-search', dir, () =>
+                runStockSearch({
+                    dir,
+                    query: query.join(' '),
+                    provider: options.provider
+                        ? parseChoice<Provider>(options.provider, '--provider', PROVIDERS)
+                        : undefined,
+                    source: options.source,
+                    orientation: options.orientation
+                        ? parseChoice<Orientation>(options.orientation, '--orientation', [
+                              'landscape',
+                              'portrait',
+                              'square',
+                          ])
+                        : undefined,
+                    count: parseInteger(options.count, '--count', 1, 20),
+                }),
+            );
+        },
+    );
+
+stock
+    .command('fetch')
+    .description(
+        'Save one search result as assets/<name>.<ext> and record it in assets/SOURCES.json',
+    )
+    .argument('<dir>', 'composition directory')
+    .argument('<id>', 'an id from stock search, such as openverse:<id>')
+    .requiredOption('--as <name>', 'file name under assets/, without the extension')
+    .action(async (dir: string, id: string, options: { as: string }) => {
+        await execute('stock-fetch', dir, () => runStockFetch({ dir, id, as: options.as }));
+    });
 
 try {
     await program.parseAsync(process.argv, { from: 'node' });

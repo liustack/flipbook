@@ -14,7 +14,15 @@ export const EXIT = {
 } as const;
 
 export type ExitCode = (typeof EXIT)[keyof typeof EXIT];
-export type Command = 'check' | 'snapshot' | 'render' | 'audio' | 'doctor' | 'usage';
+export type Command =
+    | 'check'
+    | 'snapshot'
+    | 'render'
+    | 'audio'
+    | 'stock-search'
+    | 'stock-fetch'
+    | 'doctor'
+    | 'usage';
 export type Severity = 'error' | 'warning';
 
 export interface Finding {
