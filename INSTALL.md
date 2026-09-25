@@ -1,5 +1,7 @@
 # Installing flipbook (for an AI agent)
 
+English | [中文](INSTALL.zh-CN.md)
+
 You are an AI agent and your user asked you to install `flipbook`. This file is the procedure. Follow it in order. Every step is safe to run again, and every step says what to do when it fails. Commands are POSIX shell for macOS or Linux. On Windows, do all of this inside WSL2 (Ubuntu).
 
 The whole install is four steps:

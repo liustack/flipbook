@@ -71,6 +71,7 @@ export function docTargets(root, pkgName, slug) {
         'README.md',
         'README.zh-CN.md',
         'INSTALL.md',
+        'INSTALL.zh-CN.md',
         join('skills', pkgName.split('/').pop(), 'SKILL.md'),
         join('docs', 'report-schema.md'),
         join('docs', 'report-schema.zh-CN.md'),

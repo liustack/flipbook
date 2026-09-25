@@ -47,7 +47,12 @@ describe('launcher version stamping', () => {
     it('leaves no copy of the old version in SKILL.md and the install docs', () => {
         const version = readPackageVersion();
         const base = mkdtempSync(join(tmpdir(), 'flipbook-stamp-'));
-        const docs = ['README.md', 'INSTALL.md', join('skills', 'flipbook', 'SKILL.md')];
+        const docs = [
+            'README.md',
+            'INSTALL.md',
+            'INSTALL.zh-CN.md',
+            join('skills', 'flipbook', 'SKILL.md'),
+        ];
         const launchers = ['run.sh', 'run.ps1'].map((name) =>
             join('skills', 'flipbook', 'scripts', name),
         );
