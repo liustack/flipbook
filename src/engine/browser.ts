@@ -15,6 +15,8 @@ export const FIXED_ARGS = [
     '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows',
     '--disable-checker-imaging',
+    // Screenshots stop waiting for the next 60 Hz compositor tick.
+    '--disable-frame-rate-limit',
     // Network backstops for what page routes cannot see: no WebRTC over UDP,
     // no name lookups (DNS prefetch, preconnect). Pages are served by routes, never resolved.
     '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
