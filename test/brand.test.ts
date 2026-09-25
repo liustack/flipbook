@@ -426,7 +426,14 @@ await brand();
 composition({ seek() {} });`,
             ),
         );
-        const report = await runCheck({ dir, session: await session(), recordAttempts: false });
+        // The page throws before it defines window.__flipbook, so check waits out
+        // the ready deadline: keep it short.
+        const report = await runCheck({
+            dir,
+            session: await session(),
+            recordAttempts: false,
+            readyTimeoutMs: 3000,
+        });
         const messages = report.failures.map((f) => f.message).join(' ');
         expect(messages).toMatch(/"brand": "<path to brand.json>"/);
     });
