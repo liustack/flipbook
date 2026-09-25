@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>lens-montage: 一镜之内</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0d0c0b; }
+  canvas { position: absolute; left: 0; top: 0; }
+  #title { position: absolute; left: 180px; top: 250px; margin: 0; opacity: 0;
+           font: 600 112px/1.2 "Noto Serif SC"; color: #f6f0e2; letter-spacing: 6px; }
+  #subtitle { position: absolute; left: 186px; top: 420px; margin: 0; opacity: 0;
+              font: 400 46px/1.3 "LXGW WenKai"; color: #f3e9d8; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<h1 id="title">一镜之内</h1>
+<p id="subtitle">从一片蕨叶，看到月亮</p>
+<script type="module">
+import {
+  beatTimes,
+  composition,
+  cueProgress,
+  ease,
+  grainLayer,
+  lens,
+  moveCamera,
+  progress,
+  setupCanvas,
+  staticLayer,
+  timeline,
+} from '/__flipbook/runtime.js';
+import { cloudSprite, moonSprite, plateSprites } from './plates.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const stage = { x: 0, y: 0, width: W, height: H };
+const ctx = setupCanvas(document.getElementById('stage'), W, H);
+const title = document.getElementById('title');
+const subtitle = document.getElementById('subtitle');
+const beat = tl.secondsPerBeat;
+const sky = tl.scenes[1];
+
+const PLATE = 1000;
+const MOON = [1300, 320];
+const MOON_R = 92;
+let plates;
+let moon;
+let clouds;
+let gradient;
+
+// The sky the lens pulls out to: gradient, drifting clouds, the moon.
+function drawSky(c, t) {
+  c.drawImage(gradient.canvas, 0, 0, W, H);
+  c.drawImage(clouds.canvas, -120 - t * 7, 0, W + 240, H);
+  c.drawImage(moon.canvas, MOON[0] - MOON_R, MOON[1] - MOON_R, MOON_R * 2, MOON_R * 2);
+}
+
+const radius = 390;
+const view = lens({
+  stage: tl,
+  times: beatTimes(tl, { from: 0, count: 7, every: 2 }),
+  open: beat,
+  pullOut: [13 * beat, 16 * beat],
+  radius,
+  ticks: { count: 60, major: 5 },
+  plate(c, i, info) {
+    if (i < plates.length) {
+      const s = 1 + 0.1 * info.progress;
+      c.save();
+      c.translate(W / 2, H / 2);
+      c.rotate(0.04 * info.progress * (i % 2 ? 1 : -1));
+      c.scale(s, s);
+      c.drawImage(plates[i].canvas, -PLATE / 2, -PLATE / 2, PLATE, PLATE);
+      c.restore();
+      return;
+    }
+    // The last plate is the moon: pulling out turns it into the sky.
+    const zoom = (radius * 0.86) / MOON_R;
+    const near = { x: MOON[0] - W / zoom / 2, y: MOON[1] - H / zoom / 2, width: W / zoom, height: H / zoom };
+    c.save();
+    moveCamera(c, tl, near, stage, info.pull);
+    drawSky(c, info.t);
+    c.restore();
+  },
+});
+
+composition({
+  setup() {
+    plates = plateSprites(PLATE, tl.seed);
+    moon = moonSprite(720, tl.seed + 99);
+    clouds = cloudSprite(W + 240, H, tl.seed + 5);
+    gradient = staticLayer(W, H, (c) => {
+      const g = c.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#1d2f4f');
+      g.addColorStop(0.5, '#56709b');
+      g.addColorStop(0.85, '#d9a98f');
+      g.addColorStop(1, '#eec0a0');
+      c.fillStyle = g;
+      c.fillRect(0, 0, W, H);
+    });
+    grainLayer(W, H, { seed: tl.seed, amount: 0.6, dust: 0.4 });
+  },
+  seek(t) {
+    ctx.clearRect(0, 0, W, H);
+    if (t < sky.start) {
+      view.draw(ctx, t);
+      title.style.opacity = '0';
+      subtitle.style.opacity = '0';
+      return;
+    }
+    const push = 1 + 0.04 * ease.inOutSine(progress(t, sky.start, tl.durationSec));
+    ctx.save();
+    ctx.translate(MOON[0], MOON[1]);
+    ctx.scale(push, push);
+    ctx.translate(-MOON[0], -MOON[1]);
+    drawSky(ctx, t);
+    ctx.restore();
+    const a = ease.outCubic(cueProgress(tl, t, 'title'));
+    title.style.opacity = String(a);
+    title.style.transform = `translateY(${(1 - a) * 18}px)`;
+    const b = ease.outCubic(cueProgress(tl, t, 'subtitle'));
+    subtitle.style.opacity = String(b);
+    subtitle.style.transform = `translateY(${(1 - b) * 12}px)`;
+  },
+});
+</script>
+</body>
+</html>

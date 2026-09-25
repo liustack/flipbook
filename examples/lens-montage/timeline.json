@@ -1,0 +1,25 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 20260901,
+    "bpm": 100,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "lens", "bars": 4 },
+        { "id": "sky", "bars": 2 }
+    ],
+    "cues": [
+        { "id": "title", "scene": "sky", "beat": 1, "kind": "text", "text": "一镜之内", "settleBeats": 1.5 },
+        { "id": "ding", "scene": "sky", "beat": 1, "kind": "sfx", "sfx": "ding" },
+        { "id": "subtitle", "scene": "sky", "beat": 2, "kind": "text", "text": "从一片蕨叶，看到月亮", "settleBeats": 1 }
+    ],
+    "audio": {
+        "mode": "preset",
+        "preset": "marimba",
+        "key": "A",
+        "progression": 3,
+        "dynamics": { "lens": "medium", "sky": "soft" }
+    }
+}

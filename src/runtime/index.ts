@@ -100,6 +100,14 @@ export type {
     TurningPage,
 } from './templates/flipbook.ts';
 export { pageTurn } from './templates/flipbook.ts';
+export type {
+    LensMontage,
+    LensOptions,
+    LensTicks,
+    PlateDrawer,
+    PlateInfo,
+} from './templates/lens.ts';
+export { lens } from './templates/lens.ts';
 export type { AccelerateOptions, BeatTimesOptions } from './templates/timing.ts';
 export { accelerate, beatTimes } from './templates/timing.ts';
 export type {

@@ -6,6 +6,7 @@ A template carries one device through a whole film. Pick at most one per film:
 |---|---|
 | [Objects assemble a glyph](#objects-assemble-a-glyph) | objects land one by one and build a digit, a letter or a Chinese character |
 | [Page turn](#page-turn) | a book opens into the first scene, a page turns between two scenes, or pages flip on the beat into an animation |
+| [Lens montage](#lens-montage) | plates cut on the beat inside a round eyepiece, then the window opens onto the full frame |
 
 ## Objects assemble a glyph
 
@@ -271,6 +272,78 @@ composition({
 | `shadow` (0.6) | strength of the shadows, 0 to 1 |
 
 `book.turning(t)` lists the pages in the air with their `progress`, top page first. `book.top(t)` is the page lying flat on top of the unturned stack.
+
+## Lens montage
+
+Plates seen through a round eyepiece: a dark surround, a knurled ring, a vignette and color fringes at the window edge, optional scale marks. The iris can open at the start. Each plate comes up on its cut and pulls into focus. At the end the window grows until it fills the frame and the last plate becomes the whole picture.
+
+Sample image: `docs/samples/lens-montage.png` in the flipbook repository. Full example: `examples/lens-montage/`, six specimen plates and a moon that pulls out into a dusk sky.
+
+### Steps
+
+1. Plate times, in seconds: `beatTimes(tl, { from, count, every })` or `markTimes(tl, prefix)`.
+2. Build it once: `lens({ stage: tl, times, plate, open, pullOut, ticks })`.
+3. In `seek(t)`, call `view.draw(ctx, t)`.
+
+### The plate drawer
+
+`plate` is `(ctx, index, info) => void`. It draws in stage coordinates around the window center and the lens clips it to the window. `info` has `index`, `t`, `local` (seconds since this plate came up), `span` (seconds it stays up), `progress` (local over span), `pull` (0 before the pull-out, 1 once the window fills the frame), `center` and `radius`.
+
+- Draw each plate once in `setup()` with `staticLayer()`. In the drawer, blit it and keep it moving: a slow push or turn from `info.progress`.
+- The last plate draws the full-frame scene the window opens onto. Pull the camera back with `info.pull`: `moveCamera(ctx, tl, near, stage, info.pull)`, where `near` is a rectangle around the subject that fills the window.
+
+<!-- check: pass -->
+```js
+import { beatTimes, composition, lens, setupCanvas, timeline } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
+const colors = ['#e0b04a', '#9fc5b0', '#c9d8e5', '#e9dcc3'];
+const view = lens({
+  stage: tl,
+  times: beatTimes(tl, { from: 0, count: 4, every: 1.5 }),
+  open: 0.5,
+  pullOut: [4.2, tl.durationSec],
+  ticks: true,
+  plate(c, i, info) {
+    c.fillStyle = colors[i];
+    c.fillRect(0, 0, tl.width, tl.height);
+    c.strokeStyle = '#2b2622';
+    c.lineWidth = 3;
+    for (let k = 1; k < 8; k++) {
+      c.beginPath();
+      c.arc(tl.width / 2, tl.height / 2, k * 18 * (1 + 0.1 * info.progress), 0, Math.PI * 2);
+      c.stroke();
+    }
+  },
+});
+
+composition({
+  seek(t) {
+    ctx.clearRect(0, 0, tl.width, tl.height);
+    view.draw(ctx, t);
+  },
+});
+```
+
+### Options
+
+| Option (default) | Meaning |
+|---|---|
+| `stage` | the stage size, `tl` works |
+| `times` | when each plate comes up, seconds, rising |
+| `plate` | the plate drawer |
+| `center` (the stage center), `radius` (36% of the shorter side) | the window |
+| `open` (0) | seconds the iris takes to open from shut at `times[0]` |
+| `pullOut` (none) | `[start, end]` in seconds: the window grows until it fills the frame |
+| `end` (the pull-out end) | when the last plate ends, for its `progress` |
+| `rim` (0.22) | ring width as a share of the radius |
+| `surround` (`'#0d0c0b'`) | color around the eyepiece |
+| `vignette` (0.6), `fringe` (0.4) | darkening and color fringes at the window edge, 0 to 1 |
+| `ticks` (none) | `true` or `{ count: 72, major: 6, color }` for scale marks inside the rim |
+| `refocus` (0.2), `blur` (6) | seconds each plate takes to come into focus after its cut, and the blur in px at the cut. `refocus: 0` cuts sharp |
+
+`view.plateAt(t)` is the plate up at time t. `view.windowAt(t)` gives the window `center` and `radius`.
 
 ## Camera moves
 

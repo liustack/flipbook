@@ -22,6 +22,7 @@ export const SAMPLES = [
     { name: 'text', dir: 'docs/samples/src/text', at: 1.5, width: 960 },
     { name: 'templates', dir: 'examples/eggs-five/five', at: 2.6, width: 960 },
     { name: 'page-turn', dir: 'examples/page-turn', at: 6.2, width: 960 },
+    { name: 'lens-montage', dir: 'examples/lens-montage', at: 3.1, width: 960 },
 ];
 
 function fail(message) {

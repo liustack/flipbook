@@ -166,4 +166,34 @@ describe('templates in the browser', () => {
             await page.close();
         }
     });
+
+    it('lens: the iris opens inside the ring and the pull-out reaches every corner', async () => {
+        const page = await runtimePage(await session(), 640, 360);
+        try {
+            const probe = await page.page.evaluate(() => {
+                const { rt } = window as unknown as {
+                    rt: typeof import('../src/runtime/index.ts');
+                };
+                const view = rt.lens({
+                    stage: { width: 640, height: 360 },
+                    times: [0, 1, 2],
+                    open: 0.5,
+                    pullOut: [2.5, 3.5],
+                    plate() {},
+                });
+                return {
+                    shut: view.windowAt(0).radius,
+                    open: view.windowAt(0.6).radius,
+                    full: view.windowAt(3.5).radius,
+                    plates: [0.4, 1, 1.99, 9].map((t) => view.plateAt(t)),
+                };
+            });
+            expect(probe.shut).toBe(0);
+            expect(probe.open).toBeCloseTo(360 * 0.36, 6);
+            expect(probe.full).toBeGreaterThanOrEqual(Math.hypot(320, 180));
+            expect(probe.plates).toEqual([0, 1, 1, 2]);
+        } finally {
+            await page.close();
+        }
+    });
 });

@@ -16,7 +16,7 @@ afterAll(async () => {
     cleanTemps();
 });
 
-const EXAMPLES = ['page-turn'];
+const EXAMPLES = ['page-turn', 'lens-montage'];
 
 function audioOf(report: Report): AudioCheck {
     return (report.render as { audio: AudioCheck }).audio;
