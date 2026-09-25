@@ -5,7 +5,7 @@ import { runCheck } from '../../src/cli/check.ts';
 import { runRender } from '../../src/cli/render.ts';
 import type { Determinism, Report } from '../../src/cli/report.ts';
 import { closeSession, session } from '../browser.ts';
-import { cleanTemps, codes, copyFixture } from '../helpers.ts';
+import { cleanTemps, codes, copyFixture, TEST_SEEK_TIMEOUT_MS } from '../helpers.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -20,7 +20,7 @@ async function check(name: string, seekTimeoutMs?: number) {
     return runCheck({
         dir: copyFixture(`bad/${name}`),
         session: await session(),
-        seekTimeoutMs,
+        seekTimeoutMs: seekTimeoutMs ?? TEST_SEEK_TIMEOUT_MS,
         recordAttempts: false,
     });
 }

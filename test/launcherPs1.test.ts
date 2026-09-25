@@ -80,7 +80,7 @@ function runPs1(exe: string, args: string[], env: NodeJS.ProcessEnv) {
     return spawnSync(
         exe,
         ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', launcher, ...args],
-        { env, encoding: 'utf-8', timeout: 60_000, windowsHide: true },
+        { env, encoding: 'utf-8', timeout: 180_000, windowsHide: true },
     );
 }
 

@@ -17,7 +17,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../../src/cli/check.ts';
 import { validateTimeline } from '../../src/engine/timeline.ts';
 import { closeSession, session } from '../browser.ts';
-import { cleanTemps, repoRoot, tempDir } from '../helpers.ts';
+import { cleanTemps, repoRoot, TEST_SEEK_TIMEOUT_MS, tempDir } from '../helpers.ts';
 
 const referencesDir = path.join(repoRoot, 'skills', 'flipbook', 'references');
 
@@ -162,9 +162,10 @@ describe.concurrent('reference snippets pass check as marked', () => {
                 const report = await runCheck({
                     dir,
                     session: await session(),
-                    // Only the seek-timeout snippet needs a short limit; the others run
-                    // concurrently and keep the default so a busy machine does not fail them.
-                    seekTimeoutMs: snippet.expect === 'fail seek-timeout' ? 1500 : undefined,
+                    // Only the seek-timeout snippet needs a short limit. The others run
+                    // concurrently on busy CI runners and get a generous one.
+                    seekTimeoutMs:
+                        snippet.expect === 'fail seek-timeout' ? 1500 : TEST_SEEK_TIMEOUT_MS,
                     recordAttempts: false,
                 });
                 const [verdict, code] = snippet.expect.split(/\s+/);

@@ -67,14 +67,37 @@ describe('no connection leaves the page', () => {
             tcp += 1;
         });
         server.on('upgrade', (_req, socket) => socket.destroy());
-        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-        const port = (server.address() as AddressInfo).port;
-        const udp = dgram.createSocket('udp4');
+        // TCP and UDP on the same port number. Windows reserves port ranges
+        // that refuse a bind with EACCES, so a port that fails for UDP is let
+        // go and another one tried, instead of waiting for a bind that never
+        // comes back.
+        const listen = (on: number) =>
+            new Promise<void>((resolve, reject) => {
+                server.once('error', reject);
+                server.listen(on, '127.0.0.1', () => {
+                    server.off('error', reject);
+                    resolve();
+                });
+            });
+        let udp = dgram.createSocket('udp4');
+        let port = 0;
+        for (let attempt = 0; ; attempt++) {
+            await listen(0);
+            port = (server.address() as AddressInfo).port;
+            const bound = await new Promise<boolean>((resolve) => {
+                udp.once('error', () => resolve(false));
+                udp.bind(port, '127.0.0.1', () => resolve(true));
+            });
+            if (bound) break;
+            udp.close();
+            udp = dgram.createSocket('udp4');
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+            if (attempt === 9) throw new Error('no port free for both TCP and UDP after 10 tries');
+        }
         let datagrams = 0;
         udp.on('message', () => {
             datagrams += 1;
         });
-        await new Promise<void>((resolve) => udp.bind(port, '127.0.0.1', resolve));
         try {
             const dir =
                 tinyComposition(`<div style="position:absolute;left:20px;top:20px;width:80px;height:80px;background:#246"></div>

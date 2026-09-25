@@ -10,7 +10,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../../src/cli/check.ts';
 import { runSnapshot } from '../../src/cli/snapshot.ts';
 import { closeSession, session } from '../browser.ts';
-import { cleanTemps, copyFixture, repoRoot } from '../helpers.ts';
+import { cleanTemps, copyFixture, repoRoot, TEST_SEEK_TIMEOUT_MS } from '../helpers.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -47,7 +47,12 @@ describe.concurrent.each(exampleNames())('examples/%s', (name) => {
 
     it('passes check with no findings', async () => {
         const dir = copyFixture(name, 'examples');
-        const checked = await runCheck({ dir, session: await session(), recordAttempts: false });
+        const checked = await runCheck({
+            dir,
+            session: await session(),
+            seekTimeoutMs: TEST_SEEK_TIMEOUT_MS,
+            recordAttempts: false,
+        });
         expect(checked.failures).toEqual([]);
         expect(checked.warnings).toEqual([]);
     });

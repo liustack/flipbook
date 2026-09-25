@@ -67,3 +67,11 @@ export function runCli(args: string[], env: NodeJS.ProcessEnv = process.env): Cl
     }
     return { status: result.status, stdout: result.stdout, stderr: result.stderr, json };
 }
+
+/**
+ * Seek limit for tests that check whether a composition passes, not how fast
+ * it seeks. The product's 10 s default is for one render on a real machine;
+ * CI runners with 3 cores run several browsers at once and can take longer
+ * on a single seek. Tests of seek-timeout itself pass their own short limit.
+ */
+export const TEST_SEEK_TIMEOUT_MS = 60_000;
