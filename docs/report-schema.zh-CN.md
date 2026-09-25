@@ -44,7 +44,7 @@ read_when:
 | `stopReason` | string | `stop` 为 true 时说明卡在哪 |
 | `timing` | object | `startedAt`、`durationMs` |
 
-各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`、`output`、`parallel`、`pages`、`recycle`，后四个见「画幅和分辨率」「并行渲染」两节），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同，其中 `stage` 是舞台尺寸（如 `1080x1920`），`scale` 是 `--scale`。
+各命令另有一个同名字段：`check`（`seed`、抽样帧、两次 seek 的顺序、证据目录、`contrastSkipped` 没量对比度的 canvas 字，`determinism` 是确定性三项各自的结果，见「并行渲染」一节），`snapshot`（`layout`、`tiles` 每格的帧号时间和场景、`zooms`），`render`（`frames`、`fps`、`digest` 原始帧哈希汇总、`captureMs`、`encodeMs`、`verifyMs`、`totalMs`、`captureFps`、`probe`、`audio`、`contactSheetTiles`、`output`、`parallel`、`pages`、`recycle`，后四个见「画幅和分辨率」「并行渲染」两节），`audio`（见「音频」一节）。`render` 还有 `metadata`，和写进 mp4 comment 标签的内容相同，其中 `stage` 是舞台尺寸（如 `1080x1920`），`scale` 是 `--scale`。
 
 ### 画幅和分辨率
 
@@ -73,7 +73,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 
 每一页画到一定帧数就关掉重开，长片的内存不跟着帧数涨。默认帧数按输出大小定：1920×1080 一页 2400 帧，像素越多越早重开，最少 600 帧。另外每 48 帧读一次这一页的 JS 堆和 DOM 节点数，第一次读数当基线，涨过线（先做一次完整垃圾回收再确认）就提前重开。线是所有页合起来 512 MB 堆、4 万个节点，平分给同时在画的页，每页至少 64 MB、5000 个节点，所以页数多时内存合计也不超过这个数。`--recycle <帧数>` 改成固定帧数且不看内存，`--recycle 0` 一直用同一页。重开不改变像素，理由和并行相同。
 
-多页的前提是这个合成最近一次 check 退 0：读 `.flipbook/reports/check.json`，合成文件哈希、flipbook 版本、Chromium 构建号都要和这次 render 相同。否则只用一页，`reason` 是 `no check report for this composition`、`the saved check report is not valid JSON`、`the last check ran on other files`、`the last check ran on another flipbook version`、`the last check ran on another Chromium` 或 `the last check did not pass`。直接调 `runCheck` 不存报告，要并行得自己 `saveReport`。
+多页的前提是这个合成最近一次 check 的确定性三项都过了：读 `.flipbook/reports/check.json`，合成文件哈希、flipbook 版本、Chromium 构建号都要和这次 render 相同，`check.determinism` 里 `seekOrder`（换一个顺序 seek）、`perturbation`（换时钟和随机种子）、`latePaint`（seek 后连截两张）都是 `pass`。每项的值是 `pass`、`fail` 或 `skipped`（check 没跑到这一项就停了）。check 因为别的问题没退 0（比如文字出画）不影响多页。否则只用一页，`reason` 是 `no check report for this composition`、`the saved check report is not valid JSON`、`the last check ran on other files`、`the last check ran on another flipbook version`、`the last check ran on another Chromium`、`the last check failed the determinism checks: ` 加没过的几项，或 `the last check did not finish the determinism checks`。直接调 `runCheck` 不存报告，要并行得自己 `saveReport`。
 
 ## 输出目录
 

@@ -32,6 +32,19 @@ export interface Finding {
     detail?: Record<string, unknown>;
 }
 
+/** How one of check's determinism checks came out. `skipped`: check stopped before it ran. */
+export type DeterminismOutcome = 'pass' | 'fail' | 'skipped';
+
+/** check's three determinism checks, saved as `check.determinism`. render reads it to allow parallel pages. */
+export interface Determinism {
+    /** The sampled frames seeked in a second order give the same pixels. */
+    seekOrder: DeterminismOutcome;
+    /** A shifted clock and a shifted random seed give the same pixels and no new problems. */
+    perturbation: DeterminismOutcome;
+    /** Two captures after one seek are the same. */
+    latePaint: DeterminismOutcome;
+}
+
 export interface Report {
     schema: typeof REPORT_SCHEMA;
     command: Command;

@@ -1,7 +1,10 @@
 // Planning parallel pages and page recycling: page counts, reopening intervals
 // and memory lines. The renders that prove the frames stay the same are in
 // test/e2e/parallel.test.ts.
-import { describe, expect, it } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
+import { afterAll, describe, expect, it } from 'vitest';
+import { parallelGate } from '../src/cli/render.ts';
 import {
     autoRecycle,
     HEAP_GROWTH_BUDGET,
@@ -12,6 +15,12 @@ import {
     pageLimit,
     planJobs,
 } from '../src/engine/capture.ts';
+import type { Session } from '../src/engine/session.ts';
+import { Workspace } from '../src/engine/workspace.ts';
+import { appVersion } from '../src/paths.ts';
+import { cleanTemps, tempDir } from './helpers.ts';
+
+afterAll(() => cleanTemps());
 
 describe('planJobs', () => {
     const machine = { cores: 10, memoryBytes: 16 * 1024 ** 3 };
@@ -60,5 +69,60 @@ describe('pageLimit', () => {
         expect(pageLimit(HEAP_GROWTH_BUDGET, MIN_PAGE_HEAP_GROWTH, 1)).toBe(HEAP_GROWTH_BUDGET);
         expect(pageLimit(HEAP_GROWTH_BUDGET, MIN_PAGE_HEAP_GROWTH, 4)).toBe(HEAP_GROWTH_BUDGET / 4);
         expect(pageLimit(HEAP_GROWTH_BUDGET, MIN_PAGE_HEAP_GROWTH, 16)).toBe(MIN_PAGE_HEAP_GROWTH);
+    });
+});
+
+describe('parallelGate', () => {
+    const session = { chromium: { revision: '1243' } } as Session;
+    const hash = 'sha256:abc';
+
+    function gate(check: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+        const dir = tempDir('gate');
+        fs.mkdirSync(path.join(dir, '.flipbook', 'reports'), { recursive: true });
+        const report = {
+            command: 'check',
+            ok: false,
+            composition: { dir, hash },
+            flipbook: { version: appVersion() },
+            environment: { chromium: { revision: '1243' } },
+            check,
+            ...extra,
+        };
+        fs.writeFileSync(
+            path.join(dir, '.flipbook', 'reports', 'check.json'),
+            JSON.stringify(report),
+        );
+        return parallelGate(Workspace.open(dir), hash, session);
+    }
+
+    const passed = { seekOrder: 'pass', perturbation: 'pass', latePaint: 'pass' };
+
+    it('allows pages after a check that failed on other things but passed all three determinism checks', () => {
+        expect(gate({ determinism: passed })).toEqual({ allowed: true });
+    });
+
+    it('refuses pages when a determinism check failed, and names it', () => {
+        const result = gate({ determinism: { ...passed, seekOrder: 'fail', latePaint: 'fail' } });
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toBe(
+            'the last check failed the determinism checks: seek order, late paint',
+        );
+    });
+
+    it('refuses pages when a determinism check never ran', () => {
+        expect(gate({ determinism: { ...passed, perturbation: 'skipped' } })).toEqual({
+            allowed: false,
+            reason: 'the last check did not finish the determinism checks',
+        });
+        expect(gate({})).toEqual({
+            allowed: false,
+            reason: 'the last check did not finish the determinism checks',
+        });
+    });
+
+    it('still refuses a check of other files', () => {
+        expect(
+            gate({ determinism: passed }, { composition: { dir: '.', hash: 'sha256:other' } }),
+        ).toEqual({ allowed: false, reason: 'the last check ran on other files' });
     });
 });

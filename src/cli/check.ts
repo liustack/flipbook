@@ -16,7 +16,14 @@ import { auditCueText, auditFrameText, dedupe, findingKey } from '../engine/text
 import { loadTimeline } from '../engine/timeline.ts';
 import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
 import { compositionHash, sha256, Workspace } from '../engine/workspace.ts';
-import { type Finding, finding, progress, type Report, ReportBuilder } from './report.ts';
+import {
+    type Determinism,
+    type Finding,
+    finding,
+    progress,
+    type Report,
+    ReportBuilder,
+} from './report.ts';
 
 export interface CheckOptions {
     dir: string;
@@ -172,6 +179,13 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
         const shots = new Map<number, Buffer>();
         const baselines = new Map<number, Buffer>();
         const contrastSkipped: { frame: number; element: string; reason: string }[] = [];
+        // Each stays skipped unless its pass runs to the end.
+        const determinism: Determinism = {
+            seekOrder: 'skipped',
+            perturbation: 'skipped',
+            latePaint: 'skipped',
+        };
+        let latePaintFailed = false;
         let usable = !page.broken && loadFindings.length === 0;
         try {
             if (usable) {
@@ -193,6 +207,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                 }
             }
             // Pass 1: shuffled order; a second capture of the same state catches late painting.
+            const passOneRan = usable;
             for (const frame of usable ? first : []) {
                 const failed = await page.seek(frame, options.seekTimeoutMs);
                 if (failed) {
@@ -210,6 +225,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     ];
                     ws.writeFile(files[0], a);
                     ws.writeFile(files[1], b);
+                    latePaintFailed = true;
                     dynamic.push(
                         finding(
                             'late-paint',
@@ -226,7 +242,9 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                 baselines.set(frame, await page.capture());
                 await page.setContent(true);
             }
+            if (passOneRan && usable) determinism.latePaint = latePaintFailed ? 'fail' : 'pass';
             // Pass 2: another order must give the same pixels.
+            const passTwoRan = usable;
             const orderMismatch: number[] = [];
             for (const frame of usable ? second : []) {
                 const failed = await page.seek(frame, options.seekTimeoutMs);
@@ -251,6 +269,8 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     }
                 }
             }
+            if (passTwoRan && usable)
+                determinism.seekOrder = orderMismatch.length > 0 ? 'fail' : 'pass';
             if (orderMismatch.length > 0) {
                 const frame = orderMismatch[0];
                 dynamic.push(
@@ -340,6 +360,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
         // Perturbation: same frames from a fresh page with a shifted clock, then a shifted random seed.
         const probe = first.slice(0, Math.min(3, first.length));
         if (usable && probe.length > 0) {
+            const before = dynamic.length;
             const base = defaultClock(timeline);
             const variants: {
                 code: 'clock-dependent' | 'random-dependent';
@@ -425,6 +446,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                     );
                 }
             }
+            determinism.perturbation = dynamic.length > before ? 'fail' : 'pass';
         }
 
         // Blank and paper-only samples.
@@ -490,6 +512,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
             secondOrder: second,
             evidenceDir,
             contrastSkipped,
+            determinism,
         };
     } finally {
         if (!options.session) await session.close();

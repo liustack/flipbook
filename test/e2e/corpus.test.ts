@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { afterAll, describe, expect, it } from 'vitest';
 import { runCheck } from '../../src/cli/check.ts';
 import { runRender } from '../../src/cli/render.ts';
+import type { Determinism, Report } from '../../src/cli/report.ts';
 import { closeSession, session } from '../browser.ts';
 import { cleanTemps, codes, copyFixture } from '../helpers.ts';
 
@@ -10,6 +11,10 @@ afterAll(async () => {
     await closeSession();
     cleanTemps();
 });
+
+function determinism(report: Report): Determinism {
+    return (report.check as { determinism: Determinism }).determinism;
+}
 
 async function check(name: string, seekTimeoutMs?: number) {
     return runCheck({
@@ -102,7 +107,13 @@ describe('bad composition corpus', () => {
     });
 
     it('clock: drawing from Date.now', async () => {
-        expect(codes(await check('clock'))).toContain('clock-dependent');
+        const checked = await check('clock');
+        expect(codes(checked)).toContain('clock-dependent');
+        expect(determinism(checked)).toEqual({
+            seekOrder: 'pass',
+            perturbation: 'fail',
+            latePaint: 'pass',
+        });
     });
 
     it('clock delta: Date.now() - start draws the same under any origin, and is still caught', async () => {
@@ -136,11 +147,17 @@ describe('bad composition corpus', () => {
         const checked = await check('state');
         expect(codes(checked)).toContain('seek-order-dependent');
         expect(codes(checked)).not.toContain('clock-dependent');
+        expect(determinism(checked).seekOrder).toBe('fail');
     });
 
     it('seek waits on requestAnimationFrame', async () => {
         const checked = await check('raf-wait', 1500);
         expect(codes(checked)).toContain('seek-timeout');
+        expect(determinism(checked)).toEqual({
+            seekOrder: 'skipped',
+            perturbation: 'skipped',
+            latePaint: 'skipped',
+        });
     });
 
     it('text past the frame edge, in the margin, and a marked bleed', async () => {
@@ -153,6 +170,12 @@ describe('bad composition corpus', () => {
             .filter((f) => f.code === 'text-safe-area')
             .map((f) => f.element);
         expect(margin).toEqual(['#edge']);
+        // Text off the frame fails check but says nothing about determinism.
+        expect(determinism(checked)).toEqual({
+            seekOrder: 'pass',
+            perturbation: 'pass',
+            latePaint: 'pass',
+        });
     });
 
     it('canvas text boxes follow rotation, mirroring and maxWidth', async () => {

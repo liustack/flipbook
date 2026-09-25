@@ -38,7 +38,14 @@ import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
 import { verifyAudio, verifyVideo } from '../engine/verify.ts';
 import { acquireLock, compositionHash, Workspace } from '../engine/workspace.ts';
 import { appVersion } from '../paths.ts';
-import { finding, platformId, progress, type Report, ReportBuilder } from './report.ts';
+import {
+    type Determinism,
+    finding,
+    platformId,
+    progress,
+    type Report,
+    ReportBuilder,
+} from './report.ts';
 
 export interface RenderOptions {
     dir: string;
@@ -180,10 +187,19 @@ export interface ParallelGate {
     reason?: string;
 }
 
+/** What the gate calls each determinism check in a reason. */
+const DETERMINISM_LABELS: Record<keyof Determinism, string> = {
+    seekOrder: 'seek order',
+    perturbation: 'shifted clock and seed',
+    latePaint: 'late paint',
+};
+
 /**
- * Parallel pages only for a composition whose determinism check passed: the
+ * Parallel pages only for a composition whose determinism checks passed: the
  * saved report of the last check must be for these exact files, this
- * flipbook and this Chromium, and must have exited 0.
+ * flipbook and this Chromium, and its seek order, perturbation and late paint
+ * checks must all have passed. Other failures in that check do not matter
+ * here, since pages only differ from one another in which frames they draw.
  */
 export function parallelGate(ws: Workspace, hash: string, session: Session): ParallelGate {
     let text: string | null;
@@ -208,7 +224,19 @@ export function parallelGate(ws: Workspace, hash: string, session: Session): Par
     if (report.environment?.chromium?.revision !== session.chromium.revision) {
         return { allowed: false, reason: 'the last check ran on another Chromium' };
     }
-    if (report.ok !== true) return { allowed: false, reason: 'the last check did not pass' };
+    const determinism = (report.check as { determinism?: Partial<Determinism> } | undefined)
+        ?.determinism;
+    const keys = Object.keys(DETERMINISM_LABELS) as (keyof Determinism)[];
+    const failed = keys.filter((key) => determinism?.[key] === 'fail');
+    if (failed.length > 0) {
+        return {
+            allowed: false,
+            reason: `the last check failed the determinism checks: ${failed.map((key) => DETERMINISM_LABELS[key]).join(', ')}`,
+        };
+    }
+    if (!keys.every((key) => determinism?.[key] === 'pass')) {
+        return { allowed: false, reason: 'the last check did not finish the determinism checks' };
+    }
     return { allowed: true };
 }
 

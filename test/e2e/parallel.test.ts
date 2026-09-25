@@ -70,6 +70,27 @@ describe('parallel render', () => {
         expect(hashes(dir)).toEqual(singleHashes);
     });
 
+    it('uses parallel pages after a check that failed on text, not on determinism', async () => {
+        const dir = copyFixture('bad/offstage');
+        const s = await session();
+        const checked = await runCheck({ dir, session: s, recordAttempts: false });
+        expect(checked.ok).toBe(false);
+        saveReport(checked);
+        const report = await runRender({ dir, session: s, jobs: 3, recordAttempts: false });
+        expect((report.render as RenderSection).parallel).toMatchObject({ jobs: 3 });
+    });
+
+    it('stays on one page after a check that failed on seek order', async () => {
+        const dir = copyFixture('bad/state');
+        const s = await session();
+        saveReport(await runCheck({ dir, session: s, recordAttempts: false }));
+        const report = await runRender({ dir, session: s, jobs: 3, recordAttempts: false });
+        expect((report.render as RenderSection).parallel).toMatchObject({
+            jobs: 1,
+            reason: 'the last check failed the determinism checks: seek order',
+        });
+    });
+
     it('goes back to one page once the files change after check', async () => {
         const dir = copyFixture('hello', 'examples');
         const s = await session();
