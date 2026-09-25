@@ -2,7 +2,7 @@
 
 Old natural history plates, specimen photos, micrographs and antique maps give a film the warmth of scanned paper that code-drawn shapes lack. flipbook finds public domain images, saves the chosen one with its license, and `photo()` cuts it from its paper and turns it into a sticker: a paper border, a slight tilt, a soft shadow and a grain over it all. The border hides rough cutout edges and makes pictures from different sources look like one scrapbook.
 
-Full example: `examples/specimen-board/` in the flipbook repository, four plates from the Biodiversity Heritage Library dropped onto grid paper.
+Full example: `examples/specimen-board/` in the flipbook repository, four public domain plates fetched with `stock fetch` and dropped onto grid paper as stickers.
 
 ## Find an image
 
