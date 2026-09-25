@@ -302,9 +302,14 @@ describe('a renderer the system takes away', () => {
             detail: { status: 'killed' },
         });
 
-        // chrome://crash is the renderer crashing by itself.
+        // chrome://crash is the renderer crashing by itself. Where the kernel
+        // hands crashes to a core dump handler (systemd-coredump on Ubuntu),
+        // Chromium hears of it only once the dump is written, 1.5 s later on
+        // a GitHub runner, so wait for the crash before closing.
         const crashed = await openPage(s, { dir, timeline });
+        const crash = crashed.page.page.waitForEvent('crash', { timeout: 60_000 });
         await crashed.page.page.goto('chrome://crash').catch(() => undefined);
+        await crash;
         await crashed.page.close();
         expect(crashed.page.issues.map((f) => f.code)).toContain('page-error');
     });
