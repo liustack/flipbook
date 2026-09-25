@@ -61,9 +61,14 @@ jobs:
       - name: Render the examples
         run: |
           mkdir -p release-assets
-          for dir in examples/*/; do
-            name="$(basename "$dir")"
-            node dist/main.js render "$dir" > "release-assets/$name-render.json"
+          # Every folder holding a timeline.json is one composition, at any depth.
+          find examples -name timeline.json -not -path '*/.flipbook/*' | sort | while read -r timeline; do
+            dir="$(dirname "$timeline")"
+            name="$(echo "${dir#examples/}" | tr '/' '-')"
+            if ! node dist/main.js render "$dir" > "release-assets/$name-render.json" < /dev/null; then
+              cat "release-assets/$name-render.json"
+              exit 1
+            fi
             cp "$dir/out/video.mp4" "release-assets/$name.mp4"
             cp "$dir/out/contact-sheet.png" "release-assets/$name-contact-sheet.png"
           done
