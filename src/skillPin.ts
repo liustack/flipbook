@@ -8,11 +8,15 @@ import * as os from 'os';
 import * as path from 'path';
 import { SKILL_NAME } from './names.ts';
 
-/** Where each harness reads global skills from. */
+/**
+ * Where each harness reads global skills from. `~/.agents/skills` is shared:
+ * `skills add --agent codex` installs there and Codex loads it, as do pi and
+ * opencode, so a copy found there cannot be pinned to one harness.
+ */
 export const SKILL_DIRS = [
     ['claude-code', '.claude/skills'],
     ['codex', '.codex/skills'],
-    ['pi/opencode', '.agents/skills'],
+    ['codex / pi / opencode', '.agents/skills'],
 ] as const;
 
 export interface SkillInstall {

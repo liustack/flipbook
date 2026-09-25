@@ -45,4 +45,12 @@ describe('findSkillInstalls', () => {
         expect(installs.find((i) => i.harness === 'claude-code')?.pinned).toBeNull();
         expect(findSkillInstalls('0.1.0', homeWith({}))).toEqual([]);
     });
+
+    it('names Codex alongside pi and opencode for ~/.agents/skills', () => {
+        // `skills add --agent codex` installs here, and Codex loads skills from it.
+        const home = homeWith({ '.agents/skills': '0.1.0' });
+        const [install] = findSkillInstalls('0.2.0', home);
+        expect(install.harness).toBe('codex / pi / opencode');
+        expect(install.outdated).toBe(true);
+    });
 });
