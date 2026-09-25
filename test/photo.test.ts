@@ -72,6 +72,30 @@ window.specimenPlate = () => {
     ctx.fillRect(250, 140, 24, 24);
     return c.toDataURL('image/png');
 };
+// The same plate printed inside a cream page margin with a caption, as scans of
+// books come: the ground color is nowhere on the picture's edge.
+window.framedPlate = () => {
+    const inner = new Image();
+    return new Promise((resolve) => {
+        inner.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = 360;
+            c.height = 260;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#f1e7cf';
+            ctx.fillRect(0, 0, 360, 260);
+            ctx.drawImage(inner, 20, 20);
+            // A thin rule around the printed field, as plates have.
+            ctx.strokeStyle = '#6a7a50';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(24, 24, 312, 192);
+            ctx.fillStyle = '#3a2a1a';
+            ctx.fillRect(120, 236, 120, 6);
+            resolve(c.toDataURL('image/png'));
+        };
+        inner.src = window.specimenPlate();
+    });
+};
 window.alphaAt = (canvas, x, y) =>
     canvas.getContext('2d').getImageData(x, y, 1, 1).data[3];
 window.rgbaAt = (canvas, x, y) =>
@@ -91,6 +115,7 @@ type Win = {
     rt: Rt;
     plate(): string;
     specimenPlate(): string;
+    framedPlate(): Promise<string>;
     cutPng(): string;
     alphaAt(canvas: HTMLCanvasElement, x: number, y: number): number;
     rgbaAt(canvas: HTMLCanvasElement, x: number, y: number): number[];
@@ -292,6 +317,47 @@ describe('photo on a crowded plate', () => {
         expect(px[2].y1).toBeGreaterThan(164);
         expect(found[0].area).toBeGreaterThan(found[1].area);
         expect(found[1].area).toBeGreaterThan(found[2].area);
+    });
+
+    it('finds them inside a page margin too, where the ground is not on the edge', async () => {
+        const found = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            return w.rt.specimens(await w.framedPlate(), { paper: '#0d3a12' });
+        });
+        expect(found).toHaveLength(3);
+        // The ring, now at 52..168 x 62..178 on a 360 x 260 page.
+        expect(found[0].crop.x * 360).toBeLessThan(52);
+        expect((found[0].crop.x + found[0].crop.width) * 360).toBeGreaterThan(168);
+        expect((found[0].crop.x + found[0].crop.width) * 360).toBeLessThan(210);
+    });
+
+    it('returns nothing for a plate whose specimens are all joined up', async () => {
+        const found = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            const c = document.createElement('canvas');
+            c.width = 320;
+            c.height = 200;
+            const ctx = c.getContext('2d') as CanvasRenderingContext2D;
+            ctx.fillStyle = '#0d3a12';
+            ctx.fillRect(0, 0, 320, 200);
+            // Spines from a middle body reaching every shell around it.
+            ctx.strokeStyle = '#e8d8b0';
+            ctx.lineWidth = 3;
+            for (let a = 0; a < 12; a++) {
+                ctx.beginPath();
+                ctx.moveTo(160, 100);
+                ctx.lineTo(160 + Math.cos(a) * 140, 100 + Math.sin(a) * 90);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#e8d8b0';
+            for (let a = 0; a < 12; a++) {
+                ctx.beginPath();
+                ctx.arc(160 + Math.cos(a) * 140, 100 + Math.sin(a) * 90, 10, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            return w.rt.specimens(c.toDataURL('image/png'), { paper: '#0d3a12' });
+        });
+        expect(found).toEqual([]);
     });
 
     it('says which sides of the crop cut through the subject', async () => {

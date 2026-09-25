@@ -129,7 +129,9 @@ composition({
 });
 ```
 
-On a dark plate (Haeckel's green or black grounds) give `paper` and add `holes`, for example `{ paper: '#09330b', threshold: 52, holes: 0.02 }`.
+It looks inside the printed field only, so the page margin, the caption and the scan's border never count, and a specimen near the edge of the field is not lost. On a dark plate (Haeckel's green or black grounds) give `paper`, and add `holes` to `photo()`, for example `{ paper: '#09330b', threshold: 52, holes: 0.02 }`.
+
+Color alone cannot part specimens that touch: tentacles crossing a neighbour, spines radiating across the plate. When `specimens()` returns fewer specimens than the plate shows, or none, do not guess crops for them. Use the plate whole with `cutout: 'none'` and let the camera move over it (a push, a pan, a cut on the beat), or search for a plate whose specimens stand apart.
 
 ## Rules
 

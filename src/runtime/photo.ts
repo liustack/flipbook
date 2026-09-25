@@ -695,6 +695,37 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
     };
 }
 
+/** Grow alpha > 0 by r pixels (a square neighbourhood), as a 0/255 mask. */
+function dilate(alpha: Uint8Array, w: number, h: number, r: number): Uint8Array {
+    const row = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+        let last = -Infinity;
+        for (let x = 0; x < w; x++) {
+            if (alpha[y * w + x] > 0) last = x;
+            if (x - last <= r) row[y * w + x] = 255;
+        }
+        last = Infinity;
+        for (let x = w - 1; x >= 0; x--) {
+            if (alpha[y * w + x] > 0) last = x;
+            if (last - x <= r) row[y * w + x] = 255;
+        }
+    }
+    const out = new Uint8Array(w * h);
+    for (let x = 0; x < w; x++) {
+        let last = -Infinity;
+        for (let y = 0; y < h; y++) {
+            if (row[y * w + x] > 0) last = y;
+            if (y - last <= r) out[y * w + x] = 255;
+        }
+        last = Infinity;
+        for (let y = h - 1; y >= 0; y--) {
+            if (row[y * w + x] > 0) last = y;
+            if (last - y <= r) out[y * w + x] = 255;
+        }
+    }
+    return out;
+}
+
 export interface SpecimenOptions {
     /** The ground color. Default: measured along the edge of the picture. */
     paper?: string;
@@ -734,14 +765,61 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
     work.ctx.drawImage(img, 0, 0, w, h);
     const data = work.ctx.getImageData(0, 0, w, h).data;
     const color = options.paper ? rgb(options.paper) : edgeMedian(data, w, h);
-    const { alpha } = paperAlpha(data, w, h, color, options.threshold ?? 36, 0);
+    // Ground is every pixel near the ground color, wherever it lies: scanned
+    // pages print the plate inside a margin, so the ground need not reach the
+    // edge. What touches the edge is that margin, its caption or the scan's
+    // own border, never a specimen, and is dropped below.
+    const threshold = options.threshold ?? 36;
+    const alpha = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+        const j = i * 4;
+        const d = Math.max(
+            Math.abs(data[j] - color[0]),
+            Math.abs(data[j + 1] - color[1]),
+            Math.abs(data[j + 2] - color[2]),
+        );
+        alpha[i] = d >= threshold ? 255 : 0;
+    }
+    // The printed field is the bounding box of the largest stretch of ground.
+    // Everything outside it (the page margin, the caption, the scan's border)
+    // counts as ground, so a specimen near the field's edge does not join it.
+    const ground = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) ground[i] = alpha[i] === 0 ? 255 : 0;
+    const field = islands(ground, w, h);
+    let biggest = 1;
+    for (let id = 2; id < field.sizes.length; id++)
+        if (field.sizes[id] > field.sizes[biggest]) biggest = id;
+    let fx0 = w;
+    let fy0 = h;
+    let fx1 = -1;
+    let fy1 = -1;
+    for (let i = 0; i < w * h; i++) {
+        if (field.label[i] !== biggest) continue;
+        const x = i % w;
+        const y = (i - x) / w;
+        if (x < fx0) fx0 = x;
+        if (x > fx1) fx1 = x;
+        if (y < fy0) fy0 = y;
+        if (y > fy1) fy1 = y;
+    }
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            if (x <= fx0 || x >= fx1 || y <= fy0 || y >= fy1) alpha[y * w + x] = 0;
+        }
+    }
+    const fieldArea = Math.max(1, (fx1 - fx0 + 1) * (fy1 - fy0 + 1));
     despeckle(alpha, w, h, Math.round((options.minArea ?? 0.003) * w * h));
-    const { label, sizes } = islands(alpha, w, h);
+    // Pieces closer than `gap` belong to one specimen (antennae, a stalk, a
+    // highlight splitting a wing): group them by growing every piece by the
+    // gap and labeling what joins up. Distance counts, not bounding boxes, so
+    // a rule drawn around the whole plate does not swallow what it frames.
+    const r = Math.max(1, Math.round((options.gap ?? 0.012) * Math.max(w, h)));
+    const grown = dilate(alpha, w, h, r);
+    const { label, sizes } = islands(grown, w, h);
     const boxes = sizes.map(() => ({ x0: w, y0: h, x1: -1, y1: -1, area: 0 }));
     for (let i = 0; i < label.length; i++) {
-        const id = label[i];
-        if (id === 0) continue;
-        const b = boxes[id];
+        if (alpha[i] === 0) continue;
+        const b = boxes[label[i]];
         const x = i % w;
         const y = (i - x) / w;
         if (x < b.x0) b.x0 = x;
@@ -750,36 +828,17 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
         if (y > b.y1) b.y1 = y;
         b.area++;
     }
-    let found = boxes.filter((b) => b.area > 0);
-    // Pieces within `gap` of each other belong to one specimen.
-    const gap = (options.gap ?? 0.012) * Math.max(w, h);
-    let merged = true;
-    while (merged) {
-        merged = false;
-        outer: for (let i = 0; i < found.length; i++) {
-            for (let j = i + 1; j < found.length; j++) {
-                const a = found[i];
-                const b = found[j];
-                if (
-                    a.x0 - gap <= b.x1 &&
-                    b.x0 - gap <= a.x1 &&
-                    a.y0 - gap <= b.y1 &&
-                    b.y0 - gap <= a.y1
-                ) {
-                    found[i] = {
-                        x0: Math.min(a.x0, b.x0),
-                        y0: Math.min(a.y0, b.y0),
-                        x1: Math.max(a.x1, b.x1),
-                        y1: Math.max(a.y1, b.y1),
-                        area: a.area + b.area,
-                    };
-                    found = found.filter((_, n) => n !== j);
-                    merged = true;
-                    break outer;
-                }
-            }
-        }
-    }
+    const found = boxes.filter((b) => {
+        if (b.area === 0) return false;
+        // The page margin, its caption and the scan's border reach the edge.
+        if (b.x0 === 0 || b.y0 === 0 || b.x1 === w - 1 || b.y1 === h - 1) return false;
+        // A rule around the plate: a big, nearly empty ring.
+        const boxArea = (b.x1 - b.x0 + 1) * (b.y1 - b.y0 + 1);
+        if (boxArea > 0.25 * w * h && b.area < 0.08 * boxArea) return false;
+        // Specimens joined by spines or tentacles into one group spanning
+        // much of the plate cannot be told apart by color: not a specimen.
+        return boxArea <= 0.4 * fieldArea;
+    });
     const margin = (options.margin ?? 0.015) * Math.max(w, h);
     return found
         .sort((a, b) => b.area - a.area)
