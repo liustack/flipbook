@@ -8,7 +8,7 @@
     "beatsPerBar": 4,
     "scenes": [
         { "id": "cuts", "bars": 4 },
-        { "id": "end", "bars": 2 }
+        { "id": "end", "bars": 2, "hold": true }
     ],
     "cues": [
         { "id": "sweep", "scene": "end", "beat": 0, "kind": "sfx", "sfx": "sweep" },
