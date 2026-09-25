@@ -283,7 +283,10 @@ function undeletable(dir: string): () => void {
     return () => fs.chmodSync(dir, 0o700);
 }
 
-const asRoot = process.getuid?.() === 0;
+// chmod makes a directory that cannot be emptied only for a non-root user on
+// POSIX. Root ignores the mode bits, and Windows does not apply them to
+// directories: render and snapshot there empty the folder and succeed.
+const noUndeletableDir = process.platform === 'win32' || process.getuid?.() === 0;
 
 describe('a renderer the system takes away', () => {
     it('makes close() throw resource-exhausted, while a page that crashes on its own stays page-error', async () => {
@@ -329,7 +332,7 @@ describe('cleanup when something fails half way', () => {
         expect(browser.contexts().length).toBe(before);
     });
 
-    it.skipIf(asRoot)(
+    it.skipIf(noUndeletableDir)(
         'render releases the lock and removes tmp when a directory cannot be emptied',
         async () => {
             const s = await session();
@@ -350,7 +353,7 @@ describe('cleanup when something fails half way', () => {
         },
     );
 
-    it.skipIf(asRoot)(
+    it.skipIf(noUndeletableDir)(
         'snapshot closes its page when its scratch directory cannot be emptied',
         async () => {
             const s = await session();
