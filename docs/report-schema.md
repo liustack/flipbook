@@ -48,7 +48,7 @@ Each command adds a field named after itself: `check` (`seed`, the sampled frame
 
 ### Frame size and resolution
 
-`--size` on `render` and `snapshot` replaces the timeline's `width` and `height`. A ratio such as `9:16`, `1:1` or `4:5` keeps the original short side (1920×1080 becomes 1080×1920, 1080×1080 or 1080×1350), and a value such as `1080x1920` gives the pixels directly. Both sides must be even, the width 16 to 7680 and the height 16 to 4320, otherwise the command exits 2. The composition reads the replaced size from `timeline()`.
+`--size` on `check`, `render` and `snapshot` replaces the timeline's `width` and `height`. A ratio such as `9:16`, `1:1` or `4:5` keeps the original short side (1920×1080 becomes 1080×1920, 1080×1080 or 1080×1350), and a value such as `1080x1920` gives the pixels directly. Both sides must be even, the width 16 to 7680 and the height 16 to 4320, otherwise the command exits 2. The composition reads the replaced size from `timeline()`, and check measures text past the edge, the safe margin and contrast at that size.
 
 `--scale` on `render` is how many pixels each CSS pixel becomes (Chromium's deviceScaleFactor), 1 to 4. `--scale 2` renders 1920×1080 as 3840×2160. Both output sides must be even integers, no larger than 7680×4320. The page's `devicePixelRatio` follows it, and `setupCanvas` sizes the canvas backing store by it.
 

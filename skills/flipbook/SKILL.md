@@ -23,7 +23,7 @@ bash <skill-dir>/scripts/run.sh render <dir> --size 9:16        # another shape:
 bash <skill-dir>/scripts/run.sh render <dir> --scale 2          # 3840x2160 from a 1920x1080 stage
 ```
 
-Once check has passed its determinism checks (seek order, shifted clock and seed, late paint), render draws on several pages at once (CPU cores minus one, at most 6, fewer for short films or big frames). `--jobs <n>` sets the count. `snapshot` takes `--size` too.
+Once check has passed its determinism checks (seek order, shifted clock and seed, late paint), render draws on several pages at once (CPU cores minus one, at most 6, fewer for short films or big frames). `--jobs <n>` sets the count. `check` and `snapshot` take `--size` too: check at the size you will render, so text and the safe area are checked in that shape.
 
 `<dir>` is the composition directory. stdout carries one JSON report, progress goes to stderr. Each report is also saved to `<dir>/.flipbook/reports/<command>.json`, whose path is in `artifacts.report`. When the report has `reportSaveError` instead, nothing was saved: the stdout JSON is the report to hand over.
 

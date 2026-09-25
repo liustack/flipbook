@@ -3,6 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { runCheck } from '../src/cli/check.ts';
 import { runRender } from '../src/cli/render.ts';
 import { UsageError } from '../src/cli/report.ts';
 import { run } from '../src/engine/proc.ts';
@@ -40,6 +41,52 @@ describe('--size', () => {
         expect(() => parseSize('tall')).toThrow(UsageError);
         expect(() => stageSize(parseSize('1081x1920'), HD)).toThrow(/even/);
         expect(() => stageSize(parseSize('9000x1000'), HD)).toThrow(/7680/);
+    });
+});
+
+describe('check --size', () => {
+    it('checks the page at the new stage size, so text past a tall frame is caught before render', async () => {
+        const dir = tempDir('check-size');
+        fs.writeFileSync(
+            path.join(dir, 'timeline.json'),
+            JSON.stringify({
+                version: 1,
+                width: 640,
+                height: 360,
+                fps: 12,
+                seed: 7,
+                bpm: 120,
+                beatsPerBar: 4,
+                scenes: [{ id: 'title', bars: 1, hold: true }],
+                audio: { mode: 'none' },
+            }),
+        );
+        fs.writeFileSync(
+            path.join(dir, 'index.html'),
+            `<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #f4efe4; }
+  #title { position: absolute; left: 380px; top: 150px; margin: 0; white-space: nowrap;
+           font: 600 40px "Noto Serif SC"; color: #2b2622; }
+</style></head>
+<body><p id="title">翻页书</p>
+<script type="module">
+import { composition } from '/__flipbook/runtime.js';
+composition({ seek() {} });
+</script></body></html>
+`,
+        );
+        const s = await session();
+        const wide = await runCheck({ dir, session: s, recordAttempts: false });
+        expect(wide.failures).toEqual([]);
+        const tall = await runCheck({
+            dir,
+            session: s,
+            size: parseSize('9:16'),
+            recordAttempts: false,
+        });
+        expect(tall.composition).toMatchObject({ width: 360, height: 640 });
+        expect(tall.failures.map((f) => f.code)).toContain('text-offstage');
     });
 });
 

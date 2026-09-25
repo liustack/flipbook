@@ -12,6 +12,7 @@ import {
     outputLinksFinding,
     type Session,
 } from '../engine/session.ts';
+import { applySize, type SizeSpec } from '../engine/size.ts';
 import { auditCueText, auditFrameText, dedupe, findingKey } from '../engine/textAudit.ts';
 import { loadTimeline } from '../engine/timeline.ts';
 import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
@@ -37,6 +38,8 @@ export interface CheckOptions {
     /** Reuse an open session instead of launching one. */
     session?: Session;
     recordAttempts?: boolean;
+    /** Stage size in place of the timeline's width and height, as render --size would use. */
+    size?: SizeSpec;
 }
 
 /** Clock origin and random seed shifts for the perturbation pages. */
@@ -146,7 +149,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
     const loaded = loadTimeline(dir);
     rb.addAll(loaded.findings);
     rb.addAll(scanComposition(dir));
-    const timeline = loaded.resolved;
+    const timeline = loaded.resolved && applySize(loaded.resolved, options.size);
     if (!timeline || missingIndex) return finish();
     rb.report.composition = {
         dir,

@@ -117,7 +117,7 @@ composition({
 
 Write the composition in CSS pixels equal to the timeline `width` and `height`. Create every canvas with `setupCanvas(canvas, width, height)`: it sizes the backing store for the device pixel ratio and returns a context that draws in CSS pixels, so the same code serves any output scale (`render --scale 2`).
 
-Place things from `tl.width` and `tl.height` rather than fixed pixels, so `render --size 9:16` (or `1:1`, `4:5`, `1080x1920`) gives the same film in another shape: the page then gets the new size from `timeline()`. A unit such as `Math.min(tl.width, tl.height) / 1080` keeps text and strokes in proportion. Look at the new shape first with `snapshot --size 9:16`.
+Place things from `tl.width` and `tl.height` rather than fixed pixels, so `render --size 9:16` (or `1:1`, `4:5`, `1080x1920`) gives the same film in another shape: the page then gets the new size from `timeline()`. A unit such as `Math.min(tl.width, tl.height) / 1080` keeps text and strokes in proportion. Look at the new shape first with `snapshot --size 9:16`, and run `check --size 9:16` so text past the edge or in the safe margin of that shape is caught before render.
 
 ## Time comes from t and the timeline
 
