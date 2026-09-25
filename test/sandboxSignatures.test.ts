@@ -2,6 +2,7 @@
 // measured in real sandboxes (docs/platform.md lists where each was seen).
 import type { Browser } from 'playwright-core';
 import { afterEach, describe, expect, it } from 'vitest';
+import { RUN_ONCE_OUTSIDE_SANDBOX } from '../src/cli/codes.ts';
 import type { EnvError } from '../src/cli/report.ts';
 import {
     type HeadlessShell,
@@ -155,6 +156,7 @@ describe('first download inside a sandbox', () => {
             expect(error.detail.signature).toBe('network-blocked');
             expect(error.fix[0]).toBe(installCommand(shell));
             expect(error.fix.join('\n')).toContain('network_access = true');
+            expect(error.fix).toContain(RUN_ONCE_OUTSIDE_SANDBOX);
         }
     });
 
@@ -165,6 +167,13 @@ describe('first download inside a sandbox', () => {
             {},
         );
         expect(error.code).toBe('cache-unwritable');
+        expect(error.fix).toContain(RUN_ONCE_OUTSIDE_SANDBOX);
+    });
+
+    it('says how the one approved rerun goes, in every first-download fix', () => {
+        expect(RUN_ONCE_OUTSIDE_SANDBOX).toContain('dangerouslyDisableSandbox');
+        expect(RUN_ONCE_OUTSIDE_SANDBOX).toContain('approves once');
+        expect(RUN_ONCE_OUTSIDE_SANDBOX).toContain('inside the sandbox');
     });
 });
 

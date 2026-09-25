@@ -18,7 +18,7 @@ import { ALL_FEATURES, FFMPEG_INSTALL, type FfmpegStatus, probeFfmpeg } from '..
 import { type FontStatus, fontStatus } from '../engine/fonts.ts';
 import type { PruneResult } from '../engine/prune.ts';
 import { findSkillInstalls, type SkillInstall } from '../skillPin.ts';
-import { ENV_CODES, type EnvCode } from './codes.ts';
+import { ENV_CODES, type EnvCode, RUN_ONCE_OUTSIDE_SANDBOX } from './codes.ts';
 import { EnvError, EXIT, type ExitCode, platformId } from './report.ts';
 
 export const MIN_NODE = '22.19';
@@ -125,10 +125,7 @@ export async function buildDoctorReport(deps: DoctorDeps): Promise<DoctorReport>
         problems.push({
             code: 'chromium-missing',
             message: `Chromium headless shell ${shell.browserVersion} (r${shell.revision}) is not installed at ${shell.executable}.`,
-            fix: [
-                installCommand(shell),
-                'Or run flipbook check <dir> once outside the sandbox. It installs Chromium on first use.',
-            ],
+            fix: [installCommand(shell), RUN_ONCE_OUTSIDE_SANDBOX],
         });
     }
     const launch: DoctorReport['launch'] = { ok: false, skipped: true };

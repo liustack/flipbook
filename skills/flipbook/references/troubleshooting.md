@@ -298,7 +298,7 @@ Fix: Install a full ffmpeg build with libx264. macOS: brew install ffmpeg. Debia
 
 The pinned Chromium headless shell is not installed.
 
-Fix: Run check or render once outside the sandbox to install it, or run the install command in `fix`.
+Fix: Run the install command in `fix`, or: Run the flipbook check or render that needs the download once more outside the sandbox (Claude Code: rerun it with dangerouslyDisableSandbox). The user approves once, and every later run works inside the sandbox with no settings to change and no restart.
 
 ### `chromium-install-failed`
 
@@ -346,4 +346,4 @@ Fix: Check the network or proxy, or set FLIPBOOK_FONT_BASE_URL to a mirror that 
 
 The flipbook cache directory cannot be written.
 
-Fix: Run the command outside the sandbox once, or set FLIPBOOK_CACHE_DIR to a writable directory.
+Fix: Run the flipbook check or render that needs the download once more outside the sandbox (Claude Code: rerun it with dangerouslyDisableSandbox). The user approves once, and every later run works inside the sandbox with no settings to change and no restart. Or set FLIPBOOK_CACHE_DIR to a writable directory.

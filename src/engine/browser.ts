@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { createRequire } from 'module';
 import * as path from 'path';
 import type { Browser } from 'playwright-core';
+import { RUN_ONCE_OUTSIDE_SANDBOX } from '../cli/codes.ts';
 import { EnvError, progress } from '../cli/report.ts';
 import { browsersDir, isWritable } from './cache.ts';
 import { terminate } from './proc.ts';
@@ -225,10 +226,7 @@ export async function installHeadlessShell(
         throw new EnvError(
             'cache-unwritable',
             `Cannot write ${shell.browsersPath} to install Chromium.`,
-            [
-                installCommand(shell),
-                'Or run the same flipbook command once outside the sandbox. Later runs work inside it.',
-            ],
+            [installCommand(shell), RUN_ONCE_OUTSIDE_SANDBOX],
             { browsersPath: shell.browsersPath },
         );
     }
@@ -282,7 +280,7 @@ export function installError(
         return new EnvError(
             'cache-unwritable',
             `The Chromium install could not write to ${shell.browsersPath}.`,
-            [installCommand(shell)],
+            [installCommand(shell), RUN_ONCE_OUTSIDE_SANDBOX],
             { log: tail, host },
         );
     }
@@ -292,7 +290,7 @@ export function installError(
             `The Chromium ${shell.browserVersion} download was refused. A sandbox without network access does this.`,
             [
                 installCommand(shell),
-                'Run the command above, or the same flipbook command, once outside the sandbox. Later runs work inside it.',
+                RUN_ONCE_OUTSIDE_SANDBOX,
                 'Codex: or set network_access = true under [sandbox_workspace_write] in ~/.codex/config.toml',
             ],
             { log: tail, host, signature: 'network-blocked' },

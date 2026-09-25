@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { describe, expect, it } from 'vitest';
+import { RUN_ONCE_OUTSIDE_SANDBOX } from '../src/cli/codes.ts';
 import { buildDoctorReport } from '../src/cli/doctor.ts';
 import { resetLaunchMode } from '../src/engine/browser.ts';
 import { cleanTemps, copyFixture, runCli, tempDir } from './helpers.ts';
@@ -43,6 +44,7 @@ describe('doctor exits 78 with a fix when something is missing', () => {
         const report = result.json as { problems: { code: string; fix: string[] }[] };
         const problem = report.problems.find((p) => p.code === 'chromium-missing');
         expect(problem?.fix[0]).toMatch(installPattern);
+        expect(problem?.fix).toContain(RUN_ONCE_OUTSIDE_SANDBOX);
         cleanTemps();
     });
 

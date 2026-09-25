@@ -194,6 +194,13 @@ export const FINDING_CODES = {
     },
 } as const satisfies Record<string, CodeInfo>;
 
+/**
+ * The fix for a first download a host sandbox refused: one approved rerun outside it.
+ * Only the download needs it, so later runs stay inside the sandbox.
+ */
+export const RUN_ONCE_OUTSIDE_SANDBOX =
+    'Run the flipbook check or render that needs the download once more outside the sandbox (Claude Code: rerun it with dangerouslyDisableSandbox). The user approves once, and every later run works inside the sandbox with no settings to change and no restart.';
+
 /** Environment problems: the machine is missing something. Exit 78. */
 export const ENV_CODES = {
     'platform-unsupported': {
@@ -214,7 +221,7 @@ export const ENV_CODES = {
     },
     'chromium-missing': {
         meaning: 'The pinned Chromium headless shell is not installed.',
-        fix: 'Run check or render once outside the sandbox to install it, or run the install command in `fix`.',
+        fix: `Run the install command in \`fix\`, or: ${RUN_ONCE_OUTSIDE_SANDBOX}`,
     },
     'chromium-install-failed': {
         meaning: 'Installing the Chromium headless shell failed.',
@@ -248,7 +255,7 @@ export const ENV_CODES = {
     },
     'cache-unwritable': {
         meaning: 'The flipbook cache directory cannot be written.',
-        fix: 'Run the command outside the sandbox once, or set FLIPBOOK_CACHE_DIR to a writable directory.',
+        fix: `${RUN_ONCE_OUTSIDE_SANDBOX} Or set FLIPBOOK_CACHE_DIR to a writable directory.`,
     },
 } as const satisfies Record<string, CodeInfo>;
 

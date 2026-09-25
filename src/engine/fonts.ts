@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { RUN_ONCE_OUTSIDE_SANDBOX } from '../cli/codes.ts';
 import { EnvError, progress } from '../cli/report.ts';
 import codepoints from '../fonts/codepoints.json' with { type: 'json' };
 import lxgwLicense from '../fonts/licenses/lxgw-wenkai.OFL.txt';
@@ -121,7 +122,7 @@ export async function downloadFont(
         throw new EnvError(
             'cache-unwritable',
             `Cannot write ${dir} to store ${font.family}.`,
-            ['Run the same flipbook command once outside the sandbox'],
+            [RUN_ONCE_OUTSIDE_SANDBOX],
             { dir },
         );
     }
