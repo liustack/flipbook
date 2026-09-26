@@ -142,6 +142,8 @@ What each platform was tested on, the sandbox settings and the memory a containe
 |---|---|
 | [INSTALL.md](INSTALL.md) | Installing, step by step (written for an agent) |
 | [skills/flipbook/SKILL.md](skills/flipbook/SKILL.md) | Seeing how the agent makes a video and which rules it must keep |
+| [Story](skills/flipbook/references/story.md) | Writing story.json: the idea, the turn, the beats |
+| [story.json v1](docs/story-schema.md) | The story's fields and what check verifies against it |
 | [Composition rules](skills/flipbook/references/rules.md) | Writing index.html |
 | [Timeline](skills/flipbook/references/timeline.md) | Writing timeline.json and hitting a target duration |
 | [Music and sound effects](skills/flipbook/references/audio.md) | Picking a preset, setting dynamics, placing effects, using your own music |

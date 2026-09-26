@@ -206,6 +206,13 @@ describe('story.json', () => {
         ]);
     });
 
+    it('counts sentence length in characters and takes $schema only as a string', () => {
+        expect(codesOf(story((s) => (s.leave = '🙂'.repeat(300))))).toEqual([]);
+        expect(codesOf(story((s) => (s.leave = '🙂'.repeat(301))))).toEqual(['story-invalid']);
+        expect(codesOf(story((s) => (s.$schema = './story.schema.json')))).toEqual([]);
+        expect(codesOf(story((s) => (s.$schema = 42)))).toEqual(['story-invalid']);
+    });
+
     it('counts reading units: a CJK character is one, another word two', () => {
         expect(readingUnits('撑过去')).toBe(3);
         expect(readingUnits('Hello, flipbook')).toBe(4);

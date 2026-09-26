@@ -142,6 +142,8 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
 |---|---|
 | [INSTALL.zh-CN.md](INSTALL.zh-CN.md) | 安装，写给 agent 的步骤 |
 | [skills/flipbook/SKILL.md](skills/flipbook/SKILL.md) | agent 做片的流程和硬规矩 |
+| [故事](skills/flipbook/references/story.md) | 写 story.json：想法、转折、节拍 |
+| [story.json v1](docs/story-schema.zh-CN.md) | 故事的字段，check 拿它核对什么 |
 | [合成规矩](skills/flipbook/references/rules.md) | 写 index.html |
 | [时间轴](skills/flipbook/references/timeline.md) | 写 timeline.json，凑片长 |
 | [配乐和音效](skills/flipbook/references/audio.md) | 挑预设、调和强弱，放音效，用自己的音乐 |

@@ -72,8 +72,10 @@ export function readingUnits(text: string): number {
 
 function sentence(c: Checker, value: Json, at: string): value is string {
     if (!c.str(value, at, undefined, 'a sentence')) return false;
-    if (value.length > TEXT_MAX) {
-        c.fail(at, `must be at most ${TEXT_MAX} characters (got ${value.length})`);
+    // Counted in characters, not UTF-16 units: an emoji is one.
+    const length = [...value].length;
+    if (length > TEXT_MAX) {
+        c.fail(at, `must be at most ${TEXT_MAX} characters (got ${length})`);
         return false;
     }
     return true;
@@ -87,6 +89,9 @@ function validateShape(input: Json): { c: Checker; story?: StoryV1 } {
         return { c };
     }
     c.keys(input, '$', ['$schema', 'version', 'idea', 'leave', 'subject', 'device', 'beats']);
+    if (input.$schema !== undefined && typeof input.$schema !== 'string') {
+        c.fail('$.$schema', `must be a string (got ${describe(input.$schema)})`);
+    }
     if (input.version !== STORY_VERSION) {
         c.fail('$.version', `must be ${STORY_VERSION} (got ${describe(input.version)})`);
     }

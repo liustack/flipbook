@@ -37,14 +37,14 @@ Every composition tells one story, written in story.json before the timeline. Th
 | Field | Required | Value | Meaning |
 |---|---|---|---|
 | `version` | yes | 1 | Schema version |
-| `$schema` | no | any string | For editors that validate JSON against a schema. flipbook ignores it |
+| `$schema` | no | a string | For editors that validate JSON against a schema. flipbook ignores its value |
 | `idea` | yes | one sentence | Who or what, meets what, becomes what |
 | `leave` | yes | one sentence | What the viewer should feel or remember at the end |
 | `subject` | yes | a short phrase | The one thing that changes over the film |
 | `device` | yes | `{ "what", "why" }`, a sentence each | The one visual device that runs through the film, and why it fits this story |
 | `beats` | yes | 3 to 6 beats, in order | The story in beats. More than six is a `story-arc` warning |
 
-A field not listed here is `story-invalid`. Every sentence (`idea`, `leave`, `subject`, `device.what`, `device.why`, `change.from`, `change.to`) is a non-empty string of at most 300 characters.
+A field not listed here is `story-invalid`. Every sentence (`idea`, `leave`, `subject`, `device.what`, `device.why`, `change.from`, `change.to`) is a non-empty string of at most 300 characters, counted as Unicode characters (an emoji is one).
 
 ## beats[]
 
@@ -69,7 +69,7 @@ A field not listed here is `story-invalid`. Every sentence (`idea`, `leave`, `su
 | `story-arc` | The first beat is not `opening`, the last is not `resolution`, or no `turn` lies between them. Warning: more than six beats |
 | `story-text` | A beat's `text` differs from the text cues that start inside it |
 | `story-text-fast` (warning) | A beat's words take longer to read than the beat lasts: above 7 reading units a second, where a CJK character is 1 unit and a word in a spaced script is 2 |
-| `story-static-beat` (warning) | Outside a `hold` beat, the beat's first and last frames differ in less than 0.2% of their pixels: the change the story promises does not show. Both frames are compared as gray copies scaled to fit 320×180 with the stage's proportions kept, and a pixel counts as changed when its gray level moves by more than 16. check compares the two frames on the page, render on the finished video |
+| `story-static-beat` (warning) | Outside a `hold` beat, the beat's first and last frames differ in less than 0.2% of their pixels: the change the story promises does not show. Both frames are compared as gray copies scaled, with the stage's proportions kept, to about as many pixels as 320×180 (both sides even: 180×320 for a portrait stage, 240×240 for a square one), and a pixel counts as changed when its gray level moves by more than 16. check compares the two frames on the page, render on the finished video |
 
 Only the structure is checked. Whether the idea is worth a film, whether the device means something and whether each beat's picture shows its `change` are for the agent to judge on the contact sheet and for the person asking to decide.
 

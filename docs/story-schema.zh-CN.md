@@ -37,14 +37,14 @@ read_when:
 | 字段 | 必填 | 取值 | 含义 |
 |---|---|---|---|
 | `version` | 是 | 1 | 格式版本 |
-| `$schema` | 否 | 任意字符串 | 给按 schema 校验 JSON 的编辑器用，flipbook 不读 |
+| `$schema` | 否 | 字符串 | 给按 schema 校验 JSON 的编辑器用，flipbook 不读它的值 |
 | `idea` | 是 | 一句话 | 谁或什么，遇到什么，变成什么 |
 | `leave` | 是 | 一句话 | 结尾观众该感到或记住什么 |
 | `subject` | 是 | 一个短语 | 片中会变化的那个东西，只有一个 |
 | `device` | 是 | `{ "what", "why" }`，各一句 | 贯穿全片的一个视觉装置，以及它为什么适合这个故事 |
 | `beats` | 是 | 3 到 6 个节拍，按顺序 | 按节拍讲的故事。超过六个是 `story-arc` warning |
 
-不在表里的字段是 `story-invalid`。每一句（`idea`、`leave`、`subject`、`device.what`、`device.why`、`change.from`、`change.to`）都是非空字符串，最多 300 个字符。
+不在表里的字段是 `story-invalid`。每一句（`idea`、`leave`、`subject`、`device.what`、`device.why`、`change.from`、`change.to`）都是非空字符串，最多 300 个字符，按 Unicode 字符数算（一个 emoji 算一个）。
 
 ## beats[]
 
@@ -69,7 +69,7 @@ read_when:
 | `story-arc` | 第一拍不是 `opening`，最后一拍不是 `resolution`，或者中间没有 `turn`。warning：超过六拍 |
 | `story-text` | 某拍的 `text` 和开始时刻落在这一拍里的 text cue 对不上 |
 | `story-text-fast`（warning） | 某拍的字比这一拍的时长读得久：每秒超过 7 个阅读单位，一个汉字（含日文、韩文字符）算 1，一个用空格分词的文字里的词算 2 |
-| `story-static-beat`（warning） | 没标 `hold` 的拍，首尾两帧只有不到 0.2% 的像素不同，故事说的变化没画出来。两帧都缩成灰度图再比，保持画幅比例缩进 320×180 以内，灰度变化超过 16 的像素才算变了。check 在页面上比这两帧，render 在成片上比 |
+| `story-static-beat`（warning） | 没标 `hold` 的拍，首尾两帧只有不到 0.2% 的像素不同，故事说的变化没画出来。两帧都缩成灰度图再比：保持画幅比例，缩到和 320×180 差不多的像素总量，两边取偶数（竖屏是 180×320，方形是 240×240），灰度变化超过 16 的像素才算变了。check 在页面上比这两帧，render 在成片上比 |
 
 只查结构。这个想法值不值得拍、装置有没有意义、每拍的画面有没有画出它的 `change`，交给 agent 看联系表判断，由提需求的人决定。
 
