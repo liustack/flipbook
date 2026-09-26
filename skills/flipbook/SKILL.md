@@ -77,7 +77,7 @@ Defaults:
 | music | a score written for this story (`"audio": { "mode": "score", ... }`, see `references/audio.md`) so each film gets its own tune. A preset such as `pluck` for a short, plain clip. Silent only when the user asks |
 | found music or effects | when the user names a recorded piece or an instrument the score lacks, or a real sound matters (a page turn, a pencil): `stock search --audio`, see `references/audio.md` |
 | the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
-| characters | none unless asked |
+| characters | none unless the story needs someone to act it out: then a cut-out puppet drawn in code, see `references/characters.md` |
 | photos | none unless asked, or the film calls for real specimens, plates, micrographs or maps: `references/photo.md` |
 
 ## Hard rules
@@ -103,6 +103,7 @@ Defaults:
 | Read | When |
 |---|---|
 | `references/story.md` | before the first story.json, and when a `story-*` code appears |
+| `references/characters.md` | when the story needs a character: what code draws well, puppet parts and bones, walking, waving, blinking, talking |
 | `references/rules.md` | before the first index.html, and when a determinism, text or layer code is unclear |
 | `references/timeline.md` | before the first timeline.json, and when matching a requested duration |
 | `references/audio.md` | before choosing or writing the music, finding sounds or placing sound effects, and when an `audio-*` code appears |
