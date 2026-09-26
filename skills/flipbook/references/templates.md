@@ -213,6 +213,8 @@ composition({
 
 Give the right-hand page a `box` with the stage's proportions and `page` the stage size, so page 1 draws the first scene exactly as it will look full frame. `spread: true` keeps the opened cover lying on the left, `rigid: [0]` swings the cover as a board, `back` draws the endpaper. Then push the camera with `moveCamera(ctx, stage, from, to, amount)`: at amount 1 the box fills the frame, and the next scene takes over at full size with no jump.
 
+`pageTurn` draws the pages, not the block of paper under them. When you draw the block, show its thickness only along the near (bottom) edge, as a few lines or thin strips below the page. The camera looks down from the reader's side of the desk, so the far edge and both sides stay hidden under the top page however thick the book is. Copies of the page offset down and to the right show paper on two or three sides and read as a board under the page.
+
 <!-- check: pass -->
 ```js
 import { composition, ease, moveCamera, pageTurn, progress, setupCanvas, timeline } from '/__flipbook/runtime.js';
