@@ -82,6 +82,32 @@ export type {
 } from './photo.ts';
 export { photo, specimens } from './photo.ts';
 export type {
+    OutlineOptions,
+    Pose,
+    Puppet,
+    PuppetBone,
+    PuppetFrame,
+    PuppetOptions,
+    PuppetPart,
+    Walk,
+    WalkOptions,
+    WaveOptions,
+} from './puppet.ts';
+export {
+    BIPED,
+    biped,
+    blendPose,
+    blink,
+    idle,
+    lookAt,
+    part,
+    puppet,
+    talk,
+    walk,
+    walkTime,
+    wave,
+} from './puppet.ts';
+export type {
     ArcCuts,
     ArcCutsOptions,
     ArcGeometry,
