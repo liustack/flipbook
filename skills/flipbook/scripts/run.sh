@@ -19,7 +19,7 @@ set -eu
 # scripts/stamp.test.mjs asserts PINNED equals the package.json version.
 PKG="@liustack/flipbook"
 BIN="flipbook"
-PINNED="0.5.7"
+PINNED="0.5.8"
 # -------------------------------------------------------------------------------
 
 # Split "X.Y.Z[-prerelease][+build]" into the globals _MAJ, _MIN, _PAT and _PRE
