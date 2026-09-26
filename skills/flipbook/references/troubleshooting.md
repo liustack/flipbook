@@ -42,9 +42,9 @@ Fix: Fix the field named in `detail.path` as the message says.
 
 ### `story-coverage`
 
-The beats do not follow the film: the first beat does not start where the film starts, or a beat starts before the one ahead of it.
+The beats do not follow the film: the first beat does not start where the film starts, a beat starts before the one ahead of it, or a beat covers no frame.
 
-Fix: Start the first beat at the first scene and give each later beat a later `at`. A beat lasts until the next one starts.
+Fix: Start the first beat at the first scene and give each later beat a later `at`, at least one frame later. A beat lasts until the next one starts.
 
 ### `story-arc`
 

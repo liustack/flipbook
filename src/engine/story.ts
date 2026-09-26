@@ -334,6 +334,21 @@ export function validateStory(
         };
     });
 
+    // Every beat must show at least one frame: beats a sliver apart, or a
+    // last beat starting in the film's final sliver, round to none.
+    beats.forEach((beat, i) => {
+        if (beat.endFrame > beat.startFrame) return;
+        add(
+            'story-coverage',
+            `$.beats[${i}].at`,
+            i + 1 < beats.length
+                ? `covers no frame: beat "${beats[i + 1].id}" starts on the same frame (${beat.startFrame}). Give beat "${beat.id}" at least one frame`
+                : `covers no frame: it starts on frame ${beat.startFrame}, where the film ends. Start it earlier`,
+            { startFrame: beat.startFrame, endFrame: beat.endFrame },
+        );
+    });
+    if (problems.some((p) => p.severity === 'error')) return { problems };
+
     // The words on screen and the sound, beat by beat.
     const within = (beat: ResolvedStoryBeat, absBeat: number) =>
         absBeat >= beat.startBeat && absBeat < beat.endBeat;

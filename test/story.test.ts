@@ -133,6 +133,23 @@ describe('story.json', () => {
         expect(codesOf(story((s) => (s.beats[1].at = s.beats[0].at)))).toContain('story-coverage');
     });
 
+    it('refuses a beat that rounds to no frame at all', () => {
+        // 120 bpm at 24 fps: a beat lasts 12 frames, 0.001 of one rounds to nothing.
+        const collapsed = story((s) => {
+            s.beats[1].at = { scene: 'sun', beat: 0.001 };
+            s.beats[0].text = [];
+            s.beats[1].text = ['纸船'];
+        });
+        const { problems } = validateStory(collapsed, timeline());
+        expect(problems.map((p) => [p.code, p.path])).toEqual([
+            ['story-coverage', '$.beats[0].at'],
+        ]);
+        // The last beat starting in the film's final sliver covers no frame either.
+        const tail = story((s) => (s.beats[2].at = { scene: 'snow', beat: 3.999 }));
+        const late = validateStory(tail, timeline()).problems;
+        expect(late.map((p) => [p.code, p.path])).toEqual([['story-coverage', '$.beats[2].at']]);
+    });
+
     it('lists the words on screen of each beat exactly', () => {
         expect(codesOf(story((s) => (s.beats[0].text = ['纸 船'])))).toEqual(['story-text']);
         expect(codesOf(story((s) => delete s.beats[2].text))).toEqual(['story-text']);

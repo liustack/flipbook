@@ -33,8 +33,8 @@ export const FINDING_CODES = {
     },
     'story-coverage': {
         meaning:
-            'The beats do not follow the film: the first beat does not start where the film starts, or a beat starts before the one ahead of it.',
-        fix: 'Start the first beat at the first scene and give each later beat a later `at`. A beat lasts until the next one starts.',
+            'The beats do not follow the film: the first beat does not start where the film starts, a beat starts before the one ahead of it, or a beat covers no frame.',
+        fix: 'Start the first beat at the first scene and give each later beat a later `at`, at least one frame later. A beat lasts until the next one starts.',
     },
     'story-arc': {
         meaning:

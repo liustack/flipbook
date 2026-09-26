@@ -33,7 +33,7 @@ A film about a product or a brand works the same way. The product is what moves 
 
 Each beat is `{ id, role, at, change }`, plus `text`, `sound`, `callback` or `hold` when needed.
 
-- `at` is where the beat starts: a scene id (the scene's first beat) or `{ "scene": id, "beat": n }` for a moment inside a scene, counted like a cue's `beat`. A beat lasts until the next one starts. The first beat starts at the first scene.
+- `at` is where the beat starts: a scene id (the scene's first beat) or `{ "scene": id, "beat": n }` for a moment inside a scene, counted like a cue's `beat`. A beat lasts until the next one starts and must hold at least one frame. The first beat starts at the first scene.
 - `change` is `{ "from", "to" }`: what the picture shows as the beat starts and as it ends. Write things you will draw, not feelings. The change must be on screen: check compares each beat's first and last frame and warns with `story-static-beat` when they look the same.
 - `text` lists the words on screen in that beat, exactly as its text cues show them, in order. Words carry only what the picture cannot. When a beat's words take longer to read than the beat lasts, check warns with `story-text-fast`.
 - `sound` names the sfx cue that marks the beat. `callback` names an earlier beat this one answers: an ending that returns to the opening. `hold: true` marks the one beat that stands still on purpose, at most one.

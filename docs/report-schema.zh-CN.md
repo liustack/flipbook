@@ -119,7 +119,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `timeline-invalid` | 全部 | timeline.json 不合 v1 schema，`detail.path` 给出 JSON 路径 | 改 `detail.path` 指的字段 |
 | `story-missing` | 全部 | 目录里没有 story.json | 先写故事，按 docs/story-schema.zh-CN.md |
 | `story-invalid` | 全部 | story.json 不合 v1 schema，或者引用了不存在的场、cue 或节拍，`detail.path` 给出 JSON 路径 | 改 `detail.path` 指的字段 |
-| `story-coverage` | 全部 | 第一拍不在片头开始，或者某一拍的开始不晚于上一拍 | 第一拍从第一场开始，后面每拍的 `at` 依次往后 |
+| `story-coverage` | 全部 | 第一拍不在片头开始，某一拍的开始不晚于上一拍，或者某一拍换算成帧后一帧都没有 | 第一拍从第一场开始，后面每拍的 `at` 依次往后，每拍至少留一帧 |
 | `story-arc` | 全部 | 第一拍不是开场、最后一拍不是收束，或者中间没有转折。作为 warning：节拍超过六个 | 找出转折，也就是出岔子或改变方向的那一刻。做同一件事的节拍合并 |
 | `story-text` | 全部 | 某拍的 `text` 和落在这一拍里的 text cue 原文对不上（按顺序），`detail.expected` 和 `detail.got` 列出两边 | 每拍的上屏字照 text cue 原样按顺序列出 |
 | `story-text-fast` | 全部（warning） | 某拍的上屏字超过它的时长能读完的量（每秒 7 个单位：一个汉字算 1，一个其他文字的词算 2） | 删字，或者给这一拍多几个小节 |

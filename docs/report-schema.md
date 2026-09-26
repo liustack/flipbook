@@ -119,7 +119,7 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `timeline-invalid` | all | timeline.json does not match the v1 schema. `detail.path` gives the JSON path | Fix the field `detail.path` points to |
 | `story-missing` | all | No story.json in the directory | Write the story first, following docs/story-schema.md |
 | `story-invalid` | all | story.json does not match the v1 schema, or names a scene, cue or beat that does not exist. `detail.path` gives the JSON path | Fix the field `detail.path` points to |
-| `story-coverage` | all | The first beat does not start where the film starts, or a beat starts no later than the one before it | Start the first beat at the first scene and give each later beat a later `at` |
+| `story-coverage` | all | The first beat does not start where the film starts, a beat starts no later than the one before it, or a beat covers no frame once rounded to frames | Start the first beat at the first scene, give each later beat a later `at`, and leave each beat at least one frame |
 | `story-arc` | all | No opening first, no resolution last, or no turn between them. As a warning: more than six beats | Find the turn, the moment something goes wrong or changes course. Merge beats that do the same job |
 | `story-text` | all | A beat's `text` does not match the text cues inside it, in order. `detail.expected` and `detail.got` list both | List the words on screen of each beat exactly as its text cues show them |
 | `story-text-fast` | all (warning) | A beat puts more reading units on screen than its time allows (7 a second: a CJK character is 1, another word 2) | Cut words, or give the beat more bars |
