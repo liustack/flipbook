@@ -59,22 +59,22 @@ It fixes three things that go wrong with AI-written web animation: every recordi
 Hand this line to your agent:
 
 ```text
-Install flipbook following https://github.com/liustack/flipbook/blob/v0.5.6/INSTALL.md, render the hello example, and tell me the result.
+Install flipbook following https://github.com/liustack/flipbook/blob/v0.5.7/INSTALL.md, render the hello example, and tell me the result.
 ```
 
 Or install the skill yourself. For Claude Code:
 
 ```bash
-npx -y skills add liustack/flipbook#v0.5.6 --skill flipbook --global --agent claude-code -y
+npx -y skills add liustack/flipbook#v0.5.7 --skill flipbook --global --agent claude-code -y
 ```
 
 For Codex:
 
 ```bash
-npx -y skills add liustack/flipbook#v0.5.6 --skill flipbook --global --agent codex -y
+npx -y skills add liustack/flipbook#v0.5.7 --skill flipbook --global --agent codex -y
 ```
 
-You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the skill's renderer globally: `npm install -g @liustack/flipbook@0.5.6`.
+You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the skill's renderer globally: `npm install -g @liustack/flipbook@0.5.7`.
 
 ## One sentence to a video
 
