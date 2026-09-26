@@ -45,7 +45,7 @@ skill 就是仓库里的 `skills/flipbook` 文件夹：`SKILL.md`、`references/
 
 ```bash
 rm -rf /tmp/flipbook-src
-git clone --depth 1 --branch v0.5.5 https://github.com/liustack/flipbook.git /tmp/flipbook-src
+git clone --depth 1 --branch v0.5.6 https://github.com/liustack/flipbook.git /tmp/flipbook-src
 mkdir -p ~/.claude/skills/flipbook          # 换成你的 TARGET
 cp -R /tmp/flipbook-src/skills/flipbook/. ~/.claude/skills/flipbook/
 ```
@@ -65,13 +65,13 @@ cp -R /tmp/flipbook-src/skills/flipbook/. ~/.claude/skills/flipbook/
 Claude Code：
 
 ```bash
-npx -y skills add liustack/flipbook#v0.5.5 --skill flipbook --global --agent claude-code -y
+npx -y skills add liustack/flipbook#v0.5.6 --skill flipbook --global --agent claude-code -y
 ```
 
 Codex：
 
 ```bash
-npx -y skills add liustack/flipbook#v0.5.5 --skill flipbook --global --agent codex -y
+npx -y skills add liustack/flipbook#v0.5.6 --skill flipbook --global --agent codex -y
 ```
 
 `--agent` 指定宿主，`-y` 替你回答确认提示，命令一路跑完，不停下来等输入。Codex 这条会把文件夹放到 `~/.agents/skills/flipbook`，Codex 也从这里读，后面的 `TARGET` 就用 `~/.agents/skills/`。其他宿主走路径 A。
@@ -88,7 +88,7 @@ npx -y skills add liustack/flipbook#v0.5.5 --skill flipbook --global --agent cod
 node --version
 ```
 
-低于 v22.19 或者 `command not found`：从 https://nodejs.org（或用户的版本管理器）装 Node 22 LTS 或更新的版本。启动器经 `npx` 找 CLI，npm 上别的东西都不用装。可选，想省掉每次 npx 的下载：`npm install -g @liustack/flipbook@0.5.5`。
+低于 v22.19 或者 `command not found`：从 https://nodejs.org（或用户的版本管理器）装 Node 22 LTS 或更新的版本。启动器经 `npx` 找 CLI，npm 上别的东西都不用装。可选，想省掉每次 npx 的下载：`npm install -g @liustack/flipbook@0.5.6`。
 
 ### 3b. 带 libx264 的 ffmpeg
 
