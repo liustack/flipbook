@@ -58,7 +58,7 @@ If scripts cannot run, use the first line that works (the pinned version is 0.5.
 
 ## The steps
 
-1. **Story.** Write `story.json`: the idea, what it leaves the viewer with, the subject that changes, the device and three to six beats. Read `references/story.md` before writing the first one. When the user is there, show them the story in one message and go on once they agree.
+1. **Story.** Write `story.json`: the idea, what it leaves the viewer with, the subject that changes, the device and three to six beats. Read `references/story.md` before writing the first one. When the user is there, show them the story in one message and go on once they agree. When they said to just make it, go on with your own.
 2. **Spec.** Settle size, duration, frame rate, look, text and music. Use the defaults for anything the user did not say. When the request is about a product or a brand, first search the workspace for its assets (logo files, theme color variables, design tokens, color values in the README) and list them for the user to confirm. When none turn up, ask for them instead of guessing. Then write `brand.json` as `references/brand.md` describes.
 3. **timeline.json.** Scenes in bars, text and marker cues in beats, a scene or two per story beat. Read `references/timeline.md` before writing the first one.
 4. **index.html.** One composition that calls `composition({ setup, seek })` from `/__flipbook/runtime.js`. Read `references/rules.md` before writing the first one.

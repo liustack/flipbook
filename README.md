@@ -129,7 +129,7 @@ What each platform was tested on, the sandbox settings and the memory a containe
 
 - **3D characters.** Nothing with rigged models, skeletons or motion capture.
 - **Editing real footage.** It does not cut video you shot. That is a job for a video editor or ffmpeg.
-- **Generated images or video as the main picture.** What moves on screen is drawn by code.
+- **Video from video models.** Motion is drawn by code, frame by frame. Still images, generated ones included, can be material: a character's parts, a backdrop, a prop, with their source written down in `assets/SOURCES.json`.
 - **Voice-over.** No text-to-speech narration yet, only music and sound effects.
 - **Beat detection.** With your own music, you give the bpm and the second where beat 1 falls.
 - **Native Windows.** Run it inside WSL2.
