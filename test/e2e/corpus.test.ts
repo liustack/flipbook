@@ -151,6 +151,34 @@ describe('bad composition corpus', () => {
         expect(codes(rendered)).toEqual(['story-arc']);
     });
 
+    it('story-invalid: a beat that starts in a scene the timeline does not have', async () => {
+        const checked = await check('story-invalid');
+        expect(codes(checked)).toEqual(['story-invalid']);
+        expect(checked.failures[0].detail?.path).toBe('$.beats[1].at');
+        expect(codes(await render('story-invalid'))).toEqual(['story-invalid']);
+    });
+
+    it('story-coverage: a beat a sliver long rounds to no frame at all', async () => {
+        const checked = await check('story-empty-beat');
+        expect(codes(checked)).toEqual(['story-coverage']);
+        expect(checked.failures[0].detail?.path).toBe('$.beats[0].at');
+        const rendered = await render('story-empty-beat');
+        expect(codes(rendered)).toEqual(['story-coverage']);
+        expect(rendered.artifacts.video).toBeUndefined();
+    });
+
+    it('story-text: the story lists other words than the text cue shows', async () => {
+        const checked = await check('story-text');
+        expect(codes(checked)).toEqual(['story-text']);
+        expect(checked.failures[0].detail?.expected).toEqual(['纸船']);
+    });
+
+    it('story-text-fast: seven characters in half a second', async () => {
+        const checked = await check('story-text-fast');
+        expect(codes(checked)).toEqual([]);
+        expect(checked.warnings.map((w) => w.code)).toContain('story-text-fast');
+    });
+
     it('story-static-beat: the story says the boat sinks, the picture stands still', async () => {
         const checked = await check('story-static');
         expect(codes(checked)).toEqual([]);

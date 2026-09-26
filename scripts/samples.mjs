@@ -56,11 +56,13 @@ function render(sample) {
         });
         const checked = flipbook(['check', work]);
         // A sample is one still picture for a reference page, not a film: its
-        // plain story's beats fall at arbitrary thirds, so the story's own
-        // warnings do not count.
+        // plain story's beats fall at arbitrary thirds, so the two warnings such
+        // beats cause (a still beat, words read too fast) do not count.
         const findings = [
             ...(checked.report?.failures ?? []),
-            ...(checked.report?.warnings ?? []).filter((w) => !w.code.startsWith('story-')),
+            ...(checked.report?.warnings ?? []).filter(
+                (w) => w.code !== 'story-static-beat' && w.code !== 'story-text-fast',
+            ),
         ];
         if (checked.status !== 0 || findings.length > 0) {
             fail(

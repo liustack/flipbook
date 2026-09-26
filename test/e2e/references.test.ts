@@ -12,8 +12,8 @@
 // A .wav file the snippet timeline names (an sfx cue's `file`, `audio.file`)
 // and no block supplies is written as a short generated tone. A file without a
 // `snippet-file: story.json` block gets a plain three-beat story: its snippets
-// show an API, not a story, and its beats fall at arbitrary thirds, so the
-// story's own warnings are not held against them.
+// show an API, not a story, and its beats fall at arbitrary thirds, so the two
+// warnings such beats cause (a still beat, words read too fast) do not count.
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -24,6 +24,7 @@ import { cleanTemps, repoRoot, TEST_SEEK_TIMEOUT_MS, tempDir } from '../helpers.
 import { writeStory } from '../story.ts';
 
 const referencesDir = path.join(repoRoot, 'skills', 'flipbook', 'references');
+const PLAIN_STORY_WARNINGS = new Set(['story-static-beat', 'story-text-fast']);
 
 afterAll(async () => {
     await closeSession();
@@ -180,7 +181,9 @@ describe.concurrent('reference snippets pass check as marked', () => {
                 if (verdict === 'pass') {
                     expect(report.failures, label).toEqual([]);
                     expect(
-                        report.warnings.filter((w) => !(plainStory && w.code.startsWith('story-'))),
+                        report.warnings.filter(
+                            (w) => !(plainStory && PLAIN_STORY_WARNINGS.has(w.code)),
+                        ),
                         label,
                     ).toEqual([]);
                 } else if (verdict === 'warn') {
