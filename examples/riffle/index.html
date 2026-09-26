@@ -44,7 +44,7 @@ const frames = await Promise.all(
       crop: { x: c.x + c.width * 0.02, y: c.y + c.height * 0.02, width: c.width * 0.96, height: c.height * 0.96 },
       cutout: 'none',
       sticker: false,
-      size: 640 * U,
+      size: 540 * U,
     }),
   ),
 );
@@ -52,7 +52,7 @@ if (frames.length !== 20) throw new Error(`expected 20 frames on the plate, foun
 
 
 // The turns: two slow ones from a still book, a riffle that speeds up to ten
-// pages a second and holds, then slows and settles on the standing mare.
+// pages a second and holds, then slows and settles on the first frame of the stride.
 const turns = [];
 const durations = [];
 function add(at, duration) {
@@ -178,7 +178,19 @@ function front(c, i) {
   c.save();
   c.globalCompositeOperation = 'multiply';
   c.globalAlpha = 0.8 + 0.2 * rand(tl.seed, 'ink', i);
-  frames[frameOf(i)].draw(c, box.width / 2 + 10 + dx, box.height / 2 - 6 + dy, { rotate: rot });
+  const frame = frames[frameOf(i)];
+  const fx = box.width / 2 + 10 + dx;
+  const fy = box.height / 2 - 6 + dy;
+  // The prints on the plate have round corners: clip to them so the plate's
+  // dark ground never shows at the corners.
+  c.translate(fx, fy);
+  c.rotate((rot * Math.PI) / 180);
+  c.beginPath();
+  c.roundRect(-frame.width / 2, -frame.height / 2, frame.width, frame.height, frame.width * 0.08);
+  c.clip();
+  c.rotate((-rot * Math.PI) / 180);
+  c.translate(-fx, -fy);
+  frame.draw(c, fx, fy, { rotate: rot });
   c.restore();
   // The page rises out of the binding: shade along the spine side, on the paper only.
   c.save();
