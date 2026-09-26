@@ -16,6 +16,6 @@
     "snapshot": {
         "machine": "darwin-arm64 24.3.0 Apple M4",
         "chromium": "1243",
-        "digest": "f0e4517b9a1704614cbfd73b6faf583622631dff705920591b1949f23ffac9d7"
+        "digest": "1ef62125019f6eda54e6ed1cb16ecf8d4d260b10100dffb2a659fb2c4b794724"
     }
 }
