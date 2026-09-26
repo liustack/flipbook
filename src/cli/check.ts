@@ -4,6 +4,7 @@ import { auditContrast, auditSafeArea } from '../engine/layoutAudit.ts';
 import { type ClockConfig, defaultClock } from '../engine/page.ts';
 import {
     analysisSize,
+    changedShare,
     decodeGray,
     isFlat,
     matchesBaseline,
@@ -19,6 +20,7 @@ import {
     type Session,
 } from '../engine/session.ts';
 import { applySize, type SizeSpec } from '../engine/size.ts';
+import { beatEnds, STATIC_BEAT_SHARE, staticBeatFinding } from '../engine/story.ts';
 import { auditCueText, auditFrameText, dedupe, findingKey } from '../engine/textAudit.ts';
 import { loadTimeline } from '../engine/timeline.ts';
 import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
@@ -193,6 +195,7 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
         if (!different(first, second)) second = [...first].reverse();
         const shots = new Map<number, Buffer>();
         const baselines = new Map<number, Buffer>();
+        const beatShots = new Map<number, Buffer>();
         const contrastSkipped: { frame: number; element: string; reason: string }[] = [];
         // Each stays skipped unless its pass runs to the end.
         const determinism: Determinism = {
@@ -354,6 +357,22 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                         evidenceDir,
                     )),
                 );
+            }
+            // Both ends of every beat the story says changes.
+            for (const { first, last } of usable && timeline.story
+                ? beatEnds(timeline.story)
+                : []) {
+                for (const frame of [first, last]) {
+                    if (beatShots.has(frame)) continue;
+                    const failed = await page.seek(frame, options.seekTimeoutMs);
+                    if (failed) {
+                        dynamic.push(failed);
+                        usable = false;
+                        break;
+                    }
+                    beatShots.set(frame, await page.capture());
+                }
+                if (!usable) break;
             }
             // Calls to forbidden clock and random functions over the whole run so far.
             if (!page.broken) {
@@ -529,6 +548,39 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
                         },
                     ),
                 );
+            }
+        }
+        // Beats whose last frame looks like their first.
+        if (beatShots.size > 0 && timeline.story) {
+            const order = [...beatShots.keys()].sort((a, b) => a - b);
+            const gray = analysisSize(timeline.width, timeline.height);
+            const decoded = await decodeGray(
+                session.ffmpeg.ffmpeg,
+                [
+                    '-i',
+                    writeSequence(
+                        ws,
+                        scratch('beats'),
+                        order.map((f) => beatShots.get(f) as Buffer),
+                    ),
+                ],
+                gray.width,
+                gray.height,
+            );
+            const byFrame = new Map(order.map((frame, i) => [frame, decoded[i]]));
+            for (const { beat, first, last } of beatEnds(timeline.story)) {
+                const a = byFrame.get(first);
+                const b = byFrame.get(last);
+                if (!a || !b) continue;
+                const share = changedShare(a, b);
+                if (share >= STATIC_BEAT_SHARE) continue;
+                const files = [
+                    path.join(evidenceDir, `story-static-beat-${beat.id}-first.png`),
+                    path.join(evidenceDir, `story-static-beat-${beat.id}-last.png`),
+                ];
+                ws.writeFile(files[0], beatShots.get(first) as Buffer);
+                ws.writeFile(files[1], beatShots.get(last) as Buffer);
+                dynamic.push(staticBeatFinding(beat, share, timeline.fps, files));
             }
         }
         rb.addAll(dedupe(dynamic));

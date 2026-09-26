@@ -4,6 +4,7 @@ import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { loadTimeline } from '../src/engine/timeline.ts';
 import { cleanTemps, repoRoot, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(() => cleanTemps());
 
@@ -49,6 +50,7 @@ describe('eval cases', () => {
                 scenes: [{ id: 'main', bars: 1 }],
             }),
         );
+        writeStory(dir);
         const loaded = loadTimeline(dir, false);
         expect(loaded.findings).toEqual([]);
         expect(loaded.resolved?.brand?.name).toBe('潮汐茶室');

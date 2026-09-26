@@ -13,6 +13,7 @@ import { loadTimeline } from '../src/engine/timeline.ts';
 import { type AudioCheck, probeAudio } from '../src/engine/verify.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, copyFixture, runCli, warningCodes } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -24,6 +25,7 @@ function editTimeline(dir: string, edit: (t: Record<string, unknown>) => void): 
     const t = JSON.parse(fs.readFileSync(file, 'utf-8'));
     edit(t);
     fs.writeFileSync(file, JSON.stringify(t, null, 2));
+    writeStory(dir);
 }
 
 function sha256(file: string): string {

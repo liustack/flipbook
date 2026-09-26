@@ -1,0 +1,63 @@
+{
+    "version": 1,
+    "idea": "A pencil sketch of a persimmon on a ruled notebook page turns into the 青柿文具 logo, and the brand writes out its promise by hand.",
+    "leave": "This is a stationery brand for people who write by hand.",
+    "subject": "the persimmon, from pencil sketch to finished mark",
+    "device": {
+        "what": "a ruled notebook page that everything is drawn and written on",
+        "why": "the brand sells paper, so its story is told on its own paper"
+    },
+    "beats": [
+        {
+            "id": "sketch",
+            "role": "opening",
+            "at": "mark",
+            "change": {
+                "from": "a ruled notebook page with the first stroke of a pencil circle",
+                "to": "a full pencil outline of a fruit with a stem, soaked in a pale orange wash"
+            }
+        },
+        {
+            "id": "logo",
+            "role": "turn",
+            "at": {
+                "scene": "mark",
+                "beat": 3
+            },
+            "change": {
+                "from": "the finished pencil sketch",
+                "to": "the persimmon logo has landed on it and moved left, and 青柿文具 is written beside it over a short orange underline"
+            },
+            "text": [
+                "青柿文具"
+            ],
+            "sound": "pop"
+        },
+        {
+            "id": "promise",
+            "role": "build",
+            "at": "line",
+            "change": {
+                "from": "an empty ruled page with an orange ribbon bookmark",
+                "to": "写字的人，值得一张好纸。 handwritten across the page and underlined in orange"
+            },
+            "text": [
+                "写字的人，值得一张好纸。"
+            ]
+        },
+        {
+            "id": "lockup",
+            "role": "resolution",
+            "at": "lockup",
+            "change": {
+                "from": "the logo alone inside an orange halo on plain paper",
+                "to": "the logo over the name and the promise, the halo grown wider"
+            },
+            "text": [
+                "青柿文具",
+                "写字的人，值得一张好纸。"
+            ],
+            "callback": "logo"
+        }
+    ]
+}

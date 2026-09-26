@@ -114,6 +114,36 @@ export interface ResolvedCue {
     file?: string;
 }
 
+/** Story beat roles, in the order a story usually runs through them. */
+export const BEAT_ROLES = ['opening', 'turn', 'build', 'resolution'] as const;
+export type BeatRole = (typeof BEAT_ROLES)[number];
+
+export interface ResolvedStoryBeat {
+    id: string;
+    index: number;
+    role: BeatRole;
+    startBeat: number;
+    endBeat: number;
+    start: number;
+    end: number;
+    startFrame: number;
+    /** First frame of the next beat: the beat's frames are [startFrame, endFrame). */
+    endFrame: number;
+    change: { from: string; to: string };
+    text: string[];
+    sound: string | null;
+    callback: string | null;
+    hold: boolean;
+}
+
+export interface ResolvedStory {
+    idea: string;
+    leave: string;
+    subject: string;
+    device: { what: string; why: string };
+    beats: ResolvedStoryBeat[];
+}
+
 export interface ResolvedTimeline {
     version: 1;
     protocol: typeof PROTOCOL_VERSION;
@@ -134,6 +164,8 @@ export interface ResolvedTimeline {
     brand: ResolvedBrand | null;
     /** Fonts the user supplied, installed next to flipbook's own. */
     fonts: UserFontFace[];
+    /** The story from story.json, its beats placed on the timeline. */
+    story: ResolvedStory | null;
 }
 
 /** Frame index for a time, on the frame grid. */
@@ -229,6 +261,7 @@ export function resolveTimeline(timeline: TimelineV1): ResolvedTimeline {
         // Filled from the composition's files by loadTimeline.
         brand: null,
         fonts: [],
+        story: null,
     };
 }
 

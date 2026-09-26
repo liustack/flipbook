@@ -1,0 +1,49 @@
+{
+    "version": 1,
+    "idea": "A red square tumbles across an empty page while the page says hello, first in Chinese and then in English.",
+    "leave": "A blank page can greet you back.",
+    "subject": "the page, from blank to greeting",
+    "device": {
+        "what": "a red square that rolls along the bottom edge from left to right for the whole film",
+        "why": "its trip across the page is the film's clock, so the viewer feels the greeting arrive on time"
+    },
+    "beats": [
+        {
+            "id": "blank",
+            "role": "opening",
+            "at": "intro",
+            "change": {
+                "from": "bare cream paper with a red square at the lower left",
+                "to": "the square has started to roll to the right"
+            }
+        },
+        {
+            "id": "hello",
+            "role": "turn",
+            "at": {
+                "scene": "intro",
+                "beat": 1
+            },
+            "change": {
+                "from": "the square rolling on an empty page",
+                "to": "你好，翻页书 has risen into place and the square has rolled to the middle of the page"
+            },
+            "text": [
+                "你好，翻页书"
+            ]
+        },
+        {
+            "id": "answer",
+            "role": "resolution",
+            "at": "title",
+            "change": {
+                "from": "the Chinese greeting above the square at mid-page",
+                "to": "Hello, flipbook sits under it and the square has rolled to the lower right"
+            },
+            "text": [
+                "Hello, flipbook"
+            ],
+            "callback": "hello"
+        }
+    ]
+}

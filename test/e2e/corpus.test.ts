@@ -135,6 +135,37 @@ describe('bad composition corpus', () => {
         expect(checked.exitCode).toBe(1);
     });
 
+    it('story-missing: a composition with no story.json is refused', async () => {
+        const checked = await check('story-missing');
+        expect(codes(checked)).toEqual(['story-missing']);
+        const rendered = await render('story-missing');
+        expect(codes(rendered)).toEqual(['story-missing']);
+        expect(rendered.artifacts.video).toBeUndefined();
+    });
+
+    it('story-arc: three weathers side by side with no turn is a list, not a story', async () => {
+        const checked = await check('story-list');
+        expect(codes(checked)).toEqual(['story-arc']);
+        expect(checked.failures[0].detail?.path).toBe('$.beats');
+        const rendered = await render('story-list');
+        expect(codes(rendered)).toEqual(['story-arc']);
+    });
+
+    it('story-static-beat: the story says the boat sinks, the picture stands still', async () => {
+        const checked = await check('story-static');
+        expect(codes(checked)).toEqual([]);
+        const beats = checked.warnings.filter((w) => w.code === 'story-static-beat');
+        expect(beats.map((w) => w.detail?.beat)).toEqual(['rain']);
+        expect(beats[0].evidence).toHaveLength(2);
+        const rendered = await render('story-static');
+        expect(codes(rendered)).toEqual([]);
+        expect(
+            rendered.warnings
+                .filter((w) => w.code === 'story-static-beat')
+                .map((w) => w.detail?.beat),
+        ).toEqual(['rain']);
+    });
+
     it('audio-unlicensed: a sound file with no source and license in assets/SOURCES.json', async () => {
         const checked = await check('audio-unlicensed');
         expect(codes(checked)).toEqual(['audio-unlicensed']);

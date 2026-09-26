@@ -1,0 +1,58 @@
+{
+    "version": 1,
+    "idea": "A cloth-bound book of moon drawings opens on a desk, its pages start to flip on their own and the crescent grows to a full moon, and the last page turns to a line of Su Shi about the moon.",
+    "leave": "The moon waxes and wanes, and a flip book can hold a whole month of it.",
+    "subject": "the moon on the pages, from thin crescent to full",
+    "device": {
+        "what": "a hand-drawn flip book, one moon phase per page, turned twice a beat",
+        "why": "a month of moon phases is a slow change that a riffled book shows in a few seconds"
+    },
+    "beats": [
+        {
+            "id": "book",
+            "role": "opening",
+            "at": "open",
+            "change": {
+                "from": "a closed blue cloth book on a desk, stamped in gold with a crescent and 月相 手翻书",
+                "to": "the cover open to the left on a patterned endpaper, the first page showing a mostly dark moon"
+            },
+            "sound": "cover"
+        },
+        {
+            "id": "closer",
+            "role": "build",
+            "at": {
+                "scene": "open",
+                "beat": 4
+            },
+            "change": {
+                "from": "the open book seen whole on the desk",
+                "to": "the right-hand page filling the frame: a thin lit edge on a dark moon, labelled 初二"
+            }
+        },
+        {
+            "id": "flip",
+            "role": "turn",
+            "at": "flip",
+            "change": {
+                "from": "the 初二 crescent on a still page",
+                "to": "pages flipped twice a beat until the full moon of 十五 fills the page"
+            }
+        },
+        {
+            "id": "poem",
+            "role": "resolution",
+            "at": "title",
+            "change": {
+                "from": "the 十五 full moon page as one last slow turn begins",
+                "to": "a small moon above 月有阴晴圆缺 and 苏轼《水调歌头》"
+            },
+            "text": [
+                "月有阴晴圆缺",
+                "苏轼《水调歌头》"
+            ],
+            "sound": "turn",
+            "callback": "flip"
+        }
+    ]
+}

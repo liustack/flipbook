@@ -1,0 +1,53 @@
+{
+    "version": 1,
+    "idea": "Old natural-history plates are cut out and dropped one by one onto a squared page, and once the board is full it is named as a notebook of public domain field notes.",
+    "leave": "Old public domain plates can make a new page.",
+    "subject": "the squared page, from empty to a named specimen board",
+    "device": {
+        "what": "cut-out specimens that fall onto the page like stickers, each with a paper sound as it lands",
+        "why": "sticking finds onto a page is how a field notebook fills up"
+    },
+    "beats": [
+        {
+            "id": "first",
+            "role": "opening",
+            "at": "board",
+            "change": {
+                "from": "an empty cream page with a faint square grid, a beetle cut-out falling onto it",
+                "to": "the Hercules beetle and a birdwing butterfly stuck side by side"
+            },
+            "sound": "land-1"
+        },
+        {
+            "id": "full",
+            "role": "build",
+            "at": { "scene": "board", "beat": 2 },
+            "change": {
+                "from": "two specimens on the page, a third falling in",
+                "to": "four specimens in a row: the beetle, the butterfly, a flower chafer and a cone shell"
+            },
+            "sound": "land-3"
+        },
+        {
+            "id": "named",
+            "role": "turn",
+            "at": "title",
+            "change": {
+                "from": "the full board with nothing written on it",
+                "to": "博物笔记 written under the row of specimens"
+            },
+            "text": ["博物笔记"]
+        },
+        {
+            "id": "source",
+            "role": "resolution",
+            "at": { "scene": "title", "beat": 2 },
+            "change": {
+                "from": "the board titled 博物笔记",
+                "to": "Field notes from the public domain in brown under the title, the view a little closer"
+            },
+            "text": ["Field notes from the public domain"],
+            "callback": "first"
+        }
+    ]
+}

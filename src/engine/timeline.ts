@@ -22,6 +22,7 @@ import {
     type Json,
     type SchemaError,
 } from './schema.ts';
+import { loadStory } from './story.ts';
 import {
     type ResolvedScene,
     type ResolvedTimeline,
@@ -505,6 +506,9 @@ export function loadTimeline(dir: string, write = true): LoadedTimeline {
         brand: assets.brand,
         fonts: assets.fonts,
     };
+    const story = loadStory(dir, resolved);
+    if (!story.story) return { timeline, findings: story.findings };
+    resolved.story = story.story;
     if (write) {
         const ws = Workspace.open(dir);
         ws.writeFile(
@@ -512,5 +516,5 @@ export function loadTimeline(dir: string, write = true): LoadedTimeline {
             `${JSON.stringify(resolved, null, 2)}\n`,
         );
     }
-    return { timeline, resolved, findings: [] };
+    return { timeline, resolved, findings: story.findings };
 }

@@ -117,6 +117,13 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `index-missing` | 全部 | 目录里没有 index.html | 建 index.html |
 | `timeline-missing` | 全部 | 目录里没有 timeline.json | 按 docs/timeline-schema.zh-CN.md 写 |
 | `timeline-invalid` | 全部 | timeline.json 不合 v1 schema，`detail.path` 给出 JSON 路径 | 改 `detail.path` 指的字段 |
+| `story-missing` | 全部 | 目录里没有 story.json | 先写故事，按 docs/story-schema.zh-CN.md |
+| `story-invalid` | 全部 | story.json 不合 v1 schema，或者引用了不存在的场、cue 或节拍，`detail.path` 给出 JSON 路径 | 改 `detail.path` 指的字段 |
+| `story-coverage` | 全部 | 第一拍不在片头开始，或者某一拍的开始不晚于上一拍 | 第一拍从第一场开始，后面每拍的 `at` 依次往后 |
+| `story-arc` | 全部 | 第一拍不是开场、最后一拍不是收束，或者中间没有转折。作为 warning：节拍超过六个 | 找出转折，也就是出岔子或改变方向的那一刻。做同一件事的节拍合并 |
+| `story-text` | 全部 | 某拍的 `text` 和落在这一拍里的 text cue 原文对不上（按顺序），`detail.expected` 和 `detail.got` 列出两边 | 每拍的上屏字照 text cue 原样按顺序列出 |
+| `story-text-fast` | 全部（warning） | 某拍的上屏字超过它的时长能读完的量（每秒 7 个单位：一个汉字算 1，一个其他文字的词算 2） | 删字，或者给这一拍多几个小节 |
+| `story-static-beat` | check、render（warning） | 某拍首尾两帧只有不到 0.2% 的像素不同，`detail.beat` 是哪一拍，`evidence` 是这两帧 | 画出这一拍说的变化，或者把全片唯一一个故意不动的拍标成 `"hold": true` |
 | `brand-invalid` | 全部 | timeline.json 的 `brand` 指的 brand.json 不存在、不是合法 JSON 或不合 brand schema，或者它写的 logo 和字体文件不在 brand.json 所在目录里、不是本地文件、没写许可证、不是能用的 .ttf 或 .otf。`detail.file` 是 brand.json 的路径，`detail.path` 是出错字段的 JSON 路径 | 按 message 改 `detail.path` 指的字段，见 references/brand.md |
 | `font-invalid` | 全部 | assets/fonts/ 里的字体文件没在 assets/SOURCES.json 写许可证、读不出（不是 .ttf 或 .otf、是字体集或 WOFF、没有 Unicode 字符表）、没有字体族名、字体族名和 flipbook 字体或 CSS 通用名撞了，或者两个文件是同一字体族同一字重同一字形。`detail.file` 是出错的文件 | 按 message 补许可证、换文件或改名 |
 | `protocol-missing` | 全部 | 页面没定义 `window.__flipbook`，或读它时抛错 | 调运行时库的 `composition({ seek })` |

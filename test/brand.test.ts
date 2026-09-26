@@ -13,6 +13,7 @@ import codepoints from '../src/fonts/codepoints.json' with { type: 'json' };
 import { closeSession, session } from './browser.ts';
 import { buildTestFont } from './fontBuilder.ts';
 import { cleanTemps, codes, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -108,6 +109,7 @@ function composition(brand?: string, extra: Record<string, unknown> = {}): strin
             ...extra,
         }),
     );
+    writeStory(dir);
     write(dir, 'index.html', '<!doctype html><html><body></body></html>');
     return dir;
 }

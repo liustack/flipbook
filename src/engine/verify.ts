@@ -22,6 +22,7 @@ import { sequencePattern } from './capture.ts';
 import type { Ffmpeg } from './ffmpeg.ts';
 import {
     analysisSize,
+    changedShare,
     decodeGray,
     decodeRgb,
     extractFrame,
@@ -37,6 +38,7 @@ import {
     streamFrames,
 } from './pixels.ts';
 import { run, tail } from './proc.ts';
+import { beatEnds, STATIC_BEAT_SHARE, staticBeatFinding } from './story.ts';
 import type { ResolvedTimeline } from './timelineResolve.ts';
 import type { Workspace } from './workspace.ts';
 
@@ -324,6 +326,9 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
     let current: EmptyRun | null = null;
     const sampleFrames = [...options.samples.keys()].sort((a, b) => a - b);
     const rgbFile = path.join(options.workDir, 'samples-decoded.rgb');
+    const ends = timeline.story ? beatEnds(timeline.story) : [];
+    const wanted = new Set(ends.flatMap((end) => [end.first, end.last]));
+    const beatGray = new Map<number, Uint8Array>();
     const { freezes } = await analysisPass(ffmpeg.ffmpeg, video, {
         durationSec: probe.durationSec,
         gray,
@@ -331,6 +336,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
         sampleFrames,
         rgbFile,
         onGray: (index, pixels) => {
+            if (wanted.has(index)) beatGray.set(index, Uint8Array.from(pixels));
             let kind: 'blank' | 'paper' | 'content' = 'content';
             if (isFlat(pixels)) kind = 'blank';
             else {
@@ -380,6 +386,22 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
                 },
             ),
         );
+    }
+
+    // Beats whose last frame looks like their first.
+    for (const { beat, first, last } of ends) {
+        const a = beatGray.get(first);
+        const b = beatGray.get(last);
+        if (!a || !b) continue;
+        const share = changedShare(a, b);
+        if (share >= STATIC_BEAT_SHARE) continue;
+        const files = [
+            path.join(options.evidenceDir, `story-static-beat-${beat.id}-first.png`),
+            path.join(options.evidenceDir, `story-static-beat-${beat.id}-last.png`),
+        ];
+        await extractFrame(ffmpeg.ffmpeg, video, first, files[0]);
+        await extractFrame(ffmpeg.ffmpeg, video, last, files[1]);
+        findings.push(staticBeatFinding(beat, share, fps, files));
     }
 
     // Freezes longer than the limit, outside scenes marked hold.

@@ -1,13 +1,13 @@
 ---
 name: flipbook
-description: "Make short animated videos as MP4: motion graphics, explainers, animated titles, data stories, kinetic text, beat-synced clips. You write one HTML composition plus timeline.json, flipbook renders it frame by frame and checks the result before delivery. Use when the user asks for a video, an animation exported to MP4, or a clip built with HTML, CSS, canvas or SVG. Hard rules: the picture is a pure function of t (no CSS animation or transition, timers, requestAnimationFrame, Date.now, performance.now, unseeded Math.random, network), text uses only the fonts \"Noto Serif SC\" and \"LXGW WenKai\" or font files the user supplied with a license, every command runs through this skill's scripts/run.sh, and a video is delivered only after flipbook render exits 0."
+description: "Make short animated films as MP4 that tell a story: a short film, an animated explainer, a story-driven product or brand film, an animated title. You write the story (story.json), then timeline.json and one HTML composition, and flipbook renders it frame by frame and checks the result against the story before delivery. Use when the user asks for an animated video or film, a story told in animation, or an animation exported to MP4. Hard rules: the picture is a pure function of t (no CSS animation or transition, timers, requestAnimationFrame, Date.now, performance.now, unseeded Math.random, network), text uses only the fonts \"Noto Serif SC\" and \"LXGW WenKai\" or font files the user supplied with a license, every command runs through this skill's scripts/run.sh, and a video is delivered only after flipbook render exits 0."
 metadata:
   compatibility: "Node 22.19+ (or Bun) and ffmpeg with libx264. macOS arm64 or Linux x64, Windows through WSL2. The first check or render downloads Chromium (about 95 MB) and two fonts (about 50 MB)."
 ---
 
 # flipbook
 
-Use it to turn a video request into a verified MP4. Do not use it for editing real footage, 3D characters, voice-over, or AI-generated video.
+Use it to turn a request into a short animated film that tells one story, checked before delivery. A film about a product or a brand is made the same way: one idea, with the product moving the story rather than starring in it. Do not use it for editing real footage, 3D characters, voice-over, AI-generated video, or a tour of product features.
 
 ## Run it
 
@@ -56,14 +56,15 @@ If scripts cannot run, use the first line that works (the pinned version is 0.5.
 - `stock search` and `stock fetch` reach image and sound services every time. Inside a sandbox that blocks them they exit 78 with `stock-unreachable`: run that command outside the sandbox after the user approves.
 - Exit 78 with `sandbox-blocked` or `tmp-unwritable`: relay its `fix` lines.
 
-## The six steps
+## The steps
 
-1. **Spec.** Settle size, duration, frame rate, look, text and music. Use the defaults for anything the user did not say. When the request is about a product or a brand, first search the workspace for its assets (logo files, theme color variables, design tokens, color values in the README) and list them for the user to confirm. When none turn up, ask for them instead of guessing. Then write `brand.json` as `references/brand.md` describes.
-2. **timeline.json.** Scenes in bars, text and marker cues in beats. Read `references/timeline.md` before writing the first one.
-3. **index.html.** One composition that calls `composition({ setup, seek })` from `/__flipbook/runtime.js`. Read `references/rules.md` before writing the first one.
-4. **Check and look.** Run `check`, fix every failure, repeat until it exits 0. Then run `snapshot`, open `out/snapshot/contact-sheet.png` and fix what looks wrong. Rerun `check` after every edit.
-5. **Render.** Run `render`. Exit 1 means the finished video failed acceptance: fix the codes and go back to step 4.
-6. **Deliver.** Open `out/contact-sheet.png`, confirm it shows what the user asked for, then give the user `out/video.mp4` and the contact sheet path.
+1. **Story.** Write `story.json`: the idea, what it leaves the viewer with, the subject that changes, the device and three to six beats. Read `references/story.md` before writing the first one. When the user is there, show them the story in one message and go on once they agree.
+2. **Spec.** Settle size, duration, frame rate, look, text and music. Use the defaults for anything the user did not say. When the request is about a product or a brand, first search the workspace for its assets (logo files, theme color variables, design tokens, color values in the README) and list them for the user to confirm. When none turn up, ask for them instead of guessing. Then write `brand.json` as `references/brand.md` describes.
+3. **timeline.json.** Scenes in bars, text and marker cues in beats, a scene or two per story beat. Read `references/timeline.md` before writing the first one.
+4. **index.html.** One composition that calls `composition({ setup, seek })` from `/__flipbook/runtime.js`. Read `references/rules.md` before writing the first one.
+5. **Check and look.** Run `check`, fix every failure, repeat until it exits 0. Then run `snapshot`, open `out/snapshot/contact-sheet.png` and fix what looks wrong. Rerun `check` after every edit.
+6. **Render.** Run `render`. Exit 1 means the finished video failed acceptance: fix the codes and go back to step 5.
+7. **Deliver.** Open `out/contact-sheet.png` and read it against the story: each beat's first and last pictures show its `change`, and the film can be retold from the pictures alone. Then give the user `out/video.mp4` and the contact sheet path.
 
 Defaults:
 
@@ -101,6 +102,7 @@ Defaults:
 
 | Read | When |
 |---|---|
+| `references/story.md` | before the first story.json, and when a `story-*` code appears |
 | `references/rules.md` | before the first index.html, and when a determinism, text or layer code is unclear |
 | `references/timeline.md` | before the first timeline.json, and when matching a requested duration |
 | `references/audio.md` | before choosing or writing the music, finding sounds or placing sound effects, and when an `audio-*` code appears |

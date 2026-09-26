@@ -1,0 +1,45 @@
+{
+    "version": 1,
+    "idea": "Eighty speckled bird eggs fly onto a bare page until, together, they write the character 书, and then the page names the film 手翻书.",
+    "leave": "A book can be built from many small, different pieces.",
+    "subject": "the pile of eggs, from a scatter to the character 书",
+    "device": {
+        "what": "eggs that land on quarter beats, two at a time at first and then in fours, fives and sixes",
+        "why": "the character only reads once enough eggs are down, so the speed-up carries the viewer toward it"
+    },
+    "beats": [
+        {
+            "id": "scatter",
+            "role": "opening",
+            "at": "gather",
+            "change": {
+                "from": "a few eggs on bare beige paper, more flying in from the edges",
+                "to": "a few dozen eggs spread over the page, the strokes of a character starting to show"
+            }
+        },
+        {
+            "id": "shu",
+            "role": "turn",
+            "at": {
+                "scene": "gather",
+                "beat": 3
+            },
+            "change": {
+                "from": "a loose scatter of eggs",
+                "to": "eggs landing several at a time until they fill the character 书, and the view eases in on it"
+            }
+        },
+        {
+            "id": "name",
+            "role": "resolution",
+            "at": "title",
+            "change": {
+                "from": "the eggs gone, bare beige paper",
+                "to": "手翻书 set in the middle of the page"
+            },
+            "text": [
+                "手翻书"
+            ]
+        }
+    ]
+}

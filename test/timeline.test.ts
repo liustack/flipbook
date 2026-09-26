@@ -5,6 +5,7 @@ import { loadTimeline, validateTimeline } from '../src/engine/timeline.ts';
 import { resolveTimeline, sceneAtFrame, type TimelineV1 } from '../src/engine/timelineResolve.ts';
 import { cueProgress } from '../src/runtime/core/timeline.ts';
 import { repoRoot, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 const base = (): Record<string, unknown> => ({
     version: 1,
@@ -126,6 +127,7 @@ describe('audio files in the timeline', () => {
         const t = base();
         timeline(t);
         fs.writeFileSync(path.join(dir, 'timeline.json'), JSON.stringify(t));
+        writeStory(dir);
         fs.mkdirSync(path.join(dir, 'assets'));
         fs.writeFileSync(path.join(dir, 'assets', 'tap.wav'), 'RIFF');
         fs.writeFileSync(path.join(dir, 'assets', 'song.ogg'), 'OggS');
@@ -196,10 +198,9 @@ describe('resolveTimeline', () => {
 
     it('matches the hello example', () => {
         const dir = tempDir('timeline');
-        fs.copyFileSync(
-            path.join(repoRoot, 'examples/hello/timeline.json'),
-            path.join(dir, 'timeline.json'),
-        );
+        for (const name of ['timeline.json', 'story.json']) {
+            fs.copyFileSync(path.join(repoRoot, 'examples/hello', name), path.join(dir, name));
+        }
         const loaded = loadTimeline(dir);
         const expected = JSON.parse(
             fs.readFileSync(path.join(repoRoot, 'examples/hello/expected.json'), 'utf-8'),

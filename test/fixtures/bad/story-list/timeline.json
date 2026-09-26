@@ -1,0 +1,15 @@
+{
+    "version": 1,
+    "width": 320,
+    "height": 180,
+    "fps": 12,
+    "seed": 7,
+    "bpm": 120,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "sun", "bars": 1 },
+        { "id": "rain", "bars": 1 },
+        { "id": "snow", "bars": 1 }
+    ],
+    "audio": { "mode": "none" }
+}

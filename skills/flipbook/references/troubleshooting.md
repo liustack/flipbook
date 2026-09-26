@@ -28,6 +28,48 @@ timeline.json does not match timeline schema v1.
 
 Fix: Fix the field named in `detail.path` as the message says.
 
+### `story-missing`
+
+The composition directory has no story.json.
+
+Fix: Write story.json before the timeline, as references/story.md describes: the idea, what the film leaves the viewer with, the subject that changes, the device and the beats.
+
+### `story-invalid`
+
+story.json does not match story schema v1, or names a scene, cue or beat that does not exist.
+
+Fix: Fix the field named in `detail.path` as the message says.
+
+### `story-coverage`
+
+The beats do not follow the film: the first beat does not start where the film starts, or a beat starts before the one ahead of it.
+
+Fix: Start the first beat at the first scene and give each later beat a later `at`. A beat lasts until the next one starts.
+
+### `story-arc`
+
+The beats do not make a story: no opening first, no resolution last, or no turn between them. As a warning: more than six beats.
+
+Fix: Find the turn: the moment something goes wrong or changes course. Parts that sit side by side are a list, not a story. Merge beats that do the same job.
+
+### `story-text`
+
+A beat's `text` does not match the text cues that fall inside it.
+
+Fix: List the words on screen in each beat exactly as its text cues show them, in order, or move the cues into the beat that shows them.
+
+### `story-text-fast`
+
+A beat puts more words on screen than a viewer can read in its time.
+
+Fix: Cut words, or give the beat more bars in timeline.json.
+
+### `story-static-beat`
+
+A beat's first and last frames look the same: the change the story promises does not show.
+
+Fix: Draw the change written in the beat: the picture at its end must differ from its start. Mark the one beat that stands still on purpose with "hold": true.
+
 ### `protocol-missing`
 
 The page never defined window.__flipbook.

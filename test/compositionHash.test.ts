@@ -8,6 +8,7 @@ import { loadTimeline } from '../src/engine/timeline.ts';
 import { compositionHash } from '../src/engine/workspace.ts';
 import { buildTestFont } from './fontBuilder.ts';
 import { cleanTemps, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(() => cleanTemps());
 
@@ -34,6 +35,7 @@ function branded(): { root: string; dir: string } {
             brand: '../brand.json',
         }),
     );
+    writeStory(dir);
     write(path.join(dir, 'index.html'), '<!doctype html><html><body></body></html>');
     write(path.join(root, 'Brand.ttf'), buildTestFont({ family: 'Wren Hand', chars: 'ab' }));
     return { root, dir };

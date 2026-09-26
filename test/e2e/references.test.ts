@@ -10,7 +10,10 @@
 // <!-- snippet-timeline --> in the same file, next to every block marked
 // <!-- snippet-file: <path> --> (written to that path in the composition).
 // A .wav file the snippet timeline names (an sfx cue's `file`, `audio.file`)
-// and no block supplies is written as a short generated tone.
+// and no block supplies is written as a short generated tone. A file without a
+// `snippet-file: story.json` block gets a plain three-beat story: its snippets
+// show an API, not a story, and its beats fall at arbitrary thirds, so the
+// story's own warnings are not held against them.
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -18,6 +21,7 @@ import { runCheck } from '../../src/cli/check.ts';
 import { validateTimeline } from '../../src/engine/timeline.ts';
 import { closeSession, session } from '../browser.ts';
 import { cleanTemps, repoRoot, TEST_SEEK_TIMEOUT_MS, tempDir } from '../helpers.ts';
+import { writeStory } from '../story.ts';
 
 const referencesDir = path.join(repoRoot, 'skills', 'flipbook', 'references');
 
@@ -150,6 +154,8 @@ describe.concurrent('reference snippets pass check as marked', () => {
                     fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
                     fs.writeFileSync(path.join(dir, name), content);
                 }
+                const plainStory = !('story.json' in extra);
+                if (plainStory) writeStory(dir);
                 for (const name of namedWavs(timeline as string)) {
                     if (name in extra) continue;
                     fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
@@ -173,7 +179,10 @@ describe.concurrent('reference snippets pass check as marked', () => {
                 const warnings = report.warnings.map((f) => f.code);
                 if (verdict === 'pass') {
                     expect(report.failures, label).toEqual([]);
-                    expect(report.warnings, label).toEqual([]);
+                    expect(
+                        report.warnings.filter((w) => !(plainStory && w.code.startsWith('story-'))),
+                        label,
+                    ).toEqual([]);
                 } else if (verdict === 'warn') {
                     expect(report.failures, label).toEqual([]);
                     expect(warnings, label).toContain(code);

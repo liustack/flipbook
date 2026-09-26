@@ -15,6 +15,7 @@ import { probeVideo } from '../src/engine/verify.ts';
 import { sha256 } from '../src/engine/workspace.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, copyFixture, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -63,6 +64,7 @@ describe('check --size', () => {
                 audio: { mode: 'none' },
             }),
         );
+        writeStory(dir);
         fs.writeFileSync(
             path.join(dir, 'index.html'),
             `<!doctype html>

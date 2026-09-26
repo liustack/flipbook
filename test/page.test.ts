@@ -14,6 +14,7 @@ import { openPage } from '../src/engine/session.ts';
 import { loadTimeline } from '../src/engine/timeline.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, codes, copyFixture, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -39,6 +40,7 @@ describe('fake origin', () => {
                 scenes: [{ id: 'main', bars: 1 }],
             }),
         );
+        writeStory(dir);
         fs.writeFileSync(
             path.join(dir, 'index.html'),
             `<!doctype html><body style="margin:0;background:#fff">
@@ -153,6 +155,7 @@ describe('stage size', () => {
                 scenes: [{ id: 'main', bars: 1 }],
             }),
         );
+        writeStory(dir);
         fs.writeFileSync(
             path.join(dir, 'index.html'),
             `<!doctype html><body style="margin:0;width:400px;height:180px;background:#fff">
@@ -183,6 +186,7 @@ function tinyComposition(body: string): string {
             scenes: [{ id: 'main', bars: 1 }],
         }),
     );
+    writeStory(dir);
     fs.writeFileSync(
         path.join(dir, 'index.html'),
         `<!doctype html><body style="margin:0;background:#fff">${body}</body>`,

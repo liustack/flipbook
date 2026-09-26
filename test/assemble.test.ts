@@ -17,6 +17,7 @@ import {
 } from '../src/runtime/templates/assemble.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -144,6 +145,7 @@ function assembleComposition(): string {
             cues,
         }),
     );
+    writeStory(dir);
     fs.writeFileSync(
         path.join(dir, 'index.html'),
         `<!doctype html><html><head><meta charset="utf-8"><style>

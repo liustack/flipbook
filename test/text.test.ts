@@ -8,6 +8,7 @@ import { loadTimeline } from '../src/engine/timeline.ts';
 import { graphemes, wordReveal, words } from '../src/runtime/text.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, codes, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -51,6 +52,7 @@ const TIMELINE = {
 function composition(body: string): string {
     const dir = tempDir('text');
     fs.writeFileSync(path.join(dir, 'timeline.json'), JSON.stringify(TIMELINE));
+    writeStory(dir);
     fs.writeFileSync(
         path.join(dir, 'index.html'),
         `<!doctype html><html><head><meta charset="utf-8"><style>

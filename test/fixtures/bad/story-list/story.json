@@ -1,0 +1,12 @@
+{
+    "version": 1,
+    "idea": "A paper boat sails through sun, rain and snow",
+    "leave": "Weather changes",
+    "subject": "the paper boat",
+    "device": { "what": "the boat crosses the frame on one line", "why": "the weather is what changes" },
+    "beats": [
+        { "id": "sun", "role": "opening", "at": "sun", "change": { "from": "the boat in sun", "to": "the boat further on" } },
+        { "id": "rain", "role": "build", "at": "rain", "change": { "from": "the boat in rain", "to": "the boat further on" } },
+        { "id": "snow", "role": "resolution", "at": "snow", "change": { "from": "the boat in snow", "to": "the boat at the edge" } }
+    ]
+}

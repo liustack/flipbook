@@ -1,0 +1,46 @@
+{
+    "version": 1,
+    "idea": "A worn pad printed with Muybridge's running horse lies still on a desk until its pages start to riffle, the horse gallops, and the pad slows and stops on the first frame of the stride.",
+    "leave": "Twenty still photographs are enough to make a horse run.",
+    "subject": "the horse printed on the pages, from still picture to gallop and back",
+    "device": {
+        "what": "a real flip book, filmed from above, whose pages turn faster and then slower",
+        "why": "the horse only moves while the pages turn, so the speed of the riffle is the speed of the story"
+    },
+    "beats": [
+        {
+            "id": "still",
+            "role": "opening",
+            "at": "desk",
+            "change": {
+                "from": "a small pad on a brown desk, a photograph of a horse and rider on its top page",
+                "to": "the first pages lifting over the spine as the view moves in close"
+            },
+            "sound": "lift"
+        },
+        {
+            "id": "gallop",
+            "role": "turn",
+            "at": "riffle",
+            "change": {
+                "from": "close on the right-hand page, a page in mid-turn",
+                "to": "after pages flying past ten a second with the horse galloping, the riffle slowing, a page still in the air"
+            },
+            "sound": "go"
+        },
+        {
+            "id": "stop",
+            "role": "resolution",
+            "at": "stop",
+            "change": {
+                "from": "close on the pad, a page turning slowly",
+                "to": "the whole pad at rest on the desk, the horse back on its first frame, flipbook written below"
+            },
+            "text": [
+                "flipbook"
+            ],
+            "sound": "chime",
+            "callback": "still"
+        }
+    ]
+}

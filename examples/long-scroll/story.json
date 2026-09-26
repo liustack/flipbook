@@ -1,0 +1,84 @@
+{
+    "version": 1,
+    "idea": "A long sheet of paper scrolls up for three minutes while its rows of marks change kind every half minute, from dots to stars, as a pen crosses the top from one edge to the other.",
+    "leave": "A long, steady scroll can still keep changing under your eyes.",
+    "subject": "the kind of mark in the rows",
+    "device": {
+        "what": "a line along the top that a pen draws from left to right over the whole film",
+        "why": "it shows how far along the scroll is, so each new kind of mark lands at a place the viewer can see"
+    },
+    "beats": [
+        {
+            "id": "dots",
+            "role": "opening",
+            "at": "dots",
+            "change": {
+                "from": "rows of ink dots, some red, a ruler at the left and the pen at the top left corner",
+                "to": "dots in the upper half, rows of rings rising into the lower half, the pen a sixth of the way along the top"
+            },
+            "text": [
+                "01 点"
+            ]
+        },
+        {
+            "id": "rings",
+            "role": "build",
+            "at": "rings",
+            "change": {
+                "from": "dots above, rings rising below",
+                "to": "rings above, hatched strokes rising below, the pen a third of the way along"
+            },
+            "text": [
+                "02 圈"
+            ]
+        },
+        {
+            "id": "hatch",
+            "role": "build",
+            "at": "hatch",
+            "change": {
+                "from": "rings above, hatched strokes rising below",
+                "to": "hatching above, wavy lines rising below, the pen at the middle of the top line"
+            },
+            "text": [
+                "03 线"
+            ]
+        },
+        {
+            "id": "waves",
+            "role": "turn",
+            "at": "waves",
+            "change": {
+                "from": "the pen at the middle, straight hatching above and the first wavy lines below",
+                "to": "waves above, solid squares rising below, the pen two thirds of the way along"
+            },
+            "text": [
+                "04 波"
+            ]
+        },
+        {
+            "id": "tiles",
+            "role": "build",
+            "at": "tiles",
+            "change": {
+                "from": "waves above, solid squares rising below",
+                "to": "squares above, stars rising below, the pen five sixths of the way along"
+            },
+            "text": [
+                "05 格"
+            ]
+        },
+        {
+            "id": "stars",
+            "role": "resolution",
+            "at": "stars",
+            "change": {
+                "from": "squares above, stars rising below",
+                "to": "a page of stars and the line along the top drawn all the way to the right"
+            },
+            "text": [
+                "06 星"
+            ]
+        }
+    ]
+}

@@ -13,6 +13,7 @@ import { probeAudio } from '../src/engine/verify.ts';
 import { Workspace, WorkspaceError } from '../src/engine/workspace.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, codes, tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 afterAll(async () => {
     await closeSession();
@@ -47,6 +48,7 @@ composition({ seek(t) {
 function composition(): string {
     const dir = tempDir('ws-comp');
     fs.writeFileSync(path.join(dir, 'timeline.json'), JSON.stringify(TIMELINE));
+    writeStory(dir);
     fs.writeFileSync(path.join(dir, 'index.html'), PAGE);
     return dir;
 }
@@ -164,6 +166,7 @@ function withAudio(file: string): string {
         path.join(dir, 'timeline.json'),
         JSON.stringify({ ...TIMELINE, audio: { mode: 'file', file, bpmOffset: 0 } }),
     );
+    writeStory(dir);
     fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
     fs.writeFileSync(
         path.join(dir, 'assets', 'SOURCES.json'),

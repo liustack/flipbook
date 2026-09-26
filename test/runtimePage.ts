@@ -6,6 +6,7 @@ import type { CompositionPage } from '../src/engine/page.ts';
 import { openPage, type Session } from '../src/engine/session.ts';
 import { resolveTimeline } from '../src/engine/timelineResolve.ts';
 import { tempDir } from './helpers.ts';
+import { writeStory } from './story.ts';
 
 export async function runtimePage(
     session: Session,
@@ -24,6 +25,7 @@ export async function runtimePage(
         scenes: [{ id: 'main', bars: 1 }],
     };
     fs.writeFileSync(path.join(dir, 'timeline.json'), JSON.stringify(timeline));
+    writeStory(dir);
     fs.writeFileSync(
         path.join(dir, 'index.html'),
         `<!doctype html><html><head><meta charset="utf-8"><style>

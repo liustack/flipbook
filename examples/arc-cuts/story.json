@@ -1,0 +1,47 @@
+{
+    "version": 1,
+    "idea": "One curved edge is cut through twelve materials, faster and faster, until it turns back into the rim of a planet and sets.",
+    "leave": "The same curve is everywhere, and there is more of it to find.",
+    "subject": "the arc across the lower half of the frame",
+    "device": {
+        "what": "a match cut: every shot puts a different material's curved edge in the same place",
+        "why": "keeping the curve still while the world behind it changes makes the viewer see one shape in many things"
+    },
+    "beats": [
+        {
+            "id": "rim",
+            "role": "opening",
+            "at": "cuts",
+            "change": {
+                "from": "the glowing rim of a planet's atmosphere against black space",
+                "to": "the same curve as the edge of the sun, a bread crust, a blueprint and a leaf, each shot shorter than the last"
+            }
+        },
+        {
+            "id": "words",
+            "role": "turn",
+            "at": {
+                "scene": "cuts",
+                "beat": 8.6875
+            },
+            "change": {
+                "from": "the first word, 还有, riding the curve over a pink beaded surface",
+                "to": "shots flashing past in a fraction of a second each, the last word 发现 on flowered red cloth"
+            }
+        },
+        {
+            "id": "set",
+            "role": "resolution",
+            "at": "end",
+            "change": {
+                "from": "the planet's rim again, with nothing written on it",
+                "to": "还有更多值得发现 written along the rim, then the planet sinking to the bottom edge and leaving the stars"
+            },
+            "text": [
+                "还有更多值得发现"
+            ],
+            "sound": "sweep",
+            "callback": "rim"
+        }
+    ]
+}

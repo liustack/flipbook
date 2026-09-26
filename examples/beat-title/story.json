@@ -1,0 +1,55 @@
+{
+    "version": 1,
+    "idea": "A blank card lands on the page, three words drop onto it one per bar, and once they are swept away the card is given its name.",
+    "leave": "A flip book is made of beats, frames and characters.",
+    "subject": "the card, from blank to titled",
+    "device": {
+        "what": "every word and mark lands on a beat, with a drop sound where it hits",
+        "why": "the words name the parts of a flip book, and landing on the beat shows them at work"
+    },
+    "beats": [
+        {
+            "id": "card",
+            "role": "opening",
+            "at": "open",
+            "change": {
+                "from": "one tilted edge of a card at the right side of the page",
+                "to": "the card lies flat in the middle and a small ink ball bounces above it"
+            },
+            "sound": "flip"
+        },
+        {
+            "id": "words",
+            "role": "build",
+            "at": "words",
+            "change": {
+                "from": "the empty card with the bouncing ball",
+                "to": "一拍, 一帧 and 一个字 sit in a row on the card"
+            },
+            "text": ["一拍", "一帧", "一个字"],
+            "sound": "d1"
+        },
+        {
+            "id": "sweep",
+            "role": "turn",
+            "at": { "scene": "words", "beat": 10 },
+            "change": {
+                "from": "three words in a row on the card",
+                "to": "a red line runs under them and the words and ball fade off the card"
+            },
+            "sound": "line"
+        },
+        {
+            "id": "name",
+            "role": "resolution",
+            "at": "end",
+            "change": {
+                "from": "the empty card",
+                "to": "翻页书 across the card with a red stamp at its lower right"
+            },
+            "text": ["翻页书"],
+            "sound": "stamp",
+            "callback": "card"
+        }
+    ]
+}

@@ -55,7 +55,13 @@ function render(sample) {
             filter: (src) => !/[\\/](\.flipbook|out)([\\/]|$)/.test(src),
         });
         const checked = flipbook(['check', work]);
-        const findings = [...(checked.report?.failures ?? []), ...(checked.report?.warnings ?? [])];
+        // A sample is one still picture for a reference page, not a film: its
+        // plain story's beats fall at arbitrary thirds, so the story's own
+        // warnings do not count.
+        const findings = [
+            ...(checked.report?.failures ?? []),
+            ...(checked.report?.warnings ?? []).filter((w) => !w.code.startsWith('story-')),
+        ];
         if (checked.status !== 0 || findings.length > 0) {
             fail(
                 `${sample.dir} does not pass check cleanly: ${
