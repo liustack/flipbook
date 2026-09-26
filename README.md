@@ -1,6 +1,6 @@
 <h1 align="center">flipbook</h1>
 
-<p align="center"><b>Your coding agent turns one sentence into an MP4 animation, checked before you see it.</b></p>
+<p align="center"><b>Your coding agent turns an idea into a short animated film that tells a story, checked before you see it.</b></p>
 
 <p align="center">
   <a href="./README.zh-CN.md">简体中文</a> ·
@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/5ee87eff-1436-473b-b31a-81c74769659d
 
 <p align="center"><sub>Every video plays in place. All three are flipbook renders: the paper boat and the butterfly come from eval runs where the model worked alone from one prompt.</sub></p>
 
-flipbook is an agent skill. Your agent writes one HTML composition and a timeline counted in beats, the skill renders it frame by frame into an MP4 with music, and checks the video before you get it.
+flipbook is an agent skill for short animated films that tell a story. Your agent writes the story first, one idea in three to six beats, then a timeline counted in beats and one HTML composition. The skill renders it frame by frame into an MP4 with music and checks the video against the story before you get it. Paper is the house look: cut paper, pencil, prints. A film about a product works the same way, one idea with the product moving the story.
 
 It is for anyone who wants short animations from AI: intros, data animations, concept explainers, book quotes, clips cut to music.
 
@@ -76,21 +76,21 @@ npx -y skills add liustack/flipbook#v0.5.8 --skill flipbook --global --agent cod
 
 You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the skill's renderer globally: `npm install -g @liustack/flipbook@0.5.8`.
 
-## One sentence to a video
+## From an idea to a film
 
 You say:
 
 ```text
-Make a 15-second New Year countdown: count from 10 down to 0 with the numbers hitting the beat, then show "Happy New Year 2027".
+Make a 20-second paper animation: a storm puts out the lighthouse lamp, and a small boat finds its way home by a child's lantern.
 ```
 
-The agent follows the skill's six steps: settle the spec, write `timeline.json` (scenes and text placed on beats), write `index.html`, run `check` and `snapshot` and fix things until the contact sheet looks right, run `render`, then look at the final contact sheet and deliver:
+The agent follows the skill's steps: write `story.json` (the idea, the turn, three to six beats) and show it to you, settle the spec, write `timeline.json` (a scene or two per beat), write `index.html`, run `check` and `snapshot` and fix things until the contact sheet looks right, run `render`, then read the final contact sheet against the story and deliver:
 
 ```bash
-bash ~/.claude/skills/flipbook/scripts/run.sh check countdown
-bash ~/.claude/skills/flipbook/scripts/run.sh snapshot countdown
-bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
-# countdown/out/video.mp4 and countdown/out/contact-sheet.png
+bash ~/.claude/skills/flipbook/scripts/run.sh check lighthouse
+bash ~/.claude/skills/flipbook/scripts/run.sh snapshot lighthouse
+bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
+# lighthouse/out/video.mp4 and lighthouse/out/contact-sheet.png
 ```
 
 Each command prints a JSON report to stdout. Every failure in it names a code, the second, the frame, the element, an evidence image and the fix. When the same kind of problem keeps failing, flipbook tells the agent to stop and hand you the contact sheet and the report, instead of burning through your quota.
@@ -99,6 +99,7 @@ Each command prints a JSON report to stdout. Every failure in it names a code, t
 
 | Stage | What it checks |
 |---|---|
+| story (check and render) | the beats follow the film in order with no gap, the story has an opening, a turn and a resolution, each beat lists the words it puts on screen and leaves time to read them, and each beat's picture changes from its first frame to its last |
 | check | timeline fields (errors point to the JSON path), forbidden code patterns and actual calls to forbidden clock and random functions, console errors, missing files, network requests, reads outside the directory, ready and seek timeouts, whether a frame changes when frames are visited in another order, whether it changes under another clock or random seed, late paints, blank frames and frames with nothing but paper, missing glyphs and fallback to system fonts, text off the frame or in the safe margin, text contrast |
 | render | frame count and duration, runs of blank or paper-only frames, freezes in scenes not marked as holds, PSNR between the encoded video and the captured frames, yuv420p and bt709 color tags, audio duration, loudness and true peak, whether each sound effect lands on its frame |
 

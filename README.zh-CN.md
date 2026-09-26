@@ -1,6 +1,6 @@
 <h1 align="center">flipbook</h1>
 
-<p align="center"><b>让 agent 从一句话做出一条验收过的 mp4 动画。</b></p>
+<p align="center"><b>让 agent 把一个想法做成讲故事的动画短片，交付前先验收。</b></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/5ee87eff-1436-473b-b31a-81c74769659d
 
 <p align="center"><sub>每条视频都能直接播放，全部由 flipbook 渲染：纸船和蝴蝶来自评测，模型只拿到一句话，独自做完。</sub></p>
 
-flipbook 是一个 agent skill。agent 写一个 HTML 合成文件和一份按拍写的时间轴，skill 逐帧渲染成带配乐的 mp4，交付前先自己验收一遍。
+flipbook 是一个做讲故事的动画短片的 agent skill。agent 先写故事，一个想法分成三到六拍，再写按拍计时的时间轴和一个 HTML 合成文件。skill 逐帧渲染成带配乐的 mp4，交付前拿故事核对一遍成片。默认是纸感：剪纸、铅笔、版画。产品片也这么做：一个想法，产品推动故事。
 
 给想用 AI 做短动画的人：片头、数据动画、概念讲解、书摘、跟着音乐打点的短片。
 
@@ -76,21 +76,21 @@ npx -y skills add liustack/flipbook#v0.5.8 --skill flipbook --global --agent cod
 
 需要 Node 22.19 起和带 libx264 的 ffmpeg（macOS `brew install ffmpeg`，Debian 和 Ubuntu `sudo apt-get install -y ffmpeg`）。第一次 check 或 render 会下载钉死版本的 Chromium（约 95 MB）和两款中文字体（约 50 MB）到用户缓存目录。想省掉每次 npx 的下载，可以全局装 skill 的渲染器：`npm install -g @liustack/flipbook@0.5.8`。
 
-## 一句话出片
+## 从一个想法到一条片
 
 你说：
 
 ```text
-做一段 15 秒的新年倒计时动画：从 10 倒数到 0，数字要有节奏感，最后出现「2027 新年快乐」。
+做一段 20 秒的纸感动画：暴风雨吹灭了灯塔的灯，一只小船借着孩子手里的灯笼找到了回家的路。
 ```
 
-agent 照 skill 走六步：定规格，写 `timeline.json`（按拍写分场和文字），写 `index.html`，跑 `check` 和 `snapshot` 看联系表改到通过，跑 `render`，看成片联系表后交付：
+agent 照 skill 的步骤走：先写 `story.json`（想法、转折、三到六拍）给你看，定规格，写 `timeline.json`（每拍一两场），写 `index.html`，跑 `check` 和 `snapshot` 看联系表改到通过，跑 `render`，拿成片联系表对照故事看一遍后交付：
 
 ```bash
-bash ~/.claude/skills/flipbook/scripts/run.sh check countdown
-bash ~/.claude/skills/flipbook/scripts/run.sh snapshot countdown
-bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
-# countdown/out/video.mp4 和 countdown/out/contact-sheet.png
+bash ~/.claude/skills/flipbook/scripts/run.sh check lighthouse
+bash ~/.claude/skills/flipbook/scripts/run.sh snapshot lighthouse
+bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
+# lighthouse/out/video.mp4 和 lighthouse/out/contact-sheet.png
 ```
 
 每条命令往 stdout 打一份 JSON 报告，失败的每一条都带类型码、时间点、帧号、元素、证据图和改法。同一类问题连续改不好，flipbook 会让 agent 停下来把联系表和报告交给你，不会一直烧额度。
@@ -99,6 +99,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render countdown
 
 | 阶段 | 查什么 |
 |---|---|
+| 故事（check 和 render） | 节拍按顺序铺满整条片不留缝，故事有开场、转折和收束，每拍列出它的上屏字并且留够读的时间，每拍的画面从第一帧到最后一帧有变化 |
 | check | timeline 字段（报错带 JSON 路径）、禁用写法和对禁用时钟、随机函数的实际调用、控制台报错、资源缺失、联网请求、越界读文件、ready 和 seek 超时、换 seek 顺序画面变不变、换时钟和随机种子画面变不变、迟到的绘制、空白和只剩纸底、缺字和系统字体回退、文字出画和安全区、文字对比度 |
 | render | 帧数和时长、连续空白或只剩纸底、没声明 hold 的定格、成片和原帧的 PSNR、yuv420p 和 bt709 色彩标记、音轨时长、响度和真峰值、每个音效是否落在它的帧上 |
 

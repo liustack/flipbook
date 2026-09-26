@@ -2,13 +2,13 @@
 
 ## 目标
 
-flipbook 是一个 agent skill。渲染器是 skill 背后的 `flipbook` 命令（npm 包 `@liustack/flipbook`），由 skill 的启动器按钉死版本拉取，不单独当产品介绍。模型写一个 HTML 合成文件和一份 `timeline.json`，flipbook 逐帧确定性地渲染成 mp4，并在交付前自动验收。
+flipbook 是一个做讲故事的动画短片的 agent skill。渲染器是 skill 背后的 `flipbook` 命令（npm 包 `@liustack/flipbook`），由 skill 的启动器按钉死版本拉取，不单独当产品介绍。模型先写故事 `story.json`，再写 `timeline.json` 和一个 HTML 合成文件，flipbook 逐帧确定性地渲染成 mp4，交付前拿故事和成片自动验收。纸感是前期的主皮，不是唯一的皮，故事和角色的接口不绑皮。产品宣传片只做讲故事的那种。
 
 ## 范围
 
 不加：
 
-- 3D 角色、真实素材剪辑、生成式图像或视频当画面主体、实时录屏
+- 3D 角色、真实素材剪辑、视频模型出画面、渲染时逐帧生成图、实时录屏。生成的静态图可以当素材（角色部件、背景、道具），和找来的图同等对待，来源、工具、提示词记进 `assets/SOURCES.json`
 - TTS 旁白、节拍检测、机器学习抠图
 - Remotion 或 HyperFrames 当底座、p5.js
 - Windows 原生支持（`win32` 退 78，提示用 WSL2。`FLIPBOOK_ALLOW_WIN32=1` 只给 CI 用）
@@ -33,13 +33,13 @@ src/
   paths.ts         包根目录和运行时文件定位
   skillPin.ts      读各宿主 skill 副本钉的版本
   cli/             doctor、check、snapshot、audio、render、stock、报告和类型码
-  engine/          浏览器、页面、时钟、timeline、截帧、编码、验收、字体和自带字体、品牌资产、缓存、扫描、配乐合成和混音（含文件音效 audioFiles.ts）、抠图用的工具页、渲染进程监视
+  engine/          浏览器、页面、时钟、timeline、故事（story.ts）、JSON 校验工具（schema.ts）、截帧、编码、验收、字体和自带字体、品牌资产、缓存、扫描、配乐合成和混音（含文件音效 audioFiles.ts）、抠图用的工具页、渲染进程监视
   runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、photo、audio）
   stock/           找图找声音：Pexels、Pixabay、Openverse 三家的图片搜索和详情，Openverse 的音频搜索，图片和声音格式嗅探、下载防护（只走 HTTPS、拒内网地址、连接钉在核对过的地址上）
   fonts/           字体清单、码位表、OFL 全文
 scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）、examples-baseline.mjs（记样例的帧摘要）
-skills/flipbook/   SKILL.md（英文）、references/（rules、timeline、audio、paper、materials、text、templates、brand、photo、troubleshooting）、scripts/run.sh 和 run.ps1
-docs/              report-schema.md、timeline-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
+skills/flipbook/   SKILL.md（英文）、references/（story、rules、timeline、audio、paper、materials、text、templates、brand、photo、troubleshooting）、scripts/run.sh 和 run.ps1
+docs/              report-schema.md、timeline-schema.md、story-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
 docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
 examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro、long-scroll（三分钟长片）、specimen-board（stock fetch 下的公有领域图版抠成贴纸）、riffle（迈布里奇奔马连拍做成的手翻书，specimens() 自动找格子），每个例子一份源码加 expected.json，不提交 mp4
 eval/              评测用例、models.json、run.mjs，证据写到 eval/results/（不入库）
@@ -59,6 +59,7 @@ test/release/      vitest 发版档：hello、eggs-five/five、long-scroll 的�
 - 新测试按跑的内容分档：样例的完整渲染放 `test/release/`。坏片语料、reference 片段、样例的 check 和摘要放 `test/e2e/`。其余放 `test/`，包括拿小 fixture 过一次 check 或 render 的引擎测试，这类单条要几秒内跑完：画面小、帧数少、期限短，别等满 60 秒的 ready 期限。
 - 用到浏览器的测试把 fixture 复制到临时目录再跑。首次运行需要联网装 Chromium 和字体，写的是用户缓存目录。
 - 坏片语料每类至少一条，新增检查时先加一条会被拦下的坏片。
+- 每个合成（样例、夹具、坏片、参考片段、测试里现写的合成）都要有 story.json。不是测故事的夹具用 `test/story.ts` 生成最小的三拍故事（`node test/story.ts <目录>`，测试里调 `writeStory(dir)`）。
 - `skills/flipbook/references/` 里标了 `<!-- check: ... -->` 的代码片段由 `test/e2e/references.test.ts` 真跑 check。`troubleshooting.md` 从 `src/cli/codes.ts` 生成，改了类型码跑 `UPDATE_REFERENCES=1 pnpm test test/skillText.test.ts`。
 - 评测花真实额度，按 docs/eval.md 本地跑，CI 只跑 `--dry-run`。
 - 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。然后在作者的 Mac 上跑 `pnpm examples:baseline` 重出样例的帧摘要（写进各样例的 `expected.json`），和升级放同一个提交。改了样例的画面也跑它。
@@ -68,7 +69,7 @@ test/release/      vitest 发版档：hello、eggs-five/five、long-scroll 的�
 
 - `docs/` 下的文档带 `summary` 和 `read_when` 前言。
 - README、INSTALL 和 `docs/` 下的文档英文为主，中文版是同名 `.zh-CN.md`，两边章节一一对应，标题下有一行语言切换。改一边就在同一个提交里改另一边。SKILL.md 和 references 只有英文。
-- 报告格式、类型码、timeline 字段改了，同一个提交里改 `docs/report-schema.md` 或 `docs/timeline-schema.md` 和对应的 `.zh-CN.md`，`test/units.test.ts` 会核对两份报告格式里的类型码。
+- 报告格式、类型码、timeline 或 story 字段改了，同一个提交里改 `docs/report-schema.md`、`docs/timeline-schema.md` 或 `docs/story-schema.md` 和对应的 `.zh-CN.md`，`test/units.test.ts` 会核对两份报告格式里的类型码。
 - 文档里的安装命令一律带精确版本，`scripts/stamp.test.mjs` 扫所有入库文件。
 - README 样片墙的视频放在 GitHub 的 user-attachments 上，不跟版本走：发版不改它们，Release 还没建好时也不会裂图。只有网页编辑器上传能生成这种地址（在本仓库新建 issue 的编辑框里拖入文件，拿到地址后不提交）。地址要在 README 里单独占一行（表格单元格里前后各空一行），GitHub 才渲染成播放器，未登录也能播。写成 `<video>` 标签或放在链接文字里都不行，npm 页面上也播不了。
 
