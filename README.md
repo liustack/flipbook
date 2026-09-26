@@ -19,7 +19,7 @@
   <img src="https://img.shields.io/badge/users-unknown-lightgrey?style=flat-square" alt="Users unknown">
 </p>
 
-https://github.com/user-attachments/assets/d0358eec-777e-4237-9695-e70ff8a7905d
+https://github.com/user-attachments/assets/60d42983-127c-48f8-90ed-102034ec5a94
 
 <p align="center"><sub>A flip book of Muybridge's 1878 Horse in Motion: the pages riffle faster and faster until the horse runs, then settle on the standing mare. 12.5 s, preset music.</sub></p>
 

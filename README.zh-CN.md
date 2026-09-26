@@ -19,7 +19,7 @@
   <img src="https://img.shields.io/badge/users-unknown-lightgrey?style=flat-square" alt="Users unknown">
 </p>
 
-https://github.com/user-attachments/assets/d0358eec-777e-4237-9695-e70ff8a7905d
+https://github.com/user-attachments/assets/60d42983-127c-48f8-90ed-102034ec5a94
 
 <p align="center"><sub>迈布里奇 1878 年《运动中的马》做成的手翻书：书页越翻越快，马跑了起来，最后停在站着的那一格。12.5 秒，预设配乐。</sub></p>
 
