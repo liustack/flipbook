@@ -127,7 +127,7 @@ What each platform was tested on, the sandbox settings and the memory a containe
 
 ## What it does not do
 
-- **3D characters.** Nothing with rigged models, skeletons or motion capture.
+- **3D characters.** Nothing with 3D models or motion capture. Characters are flat cut-out puppets: paper parts on bones, drawn in code.
 - **Editing real footage.** It does not cut video you shot. That is a job for a video editor or ffmpeg.
 - **Video from video models.** Motion is drawn by code, frame by frame. Still images, generated ones included, can be material: a character's parts, a backdrop, a prop, with their source written down in `assets/SOURCES.json`.
 - **Voice-over.** No text-to-speech narration yet, only music and sound effects.
