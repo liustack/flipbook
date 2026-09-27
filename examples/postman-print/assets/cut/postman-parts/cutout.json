@@ -1,0 +1,187 @@
+{
+  "image": "assets/postman-parts.png",
+  "mode": "paper",
+  "paper": null,
+  "items": [
+    {
+      "file": "assets/cut/postman-parts/postman-parts-01.png",
+      "width": 237,
+      "height": 274,
+      "crop": {
+        "x": 0.11083333333333334,
+        "y": 0.2658333333333333,
+        "width": 0.21916666666666668,
+        "height": 0.24916666666666668
+      },
+      "area": 0.02818125
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-02.png",
+      "width": 222,
+      "height": 224,
+      "crop": {
+        "x": 0.6566666666666666,
+        "y": 0.0475,
+        "width": 0.20666666666666667,
+        "height": 0.20833333333333334
+      },
+      "area": 0.01806875
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-03.png",
+      "width": 222,
+      "height": 222,
+      "crop": {
+        "x": 0.4008333333333333,
+        "y": 0.04833333333333333,
+        "width": 0.2075,
+        "height": 0.2075
+      },
+      "area": 0.018045833333333334
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-04.png",
+      "width": 221,
+      "height": 222,
+      "crop": {
+        "x": 0.15,
+        "y": 0.04833333333333333,
+        "width": 0.20666666666666667,
+        "height": 0.2075
+      },
+      "area": 0.017891666666666667
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-05.png",
+      "width": 151,
+      "height": 197,
+      "crop": {
+        "x": 0.5258333333333334,
+        "y": 0.7458333333333333,
+        "width": 0.15,
+        "height": 0.1875
+      },
+      "area": 0.010440972222222223
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-06.png",
+      "width": 149,
+      "height": 197,
+      "crop": {
+        "x": 0.74,
+        "y": 0.7458333333333333,
+        "width": 0.14916666666666667,
+        "height": 0.1875
+      },
+      "area": 0.0103625
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-07.png",
+      "width": 91,
+      "height": 190,
+      "crop": {
+        "x": 0.5758333333333333,
+        "y": 0.3025,
+        "width": 0.1025,
+        "height": 0.18083333333333335
+      },
+      "area": 0.008845833333333334
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-08.png",
+      "width": 89,
+      "height": 189,
+      "crop": {
+        "x": 0.4025,
+        "y": 0.3025,
+        "width": 0.10083333333333333,
+        "height": 0.18083333333333335
+      },
+      "area": 0.008784722222222222
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-09.png",
+      "width": 77,
+      "height": 180,
+      "crop": {
+        "x": 0.7783333333333333,
+        "y": 0.3125,
+        "width": 0.09166666666666666,
+        "height": 0.17333333333333334
+      },
+      "area": 0.0069388888888888885
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-10.png",
+      "width": 75,
+      "height": 161,
+      "crop": {
+        "x": 0.14416666666666667,
+        "y": 0.55,
+        "width": 0.09,
+        "height": 0.15833333333333333
+      },
+      "area": 0.006223611111111111
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-11.png",
+      "width": 112,
+      "height": 144,
+      "crop": {
+        "x": 0.7491666666666666,
+        "y": 0.5508333333333333,
+        "width": 0.12,
+        "height": 0.145
+      },
+      "area": 0.006049305555555555
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-12.png",
+      "width": 86,
+      "height": 139,
+      "crop": {
+        "x": 0.33166666666666667,
+        "y": 0.7566666666666667,
+        "width": 0.09916666666666667,
+        "height": 0.14083333333333334
+      },
+      "area": 0.005809722222222222
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-13.png",
+      "width": 86,
+      "height": 138,
+      "crop": {
+        "x": 0.1425,
+        "y": 0.7575,
+        "width": 0.09916666666666667,
+        "height": 0.14
+      },
+      "area": 0.005774305555555556
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-14.png",
+      "width": 78,
+      "height": 134,
+      "crop": {
+        "x": 0.35333333333333333,
+        "y": 0.5508333333333333,
+        "width": 0.0925,
+        "height": 0.13666666666666666
+      },
+      "area": 0.004775694444444444
+    },
+    {
+      "file": "assets/cut/postman-parts/postman-parts-15.png",
+      "width": 78,
+      "height": 121,
+      "crop": {
+        "x": 0.56,
+        "y": 0.5508333333333333,
+        "width": 0.0925,
+        "height": 0.12583333333333332
+      },
+      "area": 0.004411111111111111
+    }
+  ]
+}

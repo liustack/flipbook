@@ -1,0 +1,21 @@
+{
+    "frames": 403,
+    "durationSec": 16.791666666666668,
+    "fps": 24,
+    "width": 1920,
+    "height": 1080,
+    "check": "pass",
+    "render": "pass",
+    "audio": {
+        "codec": "aac",
+        "sampleRate": 48000,
+        "channels": 2,
+        "integratedLufs": -14,
+        "sfxCues": 2
+    },
+    "snapshot": {
+        "machine": "darwin-arm64 24.3.0 Apple M4",
+        "chromium": "1243",
+        "digest": "644c2c365cb81a33ef49c3f0329b984795454b64a3573768ae47ce3d78451673"
+    }
+}

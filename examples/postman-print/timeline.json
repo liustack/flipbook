@@ -1,0 +1,27 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 1024,
+    "bpm": 100,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "walk", "bars": 2 },
+        { "id": "gust", "bars": 1 },
+        { "id": "chase", "bars": 2 },
+        { "id": "land", "bars": 2 }
+    ],
+    "cues": [
+        { "id": "whoosh", "scene": "gust", "beat": 0, "kind": "sfx", "sfx": "sweep" },
+        { "id": "drop", "scene": "land", "beat": 1, "kind": "sfx", "sfx": "ding" },
+        { "id": "sent", "scene": "land", "beat": 3, "kind": "text", "text": "寄到了", "settleBeats": 1 }
+    ],
+    "audio": {
+        "mode": "preset",
+        "preset": "pluck",
+        "key": "D",
+        "progression": 1,
+        "dynamics": { "walk": "soft", "gust": "full", "chase": "full", "land": "medium" }
+    }
+}

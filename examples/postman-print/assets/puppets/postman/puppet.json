@@ -1,0 +1,27 @@
+{
+    "version": 1,
+    "reference": "assets/postman-reference.png",
+    "parts": {
+        "torso": {
+            "image": "assets/cut/postman-parts/postman-parts-01.png",
+            "pivot": [165, 240],
+            "sockets": { "neck": [160, 14], "shoulder": [145, 45], "hip": [165, 240] }
+        },
+        "head": { "image": "assets/cut/postman-parts/postman-parts-04.png", "pivot": "bottom" },
+        "headBlink": { "image": "assets/cut/postman-parts/postman-parts-03.png", "pivot": "bottom" },
+        "headTalk": { "image": "assets/cut/postman-parts/postman-parts-02.png", "pivot": "bottom" },
+        "armFront": { "image": "assets/cut/postman-parts/postman-parts-08.png", "pivot": "top", "sockets": { "elbow": "bottom" }, "fit": [0.78, 0.78] },
+        "armBack": { "image": "assets/cut/postman-parts/postman-parts-07.png", "pivot": "top", "sockets": { "elbow": "bottom" }, "fit": [0.78, 0.78] },
+        "foreFront": { "image": "assets/cut/postman-parts/postman-parts-09.png", "pivot": "top", "sockets": { "wrist": [42, 147] }, "fit": [0.78, 0.78] },
+        "foreBack": { "image": "assets/cut/postman-parts/postman-parts-10.png", "pivot": "top", "sockets": { "wrist": [39, 127] }, "fit": [0.78, 0.78] },
+        "hand": { "image": "assets/cut/postman-parts/postman-parts-14.png", "pivot": "top", "fit": [0.78, 0.78] },
+        "handFist": { "image": "assets/cut/postman-parts/postman-parts-15.png", "pivot": "top", "fit": [0.78, 0.78] },
+        "handOpen": { "image": "assets/cut/postman-parts/postman-parts-11.png", "pivot": "top", "fit": [0.78, 0.78] },
+        "thighFront": { "image": "assets/cut/postman-parts/postman-parts-13.png", "pivot": "top", "sockets": { "knee": "bottom" }, "fit": [1, 1.35] },
+        "thighBack": { "image": "assets/cut/postman-parts/postman-parts-12.png", "pivot": "top", "sockets": { "knee": "bottom" }, "fit": [1, 1.35] },
+        "shinFront": { "image": "assets/cut/postman-parts/postman-parts-05.png", "pivot": "top" },
+        "shinBack": { "image": "assets/cut/postman-parts/postman-parts-06.png", "pivot": "top" }
+    },
+    "bones": "biped",
+    "map": { "handFront": "hand", "handBack": "hand" }
+}

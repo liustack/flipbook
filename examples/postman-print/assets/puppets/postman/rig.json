@@ -1,0 +1,322 @@
+{
+  "version": 1,
+  "parts": {
+    "torso": {
+      "file": "assets/puppets/postman/parts/torso.png",
+      "width": 237,
+      "height": 274,
+      "pivot": [
+        165,
+        240
+      ],
+      "sockets": {
+        "neck": [
+          160,
+          14
+        ],
+        "shoulder": [
+          145,
+          45
+        ],
+        "hip": [
+          165,
+          240
+        ]
+      }
+    },
+    "head": {
+      "file": "assets/puppets/postman/parts/head.png",
+      "width": 221,
+      "height": 222,
+      "pivot": [
+        106,
+        202
+      ]
+    },
+    "headBlink": {
+      "file": "assets/puppets/postman/parts/headBlink.png",
+      "width": 222,
+      "height": 222,
+      "pivot": [
+        106.5,
+        202
+      ]
+    },
+    "headTalk": {
+      "file": "assets/puppets/postman/parts/headTalk.png",
+      "width": 222,
+      "height": 224,
+      "pivot": [
+        109,
+        204
+      ]
+    },
+    "armFront": {
+      "file": "assets/puppets/postman/parts/armFront.png",
+      "width": 89,
+      "height": 189,
+      "pivot": [
+        42.5,
+        41
+      ],
+      "sockets": {
+        "elbow": [
+          52,
+          152
+        ]
+      },
+      "fit": [
+        0.78,
+        0.78
+      ]
+    },
+    "armBack": {
+      "file": "assets/puppets/postman/parts/armBack.png",
+      "width": 91,
+      "height": 190,
+      "pivot": [
+        42,
+        43
+      ],
+      "sockets": {
+        "elbow": [
+          54.5,
+          154
+        ]
+      },
+      "fit": [
+        0.78,
+        0.78
+      ]
+    },
+    "foreFront": {
+      "file": "assets/puppets/postman/parts/foreFront.png",
+      "width": 77,
+      "height": 180,
+      "pivot": [
+        36,
+        24
+      ],
+      "sockets": {
+        "wrist": [
+          42,
+          147
+        ]
+      },
+      "fit": [
+        0.78,
+        0.78
+      ]
+    },
+    "foreBack": {
+      "file": "assets/puppets/postman/parts/foreBack.png",
+      "width": 75,
+      "height": 161,
+      "pivot": [
+        37.5,
+        22
+      ],
+      "sockets": {
+        "wrist": [
+          39,
+          127
+        ]
+      },
+      "fit": [
+        0.78,
+        0.78
+      ]
+    },
+    "hand": {
+      "file": "assets/puppets/postman/parts/hand.png",
+      "width": 78,
+      "height": 134,
+      "pivot": [
+        38,
+        22
+      ],
+      "fit": [
+        0.78,
+        0.78
+      ]
+    },
+    "handFist": {
+      "file": "assets/puppets/postman/parts/handFist.png",
+      "width": 78,
+      "height": 121,
+      "pivot": [
+        34,
+        22
+      ],
+      "fit": [
+        0.78,
+        0.78
+      ]
+    },
+    "handOpen": {
+      "file": "assets/puppets/postman/parts/handOpen.png",
+      "width": 112,
+      "height": 144,
+      "pivot": [
+        57.5,
+        22
+      ],
+      "fit": [
+        0.78,
+        0.78
+      ]
+    },
+    "thighFront": {
+      "file": "assets/puppets/postman/parts/thighFront.png",
+      "width": 86,
+      "height": 138,
+      "pivot": [
+        44,
+        24
+      ],
+      "sockets": {
+        "knee": [
+          42.5,
+          96
+        ]
+      },
+      "fit": [
+        1,
+        1.35
+      ]
+    },
+    "thighBack": {
+      "file": "assets/puppets/postman/parts/thighBack.png",
+      "width": 86,
+      "height": 139,
+      "pivot": [
+        44,
+        24
+      ],
+      "sockets": {
+        "knee": [
+          41.5,
+          97
+        ]
+      },
+      "fit": [
+        1,
+        1.35
+      ]
+    },
+    "shinFront": {
+      "file": "assets/puppets/postman/parts/shinFront.png",
+      "width": 151,
+      "height": 197,
+      "pivot": [
+        42.5,
+        22
+      ]
+    },
+    "shinBack": {
+      "file": "assets/puppets/postman/parts/shinBack.png",
+      "width": 149,
+      "height": 197,
+      "pivot": [
+        40,
+        23
+      ]
+    }
+  },
+  "bones": [
+    {
+      "name": "armBack",
+      "parent": "torso",
+      "socket": "shoulder",
+      "part": "armBack",
+      "z": 12,
+      "group": "armBack"
+    },
+    {
+      "name": "foreBack",
+      "parent": "armBack",
+      "socket": "elbow",
+      "part": "foreBack",
+      "z": 11,
+      "group": "armBack"
+    },
+    {
+      "name": "handBack",
+      "parent": "foreBack",
+      "socket": "wrist",
+      "part": "hand",
+      "z": 10,
+      "group": "armBack"
+    },
+    {
+      "name": "thighBack",
+      "parent": "torso",
+      "socket": "hip",
+      "part": "thighBack",
+      "z": 21,
+      "group": "legBack"
+    },
+    {
+      "name": "shinBack",
+      "parent": "thighBack",
+      "socket": "knee",
+      "part": "shinBack",
+      "z": 20,
+      "group": "legBack"
+    },
+    {
+      "name": "thighFront",
+      "parent": "torso",
+      "socket": "hip",
+      "part": "thighFront",
+      "z": 31,
+      "group": "legFront"
+    },
+    {
+      "name": "shinFront",
+      "parent": "thighFront",
+      "socket": "knee",
+      "part": "shinFront",
+      "z": 30,
+      "group": "legFront"
+    },
+    {
+      "name": "head",
+      "parent": "torso",
+      "socket": "neck",
+      "part": "head",
+      "z": 45,
+      "group": "body"
+    },
+    {
+      "name": "torso",
+      "part": "torso",
+      "z": 50,
+      "group": "body"
+    },
+    {
+      "name": "armFront",
+      "parent": "torso",
+      "socket": "shoulder",
+      "part": "armFront",
+      "z": 72,
+      "group": "armFront"
+    },
+    {
+      "name": "foreFront",
+      "parent": "armFront",
+      "socket": "elbow",
+      "part": "foreFront",
+      "z": 71,
+      "group": "armFront"
+    },
+    {
+      "name": "handFront",
+      "parent": "foreFront",
+      "socket": "wrist",
+      "part": "hand",
+      "z": 70,
+      "group": "armFront"
+    }
+  ]
+}

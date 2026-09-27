@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>postman: a letter on the wind, woodcut parts</title>
+<style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #dfe2dc; }
+  canvas { position: absolute; left: 0; top: 0; }
+  #sent { position: absolute; left: 0; width: 100%; margin: 0; text-align: center; opacity: 0;
+          top: calc(18% * 1); font: 400 calc(96px * var(--u, 1))/1.2 "LXGW WenKai"; color: #2a2320; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<p id="sent">寄到了</p>
+<script type="module">
+import {
+  blendPose, blink, boil, composition, cueProgress, drawPaper, ease, grainLayer, idle, loadRig,
+  lookAt, onTwos, progress, puppet, rand, setupCanvas, staticLayer, talk, timeline, walk, walkTime, wave,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const U = Math.min(W, H) / 1080;
+document.documentElement.style.setProperty('--u', String(U));
+const ctx = setupCanvas(document.getElementById('stage'), W, H);
+const sentText = document.getElementById('sent');
+const [walkScene, gustScene, chaseScene, landScene] = tl.scenes;
+
+// ---------------------------------------------------------------------------
+// The postman: parts from a generated woodcut sheet, rigged by flipbook puppet.
+
+const RED = '#c8423b';
+const rig = await loadRig('assets/puppets/postman/rig.json');
+const SCALE = 0.6 * U;
+const man = puppet({ ...rig, scale: SCALE, outline: { width: 5, color: '#1e1a1c' } });
+const LEGS = man.legs();
+const LEG = LEGS.thigh + LEGS.shin;
+// Where the letter sits in the hand, in the hand's own px.
+const GRIP = [rig.parts.hand.width * 0.6, rig.parts.hand.height * 0.75];
+
+/** The red envelope, centered on (x, y), turned by `angle` radians. */
+function drawLetter(c, x, y, angle, turn = 1) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(angle);
+  c.scale(turn, 1);
+  c.fillStyle = RED;
+  c.strokeStyle = '#2a2320';
+  c.lineWidth = 2.5;
+  c.beginPath();
+  c.rect(-32, -21, 64, 42);
+  c.fill();
+  c.stroke();
+  c.strokeStyle = 'rgba(42, 35, 32, 0.6)';
+  c.lineWidth = 1.6;
+  c.beginPath();
+  c.moveTo(-32, -21);
+  c.lineTo(0, 4);
+  c.lineTo(32, -21);
+  c.stroke();
+  c.restore();
+}
+
+
+// ---------------------------------------------------------------------------
+// Where he is and what he does, as a function of t.
+
+const FLOOR = 900 * U;
+const MAIL_X = 1760 * U;
+const SLOT = { x: MAIL_X + 4 * U, y: 640 * U };
+// He walks in from off screen and stops 0.4 of the way across, then chases
+// the letter to just short of the mailbox. Each walk ends with the feet
+// together half a step past its last step, and its step length follows
+// from where it starts and stops.
+const X0 = -0.12 * W;
+const X1 = 0.4 * W;
+const X2 = MAIL_X - 250 * U;
+const WALK = { ...LEGS, cadence: 1.8, steps: 7, start: 0.2 };
+WALK.step = (X1 - X0) / SCALE / (WALK.steps + 0.5);
+WALK.end = WALK.start + walkTime(WALK);
+const CHASE = { ...LEGS, cadence: 2.1, lean: 7, arm: 30, steps: 6, start: chaseScene.start + 0.15 };
+CHASE.step = (X2 - X1) / SCALE / (CHASE.steps + 0.5);
+CHASE.end = CHASE.start + walkTime(CHASE);
+
+function settle(from, t, at) {
+  return blendPose(from, idle(t - at), ease.outCubic(progress(t, at, at + 0.35)));
+}
+
+function frame(t) {
+  let x;
+  let pose;
+  const swap = {};
+  if (t < WALK.end) {
+    const w = walk(Math.max(0, t - WALK.start), WALK);
+    x = X0 + w.distance * SCALE;
+    pose = w.pose;
+  } else if (t < CHASE.start) {
+    x = X1;
+    pose = settle(walk(WALK.end - WALK.start, WALK).pose, t, WALK.end);
+  } else if (t < CHASE.end) {
+    const w = walk(t - CHASE.start, CHASE);
+    x = X1 + w.distance * SCALE;
+    pose = w.pose;
+  } else {
+    x = X2;
+    pose = settle(walk(CHASE.end - CHASE.start, CHASE).pose, t, CHASE.end);
+  }
+  const root = [x, FLOOR - LEG * SCALE];
+  // In the gust he stops, reaches up after the letter, and watches it go.
+  if (t >= gustScene.start && t < CHASE.start) {
+    const reach = ease.outCubic(progress(t, gustScene.start, gustScene.start + 0.35))
+      * (1 - ease.inOutCubic(progress(t, gustScene.start + 0.9, gustScene.start + 1.5)));
+    pose = { ...pose, armFront: -150 * reach, foreFront: -20 * reach };
+  }
+  const head = man.joint('head', root[0], root[1], { pose });
+  const letter = letterAt(t);
+  if (letter && t < landScene.start + 1.2) pose = { ...pose, head: (pose.head ?? 0) + lookAt([head.x, head.y], [letter.x, letter.y]) };
+  // At the mailbox: he blinks, waves and says it.
+  const w = wave(t, landScene.start + 1.4, landScene.start + 3.6, { reach: -85, elbow: -40 });
+  if (w.raised > 0) {
+    pose = { ...pose, ...w.pose };
+    if (w.raised > 0.5) swap.handFront = 'handOpen';
+  }
+  if (blink(t, { seed: tl.seed })) swap.head = 'headBlink';
+  if (talk(t, landScene.start + 1.8, landScene.start + 2.6, { seed: tl.seed })) swap.head = 'headTalk';
+  return { root, pose, swap };
+}
+
+// The letter's flight: out of his hand on the gust, over his head, down the
+// street and into the slot. A smooth curve through a few points.
+const LETTER_START = gustScene.start;
+let letterPath = null;
+function letterAt(t) {
+  if (t < LETTER_START || t > landScene.start + 0.6) return null;
+  if (!letterPath) {
+    const f = frame0();
+    const p0 = man.joint('handFront', f.root[0], f.root[1], { pose: f.pose }, GRIP);
+    letterPath = [
+      [LETTER_START, p0.x, p0.y],
+      [LETTER_START + 0.8, p0.x + 150 * U, p0.y - 250 * U],
+      [LETTER_START + 1.9, p0.x + 360 * U, p0.y - 310 * U],
+      [chaseScene.start + 0.6, p0.x + 560 * U, p0.y - 220 * U],
+      [chaseScene.start + 2.4, p0.x + 780 * U, p0.y - 290 * U],
+      [chaseScene.end - 0.6, SLOT.x - 70 * U, SLOT.y - 170 * U],
+      [landScene.start + 0.6, SLOT.x, SLOT.y],
+    ];
+  }
+  const k = Math.max(0, letterPath.findIndex((p) => p[0] > t) - 1);
+  const [a, b] = [letterPath[k], letterPath[Math.min(k + 1, letterPath.length - 1)]];
+  const pre = letterPath[Math.max(0, k - 1)];
+  const post = letterPath[Math.min(letterPath.length - 1, k + 2)];
+  const u = b[0] === a[0] ? 0 : (t - a[0]) / (b[0] - a[0]);
+  const cr = (p0, p1, p2, p3) =>
+    0.5 * (2 * p1 + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u * u * u);
+  const x = cr(pre[1], a[1], b[1], post[1]);
+  const y = cr(pre[2], a[2], b[2], post[2]);
+  const age = t - LETTER_START;
+  const landing = progress(t, landScene.start, landScene.start + 0.6);
+  return {
+    x,
+    y,
+    angle: (0.5 * Math.sin(age * 5.2) + 0.25 * Math.sin(age * 2.1)) * (1 - landing),
+    turn: Math.cos(age * 3.4) * (1 - landing) + landing,
+    sink: landing,
+  };
+}
+// His pose at the moment of the gust, where the letter leaves the hand.
+function frame0() {
+  const w = walk(WALK.end - WALK.start, WALK);
+  return { root: [X1, FLOOR - LEG * SCALE], pose: settle(w.pose, LETTER_START, WALK.end) };
+}
+
+// Scraps of paper the gust blows across the street.
+function scraps(c, t) {
+  const u = t - gustScene.start;
+  if (u < 0 || u > 3.2) return;
+  for (let i = 0; i < 9; i++) {
+    const delay = rand(tl.seed, 'scrap-at', i) * 0.8;
+    const s = u - delay;
+    if (s < 0) continue;
+    const x = -60 * U + s * (900 + 500 * rand(tl.seed, 'scrap-v', i)) * U;
+    const y = (420 + 340 * rand(tl.seed, 'scrap-y', i)) * U + Math.sin(s * 4 + i) * 40 * U - s * 60 * U;
+    if (x > W + 60) continue;
+    c.save();
+    c.translate(x, y);
+    c.rotate(s * (3 + i));
+    c.fillStyle = i % 3 === 0 ? '#e9e1cf' : '#c9c2b0';
+    c.strokeStyle = '#2a2320';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(-12 * U, -7 * U);
+    c.lineTo(10 * U, -9 * U);
+    c.lineTo(13 * U, 6 * U);
+    c.lineTo(-9 * U, 8 * U);
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The street: layers of torn paper, drawn once.
+
+let street;
+let mailbox;
+function tornEdge(c, y0, amp, seed, step) {
+  c.lineTo(W + 10, y0);
+  for (let x = W + 10; x >= -10; x -= step) {
+    c.lineTo(x, y0 + (rand(seed, 'edge', Math.round(x)) - 0.5) * amp);
+  }
+}
+
+composition({
+  setup() {
+    street = staticLayer(W, H, (c) => {
+      drawPaper(c, W, H, { seed: tl.seed, color: '#dde1da', mottle: 1.4, fibers: 1.2 });
+      // Far houses, one tone darker, each roof a torn triangle.
+      const houses = new Path2D();
+      houses.moveTo(-10, H);
+      let x = -40;
+      let i = 0;
+      while (x < W + 40) {
+        const w = (150 + rand(tl.seed, 'house-w', i) * 120) * U;
+        const top = (470 + rand(tl.seed, 'house-h', i) * 140) * U;
+        houses.lineTo(x, top + 40 * U);
+        houses.lineTo(x + w / 2, top);
+        houses.lineTo(x + w, top + 40 * U);
+        x += w;
+        i += 1;
+      }
+      houses.lineTo(W + 10, H);
+      houses.closePath();
+      c.save();
+      c.clip(houses);
+      drawPaper(c, W, H, { seed: tl.seed + 1, color: '#b6bdbd', mottle: 1.3, fibers: 1 });
+      c.restore();
+      c.save();
+      c.clip(houses);
+      c.fillStyle = 'rgba(42, 35, 32, 0.28)';
+      for (let k = 0; k < 26; k++) {
+        const wx = rand(tl.seed, 'win-x', k) * W;
+        const wy = (640 + rand(tl.seed, 'win-y', k) * 120) * U;
+        c.fillRect(wx, wy, 22 * U, 30 * U);
+      }
+      c.restore();
+      // The pavement in front, torn along its top edge.
+      const ground = new Path2D();
+      ground.moveTo(-10, H + 10);
+      ground.lineTo(-10, FLOOR - 16 * U);
+      const g2 = new Path2D();
+      c.save();
+      c.beginPath();
+      c.moveTo(-10, H + 10);
+      c.lineTo(-10, FLOOR - 14 * U);
+      tornEdge(c, FLOOR - 14 * U, 8 * U, tl.seed + 2, 18 * U);
+      c.lineTo(-10, FLOOR - 14 * U);
+      c.lineTo(W + 10, FLOOR - 14 * U);
+      c.lineTo(W + 10, H + 10);
+      c.closePath();
+      c.clip();
+      drawPaper(c, W, H, { seed: tl.seed + 3, color: '#cbb996', mottle: 1.5, fibers: 1.6 });
+      c.restore();
+      c.strokeStyle = 'rgba(42, 35, 32, 0.45)';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(0, FLOOR + 60 * U);
+      c.lineTo(W, FLOOR + 60 * U);
+      c.stroke();
+    });
+    mailbox = staticLayer(W, H, (c) => {
+      const box = new Path2D();
+      box.roundRect(MAIL_X - 70 * U, 560 * U, 140 * U, 190 * U, [50 * U, 50 * U, 8 * U, 8 * U]);
+      box.rect(MAIL_X - 14 * U, 750 * U, 28 * U, FLOOR - 750 * U + 4 * U);
+      c.save();
+      c.clip(box);
+      drawPaper(c, W, H, { seed: tl.seed + 4, color: '#3f6b55', mottle: 1.2, fibers: 1.2 });
+      c.restore();
+      c.strokeStyle = '#2a2320';
+      c.lineWidth = 3.5;
+      c.stroke(box);
+      c.fillStyle = '#1f2a24';
+      c.fillRect(SLOT.x - 44 * U, SLOT.y - 5 * U, 88 * U, 10 * U);
+    });
+    grainLayer(W, H, { seed: tl.seed, amount: 0.7 });
+  },
+  seek(time) {
+    // The whole picture is shot on twos and shifts a hair between drawings.
+    const t = onTwos(time, tl.fps);
+    const b = boil(t, tl.fps, { seed: 'street', amount: 1.2, turn: 0.1 });
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+    ctx.translate(b.x * U, b.y * U);
+    ctx.rotate(b.rotate);
+    street.blit(ctx);
+    mailbox.blit(ctx);
+    scraps(ctx, t);
+    const f = frame(t);
+    ctx.save();
+    ctx.shadowColor = 'rgba(42, 35, 32, 0.25)';
+    ctx.shadowBlur = 10 * U;
+    ctx.shadowOffsetX = 6 * U;
+    ctx.shadowOffsetY = 8 * U;
+    man.draw(ctx, f.root[0], f.root[1], { pose: f.pose, swap: f.swap });
+    ctx.restore();
+    // Until the gust the letter is in his hand.
+    if (t < LETTER_START) {
+      const held = man.joint('handFront', f.root[0], f.root[1], { pose: f.pose }, GRIP);
+      drawLetter(ctx, held.x, held.y, -0.25);
+    }
+    const letter = letterAt(t);
+    if (letter) {
+      ctx.save();
+      // Into the slot: the part below the slot's top edge is hidden inside the box.
+      if (letter.sink > 0) {
+        ctx.beginPath();
+        ctx.rect(0, 0, W, SLOT.y);
+        ctx.clip();
+      }
+      drawLetter(ctx, letter.x, letter.y + letter.sink * 40 * U, letter.angle, letter.turn);
+      ctx.restore();
+    }
+    ctx.restore();
+    const a = ease.outCubic(cueProgress(tl, t, 'sent'));
+    sentText.style.opacity = String(a);
+    sentText.style.transform = `translateY(${(1 - a) * 12 * U}px)`;
+  },
+});
+</script>
+</body>
+</html>
