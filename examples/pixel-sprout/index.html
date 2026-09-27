@@ -189,7 +189,7 @@ composition({
     drawCan(robotX + 5, GROUND - 7 - lift, watering, t);
     // The title on the grid, a character at a time as its cue comes in.
     const shown = Math.ceil(3 * cueProgress(tl, time, 'grew'));
-    if (shown > 0) g.text('发芽了'.slice(0, shown), 40, 4, C.ink, { id: 'grew' });
+    if (shown > 0) g.text('发芽了'.slice(0, shown), 44, 6, C.ink, { id: 'grew' });
     g.present(ctx);
   },
 });
