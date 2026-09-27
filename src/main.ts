@@ -19,6 +19,7 @@ import {
     writeJson,
 } from './cli/report.ts';
 import { parseRegion, runSnapshot } from './cli/snapshot.ts';
+import { runSprite } from './cli/sprite.ts';
 import { runStockFetch, runStockSearch } from './cli/stock.ts';
 import { win32Allowed } from './engine/browser.ts';
 import { pruneCache } from './engine/prune.ts';
@@ -369,6 +370,17 @@ program
     .argument('<name>', 'the puppet, a folder under assets/puppets/')
     .action(async (dir: string, name: string) => {
         await execute('puppet', dir, () => runPuppet({ dir, name }));
+    });
+
+program
+    .command('sprite')
+    .description(
+        'Cut frame-by-frame sprite sheets into clips: read assets/sprites/<name>/sprite.json, cut and order the drawings, align them on head and soles, scale every clip to one height, write clips.json and a sheet to look at',
+    )
+    .argument('<dir>', 'composition directory')
+    .argument('<name>', 'the sprite, a folder under assets/sprites/')
+    .action(async (dir: string, name: string) => {
+        await execute('sprite', dir, () => runSprite({ dir, name }));
     });
 
 program

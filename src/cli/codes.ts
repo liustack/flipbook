@@ -181,6 +181,16 @@ export const FINDING_CODES = {
             'flipbook puppet found no round joint tab at the named end of a part: the end is square or ragged, or the side is wrong.',
         fix: "Give that joint as [x, y] in the part's own pixels, read off the cut image, or name the side the tab is on.",
     },
+    'sprite-invalid': {
+        meaning:
+            'flipbook sprite did not start or could not cut a clip: assets/sprites/<name>/sprite.json is missing, is not valid JSON, does not match sprite schema v1, names a sheet outside assets/ or without its source and license (a generated sheet also needs its tool and prompt), shows more or fewer separate drawings than frames says, or has drawings that reach past their crop.',
+        fix: 'Fix the field named in `detail.path` as the message says, see references/characters.md. Too few drawings: those that touch or nearly touch count as one, so lower gap or ask for a sheet with wider gaps. Too many: pieces of one drawing count apart, so raise gap.',
+    },
+    'sprite-drift': {
+        meaning:
+            'A drawing of a clip is much taller or shorter than the others, or, in a clip that stands still, its feet stand away from where they stand in the others, or, in a walk, a drawing had to be shifted a lot to keep the planted foot put, or the planted foot could not be followed at all: the character grows and shrinks, slides or sways as it plays.',
+        fix: 'Look at the drawing on the sheet (out/sprite/<name>.png, drawn on pink). Leave it when the change is part of the move (a crouch, a jump) or the sway looks natural, otherwise redraw or regenerate that drawing, or leave it out. For `stride` (no drawing named): look at the whole walk, a foot must touch the ground in every drawing and move back from one to the next.',
+    },
     'cutout-none': {
         meaning:
             'flipbook cutout found no specimen standing apart on the plate: they touch one another (tentacles, spines), or the ground color is wrong.',

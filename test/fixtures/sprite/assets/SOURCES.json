@@ -1,0 +1,32 @@
+{
+    "walk.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "stick figures in a row, feet apart and together"
+    },
+    "wave.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "smaller stick figures standing"
+    },
+    "drift.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "stick figures, one too tall, one with its feet ahead"
+    },
+    "sparse.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "three drawings and a smaller fourth on a big empty sheet"
+    },
+    "tiny.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "three tiny drawings and a smaller fourth on a big white sheet"
+    }
+}

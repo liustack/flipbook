@@ -29,7 +29,7 @@ For `sandbox-blocked` and `tmp-unwritable`, `detail.signature` names the row of 
 | Field | Type | Description |
 |---|---|---|
 | `schema` | string | Always `flipbook.report/1` |
-| `command` | string | `check`, `snapshot`, `render`, `audio`, `stock-search`, `stock-fetch`, `cutout`, `puppet`, or `usage` on a usage error |
+| `command` | string | `check`, `snapshot`, `render`, `audio`, `stock-search`, `stock-fetch`, `cutout`, `puppet`, `sprite`, or `usage` on a usage error |
 | `ok` | boolean | true when the exit code is 0 |
 | `exitCode` | 0, 1, 2, 78 | Same as the process exit code |
 | `flipbook.version` | string | CLI version |
@@ -173,6 +173,8 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `cutout-clipped` | cutout, warning | A specimen reaches past its crop and was left out: its cutout would have a straight edge. `detail.index` and `detail.sides` say which and where | Nothing when enough were kept. Otherwise raise `--gap`, or use the plate whole |
 | `puppet-invalid` | puppet | Nothing was rigged: `assets/puppets/<name>/puppet.json` is missing, is not valid JSON or does not match puppet v1, a part's image lies outside `assets/` or its entry in `assets/SOURCES.json` falls short (as for `asset-unlicensed`), or the bones do not hang together (a missing socket, a missing part, more than one root). `detail.path` is the field | Fix the field as the message says. [references/characters.md](../skills/flipbook/references/characters.md) describes puppet.json |
 | `puppet-joint-missing` | puppet | No round joint tab shows at the named end of a part: the end is square or ragged, or the tab is on another side. `detail.part`, `detail.joint` and `detail.side` say where. Nothing is written | Give that joint as `[x, y]` in the part's own pixels, read off the cut image, or name the side the tab is on |
+| `sprite-invalid` | sprite | Nothing was cut: `assets/sprites/<name>/sprite.json` is missing, is not valid JSON or does not match sprite v1, a clip's sheet lies outside `assets/` or its entry in `assets/SOURCES.json` falls short (as for `asset-unlicensed`), the sheet shows more or fewer separate drawings than `frames` (`detail.found`, `detail.frames`: a piece a third the size of a typical drawing counts as one), or drawings reach past their crop (`detail.frames` lists them). `detail.path` is the field | Fix the field as the message says. Drawings that touch cannot be told apart: ask for a sheet with wider gaps |
+| `sprite-drift` | sprite, warning | A drawing is more than 6% taller or shorter than the median of its clip (`detail.kind` `height`), or, in a clip that is not a walk, its feet stand more than 5% of the height away from where they stand in the others (`feet`), or, in a walk, a drawing had to be shifted by more than 4% of the height to keep the planted foot put, so the head sways there (`nudge`), or the planted foot could not be followed and the stride is a guess (`stride`, no `detail.frame`). `detail.clip`, `detail.frame` (from 1) and `detail.share` say which and how far. The drawings flagged are drawn on pink on the sheet | Look at the drawing on the sheet. Keep it when the change is part of the move (a crouch, a jump) or the sway looks natural. Otherwise redraw it or leave it out. For `stride` no drawing is named: look at the whole walk, a foot must touch the ground in every drawing and move back from one to the next |
 | `render-busy` | render | Another render is running in the same composition directory. Does not count as an attempt | Wait for it to finish |
 | `internal-error` | all | flipbook itself failed | Leave the composition alone and open an issue with the JSON |
 
@@ -335,6 +337,25 @@ It exits 0 when at least one cutout was written and 1 with `cutout-invalid` or `
 | `puppet.sheet`, `artifacts.sheet` | The sheet |
 
 It exits 0 when the rig was written and 1 with `puppet-invalid` or `puppet-joint-missing`.
+
+### sprite
+
+`flipbook sprite <dir> <name>` cuts frame-by-frame sprite sheets into clips ahead of render. It reads `assets/sprites/<name>/sprite.json`: for each clip, the sheet under `assets/`, how many drawings it holds (`frames`), and optionally `fps` (default 8), `loop` (default false), `walk` for a walk, and the cutting settings `paper`, `threshold` and `gap` (default `0.004`) as for `cutout`, plus a `height` for every clip. In the same bare page as `cutout`, it finds the drawings with `specimens()` (a piece at least a third the size of a typical drawing counts as one, however small beside the sheet), keeps the biggest `frames` of them, puts them in reading order (rows from the top, each left to right) and cuts each with `photo()`. For each drawing it measures the anchor: across, the mean x of the ink in the top 15% of the figure (the head, so a hand raised above the head pulls it), down, the lowest row with ink (the soles). Every clip is scaled so the median of its drawings' heights (head top to soles) matches `height`, or the first clip's. For a walk it follows the planted foot from drawing to drawing (runs of ink in the bottom 4% of the figure: of the pairs that moved back by at most 0.4 of the height, or forward by a hair for noise, and changed width by at most a fifth of it, those whose width changed least, give or take 5% of the height, and of these the one that moved back furthest), makes the advance per drawing even, and shifts each drawing sideways so the planted foot stays where it landed. `stride`, how far the walk moves in one pass, is that advance times the drawings. When the planted foot cannot be followed, or the feet do not move back on the whole (a hop on the spot, a walk backward), the stride is a guess (twice the widest distance between the feet less the closest) and `sprite-drift` says so.
+
+- The drawings are `assets/sprites/<name>/frames/<clip>-01.png`, `-02.png` ... A rerun replaces the set.
+- `assets/sprites/<name>/clips.json` holds `height` and, per clip, `fps`, `loop`, `stride` and each drawing's `file`, `width`, `height` and `anchor`. `loadSprite()` in the page loads it.
+- `assets/SOURCES.json` gets one entry per drawing, `{ "source", "license", "cutFrom" }`, pointing at its sheet.
+- `out/sprite/<name>.png` shows one row per clip: every drawing laid over the others on its anchor (drift shows as a blur), then each on the baseline (red) with its anchor (blue), a drifting one on pink.
+
+| Field | Meaning |
+|---|---|
+| `sprite.name` | The sprite |
+| `sprite.height` | The height every clip was scaled to, in pixels |
+| `sprite.clips` | Per clip: `frames`, `fps`, `loop`, `scale` (the factor applied), `stride` for a walk |
+| `sprite.file` | The clips.json written |
+| `sprite.sheet`, `artifacts.sheet` | The sheet |
+
+It exits 0 when the clips were written, warnings included, and 1 with `sprite-invalid`.
 
 ## Codes: environment (exit 78)
 

@@ -29,7 +29,7 @@ read_when:
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `schema` | string | 固定 `flipbook.report/1` |
-| `command` | string | `check`、`snapshot`、`render`、`audio`、`stock-search`、`stock-fetch`、`cutout`、`puppet`，用法错时是 `usage` |
+| `command` | string | `check`、`snapshot`、`render`、`audio`、`stock-search`、`stock-fetch`、`cutout`、`puppet`、`sprite`，用法错时是 `usage` |
 | `ok` | boolean | 退出码为 0 时为 true |
 | `exitCode` | 0、1、2、78 | 和进程退出码一致 |
 | `flipbook.version` | string | CLI 版本 |
@@ -173,6 +173,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `cutout-clipped` | cutout，警告 | 有个标本超出了它的裁剪框，没收：抠出来会有一条直边。`detail.index` 和 `detail.sides` 说是哪个、哪边 | 收下的够用就不用管。不够就调大 `--gap`，或整张用 |
 | `puppet-invalid` | puppet | 什么都没装配：`assets/puppets/<name>/puppet.json` 不存在、不是合法 JSON 或不合 puppet v1，某个部件的图不在 `assets/` 下或它在 `assets/SOURCES.json` 里的条目不全（同 `asset-unlicensed`），或骨骼接不起来（缺接口、缺部件、不止一个根）。`detail.path` 是出错的字段 | 按提示改那个字段。puppet.json 的写法见 [references/characters.md](../skills/flipbook/references/characters.md) |
 | `puppet-joint-missing` | puppet | 部件指定的那一头找不到圆形关节舌：那头是方的或参差的，或者舌头在另一边。`detail.part`、`detail.joint` 和 `detail.side` 说是哪里。什么都不写 | 把这个关节写成部件自己像素里的 `[x, y]`，从抠好的图上量，或者改成舌头所在的那一边 |
+| `sprite-invalid` | sprite | 什么都没切：`assets/sprites/<name>/sprite.json` 不存在、不是合法 JSON 或不合 sprite v1，某段动作的表不在 `assets/` 下或它在 `assets/SOURCES.json` 里的条目不全（同 `asset-unlicensed`），表上分得开的画比 `frames` 多或少（`detail.found`、`detail.frames`，有一张典型画三分之一大的就算一张），或者有画超出了裁剪框（`detail.frames` 列出是哪几张）。`detail.path` 是出错的字段 | 按提示改那个字段。挨在一起的画分不开：要一张画之间空隙更宽的表 |
+| `sprite-drift` | sprite，警告 | 有一张画比同一段动作的中位数高或矮 6% 以上（`detail.kind` 为 `height`），或者在不是走路的动作里，它的脚离别的画里脚的位置超过身高的 5%（`feet`），或者在走路里为了让支撑脚不动，一张画横向挪了超过身高的 4%，头在那里会晃（`nudge`），或者跟不上支撑脚、步幅是估的（`stride`，不带 `detail.frame`）。`detail.clip`、`detail.frame`（从 1 数）和 `detail.share` 说是哪张、差多少。被点到的画在检查图上垫粉色底 | 在检查图上看那张画。变化本来就是动作的一部分（蹲下、跳起）或者晃得自然就留着，不是就重画或者不用它。`stride` 不点名哪张画：看整段走路，每张都要有一只脚着地，并且一张比一张往后移 |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 
@@ -335,6 +337,25 @@ id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 
 | `puppet.sheet`、`artifacts.sheet` | 联系表 |
 
 写下 rig 时退 0，`puppet-invalid` 或 `puppet-joint-missing` 时退 1。
+
+### sprite
+
+`flipbook sprite <dir> <name>` 在渲染之前把逐帧精灵图切成一段段动作。它读 `assets/sprites/<name>/sprite.json`：每段动作写 `assets/` 下的哪张表、表上有几张画（`frames`），可选 `fps`（默认 8）、`loop`（默认 false）、走路写 `walk`，以及和 `cutout` 一样的切图设置 `paper`、`threshold`、`gap`（默认 `0.004`），另外可以给所有动作写一个 `height`。它在和 `cutout` 一样的空白页面里用 `specimens()` 找出画（有一张典型画三分之一大的就算一张，在整张表上再小也算），留下最大的 `frames` 张，按阅读顺序排（从上到下一行行，每行从左到右），再用 `photo()` 一张张切出来。每张画量出锚点：横向是人物上面 15% 里墨迹的平均 x（头，所以举过头顶的手会把它拉偏），纵向是最低的有墨的一行（脚底）。每段动作按它各张画身高（头顶到脚底）的中位数缩放到 `height`，没写就对齐第一段。走路时它一张张跟着支撑脚走（人物下面 4% 里的墨迹段：往后移不超过身高 0.4（往前一点点也算，当作误差）、宽度变化不超过身高五分之一的几对里，先挑宽度变化最小的，差不多的（相差身高 5% 以内）再取往后移得最多的那对），把每张之间的前进量拉平，再把每张画横向挪一点，让支撑脚停在落下的地方。`stride`（走一遍前进多远）就是这个前进量乘以张数。跟不上支撑脚，或者整体上脚没有往后移（原地蹦、倒着走）时，`stride` 按两脚最远时的距离减去最近时的距离乘二估一个，并报 `sprite-drift`。
+
+- 切好的画是 `assets/sprites/<name>/frames/<clip>-01.png`、`-02.png` ……重跑整组替换。
+- `assets/sprites/<name>/clips.json` 记着 `height`，以及每段动作的 `fps`、`loop`、`stride` 和每张画的 `file`、`width`、`height`、`anchor`。页面里用 `loadSprite()` 读它。
+- `assets/SOURCES.json` 给每张画记一条 `{ "source", "license", "cutFrom" }`，指向它来自的表。
+- `out/sprite/<name>.png` 每段动作一行：先把所有画按锚点叠在一起（有漂移就糊成一片），再把每张画放在基线（红）上，标出锚点（蓝），漂移的那张垫粉色底。
+
+| 字段 | 说明 |
+|---|---|
+| `sprite.name` | 精灵名 |
+| `sprite.height` | 所有动作缩放到的身高，像素 |
+| `sprite.clips` | 每段动作的 `frames`、`fps`、`loop`、`scale`（缩放倍数），走路还有 `stride` |
+| `sprite.file` | 写下的 clips.json |
+| `sprite.sheet`、`artifacts.sheet` | 联系表 |
+
+写下 clips 时退 0（有警告也是 0），`sprite-invalid` 时退 1。
 
 ## 类型码：环境缺件（退出码 78）
 

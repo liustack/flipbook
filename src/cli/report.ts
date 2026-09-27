@@ -23,6 +23,7 @@ export type Command =
     | 'stock-fetch'
     | 'cutout'
     | 'puppet'
+    | 'sprite'
     | 'doctor'
     | 'usage';
 export type Severity = 'error' | 'warning';
