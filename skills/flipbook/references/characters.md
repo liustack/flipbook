@@ -1,6 +1,6 @@
 # Characters
 
-When a story needs someone to act it out, build a cut-out puppet: parts on bones, posed at every t. The runtime draws it, inks one outline around each group of parts so no joint shows, and gives you walking, breathing, waving, blinking and talking as pure functions of t. Draw the parts in code, or cut them from a picture of the parts (see [Parts from a picture](#parts-from-a-picture)).
+When a story needs someone to act it out, build a cut-out puppet: parts on bones, posed at every t. The runtime draws it, inks one outline around each group of parts so no joint shows, and gives you walking, breathing, waving, blinking and talking as pure functions of t. Draw the parts in code, or cut them from a picture of the parts (see [Parts from a picture](#parts-from-a-picture)). When no joint may show at all, play whole drawings one after another instead (see [Frame by frame](#frame-by-frame)).
 
 ## What to draw
 
@@ -211,3 +211,63 @@ Every picture under `assets/` needs its entry in `assets/SOURCES.json`, or check
 `cutout` and `puppet` write the entries of the pieces and parts for you, each with `cutFrom` pointing at the picture it came from, where the tool and prompt are.
 
 The full example, the same postman cut from a generated woodcut sheet, is `examples/postman-print/` in the flipbook repository.
+
+## Frame by frame
+
+A sprite is the character drawn whole in every pose: eight drawings of a walk, six of a wave. No joint shows, because nothing is jointed. What it costs: the character can only do what was drawn, drawings made one by one drift a little in size and shape, and two sheets made apart rarely match. Use it for a few moves the story needs (walk in, wave, sit), and a puppet when the character has to do many things.
+
+### The sheets
+
+- One sheet per move, the drawings in reading order (one row, or rows from the top), wide gaps between them, on one flat ground color. Every drawing whole: no foot or hat cut off.
+- The same character at the same size in every drawing, in profile facing right, the soles on one line.
+- A walk is a whole cycle, two steps: contact, down, passing, up, then the same with the other leg. A move on the spot (a wave, a nod) keeps the feet planted in the same place.
+- Keep hands below the top of the head: the anchor across is the middle of the ink in the top 15% of the figure, and a hand raised above the head pulls it sideways.
+- Sprites someone else drew (a game asset pack, a sheet from the user) work the same way. Write their source and license into `assets/SOURCES.json`. Most free game sprites are pixel art: they do not sit on paper.
+
+To an image model: "a 2D animation sprite sheet", the number of drawings and what each one is, in order, "one horizontal row", "the same character, same scale, head tops aligned, soles on one baseline", "background perfectly flat", "no text, numbers, grid lines or shadows". Give it a picture of the character, and for the second sheet the first one too, "as a scale and style reference".
+
+### Cutting them
+
+1. Write `assets/sprites/<name>/sprite.json`.
+2. Run `sprite <dir> <name>`, and open `out/sprite/<name>.png`. Each clip's drawings are laid over one another on the anchor: a sharp head and a blur below it is a walk, a blurred head is drift. `sprite-drift` names a drawing that is too tall or short, or whose feet wander in a move on the spot: leave it out or have it redrawn.
+3. Load it with `loadSprite()` and play it with `sprite()`.
+
+```json
+{
+    "version": 1,
+    "clips": {
+        "walk": { "image": "assets/walk.png", "frames": 8, "fps": 8, "loop": true, "walk": true },
+        "wave": { "image": "assets/wave.png", "frames": 6, "fps": 8 }
+    }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `clips.<clip>.image` | The sheet, under `assets/` |
+| `frames` | How many drawings it holds |
+| `fps` | Drawings a second, default 8 (each held for three frames at 24 fps) |
+| `loop` | Start over after the last drawing, or hold it (default) |
+| `walk` | A walk: the drawings are shifted so the planted foot stays where it landed, and how far it moves in one pass is measured |
+| `paper`, `threshold`, `gap` | As for `cutout`, when it cuts badly. `gap` defaults to `0.004` |
+| `height` | The height every clip is scaled to. Default: the first clip's |
+
+The command cuts the drawings, measures each one's anchor (the middle of the head across, the soles down), scales every clip to one height and writes `assets/sprites/<name>/clips.json`.
+
+### Playing them
+
+```js
+const clips = await loadSprite('assets/sprites/postman/clips.json');
+const man = sprite(clips, { scale: 0.9 });
+const stop = 3 * man.duration('walk');
+
+// in seek(t):
+const walking = t < stop;
+const x = 200 + man.distance('walk', Math.min(t, stop));
+man.draw(ctx, x, FLOOR, walking ? { clip: 'walk', t } : { clip: 'wave', t: t - stop });
+```
+
+- `draw(ctx, x, y, { clip, t, frame, flip })` puts the anchor (head across, soles down) at (x, y). `t` counts from the start of the clip. `frame` picks a drawing by number instead, for a move you pace yourself: out, in, out, in.
+- `distance(clip, t)` is how far a walk has moved, in CSS px: it advances evenly with each drawing, and `flipbook sprite` shifted the drawings so the planted foot stays put. A drawing shifted a lot (`sprite-drift`, `nudge`) makes the head sway there. The fault is in that drawing: its planted foot sits too far back or forward under the body. Lean that drawing's legs instead of moving the whole figure: the soles move by about the px the warning names, the hip stays put. Then run `sprite` again. Stop after whole passes (`n * duration(clip)`) to stop on the first drawing.
+- `frameAt(clip, t)` and `duration(clip)` tell which drawing shows and how long one pass takes.
+- Sprites are drawings already: no `boil()` on them, and change the clip on a hard cut, never a blend.
