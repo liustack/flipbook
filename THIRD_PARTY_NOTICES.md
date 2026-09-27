@@ -59,8 +59,9 @@ SOFTWARE.
 | Chromium headless shell（Chrome for Testing 153.0.8010.12） | playwright-core 的安装源 | Chromium 许可（BSD-3-Clause 及其组件的许可证），安装包内附 |
 | Noto Serif SC（可变字重 TTF） | google/fonts `ofl/notoserifsc` | SIL Open Font License 1.1，Copyright 2012 Google Inc. |
 | 霞鹜文楷 LXGW WenKai Regular v1.522 | lxgw/LxgwWenKai 发布页 | SIL Open Font License 1.1，Copyright 2021-2026 LXGW，Copyright 2020 The Klee Project Authors |
+| 缝合怪像素字体 Fusion Pixel 12px Proportional zh_hans（WOFF2）2026.09.25 | TakWolf/fusion-pixel-font 发布页的 zip，取其中一个文件 | SIL Open Font License 1.1，Copyright 2022 TakWolf。它合入的方舟像素字体（OFL 1.1，Copyright 2021 TakWolf）、俐方體 11 號（Cubic 11 的自由许可）和 Galmuri（OFL 1.1，Copyright 2019-2025 Lee Minseo）的许可全文一并放在 `src/fonts/licenses/fusion-pixel.OFL.txt` |
 
-两款字体的 OFL 全文随包提供（打进 `dist/main.js`），下载字体时写到缓存里字体文件旁边的 `OFL.txt`。字体按原文件使用，不改名、不子集化、不再分发。
+三款字体的 OFL 全文随包提供（打进 `dist/main.js`），下载字体时写到缓存里字体文件旁边的 `OFL.txt`。字体按原文件使用，不改名、不子集化、不再分发。
 
 ## 纸感通道借用的做法
 

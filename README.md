@@ -74,7 +74,7 @@ For Codex:
 npx -y skills add liustack/flipbook#v0.7.0 --skill flipbook --global --agent codex -y
 ```
 
-You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and two Chinese fonts (about 50 MB) into your user cache. To skip the npx download on every run, install the skill's renderer globally: `npm install -g @liustack/flipbook@0.7.0`.
+You need Node 22.19 or newer and ffmpeg with libx264 (`brew install ffmpeg` on macOS, `sudo apt-get install -y ffmpeg` on Debian and Ubuntu). The first check or render downloads a pinned Chromium (about 95 MB) and three fonts, two Chinese and one pixel font (about 55 MB), into your user cache. To skip the npx download on every run, install the skill's renderer globally: `npm install -g @liustack/flipbook@0.7.0`.
 
 ## From an idea to a film
 

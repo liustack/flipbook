@@ -34,6 +34,28 @@
                 "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
                 "https://ghfast.top/https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf"
             ]
+        },
+        {
+            "id": "fusion-pixel-12",
+            "family": "Fusion Pixel 12px Prop zh-Hans",
+            "file": "fusion-pixel-12px-proportional-zh_hans.otf.woff2",
+            "weight": "400",
+            "style": "normal",
+            "size": 666264,
+            "sha256": "0ebd99e6f1e9b650a793a3f759c1c3dfa99f0c5b6502e78569b48ddb43767e40",
+            "license": "OFL-1.1",
+            "licenseFile": "fusion-pixel.OFL.txt",
+            "reservedNames": [],
+            "source": "TakWolf/fusion-pixel-font release 2026.09.25 fusion-pixel-font-12px-proportional-otf.woff2-v2026.09.25.zip fusion-pixel-12px-proportional-zh_hans.otf.woff2",
+            "archive": {
+                "member": "fusion-pixel-12px-proportional-zh_hans.otf.woff2",
+                "size": 4721544,
+                "sha256": "44b456f6f920d700f98d5865e03152d6a7357ed0a8ee388376ac0530d2d57072"
+            },
+            "urls": [
+                "https://github.com/TakWolf/fusion-pixel-font/releases/download/2026.09.25/fusion-pixel-font-12px-proportional-otf.woff2-v2026.09.25.zip",
+                "https://ghfast.top/https://github.com/TakWolf/fusion-pixel-font/releases/download/2026.09.25/fusion-pixel-font-12px-proportional-otf.woff2-v2026.09.25.zip"
+            ]
         }
     ]
 }

@@ -142,7 +142,7 @@ describe('pixel in the page', () => {
         expect(r.texts[0]).toMatchObject({
             id: 'hi',
             text: 'Hi 你好',
-            font: '400 16px "LXGW WenKai"',
+            font: '12px "Fusion Pixel 12px Prop zh-Hans"',
         });
         expect(r.texts[0].box).toEqual({
             x: r.ox + r.box.x * r.k,
@@ -183,6 +183,49 @@ describe('pixel in the page', () => {
         // The whole line, past the grid's right edge: 10 px a cell, 10 px of margin.
         expect(r.texts[0].box.x).toBe(10 + r.box.x * 10);
         expect(r.texts[0].box.width).toBe(r.box.width * 10);
+    });
+
+    it('blows words up by a whole number: the same pixels, each a block of cells', async () => {
+        const r = (await page.page.evaluate(`(() => {
+            const palette = ${JSON.stringify(PALETTE)};
+            const inked = (g) => {
+                const d = g.ctx.getImageData(0, 0, g.cols, g.rows).data;
+                return (x, y) => d[(y * g.cols + x) * 4] === ${Number.parseInt(PALETTE[1].slice(1, 3), 16)};
+            };
+            const small = rt.pixel(660, 360, { palette, cols: 64, rows: 36 });
+            small.clear();
+            const one = small.text('发', 2, 2, 1);
+            const big = rt.pixel(660, 360, { palette, cols: 64, rows: 36 });
+            big.clear();
+            const three = big.text('发', 2, 2, 1, { scale: 3 });
+            const a = inked(small);
+            const b = inked(big);
+            let differ = 0;
+            let cells = 0;
+            for (let y = 0; y < 36; y++) for (let x = 0; x < 64; x++) {
+                const want = a(2 + Math.floor((x - 2) / 3), 2 + Math.floor((y - 2) / 3)) && x >= 2 && y >= 2;
+                if (b(x, y)) cells++;
+                if (b(x, y) !== want) differ++;
+            }
+            let bad = '';
+            try { big.text('发', 2, 2, 1, { scale: 1.5 }); } catch (e) { bad = e.message; }
+            return { one, three, differ, cells, bad };
+        })()`)) as {
+            one: { x: number; y: number; width: number; height: number };
+            three: { x: number; y: number; width: number; height: number };
+            differ: number;
+            cells: number;
+            bad: string;
+        };
+        expect(r.cells).toBeGreaterThan(0);
+        expect(r.differ).toBe(0);
+        expect(r.three).toEqual({
+            x: 2 + (r.one.x - 2) * 3,
+            y: 2 + (r.one.y - 2) * 3,
+            width: r.one.width * 3,
+            height: r.one.height * 3,
+        });
+        expect(r.bad).toContain('scale must be a whole number');
     });
 
     it('builds a drawing from rows of characters, and a sprite frame anchored at its feet', async () => {

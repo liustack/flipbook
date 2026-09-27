@@ -9,6 +9,7 @@ import { FontFileError, readFontFile } from '../src/engine/fontFile.ts';
 import { ensureFonts, FONTS, fontFileFor, fontPath, readUserFont } from '../src/engine/fonts.ts';
 import { auditCanvasText } from '../src/engine/textAudit.ts';
 import { loadTimeline } from '../src/engine/timeline.ts';
+import { isWoff2, woff2ToSfnt } from '../src/engine/woff2.ts';
 import codepoints from '../src/fonts/codepoints.json' with { type: 'json' };
 import { closeSession, session } from './browser.ts';
 import { buildTestFont } from './fontBuilder.ts';
@@ -54,7 +55,8 @@ describe('font files', () => {
         await ensureFonts();
         const table = codepoints as Record<string, string>;
         for (const font of FONTS) {
-            const info = readFontFile(fs.readFileSync(fontPath(font)));
+            const bytes = fs.readFileSync(fontPath(font));
+            const info = readFontFile(isWoff2(bytes) ? woff2ToSfnt(bytes) : bytes);
             expect(encode(info.ranges), font.id).toBe(table[font.id]);
             expect(info.family).toBe(font.family);
         }

@@ -27,7 +27,7 @@ export interface PixelOptions {
 }
 
 export interface PixelTextOptions {
-    /** CSS font shorthand, its size in cells. Default: 16 cells of the handwriting face. */
+    /** CSS font shorthand, its size in cells. Default: the pixel font at 12 cells, one of its pixels a cell. */
     font?: string;
     /** Which end of the line x is. Default 'left'. */
     align?: 'left' | 'center' | 'right';
@@ -35,6 +35,12 @@ export interface PixelTextOptions {
     id?: string;
     /** Let the words run off the grid, which cuts them: for words sliding in or out. */
     allowOverflow?: boolean;
+    /**
+     * Blow the letters up by a whole number after they are inked, each cell
+     * becoming scale by scale cells around (x, y): the same pixels, bigger.
+     * Default 1.
+     */
+    scale?: number;
 }
 
 /** Cells on the grid: the ones a piece of text inked. */
@@ -45,7 +51,7 @@ export interface PixelBox {
     height: number;
 }
 
-const TEXT_FONT = '400 16px "LXGW WenKai"';
+const TEXT_FONT = '12px "Fusion Pixel 12px Prop zh-Hans"';
 
 /** A drawing made of cells, from pixelArt(). */
 export interface PixelArt {
@@ -321,6 +327,11 @@ export function pixel(width: number, height: number, options: PixelOptions): Pix
         },
         text(text, x, y, color, o = {}) {
             const [r, gr, b] = parseColor(fillOf(color), 'pixel text');
+            if (o.scale !== undefined && !(Number.isInteger(o.scale) && o.scale >= 1)) {
+                throw new Error(
+                    `pixel text: scale must be a whole number of at least 1 (got ${o.scale})`,
+                );
+            }
             const font = o.font ?? TEXT_FONT;
             const align = o.align ?? 'left';
             const ax = Math.round(x);
@@ -372,7 +383,15 @@ export function pixel(width: number, height: number, options: PixelOptions): Pix
                 }
             }
             if (x1 < 0) return null;
-            const box = { x: left + x0, y: top + y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
+            // Scaled about the anchor, each cell of the letters becoming k by k.
+            const k = o.scale ?? 1;
+            const at = (v: number, anchor: number) => anchor + (v - anchor) * k;
+            const box = {
+                x: at(left + x0, ax),
+                y: at(top + y0, ay),
+                width: (x1 - x0 + 1) * k,
+                height: (y1 - y0 + 1) * k,
+            };
             // The grid cuts what runs off it: refuse that unless it is meant.
             const off =
                 box.x < 0 || box.y < 0 || box.x + box.width > cols || box.y + box.height > rows;
@@ -386,7 +405,8 @@ export function pixel(width: number, height: number, options: PixelOptions): Pix
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.globalAlpha = 1;
             ctx.globalCompositeOperation = 'source-over';
-            ctx.drawImage(scratch, left, top);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(scratch, at(left, ax), at(top, ay), sw * k, sh * k);
             ctx.restore();
             words.push({ text, font, id: o.id, box, allowOverflow: o.allowOverflow });
             return box;

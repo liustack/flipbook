@@ -107,7 +107,7 @@ ffmpeg -hide_banner -encoders 2>/dev/null | grep libx264
 
 ### 3d. 首次下载（Chromium 和字体）
 
-第一次 `check` 或 `render` 会把钉死版本的 Chromium headless shell（约 95 MB）和两款字体（约 50 MB）下载到用户缓存：macOS 是 `~/Library/Caches/liustack/flipbook`，Linux 是 `${XDG_CACHE_HOME:-~/.cache}/liustack/flipbook`。第 4 步会触发它。`doctor` 从不下载任何东西。
+第一次 `check` 或 `render` 会把钉死版本的 Chromium headless shell（约 95 MB）和三款字体（约 55 MB）下载到用户缓存：macOS 是 `~/Library/Caches/liustack/flipbook`，Linux 是 `${XDG_CACHE_HOME:-~/.cache}/liustack/flipbook`。第 4 步会触发它。`doctor` 从不下载任何东西。
 
 防火墙、代理或沙箱白名单要为首次下载放行这四个域名：
 

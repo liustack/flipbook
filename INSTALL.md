@@ -107,7 +107,7 @@ Rendering at 1920×1080 needs at least 2 GB of memory and room for 128 processes
 
 ### 3d. First download (Chromium and fonts)
 
-The first `check` or `render` downloads the pinned Chromium headless shell (about 95 MB) and two fonts (about 50 MB) into the user cache: `~/Library/Caches/liustack/flipbook` on macOS, `${XDG_CACHE_HOME:-~/.cache}/liustack/flipbook` on Linux. Step 4 triggers it. `doctor` never downloads anything.
+The first `check` or `render` downloads the pinned Chromium headless shell (about 95 MB) and three fonts (about 55 MB) into the user cache: `~/Library/Caches/liustack/flipbook` on macOS, `${XDG_CACHE_HOME:-~/.cache}/liustack/flipbook` on Linux. Step 4 triggers it. `doctor` never downloads anything.
 
 A firewall, proxy or sandbox allowlist must let these four hosts through for the first download:
 

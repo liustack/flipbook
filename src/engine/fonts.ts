@@ -4,12 +4,14 @@ import * as path from 'path';
 import { RUN_ONCE_OUTSIDE_SANDBOX } from '../cli/codes.ts';
 import { EnvError, progress } from '../cli/report.ts';
 import codepoints from '../fonts/codepoints.json' with { type: 'json' };
+import fusionLicense from '../fonts/licenses/fusion-pixel.OFL.txt';
 import lxgwLicense from '../fonts/licenses/lxgw-wenkai.OFL.txt';
 import notoLicense from '../fonts/licenses/noto-serif-sc.OFL.txt';
 import manifest from '../fonts/manifest.json' with { type: 'json' };
 import { fontsDir, isWritable } from './cache.ts';
 import { type FontFileInfo, readFontFile } from './fontFile.ts';
 import { findOnPath, run } from './proc.ts';
+import { zipMember } from './zip.ts';
 
 export interface FontEntry {
     id: string;
@@ -23,6 +25,12 @@ export interface FontEntry {
     licenseFile: string;
     reservedNames: string[];
     source: string;
+    /**
+     * When the font is only published inside a zip: `urls` serve the zip, and
+     * `member` is the font file in it. The zip's own size and SHA-256 are
+     * checked before the member is taken out.
+     */
+    archive?: { member: string; size: number; sha256: string };
     urls: string[];
 }
 
@@ -31,6 +39,7 @@ export const FONTS: FontEntry[] = manifest.fonts;
 const LICENSES: Record<string, string> = {
     'noto-serif-sc.OFL.txt': notoLicense,
     'lxgw-wenkai.OFL.txt': lxgwLicense,
+    'fusion-pixel.OFL.txt': fusionLicense,
 };
 
 /** URL path the page loads a font from. */
@@ -109,9 +118,14 @@ async function downloadTo(url: string, target: string): Promise<void> {
     fs.writeFileSync(target, Buffer.from(await response.arrayBuffer()));
 }
 
-function candidateUrls(font: FontEntry, env: NodeJS.ProcessEnv): string[] {
+/** Where to fetch a font: a mirror serves the font file itself, the manifest URLs may serve its zip. */
+function candidateUrls(
+    font: FontEntry,
+    env: NodeJS.ProcessEnv,
+): { url: string; archive: boolean }[] {
     const base = env.FLIPBOOK_FONT_BASE_URL?.replace(/\/+$/, '');
-    return base ? [`${base}/${font.file}`, ...font.urls] : [...font.urls];
+    const listed = font.urls.map((url) => ({ url, archive: font.archive !== undefined }));
+    return base ? [{ url: `${base}/${font.file}`, archive: false }, ...listed] : listed;
 }
 
 /** Download one font into the cache, verify size and SHA-256, then move it into place. */
@@ -133,10 +147,22 @@ export async function downloadFont(
     const part = `${target}.${process.pid}.part`;
     const errors: string[] = [];
     let fetched = false;
-    for (const url of candidateUrls(font, env)) {
-        progress(`downloading ${font.family} (${(font.size / 1e6).toFixed(1)} MB) from ${url}`);
+    for (const { url, archive } of candidateUrls(font, env)) {
+        const bytes = archive && font.archive ? font.archive.size : font.size;
+        progress(`downloading ${font.family} (${(bytes / 1e6).toFixed(1)} MB) from ${url}`);
         try {
             await downloadTo(url, part);
+            if (archive && font.archive) {
+                const zipSize = fs.statSync(part).size;
+                if (zipSize !== font.archive.size) {
+                    throw new Error(`zip size ${zipSize}, expected ${font.archive.size}`);
+                }
+                const zipDigest = sha256File(part);
+                if (zipDigest !== font.archive.sha256) {
+                    throw new Error(`zip sha256 ${zipDigest}, expected ${font.archive.sha256}`);
+                }
+                fs.writeFileSync(part, zipMember(fs.readFileSync(part), font.archive.member));
+            }
             const size = fs.statSync(part).size;
             if (size !== font.size) throw new Error(`size ${size}, expected ${font.size}`);
             const digest = sha256File(part);

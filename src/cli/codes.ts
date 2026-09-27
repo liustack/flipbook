@@ -145,7 +145,7 @@ export const FINDING_CODES = {
     },
     'font-fallback': {
         meaning: 'Text rendered with a system font instead of a flipbook font or a supplied font.',
-        fix: 'Set font-family to "Noto Serif SC" or "LXGW WenKai", the fonts flipbook serves, or to a font supplied in brand.json or assets/fonts/. List "Noto Serif SC" after a supplied font that lacks some characters.',
+        fix: 'Set font-family to "Noto Serif SC", "LXGW WenKai" or "Fusion Pixel 12px Prop zh-Hans", the fonts flipbook serves, or to a font supplied in brand.json or assets/fonts/. List "Noto Serif SC" after a supplied font that lacks some characters.',
     },
     'brand-invalid': {
         meaning:

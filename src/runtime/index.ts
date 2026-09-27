@@ -217,4 +217,6 @@ export {
 export const FONTS = {
     serif: 'Noto Serif SC',
     hand: 'LXGW WenKai',
+    /** A 12 px pixel font: set it at 12 times a whole number of CSS px. */
+    pixel: 'Fusion Pixel 12px Prop zh-Hans',
 } as const;
