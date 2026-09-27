@@ -69,33 +69,26 @@ describe('no connection leaves the page', () => {
             tcp += 1;
         });
         server.on('upgrade', (_req, socket) => socket.destroy());
-        // TCP and UDP on the same port number. Windows reserves port ranges
-        // that refuse a bind with EACCES, so a port that fails for UDP is let
-        // go and another one tried, instead of waiting for a bind that never
-        // comes back.
-        const listen = (on: number) =>
-            new Promise<void>((resolve, reject) => {
-                server.once('error', reject);
-                server.listen(on, '127.0.0.1', () => {
-                    server.off('error', reject);
-                    resolve();
-                });
+        // HTTP and WebSocket go to a TCP port, STUN to a UDP port, each one the
+        // system hands out. Asking for the same number on both failed on Windows,
+        // where whole ranges of UDP ports are reserved and refuse a bind.
+        await new Promise<void>((resolve, reject) => {
+            server.once('error', reject);
+            server.listen(0, '127.0.0.1', () => {
+                server.off('error', reject);
+                resolve();
             });
-        let udp = dgram.createSocket('udp4');
-        let port = 0;
-        for (let attempt = 0; ; attempt++) {
-            await listen(0);
-            port = (server.address() as AddressInfo).port;
-            const bound = await new Promise<boolean>((resolve) => {
-                udp.once('error', () => resolve(false));
-                udp.bind(port, '127.0.0.1', () => resolve(true));
+        });
+        const port = (server.address() as AddressInfo).port;
+        const udp = dgram.createSocket('udp4');
+        await new Promise<void>((resolve, reject) => {
+            udp.once('error', reject);
+            udp.bind(0, '127.0.0.1', () => {
+                udp.off('error', reject);
+                resolve();
             });
-            if (bound) break;
-            udp.close();
-            udp = dgram.createSocket('udp4');
-            await new Promise<void>((resolve) => server.close(() => resolve()));
-            if (attempt === 9) throw new Error('no port free for both TCP and UDP after 10 tries');
-        }
+        });
+        const udpPort = udp.address().port;
         let datagrams = 0;
         udp.on('message', () => {
             datagrams += 1;
@@ -106,13 +99,14 @@ describe('no connection leaves the page', () => {
 <script type="module">
 import { composition } from '/__flipbook/runtime.js';
 const base = '127.0.0.1:${port}';
+const stun = '127.0.0.1:${udpPort}';
 // Fire every attempt without waiting: timers are virtual, so nothing here may block ready.
 fetch('http://' + base + '/http').catch(() => undefined);
 try {
   new WebSocket('ws://' + base + '/ws');
 } catch {}
 try {
-  const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:' + base }] });
+  const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:' + stun }] });
   pc.createDataChannel('leak');
   pc.createOffer().then((offer) => pc.setLocalDescription(offer)).catch(() => undefined);
 } catch {}
