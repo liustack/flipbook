@@ -131,7 +131,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
 # lighthouse/out/video.mp4 和 lighthouse/out/contact-sheet.png
 ```
 
-每条命令往 stdout 打一份 JSON 报告，失败的每一条都带类型码、时间点、帧号、元素、证据图和改法。同一类问题连续改不好，flipbook 会让 agent 停下来把联系表和报告交给你，不会一直烧额度。
+每条命令往 stdout 打一份 JSON 报告，失败的每一条都带类型码和改法，再按问题带上时间点、帧号、元素或证据图。timeline.json、story.json、sprite.json 里某个字段校验不过时给出它的路径，文件本身不是合法 JSON 时路径是根 `$`。同一类问题连续改不好，flipbook 会让 agent 停下来把联系表和报告交给你，不会一直烧额度。
 
 ## 验收会拦什么
 

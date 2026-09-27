@@ -131,7 +131,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
 # lighthouse/out/video.mp4 and lighthouse/out/contact-sheet.png
 ```
 
-Each command prints a JSON report to stdout. Every failure in it names a code, the second, the frame, the element, an evidence image and the fix. When the same kind of problem keeps failing, flipbook tells the agent to stop and hand you the contact sheet and the report, instead of burning through your quota.
+Each command prints a JSON report to stdout. Every failure in it names a code and the fix and, depending on the problem, the second, the frame, the element or an evidence image. A field of timeline.json, story.json or sprite.json that fails its check is named by its path, and a file that is not valid JSON by the root, `$`. When the same kind of problem keeps failing, flipbook tells the agent to stop and hand you the contact sheet and the report, instead of burning through your quota.
 
 ## What the checks catch
 
