@@ -58,7 +58,7 @@ const cat = pixelArt([
 
 - A character is 12 to 32 cells tall on a 320 grid. Eyes are one or two cells, a mouth one row or none.
 - Moves are a few drawings, swapped: breathing is two, a walk four to eight, a blink one. Give them to `sprite()` as frames with `art.frame()` (anchored at the middle of the bottom row) and play them from `sprite(clips).draw(g.ctx, x, y, { clip, t })` with x and y rounded.
-- Sheets from elsewhere (a CC0 game asset pack, an image model) are cut with `flipbook sprite` and `"pixel": true` in sprite.json, see `references/characters.md`: every drawing keeps its pixels as drawn. Draw them on the grid at `scale: 1` with whole-number x and y. A sheet drawn at another cell size than the others needs redrawing or its own grid, never a stretch.
+- Sheets from elsewhere (a CC0 game asset pack, an image model) are cut with `flipbook sprite` and `"pixel": true` in sprite.json, see `references/characters.md`: every drawing keeps its pixels as drawn. A sheet packed in equal cells takes `grid: [columns, rows]`. Draw them on the grid at `scale: 1` with whole-number x and y. A sheet drawn at another cell size than the others needs redrawing or its own grid, never a stretch.
 
 ## Moving
 

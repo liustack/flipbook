@@ -222,7 +222,7 @@ A sprite is the character drawn whole in every pose: eight drawings of a walk, s
 - The same character at the same size in every drawing, in profile facing right, the soles on one line.
 - A walk is a whole cycle, two steps: contact, down, passing, up, then the same with the other leg. A move on the spot (a wave, a nod) keeps the feet planted in the same place.
 - Keep hands below the top of the head: the anchor across is the middle of the ink in the top 15% of the figure, and a hand raised above the head pulls it sideways.
-- Sprites someone else drew (a game asset pack, a sheet from the user) work the same way. Write their source and license into `assets/SOURCES.json`. Most free game sprites are pixel art: they do not sit on paper.
+- Sprites someone else drew (a game asset pack, a sheet from the user) work the same way. Write their source and license into `assets/SOURCES.json`. Most free game sprites are pixel art on a transparent sheet, packed in equal cells with the drawings touching: give `grid: [columns, rows]` (and `cells` for one row of a bigger sheet), and it is cut cell by cell along the sheet's own transparency.
 
 To an image model: "a 2D animation sprite sheet", the number of drawings and what each one is, in order, "one horizontal row", "the same character, same scale, head tops aligned, soles on one baseline", "background perfectly flat", "no text, numbers, grid lines or shadows". Give it a picture of the character, and for the second sheet the first one too, "as a scale and style reference".
 
@@ -250,6 +250,8 @@ To an image model: "a 2D animation sprite sheet", the number of drawings and wha
 | `loop` | Start over after the last drawing, or hold it (default) |
 | `walk` | A walk: the drawings are shifted so the planted foot stays where it landed, and how far it moves in one pass is measured |
 | `paper`, `threshold`, `gap` | As for `cutout`, when it cuts badly. `gap` defaults to `0.004`, and `0` joins nothing, so drawings one pixel apart stay apart |
+| `grid` | `[columns, rows]`, whole numbers from 1 to 64, for a sheet laid out in equal cells: cut cell by cell however close the drawings sit, an empty cell does not count. No `gap` with it |
+| `cells` | With `grid`, the cells to use, `[first, last]`, numbered from 1 in reading order. Default: all |
 | `height` | The height every clip is scaled to, unless `pixel` is true. Default: the first clip's |
 | `pixel` | `true` for pixel art: each drawing is cut on whole pixels and keeps its size, its colors and hard edges, nothing is rescaled (so no `height`), anchors fall on whole pixels. A packed sheet may have drawings reaching its edge: give `paper` then, the ground cannot be read off the edge |
 
