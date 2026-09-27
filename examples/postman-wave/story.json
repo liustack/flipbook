@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "idea": "On his early round a postman walks past a row of dark windows; one lights up, a child waves, and he waves back",
+    "leave": "A small hello is what makes the round worth walking",
+    "subject": "the windows along the street",
+    "device": {
+        "what": "one window lighting up warm in a row of cold dark ones",
+        "why": "the light is the child: it turns the street from empty to someone there"
+    },
+    "beats": [
+        {
+            "id": "round",
+            "role": "opening",
+            "at": "street",
+            "change": { "from": "an early street, every window dark", "to": "the postman has walked in along the dark windows" }
+        },
+        {
+            "id": "light",
+            "role": "turn",
+            "at": "light",
+            "change": { "from": "the window beside him is dark", "to": "it has lit up and a child stands in it" },
+            "sound": "click"
+        },
+        {
+            "id": "hello",
+            "role": "resolution",
+            "at": "hello",
+            "change": { "from": "the child waves", "to": "he has waved back and the words 早安 have appeared" },
+            "text": ["早安"],
+            "sound": "bell",
+            "callback": "round"
+        }
+    ]
+}
