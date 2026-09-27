@@ -82,6 +82,15 @@ export type {
 } from './photo.ts';
 export { photo, specimens } from './photo.ts';
 export type {
+    Pixel,
+    PixelArt,
+    PixelBox,
+    PixelColor,
+    PixelOptions,
+    PixelTextOptions,
+} from './pixel.ts';
+export { pixel, pixelArt } from './pixel.ts';
+export type {
     OutlineOptions,
     Pose,
     Puppet,
