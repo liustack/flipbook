@@ -22,6 +22,7 @@ export type Command =
     | 'stock-search'
     | 'stock-fetch'
     | 'cutout'
+    | 'puppet'
     | 'doctor'
     | 'usage';
 export type Severity = 'error' | 'warning';

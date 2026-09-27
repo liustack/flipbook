@@ -4,6 +4,7 @@ import { runAudio } from './cli/audio.ts';
 import { runCheck } from './cli/check.ts';
 import { runCutout } from './cli/cutout.ts';
 import { buildDoctorReport, MIN_NODE, renderDoctorReport } from './cli/doctor.ts';
+import { runPuppet } from './cli/puppet.ts';
 import { runRender } from './cli/render.ts';
 import {
     type Command as CommandName,
@@ -357,6 +358,17 @@ stock
     .requiredOption('--as <name>', 'file name under assets/, without the extension')
     .action(async (dir: string, id: string, options: { as: string }) => {
         await execute('stock-fetch', dir, () => runStockFetch({ dir, id, as: options.as }));
+    });
+
+program
+    .command('puppet')
+    .description(
+        'Rig a puppet from cut parts: read assets/puppets/<name>/puppet.json, find the joints, shave the printed outline, write rig.json and a sheet to look at',
+    )
+    .argument('<dir>', 'composition directory')
+    .argument('<name>', 'the puppet, a folder under assets/puppets/')
+    .action(async (dir: string, name: string) => {
+        await execute('puppet', dir, () => runPuppet({ dir, name }));
     });
 
 program

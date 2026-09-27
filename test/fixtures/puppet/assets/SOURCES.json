@@ -1,0 +1,20 @@
+{
+    "limbs.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "two outlined bars with round ends and a square block"
+    },
+    "dark.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "a dark block with no outline"
+    },
+    "thin.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "a thin light bar with a 1 px dark outline"
+    }
+}

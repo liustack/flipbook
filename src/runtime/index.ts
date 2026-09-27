@@ -107,6 +107,8 @@ export {
     walkTime,
     wave,
 } from './puppet.ts';
+export type { RigFile, Side } from './rig.ts';
+export { findTab, loadRig, outlineWidth, shave } from './rig.ts';
 export type {
     ArcCuts,
     ArcCutsOptions,

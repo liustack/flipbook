@@ -29,7 +29,7 @@ For `sandbox-blocked` and `tmp-unwritable`, `detail.signature` names the row of 
 | Field | Type | Description |
 |---|---|---|
 | `schema` | string | Always `flipbook.report/1` |
-| `command` | string | `check`, `snapshot`, `render`, `audio`, `stock-search`, `stock-fetch`, `cutout`, or `usage` on a usage error |
+| `command` | string | `check`, `snapshot`, `render`, `audio`, `stock-search`, `stock-fetch`, `cutout`, `puppet`, or `usage` on a usage error |
 | `ok` | boolean | true when the exit code is 0 |
 | `exitCode` | 0, 1, 2, 78 | Same as the process exit code |
 | `flipbook.version` | string | CLI version |
@@ -171,6 +171,8 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `cutout-invalid` | cutout | Nothing was cut: the image is missing, lies outside the composition or outside `assets/`, or has no source and license in `assets/SOURCES.json` (a generated image also needs its tool and prompt), or that file is not valid JSON | Pass an image `stock fetch` saved, or add its source and license first |
 | `cutout-none` | cutout | No specimen on the plate stands apart: they touch one another (tentacles, spines), or the ground color is wrong. `detail.found` is how many groups were found before the rest were refused | Use the plate whole with `cutout: 'none'` and move the camera over it, pass `--paper`, or pick another plate |
 | `cutout-clipped` | cutout, warning | A specimen reaches past its crop and was left out: its cutout would have a straight edge. `detail.index` and `detail.sides` say which and where | Nothing when enough were kept. Otherwise raise `--gap`, or use the plate whole |
+| `puppet-invalid` | puppet | Nothing was rigged: `assets/puppets/<name>/puppet.json` is missing, is not valid JSON or does not match puppet v1, a part's image lies outside `assets/` or its entry in `assets/SOURCES.json` falls short (as for `asset-unlicensed`), or the bones do not hang together (a missing socket, a missing part, more than one root). `detail.path` is the field | Fix the field as the message says. [references/characters.md](../skills/flipbook/references/characters.md) describes puppet.json |
+| `puppet-joint-missing` | puppet | No round joint tab shows at the named end of a part: the end is square or ragged, or the tab is on another side. `detail.part`, `detail.joint` and `detail.side` say where. Nothing is written | Give that joint as `[x, y]` in the part's own pixels, read off the cut image, or name the side the tab is on |
 | `render-busy` | render | Another render is running in the same composition directory. Does not count as an attempt | Wait for it to finish |
 | `internal-error` | all | flipbook itself failed | Leave the composition alone and open an issue with the JSON |
 
@@ -314,6 +316,25 @@ Image reports carry `stock.kind` `image` and `artifacts.image`.
 | `cutout.sheet`, `artifacts.sheet` | The sheet |
 
 It exits 0 when at least one cutout was written and 1 with `cutout-invalid` or `cutout-none`.
+
+### puppet
+
+`flipbook puppet <dir> <name>` rigs a cut-out puppet from cut parts ahead of render. It reads `assets/puppets/<name>/puppet.json`, which says which image under `assets/` is which part and where each joint is: `"top"`, `"bottom"`, `"left"` or `"right"` for the round tab at that end, or `[x, y]` in the part's own pixels. It runs in the same bare page as `cutout`: it finds each named tab (walking in from that side, the tab's center is where the chord across the part first narrows to twice the depth, and the rows above must trace a circle of that radius centered on one line, and no narrower near the tip than the circle by more than a fifth, so a square, slanted, pointed or ragged end is refused, while a point shallower than about 1 in 2 still reads as rounded; tabs of radius under 4 px are not judged), measures the printed outline along rows and columns through the middle of each part (the dark runs that lighter fill follows and that are at most a quarter of the picture's shorter side, a soft pixel on either side of the ink counting as half, rounded up) and shaves off every edge of each part the outline that part shows (none when it shows none: dark all through, no ink at its edge, or too few samples to measure). When `outline` gives a whole number instead, that many pixels come off every part, and a part it would shave away entirely is refused with `puppet-invalid`. Then it builds the puppet with the runtime's `puppet()` to pose it.
+
+- The shaved parts are `assets/puppets/<name>/parts/<part>.png`. A rerun replaces the set.
+- `assets/puppets/<name>/rig.json` holds each part's file, size, `pivot`, `sockets`, `angle` and `fit`, and the bones. `loadRig()` in the page loads it.
+- `assets/SOURCES.json` gets one entry per part, `{ "source", "license", "cutFrom" }`, pointing at the image it was shaved from.
+- `out/puppet/<name>.png` shows every part with its pivot (red) and sockets (blue), then the reference picture (when puppet.json names one) next to the puppet standing, mid-stride, with its legs passing, mid-stride on the other foot and waving: look at it before using the rig.
+
+| Field | Meaning |
+|---|---|
+| `puppet.name` | The puppet |
+| `puppet.outline` | The typical outline, in pixels: the given one, or the median over the parts that show one |
+| `puppet.rig` | The rig.json written |
+| `puppet.parts` | Each part's `pivot` and `sockets`, in its own pixels, and `shaved`: the pixels taken off its edges |
+| `puppet.sheet`, `artifacts.sheet` | The sheet |
+
+It exits 0 when the rig was written and 1 with `puppet-invalid` or `puppet-joint-missing`.
 
 ## Codes: environment (exit 78)
 

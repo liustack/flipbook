@@ -29,7 +29,7 @@ read_when:
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `schema` | string | 固定 `flipbook.report/1` |
-| `command` | string | `check`、`snapshot`、`render`、`audio`、`stock-search`、`stock-fetch`、`cutout`，用法错时是 `usage` |
+| `command` | string | `check`、`snapshot`、`render`、`audio`、`stock-search`、`stock-fetch`、`cutout`、`puppet`，用法错时是 `usage` |
 | `ok` | boolean | 退出码为 0 时为 true |
 | `exitCode` | 0、1、2、78 | 和进程退出码一致 |
 | `flipbook.version` | string | CLI 版本 |
@@ -171,6 +171,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `cutout-invalid` | cutout | 一张都没抠：图不存在、在合成目录外或不在 `assets/` 下，或 `assets/SOURCES.json` 里没有它的来源和许可（生成的图还要有工具和提示词），或这个文件不是合法 JSON | 用 `stock fetch` 存下的图，或先补上来源和许可 |
 | `cutout-none` | cutout | 图版上没有一个标本是单独分得开的：彼此连着（触手、长刺），或底色给错了。`detail.found` 是被整组拒掉之前找到的组数 | 整张图版用 `cutout: 'none'` 靠镜头动，或给 `--paper`，或换一张图版 |
 | `cutout-clipped` | cutout，警告 | 有个标本超出了它的裁剪框，没收：抠出来会有一条直边。`detail.index` 和 `detail.sides` 说是哪个、哪边 | 收下的够用就不用管。不够就调大 `--gap`，或整张用 |
+| `puppet-invalid` | puppet | 什么都没装配：`assets/puppets/<name>/puppet.json` 不存在、不是合法 JSON 或不合 puppet v1，某个部件的图不在 `assets/` 下或它在 `assets/SOURCES.json` 里的条目不全（同 `asset-unlicensed`），或骨骼接不起来（缺接口、缺部件、不止一个根）。`detail.path` 是出错的字段 | 按提示改那个字段。puppet.json 的写法见 [references/characters.md](../skills/flipbook/references/characters.md) |
+| `puppet-joint-missing` | puppet | 部件指定的那一头找不到圆形关节舌：那头是方的或参差的，或者舌头在另一边。`detail.part`、`detail.joint` 和 `detail.side` 说是哪里。什么都不写 | 把这个关节写成部件自己像素里的 `[x, y]`，从抠好的图上量，或者改成舌头所在的那一边 |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 
@@ -314,6 +316,25 @@ id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 
 | `cutout.sheet`、`artifacts.sheet` | 联系表 |
 
 至少写下一个抠图时退 0，`cutout-invalid` 或 `cutout-none` 时退 1。
+
+### puppet
+
+`flipbook puppet <dir> <name>` 在渲染之前把抠好的部件装配成剪纸木偶。它读 `assets/puppets/<name>/puppet.json`，里面写哪张 `assets/` 下的图是哪个部件、每个关节在哪：`"top"`、`"bottom"`、`"left"`、`"right"` 表示那一头的圆形关节舌，`[x, y]` 是部件自己像素里的点。它跑在和 `cutout` 一样的空白页面里：找出写明的关节舌（从那一边往里走，横穿部件的弦宽第一次收到深度两倍时就是舌头的圆心，上面各行还得描出同样半径、圆心在一条线上的圆，靠近尖端的几行也不能比圆窄五分之一以上，所以方头、斜头、尖头和参差的边都不算，但比 1 比 2 还平缓的尖头仍会被当成圆头，半径不到 4 像素的不判），沿穿过每个部件中部的行和列量出印上去的描边宽度（只算后面接着浅色填充、最多占图片短边四分之一的深色段，墨线两侧的半透明像素各算半个），向上取整，从每个部件的每条边削掉它自己的描边宽度（量不出描边的部件不削：整块深色、边上没墨，或者样本太少量不了）。`outline` 写了整数时，所有部件都削掉这么多像素，会把某个部件整个削没时报 `puppet-invalid`。然后再用运行时的 `puppet()` 装起来摆姿势。
+
+- 削好的部件是 `assets/puppets/<name>/parts/<part>.png`。重跑整组替换。
+- `assets/puppets/<name>/rig.json` 记着每个部件的文件、尺寸、`pivot`、`sockets`、`angle` 和 `fit`，还有骨骼。页面里用 `loadRig()` 读它。
+- `assets/SOURCES.json` 给每个部件记一条 `{ "source", "license", "cutFrom" }`，指向它削自的那张图。
+- `out/puppet/<name>.png` 先列出每个部件和它的枢轴（红）、接口（蓝），再把参考图（puppet.json 写了的话）和站着、迈步、两腿交错、换脚迈步、挥手的木偶并排放：用之前先看这张。
+
+| 字段 | 说明 |
+|---|---|
+| `puppet.name` | 木偶名 |
+| `puppet.outline` | 典型的描边宽度，像素：写了的就是写的，没写就是量出描边的部件的中位数 |
+| `puppet.rig` | 写下的 rig.json |
+| `puppet.parts` | 每个部件的 `pivot` 和 `sockets`（部件自己的像素），以及 `shaved`：从它边上削掉的像素 |
+| `puppet.sheet`、`artifacts.sheet` | 联系表 |
+
+写下 rig 时退 0，`puppet-invalid` 或 `puppet-joint-missing` 时退 1。
 
 ## 类型码：环境缺件（退出码 78）
 

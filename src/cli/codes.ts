@@ -171,6 +171,16 @@ export const FINDING_CODES = {
             'flipbook cutout did not start: the image is missing, lies outside the composition, is not in assets/, or has no source and license in assets/SOURCES.json (a generated image also needs its tool and prompt).',
         fix: 'Pass an image under assets/ that stock fetch saved, or add its source and license to assets/SOURCES.json first (for a generated image, its tool and prompt too).',
     },
+    'puppet-invalid': {
+        meaning:
+            'flipbook puppet did not start or could not build the puppet: assets/puppets/<name>/puppet.json is missing, is not valid JSON, does not match puppet schema v1, names an image outside assets/ or without its source and license (a generated image also needs its tool and prompt), or its bones do not hang together.',
+        fix: 'Fix the field named in `detail.path` as the message says, see references/characters.md.',
+    },
+    'puppet-joint-missing': {
+        meaning:
+            'flipbook puppet found no round joint tab at the named end of a part: the end is square or ragged, or the side is wrong.',
+        fix: "Give that joint as [x, y] in the part's own pixels, read off the cut image, or name the side the tab is on.",
+    },
     'cutout-none': {
         meaning:
             'flipbook cutout found no specimen standing apart on the plate: they touch one another (tentacles, spines), or the ground color is wrong.',

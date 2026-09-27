@@ -232,6 +232,18 @@ flipbook cutout did not start: the image is missing, lies outside the compositio
 
 Fix: Pass an image under assets/ that stock fetch saved, or add its source and license to assets/SOURCES.json first (for a generated image, its tool and prompt too).
 
+### `puppet-invalid`
+
+flipbook puppet did not start or could not build the puppet: assets/puppets/<name>/puppet.json is missing, is not valid JSON, does not match puppet schema v1, names an image outside assets/ or without its source and license (a generated image also needs its tool and prompt), or its bones do not hang together.
+
+Fix: Fix the field named in `detail.path` as the message says, see references/characters.md.
+
+### `puppet-joint-missing`
+
+flipbook puppet found no round joint tab at the named end of a part: the end is square or ragged, or the side is wrong.
+
+Fix: Give that joint as [x, y] in the part's own pixels, read off the cut image, or name the side the tab is on.
+
 ### `cutout-none`
 
 flipbook cutout found no specimen standing apart on the plate: they touch one another (tentacles, spines), or the ground color is wrong.
