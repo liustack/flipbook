@@ -33,7 +33,7 @@ src/
   paths.ts         包根目录和运行时文件定位
   skillPin.ts      读各宿主 skill 副本钉的版本
   cli/             doctor、check、snapshot、audio、render、stock、报告和类型码
-  engine/          浏览器、页面、时钟、timeline、故事（story.ts）、JSON 校验工具（schema.ts）、截帧、编码、验收、字体和自带字体、品牌资产、缓存、扫描、配乐合成和混音（含文件音效 audioFiles.ts）、抠图用的工具页、渲染进程监视
+  engine/          浏览器、页面、时钟、timeline、故事（story.ts）、JSON 校验工具（schema.ts）、截帧、编码、验收、字体和自带字体、品牌资产、缓存、扫描、配乐合成和混音（含文件音效 audioFiles.ts）、图片来源核对（assetSources.ts）、抠图用的工具页、渲染进程监视
   runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、photo、puppet、audio）
   stock/           找图找声音：Pexels、Pixabay、Openverse 三家的图片搜索和详情，Openverse 的音频搜索，图片和声音格式嗅探、下载防护（只走 HTTPS、拒内网地址、连接钉在核对过的地址上）
   fonts/           字体清单、码位表、OFL 全文

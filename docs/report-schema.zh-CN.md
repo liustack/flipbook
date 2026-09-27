@@ -162,12 +162,13 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `audio-loudness` | render | 有配乐的音轨整合响度不在 -14 LUFS 上下 1 LU 内 | 重渲一次，还出现就带 JSON 报 issue。自带音乐先确认 `bpmOffset` 之后不是静音 |
 | `audio-silent` | render | timeline 要配乐，音轨却量出来是静音。`audio.mode: "file"` 时 `detail` 给出 `file`、`offsetSec` 和 `fileDurationSec`，最常见的是 offset 超过了文件长度 | 把 `audio.offset` 调到文件长度以内，或换一个在片子用到的那段有声音的文件 |
 | `audio-peak` | render | 音轨真峰值高于 -1 dBTP | 重渲一次，还出现就带 JSON 报 issue |
+| `asset-unlicensed` | check、snapshot、audio、render | `assets/` 下的图片（字体和 brand.json 写了许可的标志除外）在 `assets/SOURCES.json` 里没有 `source` 或没有 `license`，或写了 `"license": "generated"` 却没写生成它的 `tool` 和 `prompt`。带 `cutFrom` 的图（抠图、装配好的部件）到它来自的那条条目上找工具和提示词。`element` 是那个文件，`detail.problem` 是缺了什么 | `stock fetch`、`cutout` 和 `puppet` 存下的图会自动记好。用户自己带来的图按用户说的写来源和许可。生成的图写上工具和提示词 |
 | `audio-unlicensed` | check、snapshot、audio、render | timeline 用到的音频文件（`audio.file` 或 sfx cue 的 `file`）在 `assets/SOURCES.json` 里没有 `source` 或没有 `license`，或者这个文件不是读得出的 JSON 对象。`element` 是那个文件，`detail.path` 是 timeline 里的字段，`detail.lacking` 是缺了什么 | 声音用 `stock search --audio` 和 `stock fetch` 找，两样都会记下。用户自己的文件按用户说的写来源和许可 |
 | `audio-cue-offset` | render | 某个音效的峰值离它的 cue 帧超过一帧，或在音轨里找不到，`element` 是 `cue <id>` | sfx cue 之间至少隔 1/8 拍。隔开了还报就重渲一次，再出现带 JSON 报 issue |
 | `stock-no-results` | stock search | 哪家都没找到图（带 `--audio` 时是没找到声音），只报 warning | 换两到四个别的具体英文词再搜，或加 `--source`。都不合适就不用图或声音，告诉用户 |
 | `stock-rejected` | stock fetch | 文件没存：id 不存在、许可不是 `cc0` 或 `pdm`（Openverse）、地址不是公网 HTTPS、文件不是图片（上限 40 MB）或不是 ffmpeg 读得了的 mp3、Ogg、FLAC、WAV 声音（上限 60 MB）。`detail.reason` 是 `not-found`、`license`、`unsafe-url`、`not-image`、`not-audio` 或 `too-large` | 从 stock search 的结果里另挑一个 |
 | `asset-conflict` | stock fetch | 文件没存：`assets/` 里已有别的图（存声音时是别的声音）用了这个名字（`detail.reason` 为 `name-taken`），或 `assets/SOURCES.json` 不是读得出的 JSON 对象（`sources-invalid`） | 换个 `--as` 名字，或修好 `assets/SOURCES.json` |
-| `cutout-invalid` | cutout | 一张都没抠：图不存在、在合成目录外或不在 `assets/` 下，或 `assets/SOURCES.json` 里没有它的来源和许可（或这个文件不是合法 JSON） | 用 `stock fetch` 存下的图，或先补上来源和许可 |
+| `cutout-invalid` | cutout | 一张都没抠：图不存在、在合成目录外或不在 `assets/` 下，或 `assets/SOURCES.json` 里没有它的来源和许可（生成的图还要有工具和提示词），或这个文件不是合法 JSON | 用 `stock fetch` 存下的图，或先补上来源和许可 |
 | `cutout-none` | cutout | 图版上没有一个标本是单独分得开的：彼此连着（触手、长刺），或底色给错了。`detail.found` 是被整组拒掉之前找到的组数 | 整张图版用 `cutout: 'none'` 靠镜头动，或给 `--paper`，或换一张图版 |
 | `cutout-clipped` | cutout，警告 | 有个标本超出了它的裁剪框，没收：抠出来会有一条直边。`detail.index` 和 `detail.sides` 说是哪个、哪边 | 收下的够用就不用管。不够就调大 `--gap`，或整张用 |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |

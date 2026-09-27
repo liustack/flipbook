@@ -42,11 +42,18 @@ bash <skill-dir>/scripts/run.sh cutout <dir> assets/medusae.jpg --paper '#09330b
 
 Await `photo()` at module level or in `setup()`, never in `seek()`: the cutout, border and shadow are prepared once, then `draw()` only places the finished sticker.
 
-The snippet below runs in a 640×360 page with `<canvas id="stage">`, a scanned plate at `assets/egg-plate.svg` and this timeline:
+The snippet below runs in a 640×360 page with `<canvas id="stage">`, a scanned plate at `assets/egg-plate.svg` with its source and license in `assets/SOURCES.json`, and this timeline:
 
 <!-- snippet-file: assets/egg-plate.svg -->
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="#efe6d2"/><circle cx="30" cy="30" r="2" fill="#8a7a60"/><ellipse cx="200" cy="150" rx="70" ry="92" fill="#b9c7b0"/><ellipse cx="180" cy="120" rx="22" ry="16" fill="#e8eee2"/><circle cx="220" cy="190" r="8" fill="#4a3a2a"/><circle cx="170" cy="200" r="5" fill="#4a3a2a"/><circle cx="235" cy="120" r="6" fill="#4a3a2a"/></svg>
+```
+
+<!-- snippet-file: assets/SOURCES.json -->
+```json
+{
+    "egg-plate.svg": { "source": "drawn for this example", "license": "cc0" }
+}
 ```
 
 <!-- snippet-timeline -->

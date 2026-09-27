@@ -168,8 +168,8 @@ export const FINDING_CODES = {
     },
     'cutout-invalid': {
         meaning:
-            'flipbook cutout did not start: the image is missing, lies outside the composition, is not in assets/, or has no source and license in assets/SOURCES.json.',
-        fix: 'Pass an image under assets/ that stock fetch saved, or add its source and license to assets/SOURCES.json first.',
+            'flipbook cutout did not start: the image is missing, lies outside the composition, is not in assets/, or has no source and license in assets/SOURCES.json (a generated image also needs its tool and prompt).',
+        fix: 'Pass an image under assets/ that stock fetch saved, or add its source and license to assets/SOURCES.json first (for a generated image, its tool and prompt too).',
     },
     'cutout-none': {
         meaning:
@@ -249,6 +249,11 @@ export const FINDING_CODES = {
         meaning:
             'A sound effect peaks more than one frame away from its sfx cue frame, or cannot be found.',
         fix: 'Keep sfx cues at least 1/8 beat apart and inside the scene they belong to. If the cues are clean, render again and report it with this JSON if it repeats.',
+    },
+    'asset-unlicensed': {
+        meaning:
+            'A picture under assets/ (fonts and the brand.json logo aside) has no source and license in assets/SOURCES.json, or is generated and does not name the tool and the prompt that made it.',
+        fix: 'Add its entry to assets/SOURCES.json: "source" and "license", and for a generated picture "license": "generated" with "tool" and "prompt". Pictures from stock fetch, cutout and puppet get theirs written for them.',
     },
     'audio-unlicensed': {
         meaning:

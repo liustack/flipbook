@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
+import { pictureSourceFindings } from './assetSources.ts';
 import {
     DYNAMICS,
     type Dynamic,
@@ -501,6 +502,8 @@ export function loadTimeline(dir: string, write = true): LoadedTimeline {
     if (audioProblems.length > 0) return { timeline, findings: audioProblems };
     const assets = loadAssets(dir, timeline.brand);
     if (assets.findings.length > 0) return { timeline, findings: assets.findings };
+    const pictureProblems = pictureSourceFindings(dir, assets.licensed);
+    if (pictureProblems.length > 0) return { timeline, findings: pictureProblems };
     const resolved: ResolvedTimeline = {
         ...resolveTimeline(timeline),
         brand: assets.brand,

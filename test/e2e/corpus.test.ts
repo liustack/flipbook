@@ -203,6 +203,18 @@ describe('bad composition corpus', () => {
         expect(rendered.artifacts.video).toBeUndefined();
     });
 
+    it('asset-unlicensed: a picture with no entry, a generated one with no prompt', async () => {
+        const checked = await check('asset-unlicensed');
+        expect(codes(checked)).toEqual(['asset-unlicensed', 'asset-unlicensed']);
+        expect(checked.failures.map((f) => f.detail?.problem)).toEqual([
+            'has no entry',
+            'is generated but gives no prompt',
+        ]);
+        const rendered = await render('asset-unlicensed');
+        expect(codes(rendered)).toEqual(['asset-unlicensed', 'asset-unlicensed']);
+        expect(rendered.artifacts.video).toBeUndefined();
+    });
+
     it('audio-silent: music that starts past the end of its file', async () => {
         const rendered = await render('audio-silent');
         expect(codes(rendered)).toEqual(['audio-silent']);

@@ -98,6 +98,18 @@ describe('flipbook cutout', () => {
         expect(fs.existsSync(path.join(dir, 'assets/cut'))).toBe(false);
     });
 
+    it('points at SOURCES.json when it is not an object of entries', async () => {
+        const dir = composition(PLATE, false);
+        fs.writeFileSync(path.join(dir, 'assets/SOURCES.json'), '[]');
+        const report = await runCutout({
+            dir,
+            image: 'assets/plate.svg',
+            session: await session(),
+        });
+        expect(codes(report)).toEqual(['cutout-invalid']);
+        expect(report.failures[0].element).toBe('assets/SOURCES.json');
+    });
+
     it('says so when the specimens are joined and none can be cut out alone', async () => {
         const dir = composition(JOINED);
         const report = await runCutout({

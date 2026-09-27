@@ -37,6 +37,8 @@ export interface CompositionAssets {
     brand: ResolvedBrand | null;
     fonts: UserFontFace[];
     findings: Finding[];
+    /** Real paths of pictures whose license brand.json states: the logo. */
+    licensed: string[];
 }
 
 type Json = unknown;
@@ -275,7 +277,7 @@ function readBrand(
     dir: string,
     brandPath: string,
     droppedFamilies: readonly string[],
-): { brand: ResolvedBrand | null; faces: Face[]; findings: Finding[] } {
+): { brand: ResolvedBrand | null; faces: Face[]; findings: Finding[]; logoFile: string | null } {
     const file = path.resolve(dir, brandPath);
     const problems = new Problems(brandPath);
     let raw: string;
@@ -283,18 +285,18 @@ function readBrand(
         raw = fs.readFileSync(file, 'utf-8');
     } catch {
         problems.brand('$', `does not exist: timeline.json's brand names ${brandPath}`);
-        return { brand: null, faces: [], findings: problems.findings };
+        return { brand: null, faces: [], findings: problems.findings, logoFile: null };
     }
     let input: Json;
     try {
         input = JSON.parse(raw);
     } catch (error) {
         problems.brand('$', `is not valid JSON: ${(error as Error).message}`);
-        return { brand: null, faces: [], findings: problems.findings };
+        return { brand: null, faces: [], findings: problems.findings, logoFile: null };
     }
     if (!isObject(input)) {
         problems.brand('$', 'must be a JSON object');
-        return { brand: null, faces: [], findings: problems.findings };
+        return { brand: null, faces: [], findings: problems.findings, logoFile: null };
     }
     const base = path.dirname(file);
     const allowed = ['$schema', 'version', 'name', 'tagline', 'logo', 'colors', 'fonts'];
@@ -346,6 +348,7 @@ function readBrand(
     }
 
     let logo: ResolvedBrand['logo'] = null;
+    let logoFile: string | null = null;
     if (input.logo !== undefined) {
         if (!isObject(input.logo)) {
             problems.brand('$.logo', 'must be { "file": "...", "license": "..." }');
@@ -375,6 +378,7 @@ function readBrand(
                 } else {
                     const data = fs.readFileSync(found.real);
                     logo = { src: `data:${type};base64,${data.toString('base64')}`, type };
+                    logoFile = found.real;
                 }
             }
         }
@@ -491,8 +495,9 @@ function readBrand(
         }
     }
     if (problems.findings.length > 0)
-        return { brand: null, faces: [], findings: problems.findings };
+        return { brand: null, faces: [], findings: problems.findings, logoFile: null };
     return {
+        logoFile,
         brand: {
             name: (input.name as string).trim(),
             tagline: nonEmpty(input.tagline) ? input.tagline.trim() : null,
@@ -515,12 +520,14 @@ export function loadAssets(dir: string, brandPath?: string): CompositionAssets {
     const dropped = droppedFonts(dir, findings);
     let brand: ResolvedBrand | null = null;
     let declared: Face[] = [];
+    const licensed: string[] = [];
     if (brandPath) {
         const families = dropped.flatMap((d) => (d.face ? [d.face.face.family] : []));
         const read = readBrand(dir, brandPath, families);
         findings.push(...read.findings);
         brand = read.brand;
         declared = read.faces;
+        if (read.logoFile) licensed.push(read.logoFile);
     }
     // A file brand.json declares is used and judged as declared, not a second time on its own.
     const declaredFiles = new Set(declared.map((d) => d.font.file));
@@ -547,5 +554,5 @@ export function loadAssets(dir: string, brandPath?: string): CompositionAssets {
         slots.set(slot, face.source);
         faces.push(face);
     }
-    return { brand, fonts: faces, findings };
+    return { brand, fonts: faces, findings, licensed };
 }

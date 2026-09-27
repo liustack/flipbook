@@ -4,6 +4,7 @@
 // shows every cutout on light, dark and checkered ground for a look first.
 import * as fs from 'fs';
 import * as path from 'path';
+import { cutEntry, parseSources, sourceProblem } from '../engine/assetSources.ts';
 import { compositionDir, openSession, type Session } from '../engine/session.ts';
 import { openToolPage } from '../engine/toolPage.ts';
 import { Workspace } from '../engine/workspace.ts';
@@ -62,21 +63,19 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
     if (!fs.existsSync(full) || !fs.statSync(full).isFile())
         return refuse(`${image} does not exist.`);
     const key = underAssets.split(path.sep).join('/');
-    let sources: Record<string, unknown>;
-    try {
-        sources = JSON.parse(ws.readText(ws.path(SOURCES)) ?? '{}');
-    } catch (error) {
-        return refuse(`assets/SOURCES.json is not valid JSON: ${(error as Error).message}`);
+    const read = parseSources(ws.readText(ws.path(SOURCES)));
+    if ('problem' in read) {
+        rb.add(
+            finding('cutout-invalid', read.problem, {
+                element: 'assets/SOURCES.json',
+                detail: { image },
+            }),
+        );
+        return rb.finish();
     }
-    const entry = sources[key] as { source?: unknown; license?: unknown } | undefined;
-    if (
-        !entry ||
-        typeof entry.license !== 'string' ||
-        !entry.license ||
-        typeof entry.source !== 'string'
-    ) {
-        return refuse(`${image} has no source and license in assets/SOURCES.json.`);
-    }
+    const sources = read.sources;
+    const problem = sourceProblem(sources, key);
+    if (problem) return refuse(`${image} ${problem} in assets/SOURCES.json.`);
 
     const session = options.session ?? (await openSession(options.env));
     const tool = await openToolPage(session, dir);
@@ -218,11 +217,7 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
         const name = `${stem}-${String(i + 1).padStart(2, '0')}.png`;
         const file = path.join(outDir, name);
         ws.writeFile(ws.path(file), Buffer.from(k.png.split(',')[1], 'base64'));
-        sources[`cut/${stem}/${name}`] = {
-            source: entry.source,
-            license: entry.license,
-            cutFrom: key,
-        };
+        sources[`cut/${stem}/${name}`] = cutEntry(sources, key);
         return {
             file: file.split(path.sep).join('/'),
             width: k.width,
