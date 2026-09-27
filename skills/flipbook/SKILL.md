@@ -75,7 +75,7 @@ Defaults:
 | size | 1920×1080 (16:9) |
 | frame rate | 24 fps |
 | duration | about 30 s, within 5% of what the user asked, at most 180 s |
-| look | the paper skin: `paperLayer()` and `grainLayer()` from `references/paper.md`, dark ink, one or two accent colors, serif type. When the user asks for a riso or screen print look: two or three spot inks printed with `riso()`, see `references/riso.md` |
+| look | the paper skin: `paperLayer()` and `grainLayer()` from `references/paper.md`, dark ink, one or two accent colors, serif type. When the user asks for a riso or screen print look: two or three spot inks printed with `riso()`, see `references/riso.md`. When they ask for pixel art or a game look: a small grid of cells and a few colors with `pixel()`, see `references/pixel.md` |
 | music | a score written for this story (`"audio": { "mode": "score", ... }`, see `references/audio.md`) so each film gets its own tune. A preset such as `pluck` for a short, plain clip. Silent only when the user asks |
 | found music or effects | when the user names a recorded piece or an instrument the score lacks, or a real sound matters (a page turn, a pencil): `stock search --audio`, see `references/audio.md` |
 | the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
@@ -113,6 +113,7 @@ Defaults:
 | `references/paper.md` | before the first index.html, for the paper and grain layers of the default look |
 | `references/materials.md` | when a picture needs pencil lines, hatching, halftone, stipple or torn paper |
 | `references/riso.md` | when the look is a risograph print: spot inks, overprint, misregistration, grain and dots |
+| `references/pixel.md` | when the look is pixel art: the grid, the palette, drawings from rows of characters, moving by whole cells |
 | `references/text.md` | when text goes on a canvas: handwriting, words appearing one by one, text along a curve |
 | `references/templates.md` | when the film needs one device throughout: objects assembling a glyph, a page turn or a book opening, a lens montage, an arc match cut |
 | `references/brand.md` | when the film is about a product or a brand, and before using a font file the user supplies |
