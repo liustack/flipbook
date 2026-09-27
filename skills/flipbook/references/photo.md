@@ -107,8 +107,9 @@ composition({
 | `paper` | measured | `'paper'`: the paper color, measured along the edge of the picture unless given |
 | `despeckle` | `0.002` | `'paper'`: islands smaller than this share of the picture are dropped (dust, plate numbers, captions) |
 | `flatten` | `true` | `'paper'` and `'ink'`: follow paper whose tone drifts across the scan (yellowing, a darker gutter, a stain) instead of one color. Soft edges are also measured against the paper under them and the paper is taken back out of them, so no pale rim of the old page travels with the sticker |
-| `keep` | `'all'` | `'largest'` keeps only the biggest piece and drops parts of neighbours that came in with the crop |
+| `keep` | `'all'` | `'largest'` keeps only the biggest piece and drops parts of neighbours that came in with the crop. A specimen's `box` from `specimens()` keeps the piece with the most of it inside that box: the specimen itself, even when a neighbour as big or bigger came in with the crop |
 | `holes` | `0` (off) | `'paper'`: also clear ground enclosed by the subject when a patch covers at least this share of it, such as dark water between a jellyfish's tentacles. Leave it off on light paper, where an enclosed pale patch is usually a highlight |
+| `pixelated` | `false` | pixel art: the crop grows out to whole pixels of the file, nothing is smoothed or softened and the cutout keeps its own size (no 1200 cap), so every pixel keeps its color. The paper cutout leaves every pixel in or out. The ink cutout keeps a wash half through, and a file's own transparency is kept as it is. Scaled, it is blown up without smoothing. A side on the file's own edge does not count as `clipped` |
 | `sticker` | on | `false` for the bare cutout, or the options below |
 
 `sticker` options: `border` (CSS px, default 9, 6 to 12 reads as cut with scissors), `color` (default `'#fbf8f1'`), `tilt` (degrees, default a seeded angle within ±3.5), `shadow` (`{ x, y, blur, color }`, default `{ x: 3, y: 8, blur: 10 }`, or `false`), `grain` (0 to 2, default 1), `seed`.
@@ -129,7 +130,7 @@ Only paper that touches the edge of the picture is removed, so pale areas inside
 
 ## Specimens on one plate
 
-Never guess a crop on a plate that holds several specimens: a guessed crop cuts through the one you want and brings in half of its neighbour, and both show as straight edges that no border hides. `specimens(src, options)` finds every separate specimen on the plate, biggest first, each with a crop that has room around it. Pass that crop to `photo()` with `keep: 'largest'`. Options: `paper` and `threshold` as in `photo()`, `minArea` (default `0.003` of the picture, smaller pieces are dust or captions), `gap` (default `0.012` of the long edge, pieces closer than this are one specimen), `margin` (default `0.015`).
+Never guess a crop on a plate that holds several specimens: a guessed crop cuts through the one you want and brings in half of its neighbour, and both show as straight edges that no border hides. `specimens(src, options)` finds every separate specimen on the plate, biggest first, each with a crop that has room around it. Pass its `crop` to `photo()` with `keep` set to its `box`, the specimen itself without the room, so a neighbour inside the crop is never kept in its place. Options: `paper` and `threshold` as in `photo()`, `minArea` (default `0.003` of the picture, smaller pieces are dust or captions), `gap` (default `0.012` of the long edge, pieces closer than this are one specimen, `0` joins nothing), `margin` (default `0.015`), `sheet` (a sheet of drawings rather than a printed plate: drawings may reach its edge and fill much of it, default `false`), `pixelated` (pixel art: looked for at the file's own size with nothing smoothed, so a one-pixel gap survives, default `false`).
 
 <!-- check: pass -->
 ```js
@@ -138,7 +139,7 @@ import { composition, paperLayer, photo, PAPER, setupCanvas, specimens, timeline
 const tl = await timeline();
 const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
 const [egg] = await specimens('assets/egg-plate.svg');
-const cut = await photo('assets/egg-plate.svg', { crop: egg.crop, keep: 'largest', size: 200 });
+const cut = await photo('assets/egg-plate.svg', { crop: egg.crop, keep: egg.box, size: 200 });
 if (cut.clipped.length > 0) throw new Error(`the crop cuts the egg on its ${cut.clipped.join(', ')}`);
 
 composition({

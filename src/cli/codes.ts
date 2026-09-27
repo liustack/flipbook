@@ -188,8 +188,8 @@ export const FINDING_CODES = {
     },
     'sprite-drift': {
         meaning:
-            'A drawing of a clip is much taller or shorter than the others, or, in a clip that stands still, its feet stand away from where they stand in the others, or, in a walk, a drawing had to be shifted a lot to keep the planted foot put, or the planted foot could not be followed at all: the character grows and shrinks, slides or sways as it plays.',
-        fix: 'Look at the drawing on the sheet (out/sprite/<name>.png, drawn on pink). Leave it when the change is part of the move (a crouch, a jump) or the sway looks natural, otherwise redraw or regenerate that drawing, or leave it out. For `stride` (no drawing named): look at the whole walk, a foot must touch the ground in every drawing and move back from one to the next.',
+            'A drawing of a clip is much taller or shorter than the others, or, in a clip that stands still, its feet stand away from where they stand in the others, or, in a walk, a drawing had to be shifted a lot to keep the planted foot put, or the planted foot could not be followed at all, or, for pixel sprites, which are never rescaled, a whole clip is taller or shorter than the first: the character grows and shrinks, slides or sways as it plays.',
+        fix: 'Look at the drawing on the sheet (out/sprite/<name>.png, drawn on pink). Leave it when the change is part of the move (a crouch, a jump) or the sway looks natural, otherwise redraw or regenerate that drawing, or leave it out. For `stride` (no drawing named): look at the whole walk, a foot must touch the ground in every drawing and move back from one to the next. For `clip-height` (pixel sprites): redraw that clip at the size of the first one.',
     },
     'cutout-none': {
         meaning:

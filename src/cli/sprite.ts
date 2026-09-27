@@ -45,6 +45,8 @@ interface ClipSpec {
 interface SpriteSpec {
     version: 1;
     height?: number;
+    /** Pixel art: every drawing keeps its own size and hard edges, nothing is rescaled. */
+    pixel?: boolean;
     clips: Record<string, ClipSpec>;
 }
 
@@ -86,9 +88,16 @@ function validate(
         c.fail('$', 'must be a JSON object');
         return { errors: c.errors };
     }
-    c.keys(input, '$', ['$schema', 'version', 'height', 'clips']);
+    c.keys(input, '$', ['$schema', 'version', 'height', 'pixel', 'clips']);
     if (input.version !== 1) c.fail('$.version', `must be 1 (got ${describe(input.version)})`);
-    if (input.height !== undefined) c.num(input.height, '$.height', 16, 4000);
+    if (input.pixel !== undefined && typeof input.pixel !== 'boolean') {
+        c.fail('$.pixel', `must be true or false (got ${describe(input.pixel)})`);
+    }
+    if (input.height !== undefined) {
+        if (input.pixel === true) {
+            c.fail('$.height', 'pixel sprites keep their own size: scale them when you draw them');
+        } else c.num(input.height, '$.height', 16, 4000);
+    }
     if (!isObject(input.clips) || Object.keys(input.clips).length === 0) {
         c.fail('$.clips', `must be an object of clips (got ${describe(input.clips)})`);
         return { errors: c.errors };
@@ -193,15 +202,17 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                     { canvas: HTMLCanvasElement; m: import('../runtime/sprite.ts').FrameMeasure }[]
                 > = {};
                 for (const [clipName, c] of Object.entries(o.clips)) {
-                    // Drawings on a sheet sit closer than specimens on a plate.
                     // Drawings on a sheet sit closer than specimens on a plate, and a small
                     // drawing on a big sheet is still a drawing: only pieces much smaller
-                    // than a typical drawing (below) are dust.
+                    // than a typical drawing (below) are dust. Pixel sheets are packed,
+                    // drawings reaching the sheet's edge.
                     const find = {
                         paper: c.paper,
                         threshold: c.threshold,
                         gap: c.gap ?? 0.004,
                         minArea: 0,
+                        sheet: o.pixel,
+                        pixelated: o.pixel,
                     };
                     const found = await rt.specimens(`/${c.image}`, find);
                     // The drawings are the biggest pieces: a piece counts as one when it is
@@ -212,7 +223,11 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                         .sort((a, b) => a - b);
                     const typical = top.length > 0 ? top[Math.floor(top.length / 2)] : 0;
                     const drawings = found.filter((f) => f.area >= typical / 3).length;
-                    const kept = found.slice(0, c.frames).map((f) => ({ ...f.crop, crop: f.crop }));
+                    // Read in order by where each drawing itself lies: the crop's room
+                    // is wide on a big sheet and would blur rows and columns together.
+                    const kept = found
+                        .slice(0, c.frames)
+                        .map((f) => ({ ...f.box, crop: f.crop, box: f.box }));
                     const ordered = rt.readingOrder(kept);
                     const frames: {
                         canvas: HTMLCanvasElement;
@@ -225,8 +240,11 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                             cutout: 'paper',
                             paper: c.paper,
                             threshold: c.threshold,
-                            keep: 'largest',
+                            // The drawing specimens() found, not a bigger neighbour.
+                            keep: f.box,
                             sticker: false,
+                            // Pixel art: whole pixels, nothing smoothed, a cell in or out.
+                            ...(o.pixel ? { pixelated: true } : {}),
                         });
                         if (p.clipped.length > 0) clipped.push(i);
                         const w = p.canvas.width;
@@ -264,11 +282,12 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                 if (bad) return { clips, height: 0, drift: [], sheet: null };
 
                 // One height for every clip: the given one, or the first clip's.
+                // Pixel art is never rescaled: its cells would blur or double.
                 const height = o.height ?? clips[names[0]].measured;
                 const drift: Drift[] = [];
                 const ground: [number, number][][] = [];
                 for (const n of names) {
-                    const k = height / clips[n].measured;
+                    const k = o.pixel ? 1 : height / clips[n].measured;
                     for (const f of cut[n]) {
                         const w = Math.max(1, Math.round(f.canvas.width * k));
                         const h = Math.max(1, Math.round(f.canvas.height * k));
@@ -276,16 +295,29 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                         out.width = w;
                         out.height = h;
                         const g = out.getContext('2d') as CanvasRenderingContext2D;
-                        g.imageSmoothingQuality = 'high';
-                        g.drawImage(f.canvas, 0, 0, w, h);
+                        if (o.pixel) {
+                            g.imageSmoothingEnabled = false;
+                            g.drawImage(f.canvas, 0, 0, w, h);
+                            // Every cell fully in or out.
+                            const img = g.getImageData(0, 0, w, h);
+                            for (let j = 3; j < img.data.length; j += 4) {
+                                img.data[j] = img.data[j] >= 128 ? 255 : 0;
+                            }
+                            g.putImageData(img, 0, 0);
+                        } else {
+                            g.imageSmoothingQuality = 'high';
+                            g.drawImage(f.canvas, 0, 0, w, h);
+                        }
                         clips[n].frames.push({
                             png: out.toDataURL('image/png'),
                             width: w,
                             height: h,
-                            anchor: [
-                                Math.round(f.m.headX * k * 2) / 2,
-                                Math.round((f.m.base + 1) * k * 2) / 2,
-                            ],
+                            anchor: o.pixel
+                                ? [Math.round(f.m.headX), f.m.base + 1]
+                                : [
+                                      Math.round(f.m.headX * k * 2) / 2,
+                                      Math.round((f.m.base + 1) * k * 2) / 2,
+                                  ],
                             tall: (f.m.base - f.m.top + 1) * k,
                             feet: [(f.m.feet[0] - f.m.headX) * k, (f.m.feet[1] - f.m.headX) * k],
                         });
@@ -308,7 +340,12 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                         clips[n].advance = planted ? planted.advance : null;
                         planted?.nudges.forEach((e, i) => {
                             const f = clips[n].frames[i];
-                            f.anchor = [Math.round((f.anchor[0] + e) * 2) / 2, f.anchor[1]];
+                            // Pixel anchors stay on whole pixels.
+                            const x = f.anchor[0] + e;
+                            f.anchor = [
+                                o.pixel ? Math.round(x) : Math.round(x * 2) / 2,
+                                f.anchor[1],
+                            ];
                             f.feet = [f.feet[0] - e, f.feet[1] - e];
                             if (Math.abs(e) > o.driftNudge * height) {
                                 drift.push({
@@ -381,7 +418,10 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                     const imgs = images.get(n) as HTMLImageElement[];
                     const cw = cellW(n);
                     const fit = Math.min(1, (sheet.width - 40) / (cw * (frames.length + 1.5)));
-                    const k = ((rowH - 2 * pad - 20) / tallest(n)) * fit;
+                    const fitted = ((rowH - 2 * pad - 20) / tallest(n)) * fit;
+                    // Pixel art on the sheet: whole-number zoom, no smoothing.
+                    const k = o.pixel ? Math.max(1, Math.floor(fitted)) : fitted;
+                    g.imageSmoothingEnabled = !o.pixel;
                     const base = row * rowH + rowH - pad;
                     const drifting = new Set(
                         drift.filter((d) => d.clip === n).map((d) => d.frame - 1),
@@ -428,6 +468,7 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
             {
                 clips: spec.clips,
                 height: spec.height,
+                pixel: spec.pixel === true,
                 driftHeight: DRIFT_HEIGHT,
                 driftFeet: DRIFT_FEET,
                 driftNudge: DRIFT_NUDGE,
@@ -459,6 +500,26 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
         }
     }
     if (failed || !result.sheet) return rb.finish();
+
+    // Pixel clips are not brought to one height: say when one is off from the first.
+    if (spec.pixel) {
+        const [first, ...rest] = Object.entries(result.clips);
+        for (const [clip, c] of rest) {
+            const share = c.measured / first[1].measured - 1;
+            if (Math.abs(c.measured - first[1].measured) <= 1) continue;
+            rb.add(
+                finding(
+                    'sprite-drift',
+                    `Clip "${clip}" is ${Math.abs(c.measured - first[1].measured)} px ${share > 0 ? 'taller' : 'shorter'} than "${first[0]}": pixel sprites are not rescaled, so the character changes size between the clips.`,
+                    {
+                        severity: 'warning',
+                        element: specFile,
+                        detail: { clip, kind: 'clip-height', share },
+                    },
+                ),
+            );
+        }
+    }
 
     const messages: Record<Drift['kind'], (d: Drift) => string> = {
         height: (d) =>
@@ -535,7 +596,7 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
             frames: frames.length,
             fps: s.fps ?? 8,
             loop: s.loop ?? false,
-            scale: result.height / c.measured,
+            scale: spec.pixel ? 1 : result.height / c.measured,
             ...(stride !== undefined ? { stride } : {}),
         };
     }

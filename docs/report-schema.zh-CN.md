@@ -174,7 +174,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `puppet-invalid` | puppet | 什么都没装配：`assets/puppets/<name>/puppet.json` 不存在、不是合法 JSON 或不合 puppet v1，某个部件的图不在 `assets/` 下或它在 `assets/SOURCES.json` 里的条目不全（同 `asset-unlicensed`），或骨骼接不起来（缺接口、缺部件、不止一个根）。`detail.path` 是出错的字段 | 按提示改那个字段。puppet.json 的写法见 [references/characters.md](../skills/flipbook/references/characters.md) |
 | `puppet-joint-missing` | puppet | 部件指定的那一头找不到圆形关节舌：那头是方的或参差的，或者舌头在另一边。`detail.part`、`detail.joint` 和 `detail.side` 说是哪里。什么都不写 | 把这个关节写成部件自己像素里的 `[x, y]`，从抠好的图上量，或者改成舌头所在的那一边 |
 | `sprite-invalid` | sprite | 什么都没切：`assets/sprites/<name>/sprite.json` 不存在、不是合法 JSON 或不合 sprite v1，某段动作的表不在 `assets/` 下或它在 `assets/SOURCES.json` 里的条目不全（同 `asset-unlicensed`），表上分得开的画比 `frames` 多或少（`detail.found`、`detail.frames`，有一张典型画三分之一大的就算一张），或者有画超出了裁剪框（`detail.frames` 列出是哪几张）。`detail.path` 是出错的字段 | 按提示改那个字段。挨在一起的画分不开：要一张画之间空隙更宽的表 |
-| `sprite-drift` | sprite，警告 | 有一张画比同一段动作的中位数高或矮 6% 以上（`detail.kind` 为 `height`），或者在不是走路的动作里，它的脚离别的画里脚的位置超过身高的 5%（`feet`），或者在走路里为了让支撑脚不动，一张画横向挪了超过身高的 4%，头在那里会晃（`nudge`），或者跟不上支撑脚、步幅是估的（`stride`，不带 `detail.frame`）。`detail.clip`、`detail.frame`（从 1 数）和 `detail.share` 说是哪张、差多少。被点到的画在检查图上垫粉色底 | 在检查图上看那张画。变化本来就是动作的一部分（蹲下、跳起）或者晃得自然就留着，不是就重画或者不用它。`stride` 不点名哪张画：看整段走路，每张都要有一只脚着地，并且一张比一张往后移 |
+| `sprite-drift` | sprite，警告 | 有一张画比同一段动作的中位数高或矮 6% 以上（`detail.kind` 为 `height`），或者在不是走路的动作里，它的脚离别的画里脚的位置超过身高的 5%（`feet`），或者在走路里为了让支撑脚不动，一张画横向挪了超过身高的 4%，头在那里会晃（`nudge`），或者跟不上支撑脚、步幅是估的（`stride`，不带 `detail.frame`），或者 `pixel` 为 true 时某段动作比第一段高或矮超过 1 像素（`clip-height`，不带 `detail.frame`）。`detail.clip`、`detail.frame`（从 1 数）和 `detail.share` 说是哪张、差多少。被点到的画在检查图上垫粉色底 | 在检查图上看那张画。变化本来就是动作的一部分（蹲下、跳起）或者晃得自然就留着，不是就重画或者不用它。`stride` 不点名哪张画：看整段走路，每张都要有一只脚着地，并且一张比一张往后移。`clip-height` 就按第一段的大小重画那段动作 |
 | `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 
@@ -302,7 +302,7 @@ id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 
 
 ### cutout
 
-`flipbook cutout <dir> <image>` 在渲染之前把 `assets/` 下一张图版上的标本都抠出来。它在一个只加载运行时库和合成目录文件的空白页面里（不跑合成的 `index.html`）调运行时的 `specimens()` 和 `photo()`，每个标本只留最大的一块，裁剪框仍然切到的不收。选项：`--ink` 线稿模式，`--paper #rrggbb` 指定底色，`--threshold`，`--gap`（默认 `0.012`），`--holes`，`--max`（默认 12），`--size`（默认按图版上的原尺寸，最大 1200）。
+`flipbook cutout <dir> <image>` 在渲染之前把 `assets/` 下一张图版上的标本都抠出来。它在一个只加载运行时库和合成目录文件的空白页面里（不跑合成的 `index.html`）调运行时的 `specimens()` 和 `photo()`，每个标本只留它自己（落在它自己框里最多的那一块，不会换成裁剪框带进来的邻居），裁剪框仍然切到的不收。选项：`--ink` 线稿模式，`--paper #rrggbb` 指定底色，`--threshold`，`--gap`（默认 `0.012`，`0` 表示一点不合并），`--holes`，`--max`（默认 12），`--size`（默认按图版上的原尺寸，最大 1200）。
 
 - 抠图是透明 PNG：`assets/cut/<name>/<name>-01.png`、`-02.png` ……，大的在前。重跑整组替换。
 - `assets/cut/<name>/cutout.json` 列出每个抠图和它来自的裁剪框、面积。
@@ -340,7 +340,7 @@ id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 
 
 ### sprite
 
-`flipbook sprite <dir> <name>` 在渲染之前把逐帧精灵图切成一段段动作。它读 `assets/sprites/<name>/sprite.json`：每段动作写 `assets/` 下的哪张表、表上有几张画（`frames`），可选 `fps`（默认 8）、`loop`（默认 false）、走路写 `walk`，以及和 `cutout` 一样的切图设置 `paper`、`threshold`、`gap`（默认 `0.004`），另外可以给所有动作写一个 `height`。它在和 `cutout` 一样的空白页面里用 `specimens()` 找出画（有一张典型画三分之一大的就算一张，在整张表上再小也算），留下最大的 `frames` 张，按阅读顺序排（从上到下一行行，每行从左到右），再用 `photo()` 一张张切出来。每张画量出锚点：横向是人物上面 15% 里墨迹的平均 x（头，所以举过头顶的手会把它拉偏），纵向是最低的有墨的一行（脚底）。每段动作按它各张画身高（头顶到脚底）的中位数缩放到 `height`，没写就对齐第一段。走路时它一张张跟着支撑脚走（人物下面 4% 里的墨迹段：往后移不超过身高 0.4（往前一点点也算，当作误差）、宽度变化不超过身高五分之一的几对里，先挑宽度变化最小的，差不多的（相差身高 5% 以内）再取往后移得最多的那对），把每张之间的前进量拉平，再把每张画横向挪一点，让支撑脚停在落下的地方。`stride`（走一遍前进多远）就是这个前进量乘以张数。跟不上支撑脚，或者整体上脚没有往后移（原地蹦、倒着走）时，`stride` 按两脚最远时的距离减去最近时的距离乘二估一个，并报 `sprite-drift`。
+`flipbook sprite <dir> <name>` 在渲染之前把逐帧精灵图切成一段段动作。它读 `assets/sprites/<name>/sprite.json`：每段动作写 `assets/` 下的哪张表、表上有几张画（`frames`），可选 `fps`（默认 8）、`loop`（默认 false）、走路写 `walk`，以及和 `cutout` 一样的切图设置 `paper`、`threshold`、`gap`（默认 `0.004`），另外可以给所有动作写一个 `height`，或者对像素画写 `"pixel": true`：这时按表的原尺寸、按整像素找画和切画，不做平滑，每张画保持原尺寸和原来的颜色，边缘是硬的（每个像素要么有要么没有），锚点落在整像素上，什么都不缩放，也不收 `height`。像素表可以排得很紧：画可以顶到表边（这时要给 `paper`，底色没法从边上量），`gap: 0` 让只隔一个像素的画也分得开。它在和 `cutout` 一样的空白页面里用 `specimens()` 找出画（有一张典型画三分之一大的就算一张，在整张表上再小也算），留下最大的 `frames` 张，按阅读顺序排（从上到下一行行，每行从左到右），再用 `photo()` 一张张切出来。每张画量出锚点：横向是人物上面 15% 里墨迹的平均 x（头，所以举过头顶的手会把它拉偏），纵向是最低的有墨的一行（脚底）。`pixel` 不为 true 时，每段动作按它各张画身高（头顶到脚底）的中位数缩放到 `height`，没写就对齐第一段。走路时它一张张跟着支撑脚走（人物下面 4% 里的墨迹段：往后移不超过身高 0.4（往前一点点也算，当作误差）、宽度变化不超过身高五分之一的几对里，先挑宽度变化最小的，差不多的（相差身高 5% 以内）再取往后移得最多的那对），把每张之间的前进量拉平，再把每张画横向挪一点，让支撑脚停在落下的地方。`stride`（走一遍前进多远）就是这个前进量乘以张数。跟不上支撑脚，或者整体上脚没有往后移（原地蹦、倒着走）时，`stride` 按两脚最远时的距离减去最近时的距离乘二估一个，并报 `sprite-drift`。
 
 - 切好的画是 `assets/sprites/<name>/frames/<clip>-01.png`、`-02.png` ……重跑整组替换。
 - `assets/sprites/<name>/clips.json` 记着 `height`，以及每段动作的 `fps`、`loop`、`stride` 和每张画的 `file`、`width`、`height`、`anchor`。页面里用 `loadSprite()` 读它。

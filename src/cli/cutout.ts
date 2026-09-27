@@ -97,7 +97,7 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
                         paper: o.paper,
                         threshold: o.threshold,
                         holes: o.holes,
-                        keep: 'largest',
+                        keep: f.box,
                         size: o.size,
                         sticker: false,
                     });

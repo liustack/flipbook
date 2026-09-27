@@ -28,5 +28,47 @@
         "license": "generated",
         "tool": "Pillow",
         "prompt": "three tiny drawings and a smaller fourth on a big white sheet"
+    },
+    "pixel-walk.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "pixel figures, legs apart and together"
+    },
+    "pixel-wave.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "pixel figures two cells taller"
+    },
+    "pixel-tight.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "three pixel figures one pixel apart, touching the top and bottom of the sheet"
+    },
+    "pixel-wide.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "three 8 by 20 pixel figures one pixel apart at the left of a 1600 px wide sheet, each with a mark in its own row"
+    },
+    "pixel-tall.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "three 8 by 1300 pixel figures on a 1400 px tall sheet, each with a mark in its own row"
+    },
+    "pixel-varied.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "three pixel figures 20, 21 and 22 tall, one pixel apart at the left of a 1600 px wide sheet, each with a mark in its own row"
+    },
+    "pixel-diagonal.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "three 8 by 20 pixel figures from top right to bottom left, one per row, a pixel apart, on a 1600 px wide sheet"
     }
 }

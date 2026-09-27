@@ -62,9 +62,12 @@ export interface PhotoOptions {
     despeckle?: number;
     /**
      * 'paper' and 'alpha': 'largest' keeps only the biggest piece, dropping
-     * parts of neighbours that came in with the crop. Default 'all'.
+     * parts of neighbours that came in with the crop. A box (fractions of the
+     * file, a specimen's `box` from specimens()) keeps the piece with the most
+     * of it inside that box: the specimen itself, even when a neighbour as big
+     * or bigger came in with the crop. Default 'all'.
      */
-    keep?: 'all' | 'largest';
+    keep?: 'all' | 'largest' | PhotoCrop;
     /**
      * 'paper': also clear ground enclosed by the subject (dark water between
      * tentacles) when a patch covers at least this share of the subject.
@@ -76,6 +79,16 @@ export interface PhotoOptions {
      * (yellowing, shadow near the gutter) instead of one color. Default true.
      */
     flatten?: boolean;
+    /**
+     * Pixel art: the crop grows out to whole pixels of the file, nothing is
+     * smoothed or softened and no edge color is reworked, so every pixel keeps
+     * its color, and the cutout keeps its own size. The paper cutout leaves
+     * every pixel in or out, the ink cutout keeps a wash half through, and a
+     * file's own transparency is kept as it is. Scaled, it is blown up without
+     * smoothing. A side that is the file's own edge does not count as cut.
+     * Default false.
+     */
+    pixelated?: boolean;
     /** Border, tilt, shadow and grain, or false for the bare cutout. */
     sticker?: StickerOptions | false;
 }
@@ -562,6 +575,36 @@ function keepLargest(alpha: Uint8Array, w: number, h: number): void {
 }
 
 /**
+ * Keep the piece with the most pixels inside the box [x0, x1) by [y0, y1),
+ * the bigger one of two with as many: the piece a box was drawn around.
+ */
+function keepInside(
+    alpha: Uint8Array,
+    w: number,
+    h: number,
+    box: { x0: number; y0: number; x1: number; y1: number },
+): void {
+    const { label, sizes } = islands(alpha, w, h);
+    const inside = new Array<number>(sizes.length).fill(0);
+    for (let y = Math.max(0, box.y0); y < Math.min(h, box.y1); y++) {
+        for (let x = Math.max(0, box.x0); x < Math.min(w, box.x1); x++) {
+            const id = label[y * w + x];
+            if (id > 0) inside[id]++;
+        }
+    }
+    let best = 0;
+    for (let id = 1; id < sizes.length; id++) {
+        if (
+            best === 0 ||
+            inside[id] > inside[best] ||
+            (inside[id] === inside[best] && sizes[id] > sizes[best])
+        )
+            best = id;
+    }
+    for (let i = 0; i < alpha.length; i++) if (label[i] !== best) alpha[i] = 0;
+}
+
+/**
  * Clear patches of ground-colored pixels inside the subject (closer than
  * `threshold` to the paper, 4-connected) that cover at least `share` of it.
  */
@@ -700,17 +743,19 @@ function checkCrop(crop: PhotoCrop): void {
     }
 }
 
-/** RGBA pixels scaled to another size by the canvas, smoothing on. */
+/** RGBA pixels scaled to another size by the canvas, smoothing on unless `smooth` is false. */
 function resample(
     pixels: ImageDataArray,
     w: number,
     h: number,
     nw: number,
     nh: number,
+    smooth = true,
 ): ImageDataArray {
     const from = canvasOf(w, h);
     from.ctx.putImageData(new ImageData(pixels, w, h), 0, 0);
     const to = canvasOf(nw, nh);
+    to.ctx.imageSmoothingEnabled = smooth;
     to.ctx.imageSmoothingQuality = 'high';
     to.ctx.drawImage(from.canvas, 0, 0, nw, nh);
     return to.ctx.getImageData(0, 0, nw, nh).data;
@@ -733,17 +778,44 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
     }
     const crop = options.crop ?? { x: 0, y: 0, width: 1, height: 1 };
     checkCrop(crop);
-    const sx = crop.x * nw;
-    const sy = crop.y * nh;
-    const sw = Math.min(nw - sx, crop.width * nw);
-    const sh = Math.min(nh - sy, crop.height * nh);
+    if (typeof options.keep === 'object') checkCrop(options.keep);
+    const pixelated = options.pixelated === true;
+    let sx = crop.x * nw;
+    let sy = crop.y * nh;
+    let sw = Math.min(nw - sx, crop.width * nw);
+    let sh = Math.min(nh - sy, crop.height * nh);
+    if (pixelated) {
+        // Whole pixels of the file: a fraction would be sampled between two.
+        const x0 = Math.max(0, Math.floor(sx + 1e-6));
+        const y0 = Math.max(0, Math.floor(sy + 1e-6));
+        sw = Math.min(nw, Math.ceil(sx + sw - 1e-6)) - x0;
+        sh = Math.min(nh, Math.ceil(sy + sh - 1e-6)) - y0;
+        sx = x0;
+        sy = y0;
+    }
     const dpr = window.devicePixelRatio || 1;
-    // The cutout runs at the file's own resolution, at most 2400 px on the long edge.
-    const k = Math.min(1, WORK_EDGE / Math.max(sw, sh));
+    // The cutout runs at the file's own resolution, at most 2400 px on the long
+    // edge. Pixel art always at its own.
+    const k = pixelated ? 1 : Math.min(1, WORK_EDGE / Math.max(sw, sh));
     const w = Math.max(1, Math.round(sw * k));
     const h = Math.max(1, Math.round(sh * k));
 
+    // Drop the other pieces the crop took in, by size or by the box given.
+    const keepOne = (alpha: Uint8Array) => {
+        const keep = options.keep;
+        if (keep === 'largest') keepLargest(alpha, w, h);
+        else if (typeof keep === 'object') {
+            keepInside(alpha, w, h, {
+                x0: Math.floor((keep.x * nw - sx) * k),
+                y0: Math.floor((keep.y * nh - sy) * k),
+                x1: Math.ceil(((keep.x + keep.width) * nw - sx) * k),
+                y1: Math.ceil(((keep.y + keep.height) * nh - sy) * k),
+            });
+        }
+    };
+
     const work = canvasOf(w, h);
+    work.ctx.imageSmoothingEnabled = !pixelated;
     work.ctx.imageSmoothingQuality = 'high';
     work.ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
     const pixels = work.ctx.getImageData(0, 0, w, h);
@@ -771,23 +843,30 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
         if (mode === 'ink') {
             alpha = inkAlpha(data, field, w * h);
             despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
-            if (options.keep === 'largest') keepLargest(alpha, w, h);
+            keepOne(alpha);
         } else {
-            const cut = paperAlpha(data, w, h, field, threshold, options.softness ?? 24);
+            const cut = paperAlpha(
+                data,
+                w,
+                h,
+                field,
+                threshold,
+                pixelated ? 0 : (options.softness ?? 24),
+            );
             alpha = cut.alpha;
             despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
-            if (options.keep === 'largest') keepLargest(alpha, w, h);
+            keepOne(alpha);
             if (options.holes) {
                 clearHoles(alpha, cut.dist, w, h, threshold, options.holes);
                 despeckle(alpha, w, h, Math.round((options.despeckle ?? 0.002) * w * h));
             }
-            edgeAlpha(data, alpha, field, w, h);
+            if (!pixelated) edgeAlpha(data, alpha, field, w, h);
         }
-        unmix(data, alpha, field, w * h);
+        if (!pixelated) unmix(data, alpha, field, w * h);
     } else {
         alpha = new Uint8Array(w * h);
         for (let i = 0; i < w * h; i++) alpha[i] = mode === 'alpha' ? data[i * 4 + 3] : 255;
-        if (mode === 'alpha' && options.keep === 'largest') keepLargest(alpha, w, h);
+        if (mode === 'alpha') keepOne(alpha);
     }
 
     // Trim to what is left.
@@ -811,10 +890,17 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
     }
     const clipped: ('top' | 'right' | 'bottom' | 'left')[] = [];
     if (mode !== 'none') {
-        if (y0 === 0) clipped.push('top');
-        if (x1 === w - 1) clipped.push('right');
-        if (y1 === h - 1) clipped.push('bottom');
-        if (x0 === 0) clipped.push('left');
+        // Pixel art is drawn up to the sheet's edge: that edge cuts nothing.
+        const edge = (side: 'top' | 'right' | 'bottom' | 'left') =>
+            pixelated &&
+            ((side === 'top' && sy === 0) ||
+                (side === 'left' && sx === 0) ||
+                (side === 'right' && sx + sw === nw) ||
+                (side === 'bottom' && sy + sh === nh));
+        if (y0 === 0 && !edge('top')) clipped.push('top');
+        if (x1 === w - 1 && !edge('right')) clipped.push('right');
+        if (y1 === h - 1 && !edge('bottom')) clipped.push('bottom');
+        if (x0 === 0 && !edge('left')) clipped.push('left');
     }
     const tw = x1 - x0 + 1;
     const th = y1 - y0 + 1;
@@ -832,11 +918,13 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
     // Then it is scaled so its long edge is `size` CSS px: the border is added
     // at the size the cutout will be drawn at.
     const natural = Math.max(tw, th) / k;
-    const target = Math.max(1, Math.round((options.size ?? Math.min(1200, natural)) * dpr));
+    // Pixel art keeps every pixel: no 1200 cap unless a size is asked for.
+    const long = options.size ?? (pixelated ? natural : Math.min(1200, natural));
+    const target = Math.max(1, Math.round(long * dpr));
     const ratio = target / Math.max(tw, th);
     const cw = ratio === 1 ? tw : Math.max(1, Math.round(tw * ratio));
     const ch = ratio === 1 ? th : Math.max(1, Math.round(th * ratio));
-    const cut = ratio === 1 ? trimmed : resample(trimmed, tw, th, cw, ch);
+    const cut = ratio === 1 ? trimmed : resample(trimmed, tw, th, cw, ch, !pixelated);
 
     const sticker = options.sticker === false ? null : (options.sticker ?? {});
     const seed = sticker?.seed ?? hash32(src, JSON.stringify(crop));
@@ -1013,11 +1101,21 @@ export interface SpecimenOptions {
     gap?: number;
     /** Room left around each specimen, as a share of the long edge. Default 0.015. */
     margin?: number;
+    /**
+     * A sheet of drawings (sprites, parts), not a printed plate: nothing on it
+     * is a page margin, a caption or a frame, so a drawing may reach the
+     * picture's edge and fill much of it. Default false.
+     */
+    sheet?: boolean;
+    /** Pixel art: looked for at the file's own size with nothing smoothed. Default false. */
+    pixelated?: boolean;
 }
 
 export interface Specimen {
     /** A crop for photo(), fractions of the file, the specimen with room around it. */
     crop: PhotoCrop;
+    /** The specimen itself, fractions of the file: pass it to photo() as `keep`. */
+    box: PhotoCrop;
     /** The specimen's share of the picture's area. */
     area: number;
 }
@@ -1033,10 +1131,13 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
     const nw = img.naturalWidth;
     const nh = img.naturalHeight;
     if (!nw || !nh) throw new Error(`specimens(): ${src.slice(0, 120)} has no size.`);
-    const k = Math.min(1, 1200 / Math.max(nw, nh));
+    // Looked for at 1200 px at most, smoothed. Pixel art at its own size,
+    // unsmoothed: a gap of one pixel would not survive the scaling.
+    const k = options.pixelated ? 1 : Math.min(1, 1200 / Math.max(nw, nh));
     const w = Math.max(1, Math.round(nw * k));
     const h = Math.max(1, Math.round(nh * k));
     const work = canvasOf(w, h);
+    work.ctx.imageSmoothingEnabled = !options.pixelated;
     work.ctx.imageSmoothingQuality = 'high';
     work.ctx.drawImage(img, 0, 0, w, h);
     const data = work.ctx.getImageData(0, 0, w, h).data;
@@ -1072,6 +1173,13 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
         if (y < fy0) fy0 = y;
         if (y > fy1) fy1 = y;
     }
+    if (options.sheet) {
+        // A sheet is all field.
+        fx0 = -1;
+        fy0 = -1;
+        fx1 = w;
+        fy1 = h;
+    }
     for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
             if (x <= fx0 || x >= fx1 || y <= fy0 || y >= fy1) alpha[y * w + x] = 0;
@@ -1083,7 +1191,9 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
     // highlight splitting a wing): group them by growing every piece by the
     // gap and labeling what joins up. Distance counts, not bounding boxes, so
     // a rule drawn around the whole plate does not swallow what it frames.
-    const r = Math.max(1, Math.round((options.gap ?? 0.012) * Math.max(w, h)));
+    // A gap of 0 joins nothing: drawings a pixel apart stay apart.
+    const r =
+        options.gap === 0 ? 0 : Math.max(1, Math.round((options.gap ?? 0.012) * Math.max(w, h)));
     const grown = dilate(alpha, w, h, r);
     const { label, sizes } = islands(grown, w, h);
     const boxes = sizes.map(() => ({ x0: w, y0: h, x1: -1, y1: -1, area: 0 }));
@@ -1100,6 +1210,7 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
     }
     const found = boxes.filter((b) => {
         if (b.area === 0) return false;
+        if (options.sheet) return true;
         // The page margin, its caption and the scan's border reach the edge.
         if (b.x0 === 0 || b.y0 === 0 || b.x1 === w - 1 || b.y1 === h - 1) return false;
         // A rule around the plate: a big, nearly empty ring.
@@ -1119,6 +1230,12 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
             const y1 = Math.min(h, b.y1 + 1 + margin);
             return {
                 crop: { x: x0 / w, y: y0 / h, width: (x1 - x0) / w, height: (y1 - y0) / h },
+                box: {
+                    x: b.x0 / w,
+                    y: b.y0 / h,
+                    width: (b.x1 + 1 - b.x0) / w,
+                    height: (b.y1 + 1 - b.y0) / h,
+                },
                 area: b.area / (w * h),
             };
         });

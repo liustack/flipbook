@@ -5,9 +5,54 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runSprite } from '../src/cli/sprite.ts';
+import { requireFfmpeg } from '../src/engine/ffmpeg.ts';
+import { run } from '../src/engine/proc.ts';
 import type { SpriteFile } from '../src/runtime/sprite.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, codes, copyFixture } from './helpers.ts';
+
+/** The alpha of every pixel of a PNG, decoded by ffmpeg. */
+async function readPixels(file: string): Promise<{ alphas: number[] }> {
+    const { ffmpeg } = await requireFfmpeg([]);
+    const result = await run(
+        ffmpeg,
+        ['-v', 'error', '-i', file, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'],
+        {
+            timeoutMs: 30_000,
+        },
+    );
+    const alphas: number[] = [];
+    for (let i = 3; i < result.stdout.length; i += 4) alphas.push(result.stdout[i]);
+    return { alphas };
+}
+
+/** The RGBA bytes of a PNG, decoded by ffmpeg. */
+async function readRgba(file: string): Promise<Buffer> {
+    const { ffmpeg } = await requireFfmpeg([]);
+    const result = await run(
+        ffmpeg,
+        ['-v', 'error', '-i', file, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'],
+        { timeoutMs: 30_000 },
+    );
+    return result.stdout;
+}
+
+/** The colors a PNG uses where it is not transparent, as rrggbb. */
+async function readColors(file: string): Promise<Set<string>> {
+    const { ffmpeg } = await requireFfmpeg([]);
+    const result = await run(
+        ffmpeg,
+        ['-v', 'error', '-i', file, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'],
+        { timeoutMs: 30_000 },
+    );
+    const colors = new Set<string>();
+    const px = result.stdout;
+    for (let i = 0; i < px.length; i += 4) {
+        if (px[i + 3] === 0) continue;
+        colors.add(((px[i] << 16) | (px[i + 1] << 8) | px[i + 2]).toString(16).padStart(6, '0'));
+    }
+    return colors;
+}
 
 afterAll(async () => {
     await closeSession();
@@ -130,5 +175,185 @@ describe('flipbook sprite', () => {
             '$.clips.walk.image',
             '$.clips.walk.fps',
         ]);
+    });
+
+    it('keeps pixel art as it is: same size, every cell in or out, whole-pixel anchors', async () => {
+        writeSpec(dir, {
+            version: 1,
+            pixel: true,
+            clips: {
+                walk: {
+                    image: 'assets/pixel-walk.png',
+                    frames: 4,
+                    loop: true,
+                    gap: 0.01,
+                },
+                wave: { image: 'assets/pixel-wave.png', frames: 2 },
+            },
+        });
+        const report = await runSprite({ dir, name: 'kid', session: await session() });
+        expect(codes(report)).toEqual([]);
+        // The wave sheet is two cells taller: said, not stretched.
+        expect(report.warnings.map((w) => [w.code, w.detail?.clip, w.detail?.kind])).toEqual([
+            ['sprite-drift', 'wave', 'clip-height'],
+        ]);
+        expect(report.warnings[0].message).toContain('2 px taller');
+        const file = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets/sprites/kid/clips.json'), 'utf-8'),
+        ) as SpriteFile;
+        for (const clip of Object.values(file.clips)) {
+            for (const f of clip.frames) {
+                expect(Number.isInteger(f.anchor[0]) && Number.isInteger(f.anchor[1])).toBe(true);
+            }
+        }
+        const done = report.sprite as { clips: Record<string, { scale: number }> };
+        expect(done.clips.wave.scale).toBe(1);
+        // Every drawing as drawn: its own size (8 by 21 walking, 8 by 23 waving),
+        // every cell in or out, and no color the sheet does not have.
+        for (const [name, clip] of Object.entries(file.clips)) {
+            const sheet = await readColors(path.join(dir, `assets/pixel-${name}.png`));
+            for (const f of clip.frames) {
+                expect([f.width, f.height]).toEqual(name === 'walk' ? [8, 21] : [8, 23]);
+                const png = path.join(dir, f.file);
+                const frame = await readPixels(png);
+                expect(frame.alphas.every((a) => a === 0 || a === 255)).toBe(true);
+                const extra = [...(await readColors(png))].filter((c) => !sheet.has(c));
+                expect(extra, `${f.file} has colors the sheet does not`).toEqual([]);
+            }
+        }
+    });
+
+    it('parts pixel drawings a pixel apart with gap 0, drawn right up to the edge of the sheet', async () => {
+        // Three 5 by 12 figures, one pixel apart, top and bottom on the sheet's
+        // edges: the ground cannot be read off the edge, so it is given.
+        const spec = (gap?: number) => ({
+            version: 1,
+            pixel: true,
+            clips: {
+                walk: { image: 'assets/pixel-tight.png', frames: 3, paper: '#f2e8cf', gap },
+            },
+        });
+        writeSpec(dir, spec());
+        const joined = await runSprite({ dir, name: 'kid', session: await session() });
+        expect(codes(joined)).toEqual(['sprite-invalid']);
+        writeSpec(dir, spec(0));
+        const report = await runSprite({ dir, name: 'kid', session: await session() });
+        expect(codes(report)).toEqual([]);
+        const file = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets/sprites/kid/clips.json'), 'utf-8'),
+        ) as SpriteFile;
+        expect(file.clips.walk.frames.map((f) => [f.width, f.height, ...f.anchor])).toEqual([
+            [5, 12, 2, 12],
+            [5, 12, 2, 12],
+            [5, 12, 2, 12],
+        ]);
+        const sheet = await readColors(path.join(dir, 'assets/pixel-tight.png'));
+        for (const f of file.clips.walk.frames) {
+            const extra = [...(await readColors(path.join(dir, f.file)))].filter(
+                (c) => !sheet.has(c),
+            );
+            expect(extra).toEqual([]);
+        }
+    });
+
+    it('finds and keeps each pixel drawing as drawn, in reading order, on big sheets', async () => {
+        // Each drawing has a mark in its own row, so a frame that is its
+        // neighbour, or out of order, shows. The sheets are wide or tall, so
+        // they are never looked for scaled down, and the room around each crop
+        // is wide enough to take in the neighbours. [left, top, width, height]
+        // of every drawing, in reading order.
+        const sheets: [string, number, [number, number, number, number][]][] = [
+            [
+                'pixel-wide',
+                1600,
+                [
+                    [10, 14, 8, 20],
+                    [19, 14, 8, 20],
+                    [28, 14, 8, 20],
+                ],
+            ],
+            [
+                'pixel-tall',
+                100,
+                [
+                    [10, 50, 8, 1300],
+                    [40, 50, 8, 1300],
+                    [70, 50, 8, 1300],
+                ],
+            ],
+            [
+                'pixel-varied',
+                1600,
+                [
+                    [10, 10, 8, 20],
+                    [19, 10, 8, 21],
+                    [28, 10, 8, 22],
+                ],
+            ],
+            [
+                'pixel-diagonal',
+                1600,
+                [
+                    [28, 10, 8, 20],
+                    [19, 31, 8, 20],
+                    [10, 52, 8, 20],
+                ],
+            ],
+        ];
+        for (const [sheet, sheetWidth, drawings] of sheets) {
+            writeSpec(dir, {
+                version: 1,
+                pixel: true,
+                clips: {
+                    idle: { image: `assets/${sheet}.png`, frames: 3, paper: '#faf5eb', gap: 0 },
+                },
+            });
+            const report = await runSprite({ dir, name: 'kid', session: await session() });
+            expect(codes(report), sheet).toEqual([]);
+            const file = JSON.parse(
+                fs.readFileSync(path.join(dir, 'assets/sprites/kid/clips.json'), 'utf-8'),
+            ) as SpriteFile;
+            expect(
+                file.clips.idle.frames.map((f) => [f.width, f.height]),
+                sheet,
+            ).toEqual(drawings.map(([, , w, h]) => [w, h]));
+            const done = report.sprite as { clips: Record<string, { scale: number }> };
+            expect(done.clips.idle.scale).toBe(1);
+            // Every pixel of every frame is the pixel of its own drawing on the
+            // sheet: the ground transparent, the rest as it is.
+            const source = await readRgba(path.join(dir, `assets/${sheet}.png`));
+            for (const [i, f] of file.clips.idle.frames.entries()) {
+                const [left, top, w, h] = drawings[i];
+                const frame = await readRgba(path.join(dir, f.file));
+                let wrong = 0;
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const s = ((top + y) * sheetWidth + left + x) * 4;
+                        const o = (y * w + x) * 4;
+                        const ground =
+                            source[s] === 0xfa && source[s + 1] === 0xf5 && source[s + 2] === 0xeb;
+                        const same = ground
+                            ? frame[o + 3] === 0
+                            : frame[o + 3] === 255 &&
+                              frame[o] === source[s] &&
+                              frame[o + 1] === source[s + 1] &&
+                              frame[o + 2] === source[s + 2];
+                        if (!same) wrong++;
+                    }
+                }
+                expect(wrong, `${sheet} frame ${i + 1}`).toBe(0);
+            }
+        }
+    });
+
+    it('refuses a height for pixel sprites', async () => {
+        writeSpec(dir, {
+            version: 1,
+            pixel: true,
+            height: 40,
+            clips: { walk: { image: 'assets/pixel-walk.png', frames: 4 } },
+        });
+        const report = await runSprite({ dir, name: 'kid', session: await session() });
+        expect(report.failures.map((f) => f.detail?.path)).toEqual(['$.height']);
     });
 });

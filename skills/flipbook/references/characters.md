@@ -249,10 +249,11 @@ To an image model: "a 2D animation sprite sheet", the number of drawings and wha
 | `fps` | Drawings a second, default 8 (each held for three frames at 24 fps) |
 | `loop` | Start over after the last drawing, or hold it (default) |
 | `walk` | A walk: the drawings are shifted so the planted foot stays where it landed, and how far it moves in one pass is measured |
-| `paper`, `threshold`, `gap` | As for `cutout`, when it cuts badly. `gap` defaults to `0.004` |
-| `height` | The height every clip is scaled to. Default: the first clip's |
+| `paper`, `threshold`, `gap` | As for `cutout`, when it cuts badly. `gap` defaults to `0.004`, and `0` joins nothing, so drawings one pixel apart stay apart |
+| `height` | The height every clip is scaled to, unless `pixel` is true. Default: the first clip's |
+| `pixel` | `true` for pixel art: each drawing is cut on whole pixels and keeps its size, its colors and hard edges, nothing is rescaled (so no `height`), anchors fall on whole pixels. A packed sheet may have drawings reaching its edge: give `paper` then, the ground cannot be read off the edge |
 
-The command cuts the drawings, measures each one's anchor (the middle of the head across, the soles down), scales every clip to one height and writes `assets/sprites/<name>/clips.json`.
+The command cuts the drawings, measures each one's anchor (the middle of the head across, the soles down), scales every clip to one height (not pixel art) and writes `assets/sprites/<name>/clips.json`.
 
 ### Playing them
 
