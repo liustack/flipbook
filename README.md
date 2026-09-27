@@ -145,7 +145,7 @@ Render twice on the same machine with the same version and the raw frames match 
 
 ## Eval
 
-Before the 0.3 release, Claude Code with Claude Opus 5.5 ran 8 prompts once each, unattended. All 8 were one-shot passes: from one sentence to a video that passed acceptance, with nobody stepping in. A run took 1.9 to 13.5 minutes and cost $0.65 to $2.78. Illustrated stories (a seed growing into a tree, the life of a butterfly) took 2 to 3 times the time and money of text and data videos. A person then went through every video and found none broken in a way the checks missed. Cases, judging rules and per-case numbers are in [docs/eval.md](docs/eval.md).
+Before the 0.3 release, Claude Code with Claude Opus 5.5 ran 8 prompts once each, unattended. All 8 were one-shot passes: from one sentence to a video that passed acceptance, with nobody stepping in. A run took 1.9 to 13.5 minutes and cost $0.65 to $2.78. Illustrated stories (a seed growing into a tree, the life of a butterfly) took 2 to 3 times the time and money of text and data videos. A person then went through every video and found none broken in a way the checks missed. Those cases were written for short animation in general and have since been retired: the eval now has ten new cases built around stories, characters and looks, not run yet. The new cases, how a run is judged and the old numbers are in [docs/eval.md](docs/eval.md).
 
 ## Support
 
