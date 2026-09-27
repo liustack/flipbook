@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### 从部件图做纸偶
+
+手绘风格的角色（木刻、水粉、蜡笔）代码画不好，现在可以从一张部件图做纸偶：用户画的，或者生图模型出的。
+
+- **新命令 `flipbook puppet <dir> <name>`**：读 `assets/puppets/<name>/puppet.json`（哪块抠图是哪个部件、关节在哪），自动找出部件两头的圆形关节舌，量出印在部件上的描边宽度并削掉（纸偶按组自己描边），写出部件、`rig.json` 和一张检查图。检查图上每个部件标出挂点和接口，再把纸偶站着、迈步、两腿交错、换脚迈步、挥手的样子和参考图并排放。关节写 `"top"`、`"bottom"` 这类方向就自动找，一头不是圆的（方头、斜头、尖头、平袖口）或者太小时报 `puppet-joint-missing`，改写成像素坐标。整块深色、没有描边的部件量出来是 0，不会被削空。puppet.json 写错报 `puppet-invalid`，自定义骨骼逐项核对，报错写到具体字段。
+- **运行时库新增 `loadRig()`**：页面里读 `rig.json`，拿到部件和骨骼，直接交给 `puppet()`。
+- **图片也要登记来源**：`assets/` 下的每张图片（字体和 brand.json 写了许可的标志除外）都要在 `assets/SOURCES.json` 里写来源和许可，否则 check、render、snapshot、audio 报新类型码 `asset-unlicensed`。生成的图写 `"license": "generated"`，还要写生成它的 `tool` 和完整的 `prompt`。`cutout` 和 `puppet` 给切出来的图记一条带 `cutFrom` 的条目，工具和提示词顺着 `cutFrom` 到原图的条目上找，不再每块抄一遍。`cutout` 对缺工具或提示词的生成图也会拒绝。
+- **skill**：`references/characters.md` 新增「从图片做部件」一节，讲部件图怎么画（关节舌不描边、盖在上面的一头描边）、跟生图模型怎么说、puppet.json 的写法和来源怎么记。SKILL.md 写明生成的静态图可以当素材，要记工具和提示词。
+- **新样例 `examples/postman-print/`**：和 `examples/postman/` 同一个故事，邮差换成生图模型出的手工上色木刻部件，经 `cutout` 和 `puppet` 装成纸偶。17 秒。
+
+### 修复
+
+- **check 解码的帧少了会直接报错**：check 把截下的帧交给 ffmpeg 解成灰度图再比较，ffmpeg 遇到解不开的图片会跳过它却照样正常退出，帧就错了位，后面的比较拿到空值崩成 `internal-error`。现在解出的帧数和交出去的对不上就报错，写明是哪个序列、ffmpeg 说了什么。
+
 ## 0.6.1 - 2026-09-27
 
 ### 剪纸纸偶
