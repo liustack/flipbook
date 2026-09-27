@@ -161,6 +161,39 @@ function canvasOf(
     return { canvas, ctx };
 }
 
+const clear = new WeakMap<HTMLImageElement, boolean>();
+
+/**
+ * Whether the file has a pixel you can see through, anywhere in it. What
+ * 'auto' goes by: a crop of a transparent file filled edge to edge by its
+ * drawing is still that file's, and its ground is the transparency. Read at
+ * the file's own size in strips of about four million pixels.
+ */
+function seeThrough(img: HTMLImageElement): boolean {
+    let known = clear.get(img);
+    if (known === undefined) {
+        const nw = img.naturalWidth;
+        const nh = img.naturalHeight;
+        const strip = Math.max(1, Math.min(nh, Math.floor(4_000_000 / nw)));
+        const { ctx } = canvasOf(nw, strip);
+        known = false;
+        for (let y = 0; y < nh && !known; y += strip) {
+            const h = Math.min(strip, nh - y);
+            ctx.clearRect(0, 0, nw, strip);
+            ctx.drawImage(img, 0, y, nw, h, 0, 0, nw, h);
+            const data = ctx.getImageData(0, 0, nw, h).data;
+            for (let i = 3; i < data.length; i += 4) {
+                if (data[i] < 250) {
+                    known = true;
+                    break;
+                }
+            }
+        }
+        clear.set(img, known);
+    }
+    return known;
+}
+
 /** Per-channel median of a ring of pixels two percent deep along the edge. */
 function edgeMedian(data: Uint8ClampedArray, w: number, h: number): [number, number, number] {
     const depth = Math.max(1, Math.round(Math.min(w, h) * 0.02));
@@ -823,13 +856,7 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
 
     let mode: Photo['cutout'];
     if (!options.cutout || options.cutout === 'auto') {
-        mode = 'paper';
-        for (let i = 3; i < data.length; i += 4) {
-            if (data[i] < 250) {
-                mode = 'alpha';
-                break;
-            }
-        }
+        mode = seeThrough(img) ? 'alpha' : 'paper';
     } else {
         mode = options.cutout;
     }

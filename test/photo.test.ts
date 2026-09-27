@@ -220,6 +220,19 @@ describe('photo cutout', () => {
         expect(out).toEqual({ cutout: 'alpha', width: 80, height: 50, paper: null });
     });
 
+    it('goes by the whole file, not the crop, when a crop has no transparent pixel', async () => {
+        // Inside the opaque block: read as paper, the one color would all go.
+        const out = await page.page.evaluate(async () => {
+            const w = window as unknown as Win;
+            const p = await w.rt.photo(w.cutPng(), {
+                crop: { x: 0.35, y: 0.3, width: 0.3, height: 0.4 },
+                sticker: false,
+            });
+            return { cutout: p.cutout, width: p.width, height: p.height };
+        });
+        expect(out).toEqual({ cutout: 'alpha', width: 60, height: 40 });
+    });
+
     it('keeps the whole rectangle with cutout none', async () => {
         const out = await page.page.evaluate(async () => {
             const w = window as unknown as Win;
