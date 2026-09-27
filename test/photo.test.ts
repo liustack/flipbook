@@ -1,5 +1,7 @@
 // photo(): the paper and alpha cutouts, trimming, the sticker border and
 // shadow, and determinism, on images drawn in the page itself.
+import * as fs from 'fs';
+import * as path from 'path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CompositionPage } from '../src/engine/page.ts';
 import { closeSession, session } from './browser.ts';
@@ -218,6 +220,40 @@ describe('photo cutout', () => {
             return { cutout: p.cutout, width: p.width, height: p.height, paper: p.paper };
         });
         expect(out).toEqual({ cutout: 'alpha', width: 80, height: 50, paper: null });
+    });
+
+    it('decodes pixel art as written and a photo through its profile, in either order', async () => {
+        // The same file twice in one page: pixel art keeps the file's numbers,
+        // a photo goes through its ICC profile, and neither load changes the other.
+        const png = fs.readFileSync(
+            path.join(import.meta.dirname, 'fixtures/sprite/assets/pixel-icc.png'),
+        );
+        const url = `data:image/png;base64,${png.toString('base64')}`;
+        const out = await page.page.evaluate(async (src) => {
+            const w = window as unknown as Win;
+            const at = async (s: string, pixelated: boolean) => {
+                const p = await w.rt.photo(s, { cutout: 'none', sticker: false, pixelated });
+                const g = p.canvas.getContext('2d') as CanvasRenderingContext2D;
+                const k = p.canvas.width / 24;
+                return Array.from(
+                    g.getImageData(Math.floor(2.5 * k), Math.floor(1.5 * k), 1, 1).data,
+                );
+            };
+            const a = [await at(src, true), await at(src, false), await at(src, true)];
+            const b = [
+                await at(`${src}#b`, false),
+                await at(`${src}#b`, true),
+                await at(`${src}#b`, false),
+            ];
+            return { a, b };
+        }, url);
+        const written = [200, 170, 120, 255];
+        expect(out.a[0]).toEqual(written);
+        expect(out.a[2]).toEqual(written);
+        expect(out.b[1]).toEqual(written);
+        expect(out.a[1]).not.toEqual(written);
+        expect(out.b[0]).toEqual(out.a[1]);
+        expect(out.b[2]).toEqual(out.a[1]);
     });
 
     it('goes by the whole file, not the crop, when a crop has no transparent pixel', async () => {

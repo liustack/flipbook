@@ -459,6 +459,38 @@ describe('flipbook sprite', () => {
         }
     });
 
+    it("keeps a pixel sheet's own numbers when it carries color information", async () => {
+        // A calibrated display's ICC profile, and a palette PNG whose gAMA
+        // chunk would brighten every color: managed, the colors move, and a
+        // palette is a palette only as written.
+        for (const sheet of ['pixel-icc.png', 'pixel-gama.png']) {
+            writeSpec(dir, {
+                version: 1,
+                pixel: true,
+                clips: { idle: { image: `assets/${sheet}`, frames: 3, grid: [3, 1] } },
+            });
+            const report = await runSprite({ dir, name: 'kid', session: await session() });
+            expect(codes(report), sheet).toEqual([]);
+            const file = JSON.parse(
+                fs.readFileSync(path.join(dir, 'assets/sprites/kid/clips.json'), 'utf-8'),
+            ) as SpriteFile;
+            const source = await readRgba(path.join(dir, `assets/${sheet}`));
+            let wrong = 0;
+            for (const [i, f] of file.clips.idle.frames.entries()) {
+                expect([f.width, f.height], sheet).toEqual([4, 7]);
+                const frame = await readRgba(path.join(dir, f.file));
+                for (let y = 0; y < 7; y++) {
+                    for (let x = 0; x < 4; x++) {
+                        const s = ((1 + y) * 24 + i * 8 + 2 + x) * 4;
+                        const o = (y * 4 + x) * 4;
+                        for (let c = 0; c < 4; c++) if (frame[o + c] !== source[s + c]) wrong++;
+                    }
+                }
+            }
+            expect(wrong, sheet).toBe(0);
+        }
+    });
+
     it('refuses a height for pixel sprites', async () => {
         writeSpec(dir, {
             version: 1,

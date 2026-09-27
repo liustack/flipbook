@@ -253,7 +253,7 @@ To an image model: "a 2D animation sprite sheet", the number of drawings and wha
 | `grid` | `[columns, rows]`, whole numbers from 1 to 64, for a sheet laid out in equal cells: cut cell by cell however close the drawings sit, an empty cell does not count. No `gap` with it |
 | `cells` | With `grid`, the cells to use, `[first, last]`, numbered from 1 in reading order. Default: all |
 | `height` | The height every clip is scaled to, unless `pixel` is true. Default: the first clip's |
-| `pixel` | `true` for pixel art: each drawing is cut on whole pixels and keeps its size, its colors and hard edges, nothing is rescaled (so no `height`), anchors fall on whole pixels. A packed sheet may have drawings reaching its edge: give `paper` then, the ground cannot be read off the edge |
+| `pixel` | `true` for pixel art: each drawing is cut on whole pixels and keeps its size, its colors as written in the file (the sheet's color profile or gamma is not applied, a 16-bit sheet is read at 8 bits) and hard edges, nothing is rescaled (so no `height`), anchors fall on whole pixels. A packed sheet may have drawings reaching its edge: give `paper` then, the ground cannot be read off the edge |
 
 The command cuts the drawings, measures each one's anchor (the middle of the head across, the soles down), scales every clip to one height (not pixel art) and writes `assets/sprites/<name>/clips.json`.
 

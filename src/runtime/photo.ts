@@ -126,22 +126,44 @@ export interface Photo {
     draw(ctx: CanvasRenderingContext2D, x: number, y: number, options?: DrawPhotoOptions): void;
 }
 
-const images = new Map<string, Promise<HTMLImageElement>>();
+/** A decoded picture and its size in the file's own pixels. */
+interface Picture {
+    readonly source: CanvasImageSource;
+    readonly width: number;
+    readonly height: number;
+}
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-    let pending = images.get(src);
+const images = new Map<string, Promise<Picture>>();
+
+/**
+ * Decode a picture once per page. A photo's colors go through its color
+ * profile, as the page shows it. Pixel art (`raw`) keeps the numbers written
+ * in the file: a palette is a palette only as written, and a profile would
+ * move nearly every color by a step or two.
+ */
+function loadImage(src: string, raw = false): Promise<Picture> {
+    const key = `${raw ? 'raw' : 'managed'} ${src}`;
+    let pending = images.get(key);
     if (!pending) {
         pending = (async () => {
-            const img = new Image();
-            img.src = src;
             try {
+                if (raw) {
+                    const response = await fetch(src);
+                    if (!response.ok) throw new Error(String(response.status));
+                    const bitmap = await createImageBitmap(await response.blob(), {
+                        colorSpaceConversion: 'none',
+                    });
+                    return { source: bitmap, width: bitmap.width, height: bitmap.height };
+                }
+                const img = new Image();
+                img.src = src;
                 await img.decode();
+                return { source: img, width: img.naturalWidth, height: img.naturalHeight };
             } catch {
                 throw new Error(`photo(): could not load ${src.slice(0, 120)}`);
             }
-            return img;
         })();
-        images.set(src, pending);
+        images.set(key, pending);
     }
     return pending;
 }
@@ -161,7 +183,7 @@ function canvasOf(
     return { canvas, ctx };
 }
 
-const clear = new WeakMap<HTMLImageElement, boolean>();
+const clear = new WeakMap<Picture, boolean>();
 
 /**
  * Whether the file has a pixel you can see through, anywhere in it. What
@@ -169,18 +191,18 @@ const clear = new WeakMap<HTMLImageElement, boolean>();
  * drawing is still that file's, and its ground is the transparency. Read at
  * the file's own size in strips of about four million pixels.
  */
-function seeThrough(img: HTMLImageElement): boolean {
+function seeThrough(img: Picture): boolean {
     let known = clear.get(img);
     if (known === undefined) {
-        const nw = img.naturalWidth;
-        const nh = img.naturalHeight;
+        const nw = img.width;
+        const nh = img.height;
         const strip = Math.max(1, Math.min(nh, Math.floor(4_000_000 / nw)));
         const { ctx } = canvasOf(nw, strip);
         known = false;
         for (let y = 0; y < nh && !known; y += strip) {
             const h = Math.min(strip, nh - y);
             ctx.clearRect(0, 0, nw, strip);
-            ctx.drawImage(img, 0, y, nw, h, 0, 0, nw, h);
+            ctx.drawImage(img.source, 0, y, nw, h, 0, 0, nw, h);
             const data = ctx.getImageData(0, 0, nw, h).data;
             for (let i = 3; i < data.length; i += 4) {
                 if (data[i] < 250) {
@@ -803,9 +825,9 @@ const DEFAULT_SHADOW = { x: 3, y: 8, blur: 10, color: 'rgba(38, 28, 18, 0.32)' }
  * or in setup, never in seek.
  */
 export async function photo(src: string, options: PhotoOptions = {}): Promise<Photo> {
-    const img = await loadImage(src);
-    const nw = img.naturalWidth;
-    const nh = img.naturalHeight;
+    const img = await loadImage(src, options.pixelated === true);
+    const nw = img.width;
+    const nh = img.height;
     if (!nw || !nh) {
         throw new Error(`photo(): ${src.slice(0, 120)} has no size. Give an SVG width and height.`);
     }
@@ -850,7 +872,7 @@ export async function photo(src: string, options: PhotoOptions = {}): Promise<Ph
     const work = canvasOf(w, h);
     work.ctx.imageSmoothingEnabled = !pixelated;
     work.ctx.imageSmoothingQuality = 'high';
-    work.ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    work.ctx.drawImage(img.source, sx, sy, sw, sh, 0, 0, w, h);
     const pixels = work.ctx.getImageData(0, 0, w, h);
     const data = pixels.data;
 
@@ -1154,9 +1176,9 @@ export interface Specimen {
  * cuts through it nor brings in half a neighbour.
  */
 export async function specimens(src: string, options: SpecimenOptions = {}): Promise<Specimen[]> {
-    const img = await loadImage(src);
-    const nw = img.naturalWidth;
-    const nh = img.naturalHeight;
+    const img = await loadImage(src, options.pixelated === true);
+    const nw = img.width;
+    const nh = img.height;
     if (!nw || !nh) throw new Error(`specimens(): ${src.slice(0, 120)} has no size.`);
     // Looked for at 1200 px at most, smoothed. Pixel art at its own size,
     // unsmoothed: a gap of one pixel would not survive the scaling.
@@ -1166,7 +1188,7 @@ export async function specimens(src: string, options: SpecimenOptions = {}): Pro
     const work = canvasOf(w, h);
     work.ctx.imageSmoothingEnabled = !options.pixelated;
     work.ctx.imageSmoothingQuality = 'high';
-    work.ctx.drawImage(img, 0, 0, w, h);
+    work.ctx.drawImage(img.source, 0, 0, w, h);
     const data = work.ctx.getImageData(0, 0, w, h).data;
     const color = options.paper ? rgb(options.paper) : edgeMedian(data, w, h);
     // Ground is every pixel near the ground color, wherever it lies: scanned
