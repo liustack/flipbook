@@ -220,6 +220,12 @@ stock search found no image or sound for the query.
 
 Fix: Search again with two to four other concrete English words, or with --source for one collection. When nothing fits, leave the picture or sound out and tell the user.
 
+### `stock-smaller`
+
+stock fetch saved a smaller copy than the service lists: the collection hands out only a preview of the original.
+
+Fix: Use the picture only where it shows no larger than the size the report gives, or search again for a larger one. The warning names both sizes.
+
 ### `stock-rejected`
 
 stock fetch did not save the file: the id is unknown, its license is not public domain, its address is not a public HTTPS address, or the file is not an image or sound it can read, or is too large.

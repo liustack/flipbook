@@ -172,6 +172,7 @@ describe('servedLongEdge', () => {
         expect(
             servedLongEdge('https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXM.jpg'),
         ).toBe(1024);
+        expect(servedLongEdge('https://cdn.stocksnap.io/img-thumbs/960w/F2RHZDPRTQ.jpg')).toBe(960);
         expect(
             servedLongEdge('https://upload.wikimedia.org/wikipedia/commons/6/60/Horse.jpg'),
         ).toBeNull();
@@ -424,6 +425,58 @@ describe('stock fetch', () => {
             creator: 'BioDivLibrary',
             url: 'https://live.staticflickr.com/6013/6012000493_ced35d5e50_b.jpg',
         });
+    });
+
+    it('says so when the collection hands out a smaller copy than it lists', async () => {
+        // Openverse lists the original's size; some collections serve only a preview.
+        const dir = tempDir('stock');
+        const listed = {
+            ...DETAIL,
+            url: 'https://img.example.org/big.png',
+            width: 2000,
+            height: 1500,
+        };
+        const { deps } = openverseDetail(listed);
+        const report = await runStockFetch({ dir, id: 'openverse:ov-1', as: 'big' }, deps);
+        expect(report.exitCode).toBe(0);
+        expect(fs.existsSync(path.join(dir, 'assets', 'big.png'))).toBe(true);
+        expect(report.warnings.map((w) => w.code)).toEqual(['stock-smaller']);
+        expect(report.warnings[0].detail).toMatchObject({ listed: [2000, 1500], got: [40, 30] });
+        // The size it lists, or less by a hair: nothing to say.
+        const exact = {
+            ...DETAIL,
+            url: 'https://img.example.org/exact.png',
+            width: 40,
+            height: 30,
+        };
+        const same = await runStockFetch(
+            { dir: tempDir('stock'), id: 'openverse:ov-1', as: 'exact' },
+            openverseDetail(exact).deps,
+        );
+        expect(same.warnings).toEqual([]);
+        // No size listed: a known preview edge is still what to expect.
+        for (const size of [
+            { width: 0, height: 0 },
+            { width: undefined, height: undefined },
+        ]) {
+            const preview = {
+                ...DETAIL,
+                url: 'https://cdn.stocksnap.io/img-thumbs/960w/PREVIEW.png',
+                ...size,
+            };
+            const got = await runStockFetch(
+                { dir: tempDir('stock'), id: 'openverse:ov-1', as: 'preview' },
+                openverseDetail(preview).deps,
+            );
+            expect(got.warnings.map((w) => w.code)).toEqual(['stock-smaller']);
+        }
+        // Nothing listed and no known preview: nothing to compare with.
+        const unknown = { ...DETAIL, url: 'https://img.example.org/u.png', width: 0, height: 0 };
+        const quiet = await runStockFetch(
+            { dir: tempDir('stock'), id: 'openverse:ov-1', as: 'unknown' },
+            openverseDetail(unknown).deps,
+        );
+        expect(quiet.warnings).toEqual([]);
     });
 
     it('scales an image longer than 3200 pixels down with ffmpeg', async () => {

@@ -165,6 +165,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `asset-unlicensed` | check、snapshot、audio、render | `assets/` 下的图片（字体和 brand.json 写了许可的标志除外）在 `assets/SOURCES.json` 里没有 `source` 或没有 `license`，或写了 `"license": "generated"` 却没写生成它的 `tool` 和 `prompt`。带 `cutFrom` 的图（抠图、装配好的部件）到它来自的那条条目上找工具和提示词。`element` 是那个文件，`detail.problem` 是缺了什么 | `stock fetch`、`cutout` 和 `puppet` 存下的图会自动记好。用户自己带来的图按用户说的写来源和许可。生成的图写上工具和提示词 |
 | `audio-unlicensed` | check、snapshot、audio、render | timeline 用到的音频文件（`audio.file` 或 sfx cue 的 `file`）在 `assets/SOURCES.json` 里没有 `source` 或没有 `license`，或者这个文件不是读得出的 JSON 对象。`element` 是那个文件，`detail.path` 是 timeline 里的字段，`detail.lacking` 是缺了什么 | 声音用 `stock search --audio` 和 `stock fetch` 找，两样都会记下。用户自己的文件按用户说的写来源和许可 |
 | `audio-cue-offset` | render | 某个音效的峰值离它的 cue 帧超过一帧，或在音轨里找不到，`element` 是 `cue <id>` | sfx cue 之间至少隔 1/8 拍。隔开了还报就重渲一次，再出现带 JSON 报 issue |
+| `stock-smaller` | stock fetch | 馆藏给的文件比来源登记的小，它只给预览图。只报 warning，文件照样存下 | 只在画面上不超过 `detail.got` 那么大的地方用它，或者再搜一张大的 |
 | `stock-no-results` | stock search | 哪家都没找到图（带 `--audio` 时是没找到声音），只报 warning | 换两到四个别的具体英文词再搜，或加 `--source`。都不合适就不用图或声音，告诉用户 |
 | `stock-rejected` | stock fetch | 文件没存：id 不存在、许可不是 `cc0` 或 `pdm`（Openverse）、地址不是公网 HTTPS、文件不是图片（上限 40 MB）或不是 ffmpeg 读得了的 mp3、Ogg、FLAC、WAV 声音（上限 60 MB）。`detail.reason` 是 `not-found`、`license`、`unsafe-url`、`not-image`、`not-audio` 或 `too-large` | 从 stock search 的结果里另挑一个 |
 | `asset-conflict` | stock fetch | 文件没存：`assets/` 里已有别的图（存声音时是别的声音）用了这个名字（`detail.reason` 为 `name-taken`），或 `assets/SOURCES.json` 不是读得出的 JSON 对象（`sources-invalid`） | 换个 `--as` 名字，或修好 `assets/SOURCES.json` |
@@ -233,7 +234,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `stock.kind` | `image` |
 | `stock.query`、`stock.provider`、`stock.source` | 查询词和两个选项，没给是 `null` |
 | `stock.providers[]` | 按顺序每家的情况：`provider`、`status`（`ok` 带 `count`，`no-key`，或 `failed` 带 `message`） |
-| `stock.results[]` | `id`（`stock fetch` 收的写法，如 `openverse:<id>`）、`provider`、`title`、`width`、`height`、`license`、`licenseUrl`、`creator`、`source`（Openverse 的馆藏）、`pageUrl`、`thumbnail`、`servedEdge`（馆藏只给预览图时 `stock fetch` 实际拿到的长边：Flickr（生物多样性遗产图书馆也在上面）和 rawpixel 是 1024，Pixabay 是 1280。`width`、`height` 仍是原图尺寸。下到的就是原图时为 `null`），以及 `tile`：它在联系表上的位置，从 1 起，从左到右、从上到下，缩略图下不来时是 `null` |
+| `stock.results[]` | `id`（`stock fetch` 收的写法，如 `openverse:<id>`）、`provider`、`title`、`width`、`height`、`license`、`licenseUrl`、`creator`、`source`（Openverse 的馆藏）、`pageUrl`、`thumbnail`、`servedEdge`（馆藏只给预览图时 `stock fetch` 实际拿到的长边：Flickr（生物多样性遗产图书馆也在上面）和 rawpixel 是 1024，StockSnap 是 960，Pixabay 是 1280。`width`、`height` 仍是原图尺寸。下到的就是原图，或者是 flipbook 不认识的馆藏时为 `null`，这种文件下下来比登记的小时 `stock fetch` 报 `stock-smaller` 警告），以及 `tile`：它在联系表上的位置，从 1 起，从左到右、从上到下，缩略图下不来时是 `null` |
 | `stock.thumbnailFailures[]` | 有缩略图没下来时才有：`id`、`message` |
 | `artifacts.contactSheet` | `out/stock/contact-sheet.png`：所有缩略图按结果顺序各放进一个方格。没有结果时不给 |
 
@@ -282,7 +283,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `stock.skipped` | `assets/SOURCES.json` 已经给这个名字记了同一个 id 且文件还在时为 true，这次没下载 |
 | `artifacts.image`、`artifacts.sources` | 图片和 `assets/SOURCES.json` |
 
-id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 的 id 没配对应的 key，退 78 报 `stock-key-missing`。
+id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 的 id 没配对应的 key，退 78 报 `stock-key-missing`。下到的文件明显比来源登记的小（长边不到 `servedEdge` 的十分之九，`servedEdge` 为 `null` 时比登记的长边），照样存下，报 `stock-smaller` 警告：`detail.listed` 和 `detail.got` 给出两个尺寸。
 
 ### stock fetch 存声音
 

@@ -83,6 +83,8 @@ export function servedLongEdge(url: string): number | null {
     if (flickr) return FLICKR_SIZES[flickr[1].toLowerCase()] ?? null;
     const rawpixel = /images\.rawpixel\.com\/editor_(\d+)\//.exec(url);
     if (rawpixel) return Number(rawpixel[1]);
+    const stocksnap = /cdn\.stocksnap\.io\/img-thumbs\/(\d+)w\//.exec(url);
+    if (stocksnap) return Number(stocksnap[1]);
     return null;
 }
 

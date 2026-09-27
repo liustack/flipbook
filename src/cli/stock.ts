@@ -644,6 +644,27 @@ export async function runStockFetch(
         );
         return rb.finish();
     }
+    // The service lists the original's size. A collection that hands out only a
+    // preview gives less, and nothing but the bytes says so for one it does not know.
+    const listedLong = Math.max(image.width, image.height);
+    const expected = image.servedEdge ?? listedLong;
+    const gotLong = Math.max(sniffed.width, sniffed.height);
+    if (expected > 0 && gotLong < expected * 0.9) {
+        rb.add(
+            finding(
+                'stock-smaller',
+                `${id} is listed at ${image.width} by ${image.height} px, but the collection handed out ${sniffed.width} by ${sniffed.height} px.`,
+                {
+                    severity: 'warning',
+                    element: image.url,
+                    detail: {
+                        listed: [image.width, image.height],
+                        got: [sniffed.width, sniffed.height],
+                    },
+                },
+            ),
+        );
+    }
     let normalized: Awaited<ReturnType<typeof normalize>>;
     try {
         normalized = await normalize(ws, bytes, sniffed, env);
