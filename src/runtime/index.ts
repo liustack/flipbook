@@ -109,6 +109,8 @@ export {
 } from './puppet.ts';
 export type { RigFile, Side } from './rig.ts';
 export { findTab, loadRig, outlineWidth, shave } from './rig.ts';
+export type { Riso, RisoInk, RisoOptions, RisoPrintOptions, RisoScreen } from './riso.ts';
+export { RISO_INKS, riso, screenPlate } from './riso.ts';
 export type {
     FrameMeasure,
     Sprite,
