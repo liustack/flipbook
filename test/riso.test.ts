@@ -1,6 +1,6 @@
 // Riso printing: tints screened to dots or grain, inks laid down by
 // multiplying, never quite full, each plate a little off from the others.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { CompositionPage } from '../src/engine/page.ts';
 import { dotArea, screenPlate } from '../src/runtime/riso.ts';
 import { closeSession, session } from './browser.ts';
@@ -13,12 +13,23 @@ function printed(
     screen: 'halftone' | 'grain',
     seed = 1,
     grid: { cell: number; angle: number } = { cell: 8, angle: 15 },
+    side = 200,
+    inked?: Uint8Array,
 ): number {
-    const w = 200;
-    const h = 200;
+    const w = side;
+    const h = side;
     const data = new Uint8ClampedArray(w * h * 4);
     for (let i = 0; i < w * h; i++) data[i * 4 + 3] = Math.round(density * 255);
     screenPlate(data, w, h, screen, { ...grid, seed });
+    // What printed at a lower level stays printed: counted, then checked once.
+    if (inked) {
+        let lost = 0;
+        for (let i = 0; i < w * h; i++) {
+            if (inked[i] && data[i * 4 + 3] !== 255) lost++;
+            inked[i] = data[i * 4 + 3] === 255 ? 1 : 0;
+        }
+        expect(lost).toBe(0);
+    }
     // Counted, then checked once: an expect per pixel runs millions of times across the levels.
     let on = 0;
     let between = 0;
@@ -41,19 +52,58 @@ describe('screening a plate', () => {
                 expect(Math.abs(got - d), `${d} at ${angle} degrees`).toBeLessThan(0.01);
             }
         }
-        // A grid square to the pixels prints a whole pixel of each cell at a
-        // time: at every level it stays within two and a half pixels of a cell
-        // (a tenth of a 5 px cell, 4% of an 8 px one) and never goes back.
-        for (const cell of [5, 8]) {
-            let last = 0;
+        // A grid square to the pixels has its pixels at the same spots in every
+        // cell, ranked once: at every level it prints within half a pixel of a
+        // cell of the density (a fiftieth of a 5 px cell), and no pixel that
+        // printed stops printing further up. 10 and 16 are 5 and 8 at DPR 2.
+        for (const angle of [0, 90]) {
+            for (const cell of [5, 8, 10, 16]) {
+                const inked = new Uint8Array(80 * 80);
+                for (let level = 1; level < 255; level++) {
+                    const d = level / 255;
+                    const got = printed(d, 'halftone', 1, { cell, angle }, 80, inked);
+                    expect(
+                        Math.abs(got - d),
+                        `${d} at ${angle} degrees, ${cell} px`,
+                    ).toBeLessThanOrEqual(0.5 / (cell * cell) + 1e-9);
+                }
+            }
+        }
+    });
+
+    it('ranks a square grid the same for every turn of one angle, whichever a page used first', async () => {
+        // The ranking is kept for the page by cell and angle, so 0, 360 and -360
+        // degrees share one. Each is ranked here in a module of its own: they
+        // must agree, or what prints would hang on which of them came first.
+        const side = 80;
+        const all = async (angle: number, cell: number) => {
+            vi.resetModules();
+            const fresh = await import('../src/runtime/riso.ts');
+            const out = new Uint8Array(254 * side * side);
             for (let level = 1; level < 255; level++) {
-                const d = level / 255;
-                const got = printed(d, 'halftone', 1, { cell, angle: 0 });
-                expect(Math.abs(got - d), `${d} at 0 degrees, ${cell} px`).toBeLessThan(
-                    2.5 / (cell * cell),
-                );
-                expect(got).toBeGreaterThanOrEqual(last);
-                last = got;
+                const data = new Uint8ClampedArray(side * side * 4);
+                for (let i = 0; i < side * side; i++) data[i * 4 + 3] = level;
+                fresh.screenPlate(data, side, side, 'halftone', { cell, angle });
+                for (let i = 0; i < side * side; i++)
+                    out[(level - 1) * side * side + i] = data[i * 4 + 3];
+            }
+            return Buffer.from(out);
+        };
+        const turns = [
+            [0, 360, -360, 720],
+            [90, -270, 450],
+            [180, -180, 540],
+            [270, -90, 630],
+        ];
+        for (const cell of [8, 10]) {
+            for (const [first, ...same] of turns) {
+                const want = await all(first, cell);
+                for (const angle of same) {
+                    expect(
+                        (await all(angle, cell)).equals(want),
+                        `${angle} and ${first} degrees, ${cell} px`,
+                    ).toBe(true);
+                }
             }
         }
     });

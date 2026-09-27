@@ -101,6 +101,11 @@ const MOTTLE_SCALE = 1 / 6;
 const GRID_PHASE_U = 0.137;
 const GRID_PHASE_V = 0.291;
 
+/** Largest cell, in device px, whose spots are ranked: 4096 of them. */
+const RANKED_CELL = 64;
+/** Ranked spots of a grid square to the pixels, by cell and angle: the same for every plate. */
+const rankings = new Map<string, Float64Array>();
+
 /** A hash in [0, 1) for a device pixel, cheap enough for every pixel of a plate. */
 function pixelHash(x: number, y: number, seed: number): number {
     let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 2246822519);
@@ -138,6 +143,56 @@ export function screenPlate(
     const a = ((options.angle ?? 15) * Math.PI) / 180;
     const cos = Math.cos(a) / cell;
     const sin = Math.sin(a) / cell;
+    // Where on its cell's grid a pixel sits, as the area a dot needs to reach it.
+    // The grid sits a little off the pixels, so on a grid turned by 0 or 90
+    // degrees pixels are not the same distance from the middle in fours and eights.
+    const areaAt = (x: number, y: number, c: number, s: number) => {
+        const u = (x + 0.5) * c + (y + 0.5) * s + GRID_PHASE_U;
+        const v = -(x + 0.5) * s + (y + 0.5) * c + GRID_PHASE_V;
+        const fu = u - Math.floor(u) - 0.5;
+        const fv = v - Math.floor(v) - 0.5;
+        return dotArea(Math.sqrt(fu * fu + fv * fv));
+    };
+    const dotAt = (x: number, y: number) => areaAt(x, y, cos, sin);
+    // A grid square to the pixels, a whole number of pixels a cell: every cell
+    // has its pixels at the same spots, so they are ranked once by that area and
+    // the k-th of n prints past (k + 0.5) / n. What prints is then within half a
+    // pixel of a cell of the density at every level, not just on average.
+    // Cells bigger than RANKED_CELL keep the dot's own threshold, as before.
+    const turn = (((options.angle ?? 15) % 360) + 360) % 360;
+    let ranked: Float64Array | null = null;
+    if (
+        screen === 'halftone' &&
+        turn % 90 === 0 &&
+        Number.isInteger(cell) &&
+        cell >= 1 &&
+        cell <= RANKED_CELL
+    ) {
+        const key = `${cell} ${turn}`;
+        ranked = rankings.get(key) ?? null;
+        if (!ranked) {
+            // The quarter turn's own sine and cosine, exact: every angle that
+            // shares this ranking ranks the same, 0 and -360 degrees alike.
+            const [c, s] = [
+                [1, 0],
+                [0, 1],
+                [-1, 0],
+                [0, -1],
+            ][turn / 90];
+            const n = cell * cell;
+            const spots = Array.from({ length: n }, (_, i) => ({
+                i,
+                area: areaAt(i % cell, Math.floor(i / cell), c / cell, s / cell),
+            }));
+            spots.sort((p, q) => p.area - q.area || p.i - q.i);
+            const ranks = new Float64Array(n);
+            spots.forEach((spot, k) => {
+                ranks[spot.i] = (k + 0.5) / n;
+            });
+            rankings.set(key, ranks);
+            ranked = ranks;
+        }
+    }
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4 + 3;
@@ -147,17 +202,12 @@ export function screenPlate(
             let threshold: number;
             if (screen === 'grain') {
                 threshold = pixelHash(x, y, seed);
+            } else if (ranked) {
+                threshold = ranked[(y % cell) * cell + (x % cell)];
             } else {
                 // A dot grows from the middle of this pixel's cell on the turned
                 // grid: the pixel prints once the dot's area passes the density.
-                // The grid sits a little off the pixels, so pixels on a grid
-                // turned by 0 or 90 degrees are not the same distance from the
-                // middle in fours and eights, and print one by one.
-                const u = (x + 0.5) * cos + (y + 0.5) * sin + GRID_PHASE_U;
-                const v = -(x + 0.5) * sin + (y + 0.5) * cos + GRID_PHASE_V;
-                const fu = u - Math.floor(u) - 0.5;
-                const fv = v - Math.floor(v) - 0.5;
-                threshold = dotArea(Math.sqrt(fu * fu + fv * fv));
+                threshold = dotAt(x, y);
             }
             alpha[i] = d > threshold ? 255 : 0;
         }
