@@ -58,6 +58,17 @@ export async function decodeGray(
     height: number,
     filterPrefix = '',
 ): Promise<Uint8Array[]> {
+    return (await decodeGrayWithLog(ffmpeg, input, width, height, filterPrefix)).frames;
+}
+
+/** decodeGray, keeping what ffmpeg said: it reports pictures it skipped and still exits 0. */
+async function decodeGrayWithLog(
+    ffmpeg: string,
+    input: string[],
+    width: number,
+    height: number,
+    filterPrefix = '',
+): Promise<{ frames: Uint8Array[]; stderr: string }> {
     const vf = `${filterPrefix}${grayFilter(width, height)}`;
     const result = await run(
         ffmpeg,
@@ -78,7 +89,28 @@ export async function decodeGray(
         { timeoutMs: 600_000 },
     );
     if (result.code !== 0) throw new Error(`ffmpeg gray decode failed: ${tail(result.stderr)}`);
-    return splitFrames(result.stdout, width * height);
+    return { frames: splitFrames(result.stdout, width * height), stderr: result.stderr };
+}
+
+/**
+ * decodeGray for a sequence of `count` frames, all of which must come back:
+ * ffmpeg skips a picture it cannot read and still exits 0, and a short list
+ * would pair the wrong frames. Fails with ffmpeg's own words instead.
+ */
+export async function decodeGraySequence(
+    ffmpeg: string,
+    sequence: string,
+    count: number,
+    width: number,
+    height: number,
+): Promise<Uint8Array[]> {
+    const { frames, stderr } = await decodeGrayWithLog(ffmpeg, ['-i', sequence], width, height);
+    if (frames.length !== count) {
+        throw new Error(
+            `ffmpeg decoded ${frames.length} of the ${count} frames in ${sequence}: some picture there did not decode (${tail(stderr) || 'ffmpeg said nothing'})`,
+        );
+    }
+    return frames;
 }
 
 /** Decode to RGB frames of width x height (see analysisSize). */

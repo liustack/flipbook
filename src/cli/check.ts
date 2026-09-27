@@ -5,7 +5,7 @@ import { type ClockConfig, defaultClock } from '../engine/page.ts';
 import {
     analysisSize,
     changedShare,
-    decodeGray,
+    decodeGraySequence,
     isFlat,
     matchesBaseline,
     writeSequence,
@@ -488,29 +488,25 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
         if (shots.size > 0) {
             const order = [...shots.keys()].sort((a, b) => a - b);
             const gray = analysisSize(timeline.width, timeline.height);
-            const content = await decodeGray(
+            const content = await decodeGraySequence(
                 session.ffmpeg.ffmpeg,
-                [
-                    '-i',
-                    writeSequence(
-                        ws,
-                        scratch('frames'),
-                        order.map((f) => shots.get(f) as Buffer),
-                    ),
-                ],
+                writeSequence(
+                    ws,
+                    scratch('frames'),
+                    order.map((f) => shots.get(f) as Buffer),
+                ),
+                order.length,
                 gray.width,
                 gray.height,
             );
-            const paper = await decodeGray(
+            const paper = await decodeGraySequence(
                 session.ffmpeg.ffmpeg,
-                [
-                    '-i',
-                    writeSequence(
-                        ws,
-                        scratch('baseline'),
-                        order.map((f) => baselines.get(f) as Buffer),
-                    ),
-                ],
+                writeSequence(
+                    ws,
+                    scratch('baseline'),
+                    order.map((f) => baselines.get(f) as Buffer),
+                ),
+                order.length,
                 gray.width,
                 gray.height,
             );
@@ -554,16 +550,14 @@ export async function runCheck(options: CheckOptions): Promise<Report> {
         if (beatShots.size > 0 && timeline.story) {
             const order = [...beatShots.keys()].sort((a, b) => a - b);
             const gray = analysisSize(timeline.width, timeline.height);
-            const decoded = await decodeGray(
+            const decoded = await decodeGraySequence(
                 session.ffmpeg.ffmpeg,
-                [
-                    '-i',
-                    writeSequence(
-                        ws,
-                        scratch('beats'),
-                        order.map((f) => beatShots.get(f) as Buffer),
-                    ),
-                ],
+                writeSequence(
+                    ws,
+                    scratch('beats'),
+                    order.map((f) => beatShots.get(f) as Buffer),
+                ),
+                order.length,
                 gray.width,
                 gray.height,
             );
