@@ -258,9 +258,9 @@ Fix: Look at the drawing on the sheet (out/sprite/<name>.png, drawn on pink). Le
 
 ### `cutout-none`
 
-flipbook cutout cut nothing: no specimen on the plate stands apart (they touch one another, or the ground color is wrong) and the picture cut whole lost everything with the ground or ran off the picture.
+flipbook cutout cut nothing: no specimen on the plate stands apart (they touch one another, or the ground color is wrong) and the picture cut whole lost everything with the ground or ran off the picture, or, with --subject, Vision found no subject bigger than a speck.
 
-Fix: Use the picture whole with cutout: none and move the camera over it, pass --paper with the ground color, or search for a picture whose subjects stand apart.
+Fix: Use the picture whole with cutout: none and move the camera over it, pass --paper with the ground color, cut a photo with a real background with --subject on macOS 14 or newer, or search for a picture whose subjects stand apart.
 
 ### `cutout-clipped`
 
@@ -389,6 +389,12 @@ flipbook itself failed.
 Fix: Do not edit the composition for this. Report it with this JSON at https://github.com/liustack/flipbook/issues.
 
 ## Environment problems (exit 78)
+
+### `vision-unavailable`
+
+cutout --subject asks the Vision framework of macOS 14 or newer for the photo's subject, and this machine does not have it, or osascript could not run it.
+
+Fix: Run the same cutout on a Mac with macOS 14 or newer and keep the PNGs it writes. Elsewhere, a photo on a plain light ground cuts without --subject, and any other photo can be used whole as a framed sticker with cutout: none.
 
 ### `platform-unsupported`
 

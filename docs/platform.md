@@ -21,6 +21,8 @@ English | [中文](platform.zh-CN.md)
 | macOS x64 | Best effort | Untested |
 | Windows | Not supported, use WSL2 | Native `win32` exits 78. CI has a windows-latest column that runs with `FLIPBOOK_ALLOW_WIN32=1`, see the Windows section below |
 
+One command asks more of the machine: `cutout --subject` uses the Vision framework of macOS 14 or newer and exits 78 with `vision-unavailable` anywhere else. It has run directly on the machine, not yet inside a host's sandbox.
+
 | Host | Status |
 |---|---|
 | Claude Code | Runs inside the sandbox. The first run downloads Chromium and fonts, which the sandbox blocks. On that exit 78 the agent reruns the same command with `dangerouslyDisableSandbox` as the fix says, and the user clicks allow once. Every run after that stays inside the sandbox, with no settings to change and no restart. The allow settings in INSTALL.md step 3e are only for users who want no prompt at all, and Claude Code applies sandbox settings as soon as they are saved |

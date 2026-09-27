@@ -9,7 +9,7 @@ flipbook 是一个做讲故事的动画短片的 agent skill。渲染器是 skil
 不加：
 
 - 3D 角色、真实素材剪辑、视频模型出画面、渲染时逐帧生成图、实时录屏。生成的静态图可以当素材（角色部件、背景、道具），和找来的图同等对待，来源、工具、提示词记进 `assets/SOURCES.json`
-- TTS 旁白、节拍检测、机器学习抠图
+- TTS 旁白、节拍检测、随包带或另外下载的机器学习模型。系统自带的能力可以用：`cutout --subject` 在 macOS 14 以上经 osascript 调系统的 Vision 抠照片主体，只在准备素材时跑，抠好的 PNG 入库，渲染和 check 不调它
 - Remotion 或 HyperFrames 当底座、p5.js
 - Windows 原生支持（`win32` 退 78，提示用 WSL2。`FLIPBOOK_ALLOW_WIN32=1` 只给 CI 用）
 - 预览（`preview` 命令和双击打开的预览都不做，0.x 看画面靠 `snapshot`）
@@ -33,7 +33,7 @@ src/
   paths.ts         包根目录和运行时文件定位
   skillPin.ts      读各宿主 skill 副本钉的版本
   cli/             doctor、check、snapshot、audio、render、stock、cutout、puppet（抠好的部件装成纸偶）、sprite（精灵图切成一段段动作）、报告和类型码
-  engine/          浏览器、页面、时钟、timeline、故事（story.ts）、JSON 校验工具（schema.ts）、截帧、编码、验收、字体和自带字体（只在 zip 里发布的字体由 zip.ts 取出）、品牌资产、缓存、扫描、配乐合成和混音（含文件音效 audioFiles.ts）、图片来源核对（assetSources.ts）、抠图用的工具页、渲染进程监视
+  engine/          浏览器、页面、时钟、timeline、故事（story.ts）、JSON 校验工具（schema.ts）、截帧、编码、验收、字体和自带字体（只在 zip 里发布的字体由 zip.ts 取出）、品牌资产、缓存、扫描、配乐合成和混音（含文件音效 audioFiles.ts）、图片来源核对（assetSources.ts）、照片主体（vision.ts，经 osascript 调 macOS 自带的 Vision）、抠图用的工具页、渲染进程监视
   runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、photo、puppet、rig（部件找关节、削描边、读 rig.json）、sprite（逐帧精灵）、riso（孔版印刷）、pixel（像素皮）、audio）
   stock/           找图找声音：Pexels、Pixabay、Openverse 三家的图片搜索和详情，Openverse 的音频搜索，图片和声音格式嗅探、下载防护（只走 HTTPS、拒内网地址、连接钉在核对过的地址上）
   fonts/           字体清单、码位表、OFL 全文

@@ -169,7 +169,7 @@ Inside a composition directory, flipbook writes only to `out/` and `.flipbook/`,
 | `stock-rejected` | stock fetch | The file was not saved: the id is unknown, its license is not `cc0` or `pdm` (Openverse), its address is not a public HTTPS address, the file is not an image (over 40 MB) or not an mp3, Ogg, FLAC or WAV sound ffmpeg can read (over 60 MB). `detail.reason` is `not-found`, `license`, `unsafe-url`, `not-image`, `not-audio` or `too-large` | Pick another result from stock search |
 | `asset-conflict` | stock fetch | The file was not saved: another image (or, for a sound, another sound) in `assets/` already has that name (`detail.reason` `name-taken`), or `assets/SOURCES.json` is not a readable JSON object (`sources-invalid`) | Pass another `--as` name, or fix `assets/SOURCES.json` |
 | `cutout-invalid` | cutout | Nothing was cut: the image is missing, lies outside the composition or outside `assets/`, or has no source and license in `assets/SOURCES.json` (a generated image also needs its tool and prompt), or that file is not valid JSON | Pass an image `stock fetch` saved, or add its source and license first |
-| `cutout-none` | cutout | Nothing was cut. No specimen on the plate stands apart (they touch one another, or the ground color is wrong) and the picture cut whole lost everything with the ground or ran off the picture. `detail.found` is how many groups were found, `detail.whole` whether the picture was tried whole, `detail.empty` how many the ground took entirely | Use the picture whole with `cutout: 'none'` and move the camera over it, pass `--paper`, or pick another picture |
+| `cutout-none` | cutout | Nothing was cut. No specimen on the plate stands apart (they touch one another, or the ground color is wrong) and the picture cut whole lost everything with the ground or ran off the picture, or, with `--subject`, Vision found no subject bigger than a speck. `detail.found` is how many groups were found, `detail.whole` whether the picture was tried whole, `detail.empty` how many the ground took entirely | Use the picture whole with `cutout: 'none'` and move the camera over it, pass `--paper`, cut a photo with `--subject` on macOS, or pick another picture |
 | `cutout-clipped` | cutout, warning | A specimen reaches past its crop and was left out: its cutout would have a straight edge. `detail.index` and `detail.sides` say which and where | Nothing when enough were kept. Otherwise raise `--gap`, or use the plate whole |
 | `puppet-invalid` | puppet | Nothing was rigged: `assets/puppets/<name>/puppet.json` is missing, is not valid JSON or does not match puppet v1, a part's image lies outside `assets/` or its entry in `assets/SOURCES.json` falls short (as for `asset-unlicensed`), or the bones do not hang together (a missing socket, a missing part, more than one root). `detail.path` is the field | Fix the field as the message says. [references/characters.md](../skills/flipbook/references/characters.md) describes puppet.json |
 | `puppet-joint-missing` | puppet | No round joint tab shows at the named end of a part: the end is square or ragged, or the tab is on another side. `detail.part`, `detail.joint` and `detail.side` say where. Nothing is written | Give that joint as `[x, y]` in the part's own pixels, read off the cut image, or name the side the tab is on |
@@ -304,22 +304,24 @@ Image reports carry `stock.kind` `image` and `artifacts.image`.
 
 `flipbook cutout <dir> <image>` cuts every specimen on a plate under `assets/` ahead of render. It runs `specimens()` and `photo()` of the runtime in a bare page that loads nothing but the runtime and files from the composition (never its `index.html`), keeps each specimen itself (the piece with the most of it inside the specimen's own box, never a neighbour the crop took in), and leaves out any the crop still cuts through. When no specimen stands apart (one subject filling the picture, or specimens that touch), it cuts the picture whole as one and says so with `cutout.whole`. Options: `--ink` for line art, `--paper #rrggbb` for the ground, `--threshold`, `--gap` (default `0.012`, `0` joins nothing), `--holes`, `--max` (default 12), `--size` (default: each cutout's size on the plate, at most 1200).
 
+With `--subject` (macOS 14 or newer) it cuts the subjects of a photo with a real background instead. It asks the Vision framework that comes with macOS for one mask per subject, through `osascript`, so nothing is compiled or bundled. Each mask becomes the photo's transparency, the subject is cropped, and its soft rim takes the colors of the subject just inside it, so the old background shows as little as it can along the edge on a new ground: look at the sheet. Subjects smaller than 0.2% of the photo are left out. It takes `--max` and `--size`, not `--ink` or `--paper`. Vision's masks go to a temporary folder and are gone once read. On another system, or when `osascript` cannot start or run Vision, it exits 78 with `vision-unavailable` before anything is cut, the composition's files as they were. A macOS update can change what Vision answers, so it runs only here, never in check or render: the PNGs it writes are the cutouts from then on.
+
 - The cutouts are transparent PNGs `assets/cut/<name>/<name>-01.png`, `-02.png` ..., biggest first. A rerun replaces the set.
-- `assets/cut/<name>/cutout.json` lists them with the crop and area each came from, with the `mode`, and `whole` when the picture was cut whole.
-- `assets/SOURCES.json` gets one entry per cutout, `"cut/<name>/<name>-01.png": { "source", "license", "cutFrom" }`, with the plate's source and license. The plate needs its own entry first.
+- `assets/cut/<name>/cutout.json` lists them with the crop and area each came from, with the `mode`, `whole` when the picture was cut whole, and for `--subject` the `vision` that cut them (`os`, `revision`) and each item's `edges`, the sides of the photo the subject runs off, where the cutout has a straight edge.
+- `assets/SOURCES.json` gets one entry per cutout, `"cut/<name>/<name>-01.png": { "source", "license", "cutFrom" }`, with the plate's source and license, and for `--subject` also `cutWith`, the macOS version and Vision revision that cut it. The plate needs its own entry first.
 - `out/cutout/<name>.png` shows every cutout on light paper, on dark ground and on a checkerboard: look at it before using them.
 
 | Field | Description |
 |---|---|
 | `cutout.image` | The plate |
-| `cutout.mode` | `paper` or `ink` |
-| `cutout.found` | Specimens found |
+| `cutout.mode` | `paper`, `ink` or `subject` |
+| `cutout.found` | Specimens found (with `--subject`, the subjects Vision found) |
 | `cutout.whole` | True when no specimen stood apart and the picture was cut whole |
-| `cutout.kept` | The cutouts written: `file`, `width`, `height` (pixels), `crop` (fractions of the plate), `area` (share of the plate) |
+| `cutout.kept` | The cutouts written: `file`, `width`, `height` (pixels), `crop` (fractions of the plate), `area` (share of the plate), and with `--subject` `edges` |
 | `cutout.skipped` | Specimens left out because their crop cuts through them: `index`, `sides` |
 | `cutout.sheet`, `artifacts.sheet` | The sheet |
 
-It exits 0 when at least one cutout was written and 1 with `cutout-invalid` or `cutout-none`.
+It exits 0 when at least one cutout was written, 1 with `cutout-invalid` or `cutout-none`, and 78 with `vision-unavailable`.
 
 ### puppet
 
@@ -364,6 +366,7 @@ It exits 0 when the clips were written, warnings included, and 1 with `sprite-in
 | Code | Meaning |
 |---|---|
 | `platform-unsupported` | Unsupported system (on Windows, use WSL2) |
+| `vision-unavailable` | `cutout --subject` needs the Vision framework of macOS 14 or newer, and this machine does not have it, or `osascript` could not run it |
 | `node-too-old` | Node is older than 22.19 |
 | `ffmpeg-missing` | No ffmpeg or ffprobe on PATH |
 | `ffmpeg-feature-missing` | ffmpeg lacks libx264 or a required filter |

@@ -2,11 +2,15 @@
 // into a transparent PNG under assets/cut/<name>/, ahead of render. Each file
 // carries the plate's source and license in assets/SOURCES.json, and a sheet
 // shows every cutout on light, dark and checkered ground for a look first.
+// With --subject, the subjects of a photo with a real background are found by
+// macOS Vision instead (see engine/vision.ts).
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { cutEntry, parseSources, sourceProblem } from '../engine/assetSources.ts';
 import { compositionDir, openSession, type Session } from '../engine/session.ts';
 import { openToolPage } from '../engine/toolPage.ts';
+import { type VisionMasks, visionMasks } from '../engine/vision.ts';
 import { Workspace } from '../engine/workspace.ts';
 import { finding, progress, type Report, ReportBuilder } from './report.ts';
 
@@ -14,7 +18,8 @@ export interface CutoutOptions {
     dir: string;
     /** The plate, relative to dir, under assets/. */
     image: string;
-    mode?: 'paper' | 'ink';
+    /** 'subject': a photo with a real background, cut by macOS Vision. */
+    mode?: 'paper' | 'ink' | 'subject';
     /** Ground color, as #rrggbb. Default: measured along the plate's edge. */
     paper?: string;
     threshold?: number;
@@ -28,6 +33,8 @@ export interface CutoutOptions {
     size?: number;
     env?: NodeJS.ProcessEnv;
     session?: Session;
+    /** Stands in for Vision in tests. */
+    vision?: (image: string, outDir: string) => Promise<VisionMasks>;
 }
 
 interface Kept {
@@ -37,6 +44,8 @@ interface Kept {
     height: number;
     crop: { x: number; y: number; width: number; height: number };
     area: number;
+    /** --subject: the sides of the photo the subject runs off. */
+    edges?: string[];
 }
 
 interface Cut {
@@ -50,6 +59,8 @@ interface Cut {
 }
 
 const SOURCES = path.join('assets', 'SOURCES.json');
+/** Subjects smaller than this share of the photo are specks, not subjects. */
+const SPECK = 0.002;
 
 export async function runCutout(options: CutoutOptions): Promise<Report> {
     const dir = compositionDir(options.dir);
@@ -84,23 +95,51 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
     if (problem) return refuse(`${image} ${problem} in assets/SOURCES.json.`);
     const stem = path.basename(key, path.extname(key));
 
+    // Vision runs before the browser: on a machine without it, nothing else
+    // starts. Its masks go to a temporary folder, gone once they are read, so
+    // a failed run leaves the composition as it was.
+    let vision: VisionMasks | null = null;
+    let maskPngs: string[] = [];
+    if (mode === 'subject') {
+        progress(`cutout: asking macOS Vision for the subjects of ${image}`);
+        const masks = fs.mkdtempSync(path.join(os.tmpdir(), 'flipbook-vision-'));
+        try {
+            vision = await (options.vision ?? visionMasks)(full, masks);
+            maskPngs = vision.masks.map(
+                (m) => `data:image/png;base64,${fs.readFileSync(m).toString('base64')}`,
+            );
+        } finally {
+            fs.rmSync(masks, { recursive: true, force: true });
+        }
+    }
+
     const session = options.session ?? (await openSession(options.env));
     const tool = await openToolPage(session, dir);
     let cut: Cut;
     let sheet: string | null = null;
     try {
         rb.report.environment.chromium = session.chromium;
-        progress(`cutout: finding specimens on ${image}`);
-        cut = await tool.page.evaluate(cutSpecimens, {
-            src: `/${image}`,
-            mode,
-            paper: options.paper,
-            threshold: options.threshold,
-            gap: options.gap,
-            holes: options.holes,
-            max: options.max ?? 12,
-            size: options.size,
-        });
+        if (vision) {
+            cut = await tool.page.evaluate(cutSubjects, {
+                src: `/${image}`,
+                masks: maskPngs,
+                max: options.max ?? 12,
+                size: options.size,
+                speck: SPECK,
+            });
+        } else {
+            progress(`cutout: finding specimens on ${image}`);
+            cut = await tool.page.evaluate(cutSpecimens, {
+                src: `/${image}`,
+                mode: mode as 'paper' | 'ink',
+                paper: options.paper,
+                threshold: options.threshold,
+                gap: options.gap,
+                holes: options.holes,
+                max: options.max ?? 12,
+                size: options.size,
+            });
+        }
         if (cut.kept.length > 0) {
             sheet = await tool.page.evaluate(
                 drawSheet,
@@ -126,13 +165,15 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
         );
     }
     if (cut.kept.length === 0) {
-        const why = cut.whole
-            ? `No specimen on ${image} stands apart from the others, and cut whole it ${
-                  cut.empty.length > 0
-                      ? 'loses everything with the ground: the ground is not one flat color'
-                      : 'runs off the picture'
-              }.`
-            : `No specimen on ${image} stands apart from the others (${cut.found} found, ${cut.clipped.length} cut by their crop, ${cut.empty.length} lost with the ground).`;
+        const why = vision
+            ? `Vision found no subject in ${image} (${vision.masks.length} found, none bigger than a speck).`
+            : cut.whole
+              ? `No specimen on ${image} stands apart from the others, and cut whole it ${
+                    cut.empty.length > 0
+                        ? 'loses everything with the ground: the ground is not one flat color'
+                        : 'runs off the picture'
+                }.`
+              : `No specimen on ${image} stands apart from the others (${cut.found} found, ${cut.clipped.length} cut by their crop, ${cut.empty.length} lost with the ground).`;
         rb.add(
             finding('cutout-none', why, {
                 element: image,
@@ -148,17 +189,23 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
     for (const name of Object.keys(sources)) {
         if (name.startsWith(`cut/${stem}/`)) delete sources[name];
     }
+    const cutWith = vision
+        ? `macOS Vision foreground instance mask, revision ${vision.revision}, macOS ${vision.os}`
+        : undefined;
     const items = cut.kept.map((k, i) => {
         const name = `${stem}-${String(i + 1).padStart(2, '0')}.png`;
         const file = path.join(outDir, name);
         ws.writeFile(ws.path(file), Buffer.from(k.png.split(',')[1], 'base64'));
-        sources[`cut/${stem}/${name}`] = cutEntry(sources, key);
+        sources[`cut/${stem}/${name}`] = cutWith
+            ? { ...cutEntry(sources, key), cutWith }
+            : cutEntry(sources, key);
         return {
             file: file.split(path.sep).join('/'),
             width: k.width,
             height: k.height,
             crop: k.crop,
             area: k.area,
+            ...(k.edges ? { edges: k.edges } : {}),
         };
     });
     ws.writeFile(
@@ -169,6 +216,7 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
                 mode,
                 paper: options.paper ?? null,
                 ...(cut.whole ? { whole: true } : {}),
+                ...(vision ? { vision: { os: vision.os, revision: vision.revision } } : {}),
                 items,
             },
             null,
@@ -257,6 +305,192 @@ async function cutSpecimens(o: {
         });
     }
     return { found: found.length, whole, kept, clipped, empty };
+}
+
+/**
+ * Subject: each Vision mask as the alpha of the photo, cropped to the subject.
+ * The mask's soft rim keeps the colors of the ground behind it, which show as
+ * a fringe on any other ground, so the rim takes the colors of the subject
+ * just inside it instead.
+ */
+async function cutSubjects(o: {
+    src: string;
+    masks: string[];
+    max: number;
+    size?: number;
+    speck: number;
+}): Promise<Cut> {
+    const load = async (src: string) => {
+        const img = new Image();
+        img.src = src;
+        await img.decode();
+        return img;
+    };
+    const pixels = (img: HTMLImageElement, w: number, h: number) => {
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const g = c.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
+        g.drawImage(img, 0, 0, w, h);
+        return g.getImageData(0, 0, w, h).data;
+    };
+    const photo = await load(o.src);
+    const W = photo.naturalWidth;
+    const H = photo.naturalHeight;
+    const rgb = pixels(photo, W, H);
+    const kept: Kept[] = [];
+    for (const [index, src] of o.masks.entries()) {
+        const mask = pixels(await load(src), W, H);
+        let x0 = W;
+        let y0 = H;
+        let x1 = -1;
+        let y1 = -1;
+        let solid = 0;
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                const a = mask[(y * W + x) * 4];
+                if (a < 8) continue;
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                if (y > y1) y1 = y;
+                if (a >= 128) solid++;
+            }
+        }
+        const area = solid / (W * H);
+        if (x1 < 0 || area < o.speck) continue;
+        const edges: string[] = [];
+        if (x0 === 0) edges.push('left');
+        if (y0 === 0) edges.push('top');
+        if (x1 === W - 1) edges.push('right');
+        if (y1 === H - 1) edges.push('bottom');
+        const w = x1 - x0 + 1;
+        const h = y1 - y0 + 1;
+        const out = new ImageData(w, h);
+        const d = out.data;
+        const known = new Uint8Array(w * h);
+        let rim: number[] = [];
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const from = ((y + y0) * W + (x + x0)) * 4;
+                const i = (y * w + x) * 4;
+                const a = mask[from];
+                d[i] = rgb[from];
+                d[i + 1] = rgb[from + 1];
+                d[i + 2] = rgb[from + 2];
+                d[i + 3] = a;
+                if (a >= 250) known[y * w + x] = 1;
+                else if (a > 0) rim.push(y * w + x);
+            }
+        }
+        // The photo's own soft edge runs a pixel into the solid part: the solid
+        // pixels touching the rim join it and take colors from further in.
+        const edge: number[] = [];
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const p = y * w + x;
+                if (!known[p]) continue;
+                const open =
+                    x === 0 ||
+                    y === 0 ||
+                    x === w - 1 ||
+                    y === h - 1 ||
+                    !known[p - 1] ||
+                    !known[p + 1] ||
+                    !known[p - w] ||
+                    !known[p + w];
+                if (open) edge.push(p);
+            }
+        }
+        for (const p of edge) {
+            const px = p % w;
+            const py = (p - px) / w;
+            // A side the photo's frame cuts is not an edge of the subject.
+            const frame =
+                (px === 0 && x0 === 0) ||
+                (py === 0 && y0 === 0) ||
+                (px === w - 1 && x1 === W - 1) ||
+                (py === h - 1 && y1 === H - 1);
+            if (frame) continue;
+            known[p] = 0;
+            rim.push(p);
+        }
+        // Ring by ring from the solid inside out, each rim pixel takes the mean
+        // color of its solid neighbors, until the whole rim has one: a big
+        // photo has a wide soft rim, so no fixed number of rings is enough.
+        while (rim.length > 0) {
+            const next: number[] = [];
+            const done: number[] = [];
+            for (const p of rim) {
+                const px = p % w;
+                const py = (p - px) / w;
+                let r = 0;
+                let g = 0;
+                let b = 0;
+                let n = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const qx = px + dx;
+                        const qy = py + dy;
+                        if (qx < 0 || qy < 0 || qx >= w || qy >= h) continue;
+                        const q = qy * w + qx;
+                        if (!known[q]) continue;
+                        r += d[q * 4];
+                        g += d[q * 4 + 1];
+                        b += d[q * 4 + 2];
+                        n++;
+                    }
+                }
+                if (n === 0) {
+                    next.push(p);
+                    continue;
+                }
+                d[p * 4] = r / n;
+                d[p * 4 + 1] = g / n;
+                d[p * 4 + 2] = b / n;
+                done.push(p);
+            }
+            // A rim pixel with no solid pixel anywhere near is left as it is.
+            if (done.length === 0) break;
+            for (const p of done) known[p] = 1;
+            rim = next;
+        }
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        (c.getContext('2d') as CanvasRenderingContext2D).putImageData(out, 0, 0);
+        // Its own size, at most 1200 on the long edge, or the size asked for.
+        const long = Math.max(w, h);
+        const target = o.size ?? Math.min(1200, long);
+        let final = c;
+        if (target !== long) {
+            const k = target / long;
+            final = document.createElement('canvas');
+            final.width = Math.max(1, Math.round(w * k));
+            final.height = Math.max(1, Math.round(h * k));
+            const g = final.getContext('2d') as CanvasRenderingContext2D;
+            g.imageSmoothingEnabled = true;
+            g.imageSmoothingQuality = 'high';
+            g.drawImage(c, 0, 0, final.width, final.height);
+        }
+        kept.push({
+            index,
+            png: final.toDataURL('image/png'),
+            width: final.width,
+            height: final.height,
+            crop: { x: x0 / W, y: y0 / H, width: w / W, height: h / H },
+            area,
+            edges,
+        });
+    }
+    kept.sort((a, b) => b.area - a.area);
+    return {
+        found: o.masks.length,
+        whole: false,
+        kept: kept.slice(0, o.max),
+        clipped: [],
+        empty: [],
+    };
 }
 
 /**

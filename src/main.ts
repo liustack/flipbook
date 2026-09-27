@@ -394,6 +394,10 @@ program
         '--ink',
         'line art (engravings, pen drawings): turn the paper transparent and keep the lines',
     )
+    .option(
+        '--subject',
+        'a photo with a real background: find its subjects with macOS Vision (macOS 14 or newer)',
+    )
     .option('--paper <color>', 'ground color as #rrggbb, measured along the edge when not given')
     .option(
         '--threshold <n>',
@@ -419,6 +423,7 @@ program
             image: string,
             options: {
                 ink?: boolean;
+                subject?: boolean;
                 paper?: string;
                 threshold?: string;
                 gap: string;
@@ -427,16 +432,22 @@ program
                 size?: string;
             },
         ) => {
-            if (options.paper && !/^#[0-9a-fA-F]{6}$/.test(options.paper)) {
-                throw new UsageError(
-                    `Invalid --paper "${options.paper}". Use a color such as #efe6d2.`,
-                );
-            }
-            await execute('cutout', dir, () =>
-                runCutout({
+            await execute('cutout', dir, async () => {
+                // Inside execute, so a bad flag comes out as a usage report and exit 2.
+                if (options.subject && (options.ink || options.paper)) {
+                    throw new UsageError(
+                        '--subject finds the subject with Vision: it takes no --ink or --paper.',
+                    );
+                }
+                if (options.paper && !/^#[0-9a-fA-F]{6}$/.test(options.paper)) {
+                    throw new UsageError(
+                        `Invalid --paper "${options.paper}". Use a color such as #efe6d2.`,
+                    );
+                }
+                return runCutout({
                     dir,
                     image,
-                    mode: options.ink ? 'ink' : 'paper',
+                    mode: options.subject ? 'subject' : options.ink ? 'ink' : 'paper',
                     paper: options.paper,
                     threshold: options.threshold
                         ? parseInteger(options.threshold, '--threshold', 1, 255)
@@ -445,8 +456,8 @@ program
                     holes: options.holes ? parseNumber(options.holes, '--holes', 0, 1) : undefined,
                     max: parseInteger(options.max, '--max', 1, 64),
                     size: options.size ? parseInteger(options.size, '--size', 64, 4000) : undefined,
-                }),
-            );
+                });
+            });
         },
     );
 

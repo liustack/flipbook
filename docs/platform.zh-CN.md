@@ -21,6 +21,8 @@ read_when:
 | macOS x64 | 尽力而为 | 没测 |
 | Windows | 不支持，在 WSL2 里用 | 原生 `win32` 退 78。CI 有一列 windows-latest，设 `FLIPBOOK_ALLOW_WIN32=1` 跑，结果见下面 Windows 一节 |
 
+有一条命令对机器要求更高：`cutout --subject` 用 macOS 14 或更新版本自带的 Vision 框架，别的地方报 `vision-unavailable` 退 78。它只在本机直接跑过，还没在宿主的沙箱里跑过。
+
 | 宿主 | 状态 |
 |---|---|
 | Claude Code | 沙箱里能跑。首次运行要下载 Chromium 和字体，被沙箱挡住退 78 时，agent 按提示带 `dangerouslyDisableSandbox` 把同一条命令重跑一次，用户在确认框里点一次允许，之后都在沙箱里跑，不用改设置也不用重启。INSTALL.zh-CN.md 第 3e 步的放行设置只给一次都不想弹的人，Claude Code 的沙箱设置改了即时生效 |

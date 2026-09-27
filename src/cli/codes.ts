@@ -193,8 +193,8 @@ export const FINDING_CODES = {
     },
     'cutout-none': {
         meaning:
-            'flipbook cutout cut nothing: no specimen on the plate stands apart (they touch one another, or the ground color is wrong) and the picture cut whole lost everything with the ground or ran off the picture.',
-        fix: 'Use the picture whole with cutout: none and move the camera over it, pass --paper with the ground color, or search for a picture whose subjects stand apart.',
+            'flipbook cutout cut nothing: no specimen on the plate stands apart (they touch one another, or the ground color is wrong) and the picture cut whole lost everything with the ground or ran off the picture, or, with --subject, Vision found no subject bigger than a speck.',
+        fix: 'Use the picture whole with cutout: none and move the camera over it, pass --paper with the ground color, cut a photo with a real background with --subject on macOS 14 or newer, or search for a picture whose subjects stand apart.',
     },
     'cutout-clipped': {
         meaning:
@@ -299,6 +299,11 @@ export const RUN_ONCE_OUTSIDE_SANDBOX =
 
 /** Environment problems: the machine is missing something. Exit 78. */
 export const ENV_CODES = {
+    'vision-unavailable': {
+        meaning:
+            "cutout --subject asks the Vision framework of macOS 14 or newer for the photo's subject, and this machine does not have it, or osascript could not run it.",
+        fix: 'Run the same cutout on a Mac with macOS 14 or newer and keep the PNGs it writes. Elsewhere, a photo on a plain light ground cuts without --subject, and any other photo can be used whole as a framed sticker with cutout: none.',
+    },
     'platform-unsupported': {
         meaning: 'This operating system is not supported.',
         fix: 'Run flipbook inside WSL2 (Ubuntu) on Windows, or on macOS or Linux.',
