@@ -19,6 +19,7 @@ import {
     TRUE_PEAK_MAX_DBTP,
 } from './audio.ts';
 import { sequencePattern } from './capture.ts';
+import { DELIVERY_PIXELS } from './encode.ts';
 import type { Ffmpeg } from './ffmpeg.ts';
 import {
     analysisSize,
@@ -445,7 +446,8 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
         }
     }
 
-    // Decoded frames against their captures.
+    // Decoded frames against their captures, the captures first put into the
+    // film's pixel format: what yuv420p cannot hold is not a glitch.
     if (sampleFrames.length > 0) {
         const decoded = splitFrames(fs.readFileSync(rgbFile), rgb.width * rgb.height * 3);
         const captured = await decodeRgb(
@@ -453,6 +455,7 @@ export async function verifyVideo(options: VerifyOptions): Promise<VerifyOutput>
             ['-i', sequencePattern(path.dirname(options.samples.get(sampleFrames[0]) as string))],
             rgb.width,
             rgb.height,
+            `${DELIVERY_PIXELS},`,
         );
         const worst: { frame: number; db: number }[] = [];
         sampleFrames.forEach((frame, i) => {

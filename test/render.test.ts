@@ -1,5 +1,5 @@
 // Render output on small fixtures: color tags and values through yuv420p bt709,
-// and the user's own music lined up with the picture.
+// fine color not taken for a glitch, and the user's own music lined up with the picture.
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -53,6 +53,15 @@ describe('color', () => {
         expect(error(blue, [0x33, 0x66, 0xcc]), `blue decoded as ${blue}`).toBeLessThanOrEqual(3);
         expect(error(red, [0xff, 0x00, 0x00]), `red decoded as ${red}`).toBeLessThanOrEqual(3);
         fs.writeFileSync(path.join(dir, 'decoded.json'), JSON.stringify({ blue, red }));
+    });
+});
+
+describe('glitch check', () => {
+    it('takes color finer than yuv420p holds for the format, not for damage', async () => {
+        const dir = copyFixture('fine-color');
+        const s = await session();
+        const rendered = await runRender({ dir, session: s, recordAttempts: false });
+        expect(rendered.failures).toEqual([]);
     });
 });
 

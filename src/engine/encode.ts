@@ -14,6 +14,16 @@ export interface EncoderOptions {
 /** Default limit for one frame to leave the pipe. */
 export const WRITE_TIMEOUT_MS = 60_000;
 
+/**
+ * The delivered film's pixels: bt709 limited-range yuv420p, tagged. The glitch
+ * check passes captures through the same filter before comparing them with the
+ * decoded film, so detail this format cannot hold (color finer than two pixels)
+ * is not taken for damage.
+ */
+export const DELIVERY_PIXELS =
+    'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,' +
+    'setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv';
+
 /** ffmpeg arguments: PNG frames on stdin to H.264 yuv420p with bt709 matrix and tags. */
 export function encoderArgs(options: EncoderOptions): string[] {
     return [
@@ -30,8 +40,7 @@ export function encoderArgs(options: EncoderOptions): string[] {
         '-i',
         '-',
         '-vf',
-        'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,' +
-            'setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv',
+        DELIVERY_PIXELS,
         '-c:v',
         'libx264',
         '-preset',

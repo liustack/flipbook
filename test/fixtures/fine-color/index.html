@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 320px; height: 180px; overflow: hidden; background: #f3eee3; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="c" width="320" height="180"></canvas>
+<script type="module">
+// Yellow ink on paper, one pixel at a time: color finer than yuv420p holds.
+import { composition } from '/__flipbook/runtime.js';
+const ctx = document.getElementById('c').getContext('2d');
+const img = ctx.createImageData(320, 180);
+composition({
+  seek(t) {
+    const f = Math.round(t * 12);
+    for (let y = 0; y < 180; y++) {
+      for (let x = 0; x < 320; x++) {
+        let h = Math.imul(x + f * 7, 374761393) ^ Math.imul(y, 668265263);
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        const ink = ((h ^ (h >>> 16)) >>> 0) / 4294967296 < 0.5;
+        const i = (y * 320 + x) * 4;
+        img.data[i] = ink ? 0xff : 0xf3;
+        img.data[i + 1] = ink ? 0xe8 : 0xee;
+        img.data[i + 2] = ink ? 0x00 : 0xe3;
+        img.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  },
+});
+</script>
+</body>
+</html>
