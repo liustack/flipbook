@@ -30,6 +30,7 @@ bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse:<id> --as beetle
 bash <skill-dir>/scripts/run.sh cutout <dir> assets/beetle.jpg
 bash <skill-dir>/scripts/run.sh cutout <dir> assets/hand-study.jpg --ink
 bash <skill-dir>/scripts/run.sh cutout <dir> assets/medusae.jpg --paper '#09330b' --threshold 52 --holes 0.02
+bash <skill-dir>/scripts/run.sh cutout <dir> assets/owl.jpg --subject
 ```
 
 - `cutout` finds every specimen on the plate, cuts each into a transparent PNG `assets/cut/<name>/<name>-01.png` (biggest first), records its source and license in `assets/SOURCES.json` and draws `out/cutout/<name>.png`, every cutout on light paper, dark ground and a checkerboard.
@@ -38,6 +39,7 @@ bash <skill-dir>/scripts/run.sh cutout <dir> assets/medusae.jpg --paper '#09330b
 - `--ink` is for line art (engravings, pen drawings): the paper turns transparent and the lines keep their weight. `--paper` and `--threshold` set the ground on dark plates, `--holes` clears ground enclosed by a specimen, `--gap` (default `0.012` of the long edge) joins pieces that belong together.
 - When no specimen stands apart (one subject filling the picture, or specimens that touch), the picture is cut whole as one piece and the report says `whole`. Look at the sheet: a cluster of touching specimens comes out as one piece.
 - `cutout-none` means even that cut nothing: use the picture whole (see below). `cutout-clipped` warnings name specimens that were left out because their crop cut through them.
+- `--subject` is for a photo with a real background (an animal in the grass, a thing on a table), on macOS 14 or newer: the Vision framework of macOS finds each subject and cuts it, and each cutout's source records the macOS version. Its limits: fur and hair come out as a smooth outline, it decides by itself what counts as the subject (it may keep the eggs and drop the nest, or miss one of several things), and a subject the photo's frame cuts keeps that straight edge (`edges` in `cutout.json`): put that edge at the stage's edge or behind something. Never use it on plates, drawings or sheets on flat paper: the paper cutout is sharper there, keeps antennae and claws, and finds small specimens Vision misses. On another system it exits 78 with `vision-unavailable`: use the photo whole with `cutout: 'none'`.
 
 ## photo() in the composition
 
@@ -127,7 +129,7 @@ The result:
 | `canvas` | the finished sticker, for `drawImage` or a pattern |
 | `clipped` | the sides of the crop the subject touches, such as `['right']`: the crop cut through it. Empty when nothing was cut. Fix a non-empty one before drawing |
 
-Only paper that touches the edge of the picture is removed, so pale areas inside the subject (a white wing, a highlight) stay. Only light, even paper cuts well: for a photo with a real background use `cutout: 'none'` and let the border frame it. Check each cutout on the snapshot contact sheet, and zoom in with `snapshot --zoom` when an edge looks wrong.
+Only paper that touches the edge of the picture is removed, so pale areas inside the subject (a white wing, a highlight) stay. Only light, even paper cuts well: cut a photo with a real background ahead with `cutout --subject` on macOS, or use `cutout: 'none'` and let the border frame it. Check each cutout on the snapshot contact sheet, and zoom in with `snapshot --zoom` when an edge looks wrong.
 
 ## Specimens on one plate
 
