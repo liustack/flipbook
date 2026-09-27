@@ -1,0 +1,26 @@
+{
+    "version": 1,
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "seed": 314,
+    "bpm": 100,
+    "beatsPerBar": 4,
+    "scenes": [
+        { "id": "days", "bars": 2 },
+        { "id": "sprout", "bars": 1 },
+        { "id": "bloom", "bars": 2 }
+    ],
+    "cues": [
+        { "id": "pop", "scene": "sprout", "beat": 1, "kind": "sfx", "sfx": "drop" },
+        { "id": "open", "scene": "bloom", "beat": 2, "kind": "sfx", "sfx": "ding" },
+        { "id": "grew", "scene": "bloom", "beat": 4, "kind": "text", "text": "发芽了", "settleBeats": 1 }
+    ],
+    "audio": {
+        "mode": "preset",
+        "preset": "marimba",
+        "key": "C",
+        "progression": 1,
+        "dynamics": { "days": "soft", "sprout": "medium", "bloom": "full" }
+    }
+}

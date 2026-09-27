@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>pixel sprout: a robot, a seed and four mornings</title>
+<style>
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #1d2340; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script type="module">
+import {
+  composition, cueProgress, cue, onFrames, pixel, pixelArt, progress, rand, setupCanvas, timeline,
+} from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const ctx = setupCanvas(document.getElementById('stage'), W, H);
+const [daysScene, sproutScene, bloomScene] = tl.scenes;
+
+// ---------------------------------------------------------------------------
+// The grid and its colors.
+
+const C = {
+  night: '#1d2340', dusk: '#e07a5f', sky: '#9fd3e6', sun: '#ffd166', moon: '#f4f1de',
+  mound: '#5c3d2e', soil: '#8a5a3c', grass: '#3f7d20', leaf: '#7ac74f',
+  light: '#d9dde3', body: '#8d99ae', ink: '#2b2d42', water: '#4ea8de', petal: '#ef476f',
+};
+const g = pixel(W, H, { cols: 96, palette: Object.values(C) });
+// The ground line a fixed height above the bottom, whatever the stage's shape.
+const GROUND = g.rows - 12;
+const MOUND_X = 58;
+
+// ---------------------------------------------------------------------------
+// Drawings. Each character is a key into C.
+
+const K = { k: C.ink, r: C.petal, l: C.light, m: C.body, g: C.grass, f: C.leaf, p: C.petal, y: C.sun };
+const robot = pixelArt([
+  '.....r......',
+  '.....k......',
+  '..kkkkkkkk..',
+  '..kllllllk..',
+  '..kllklklk..',
+  '..kllllllk..',
+  '..kkkkkkkk..',
+  '...kmmmmk...',
+  '..kmmmmmmk..',
+  '..kmmmmmmk..',
+  '...kmmmmk...',
+  '...kk..kk...',
+  '...kk..kk...',
+], K);
+const sprout1 = pixelArt([
+  'f...f',
+  'ff.ff',
+  '..g..',
+  '..g..',
+], K);
+const sprout2 = pixelArt([
+  '...f...',
+  '..fff..',
+  'f..g..f',
+  'ff.g.ff',
+  '.ffgff.',
+  '...g...',
+  '...g...',
+], K);
+const bud = pixelArt([
+  '...p...',
+  '..ppp..',
+  '...g...',
+  'f..g..f',
+  'ff.g.ff',
+  '.ffgff.',
+  '...g...',
+  '...g...',
+], K);
+const flower = pixelArt([
+  '..ppp..',
+  '.ppypp.',
+  'ppyyypp',
+  '.ppypp.',
+  '..ppp..',
+  '...g...',
+  'f..g..f',
+  'ff.g.ff',
+  '.ffgff.',
+  '...g...',
+  '...g...',
+], K);
+
+// ---------------------------------------------------------------------------
+// Time: three days and nights in the first scene, then mornings.
+
+const DAY = (daysScene.end - daysScene.start) / 3;
+const POP = cue(tl, 'pop').frame / tl.fps;
+const OPEN = cue(tl, 'open').frame / tl.fps;
+
+/** 'day', 'dusk', 'night' or 'dawn', and how far through the day part (0 to 1). */
+function sky(t) {
+  // The mornings after: the sun low on the left, clear of the title.
+  if (t >= daysScene.end) return { part: 'day', p: 0.1 + 0.08 * progress(t, daysScene.end, tl.durationSec) };
+  const u = (t % DAY) / DAY;
+  if (u < 0.55) return { part: 'day', p: u / 0.55 };
+  if (u < 0.62) return { part: 'dusk', p: 0 };
+  if (u < 0.93) return { part: 'night', p: (u - 0.62) / 0.31 };
+  return { part: 'dawn', p: 0 };
+}
+
+function drawSky(s, t) {
+  g.clear(s.part === 'day' ? C.sky : s.part === 'night' ? C.night : C.dusk);
+  if (s.part === 'day') {
+    const x = 8 + 80 * s.p;
+    g.disc(x, 26 - 18 * Math.sin(Math.PI * s.p), 4, C.sun);
+  }
+  if (s.part === 'night') {
+    for (let i = 0; i < 14; i++) {
+      const on = rand(tl.seed, 'twinkle', i, Math.floor(t * 4)) > 0.2;
+      if (on) g.dot(3 + rand(tl.seed, 'star-x', i) * 90, 2 + rand(tl.seed, 'star-y', i) * 24, C.moon);
+    }
+    const x = 10 + 76 * s.p;
+    const y = 24 - 16 * Math.sin(Math.PI * s.p);
+    g.disc(x, y, 3, C.moon);
+    g.disc(x + 2, y - 1, 2, C.night);
+  }
+}
+
+function drawGround() {
+  g.disc(MOUND_X, GROUND + 1, 6, C.mound);
+  g.rect(0, GROUND + 1, 96, g.rows - GROUND - 1, C.soil);
+  g.rect(0, GROUND, 96, 1, C.grass);
+  for (let i = 0; i < 14; i++) g.dot(rand(tl.seed, 'pebble', i) * 96, GROUND + 3 + rand(tl.seed, 'pebble-y', i) * 9, C.mound);
+}
+
+/** The plant on the mound: nothing, a sprout, a taller sprout, a bud, the flower. */
+function plant(t) {
+  if (t < POP) return null;
+  if (t < POP + 1) return sprout1;
+  if (t < bloomScene.start) return sprout2;
+  if (t < OPEN) return bud;
+  return flower;
+}
+
+/** Robot's feet at (x, GROUND), hopping up `lift` cells. */
+function drawRobot(x, lift) {
+  g.draw(robot, x - 6, GROUND - robot.height - lift);
+}
+
+// The watering can in the robot's hand: level, or tipped with water running.
+function drawCan(x, y, tipped, t) {
+  if (!tipped) {
+    g.rect(x, y, 4, 3, C.body);
+    g.rect(x + 4, y, 2, 1, C.ink);
+    return;
+  }
+  g.rect(x, y - 1, 4, 3, C.body);
+  g.dot(x + 4, y + 1, C.ink);
+  g.dot(x + 5, y + 2, C.ink);
+  for (let i = 0; i < 3; i++) {
+    const f = (t * 2.2 + i / 3) % 1;
+    g.dot(x + 6 + 3 * f, y + 3 + 5 * f * f, C.water);
+  }
+}
+
+composition({
+  seek(time) {
+    // A game's pace: a new drawing every third frame.
+    const t = onFrames(time, tl.fps, 3);
+    const s = sky(t);
+    drawSky(s, t);
+    drawGround();
+    const p = plant(t);
+    if (p) g.draw(p, MOUND_X - Math.floor(p.width / 2), GROUND - 5 - p.height);
+    // The robot waters in the middle of each day, hops once at the sprout, and
+    // keeps hopping once the flower comes.
+    // It leans in to look once the sprout has grown.
+    const robotX = t >= POP + 1.4 && t < bloomScene.start ? 43 : 42;
+    const watering = t < daysScene.end && s.part === 'day' && s.p > 0.25 && s.p < 0.7;
+    let lift = 0;
+    // Three quick hops of surprise at the sprout.
+    for (const at of [0.4, 0.75, 1.1]) if (t >= POP + at && t < POP + at + 0.2) lift = 2;
+    if (t >= bloomScene.start + 0.5 && t < tl.durationSec - 0.8) lift = Math.floor((t - bloomScene.start) * 4) % 2 === 0 ? 3 : 0;
+    drawRobot(robotX, lift);
+    // An arm out to the can.
+    g.rect(robotX + 3, GROUND - 6 - lift, 2, 1, C.ink);
+    drawCan(robotX + 5, GROUND - 7 - lift, watering, t);
+    // The title on the grid, a character at a time as its cue comes in.
+    const shown = Math.ceil(3 * cueProgress(tl, time, 'grew'));
+    if (shown > 0) g.text('发芽了'.slice(0, shown), 40, 4, C.ink, { id: 'grew' });
+    g.present(ctx);
+  },
+});
+</script>
+</body>
+</html>

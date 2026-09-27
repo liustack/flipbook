@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "idea": "A little robot waters a seed for three days and nights and nothing comes up; on the fourth morning a sprout shows, and it blooms",
+    "leave": "Keep tending what you care about, even when nothing shows yet",
+    "subject": "the mound of earth",
+    "device": {
+        "what": "the sun and the moon crossing the sky over one small mound",
+        "why": "the days going by without change are the waiting; the mound is where the change comes"
+    },
+    "beats": [
+        {
+            "id": "waiting",
+            "role": "opening",
+            "at": "days",
+            "change": { "from": "the first morning, the robot watering a bare mound", "to": "three days and nights have passed and the mound is still bare" }
+        },
+        {
+            "id": "sprout",
+            "role": "turn",
+            "at": "sprout",
+            "change": { "from": "the fourth morning, a bare mound", "to": "a green sprout stands in it" },
+            "sound": "pop"
+        },
+        {
+            "id": "bloom",
+            "role": "resolution",
+            "at": "bloom",
+            "change": { "from": "the robot sees the sprout", "to": "it is hopping, the flower is open and the words 发芽了 have appeared" },
+            "text": ["发芽了"],
+            "sound": "open",
+            "callback": "waiting"
+        }
+    ]
+}
