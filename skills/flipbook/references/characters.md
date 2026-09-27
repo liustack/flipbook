@@ -1,6 +1,6 @@
 # Characters
 
-When a story needs someone to act it out, build a cut-out puppet: parts on bones, posed at every t. The runtime draws it, inks one outline around each group of parts so no joint shows, and gives you walking, breathing, waving, blinking and talking as pure functions of t.
+When a story needs someone to act it out, build a cut-out puppet: parts on bones, posed at every t. The runtime draws it, inks one outline around each group of parts so no joint shows, and gives you walking, breathing, waving, blinking and talking as pure functions of t. Draw the parts in code, or cut them from a picture of the parts (see [Parts from a picture](#parts-from-a-picture)).
 
 ## What to draw
 
@@ -131,3 +131,83 @@ composition({
 ```
 
 The full example, a postman who loses a letter to the wind, is `examples/postman/` in the flipbook repository.
+
+## Parts from a picture
+
+When the story wants a character drawn by hand (a woodcut, a gouache, a crayon line), take its parts from a picture instead of drawing them in code: a sheet the user made, or one an image model made. `cutout` cuts the sheet into pieces and `puppet` turns the pieces into a rig.
+
+### The sheet
+
+- One character, every part apart from the others with wide gaps, on one flat ground color. All parts at one scale, in profile facing right.
+- The parts of a biped: the torso without arms, the head (plus a blinking head and a talking head to swap in), two upper arms, two forearms, a hand (plus a fist and an open hand), two thighs, two shins with the shoe.
+- **Joints**: where a part tucks under its parent (the top of the forearm, the thigh, the shin, the hand's wrist, the neck), it ends in a round tab of plain fill with no outline around it. The parent's end over it (the elbow, the knee, the collar, the cuff) is drawn with its outline, round, and covers the tab. A tab with an outline, or a ball drawn as a separate knob, shows as a ring at the joint.
+- Also ask for the whole character standing, as a reference to compare the rig with.
+
+To an image model, say it plainly: "a cut-out animation puppet parts sheet", the parts and their count row by row, "every hidden insertion tab is a round extension of solid fill with no black outline", "the upper part's outlined end covers the tab", "background perfectly flat", "no text, labels, guides or fasteners". Give the reference picture of the character along with it. Write the tool and the whole prompt into `assets/SOURCES.json` (see below).
+
+### Rigging it
+
+1. Cut it: `cutout <dir> assets/postman-parts.png --max 20`, and open `out/cutout/postman-parts.png`. The pieces are numbered biggest first.
+2. Write `assets/puppets/<name>/puppet.json`: which piece is which part, and where each joint is.
+3. Rig it: `puppet <dir> <name>`, and open `out/puppet/<name>.png`. It shows every part with its pivot (red) and sockets (blue), and the puppet standing, mid-stride, with its legs passing, mid-stride on the other foot and waving, next to the reference. Fix puppet.json until the joints sit in the tabs and the poses look whole.
+4. Load it in the page with `loadRig()` and build the puppet from it.
+
+An excerpt of the postman's puppet.json, four of its fifteen parts (the whole file is `examples/postman-print/assets/puppets/postman/puppet.json` in the flipbook repository):
+
+```json
+{
+    "version": 1,
+    "reference": "assets/postman-reference.png",
+    "parts": {
+        "torso": {
+            "image": "assets/cut/postman-parts/postman-parts-01.png",
+            "pivot": [165, 240],
+            "sockets": { "neck": [160, 14], "shoulder": [145, 45], "hip": [165, 240] }
+        },
+        "head": { "image": "assets/cut/postman-parts/postman-parts-04.png", "pivot": "bottom" },
+        "armFront": { "image": "assets/cut/postman-parts/postman-parts-08.png", "pivot": "top", "sockets": { "elbow": "bottom" } },
+        "thighFront": { "image": "assets/cut/postman-parts/postman-parts-13.png", "pivot": "top", "sockets": { "knee": "bottom" }, "fit": [1, 1.35] }
+    },
+    "bones": "biped",
+    "map": { "handFront": "hand", "handBack": "hand" }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `parts.<part>.image` | The cut piece, under `assets/` |
+| `pivot`, `sockets.<name>` | `"top"`, `"bottom"`, `"left"` or `"right"`: the round tab at that end, found for you. Or `[x, y]` in the piece's own pixels, for an end that is not round (square, slanted, pointed, a flat cuff), a tab under about 8 px across, or a point in the middle (the torso's neck, shoulder and hip). A point shallower than about 1 in 2 still reads as a rounded end: check the sheet |
+| `angle`, `fit` | As for `part()`: a piece drawn on its side, a piece a little too long |
+| `bones` | `"biped"`, or an array of bones as for `puppet()`: each with `name`, `part`, `z`, and `parent` and `socket` except the one root |
+| `map` | With `"biped"`: bones shown by a part named otherwise, such as both hands by `hand` |
+| `outline` | The width of the outline printed on the pieces, a whole number of pixels. Left out, each part loses the outline it shows itself: an edge of dark ink with lighter fill inside, at most a quarter of the picture's shorter side. A part that shows none (dark all through, no ink at its edge, or under about 12 px across, too small to measure) keeps its pixels, printed line included. Given, it comes off every part, and a part it would shave away entirely is refused |
+| `reference` | The picture of the whole character, shown on the sheet |
+
+The command shaves the printed outline off every piece that shows one (the puppet inks its own, one per group), writes the pieces to `assets/puppets/<name>/parts/`, and writes `assets/puppets/<name>/rig.json`. `puppet-joint-missing` means an end has no round tab: give that joint as `[x, y]`.
+
+```js
+const rig = await loadRig('assets/puppets/postman/rig.json');
+const man = puppet({ ...rig, scale: 0.6, outline: { width: 5, color: '#1e1a1c' } });
+const legs = man.legs();
+```
+
+Everything else is as for parts drawn in code: `walk()` with `...legs`, `swap` for the blinking head and the open hand.
+
+### Where the pictures came from
+
+Every picture under `assets/` needs its entry in `assets/SOURCES.json`, or check fails with `asset-unlicensed`. A picture an image model made has `"license": "generated"`, the `tool` that made it and the whole `prompt`:
+
+```json
+{
+    "postman-parts.png": {
+        "source": "made with an image model from postman-reference.png",
+        "license": "generated",
+        "tool": "<the model or app>",
+        "prompt": "<the whole prompt>"
+    }
+}
+```
+
+`cutout` and `puppet` write the entries of the pieces and parts for you, each with `cutFrom` pointing at the picture it came from, where the tool and prompt are.
+
+The full example, the same postman cut from a generated woodcut sheet, is `examples/postman-print/` in the flipbook repository.

@@ -25,6 +25,7 @@ bash <skill-dir>/scripts/run.sh stock search <dir> beetle plate  # public domain
 bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse:<id> --as beetle
 bash <skill-dir>/scripts/run.sh stock search <dir> page turn --audio  # public domain sounds and music, see references/audio.md
 bash <skill-dir>/scripts/run.sh cutout <dir> assets/beetle.jpg          # every specimen as a transparent PNG, before composing
+bash <skill-dir>/scripts/run.sh puppet <dir> postman                    # rig cut parts into a puppet, see references/characters.md
 ```
 
 Once check has passed its determinism checks (seek order, shifted clock and seed, late paint), render draws on several pages at once (CPU cores minus one, at most 6, fewer for short films or big frames). `--jobs <n>` sets the count. `check` and `snapshot` take `--size` too, and `check` takes `--scale`: check at the size and scale you will render, so text and the safe area are checked in that shape, and render gets parallel pages only after a check at the same size and scale.
@@ -77,7 +78,7 @@ Defaults:
 | music | a score written for this story (`"audio": { "mode": "score", ... }`, see `references/audio.md`) so each film gets its own tune. A preset such as `pluck` for a short, plain clip. Silent only when the user asks |
 | found music or effects | when the user names a recorded piece or an instrument the score lacks, or a real sound matters (a page turn, a pencil): `stock search --audio`, see `references/audio.md` |
 | the user's own music | put the file in `assets/`, ask for its bpm and the second where beat 1 falls. The bpm goes in the top-level `bpm`, the rest in `audio`: `"audio": { "mode": "file", "file": "assets/music.mp3", "bpmOffset": 0.42 }` |
-| characters | none unless the story needs someone to act it out: then a cut-out puppet drawn in code, see `references/characters.md` |
+| characters | none unless the story needs someone to act it out: then a cut-out puppet drawn in code, or cut from a picture of its parts the user gives, see `references/characters.md` |
 | photos | none unless asked, or the film calls for real specimens, plates, micrographs or maps: `references/photo.md` |
 
 ## Hard rules
@@ -103,7 +104,7 @@ Defaults:
 | Read | When |
 |---|---|
 | `references/story.md` | before the first story.json, and when a `story-*` code appears |
-| `references/characters.md` | when the story needs a character: what code draws well, puppet parts and bones, walking, waving, blinking, talking |
+| `references/characters.md` | when the story needs a character: what code draws well, puppet parts and bones, walking, waving, blinking, talking, parts cut from a picture |
 | `references/rules.md` | before the first index.html, and when a determinism, text or layer code is unclear |
 | `references/timeline.md` | before the first timeline.json, and when matching a requested duration |
 | `references/audio.md` | before choosing or writing the music, finding sounds or placing sound effects, and when an `audio-*` code appears |
