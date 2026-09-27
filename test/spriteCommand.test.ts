@@ -376,6 +376,89 @@ describe('flipbook sprite', () => {
         }
     });
 
+    it('cuts a packed sheet by its grid: drawings touching, an empty cell left out', async () => {
+        // A 1 by 4 grid of 24 by 16 cells on a transparent sheet: three figures
+        // fill their cells top to bottom, so each touches the next, outlined in
+        // near black. The last cell is empty.
+        const cut = async (clip: Record<string, unknown>) => {
+            writeSpec(dir, {
+                version: 1,
+                pixel: true,
+                clips: { idle: { image: 'assets/pixel-grid.png', ...clip } },
+            });
+            return runSprite({ dir, name: 'kid', session: await session() });
+        };
+        const report = await cut({ frames: 3, grid: [1, 4] });
+        expect(codes(report)).toEqual([]);
+        const file = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets/sprites/kid/clips.json'), 'utf-8'),
+        ) as SpriteFile;
+        const source = await readRgba(path.join(dir, 'assets/pixel-grid.png'));
+        for (const [i, f] of file.clips.idle.frames.entries()) {
+            expect([f.width, f.height]).toEqual([8, 16]);
+            const frame = await readRgba(path.join(dir, f.file));
+            let wrong = 0;
+            for (let y = 0; y < 16; y++) {
+                for (let x = 0; x < 8; x++) {
+                    const s = ((16 * i + y) * 24 + 8 + x) * 4;
+                    const o = (y * 8 + x) * 4;
+                    for (let c = 0; c < 4; c++) if (frame[o + c] !== source[s + c]) wrong++;
+                }
+            }
+            expect(wrong, `frame ${i + 1}`).toBe(0);
+        }
+        // Some of the cells, and what is wrong said by field.
+        expect(codes(await cut({ frames: 2, grid: [1, 4], cells: [2, 4] }))).toEqual([]);
+        const off = await cut({ frames: 3, grid: [5, 4] });
+        expect(off.failures.map((f) => f.detail?.path)).toEqual(['$.clips.idle.grid']);
+        expect(off.failures[0].message).toContain('24 by 64 px');
+        const count = await cut({ frames: 4, grid: [1, 4] });
+        expect(count.failures[0].message).toContain('hold 3 drawings (empty cells do not count)');
+        const lone = await cut({ frames: 3, cells: [1, 3] });
+        expect(lone.failures.map((f) => f.detail?.path)).toEqual(['$.clips.idle.cells']);
+    });
+
+    it('keeps a cell filled edge to edge on a transparent sheet whole', async () => {
+        // Three 16 px cells: an outlined block and a solid block that fill theirs,
+        // with no clear pixel inside, and a small figure. The sheet's own
+        // transparency is the ground, so nothing of the full cells is cut away.
+        writeSpec(dir, {
+            version: 1,
+            pixel: true,
+            clips: { idle: { image: 'assets/pixel-full.png', frames: 3, grid: [3, 1] } },
+        });
+        const report = await runSprite({ dir, name: 'kid', session: await session() });
+        expect(codes(report)).toEqual([]);
+        const file = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets/sprites/kid/clips.json'), 'utf-8'),
+        ) as SpriteFile;
+        const frames = file.clips.idle.frames;
+        expect(frames.map((f) => [f.width, f.height])).toEqual([
+            [16, 16],
+            [16, 16],
+            [8, 10],
+        ]);
+        expect(frames[0].anchor).toEqual([8, 16]);
+        const source = await readRgba(path.join(dir, 'assets/pixel-full.png'));
+        const at = [
+            [0, 0],
+            [16, 0],
+            [36, 6],
+        ];
+        for (const [i, f] of frames.entries()) {
+            const frame = await readRgba(path.join(dir, f.file));
+            let wrong = 0;
+            for (let y = 0; y < f.height; y++) {
+                for (let x = 0; x < f.width; x++) {
+                    const s = ((at[i][1] + y) * 48 + at[i][0] + x) * 4;
+                    const o = (y * f.width + x) * 4;
+                    for (let c = 0; c < 4; c++) if (frame[o + c] !== source[s + c]) wrong++;
+                }
+            }
+            expect(wrong, `frame ${i + 1}`).toBe(0);
+        }
+    });
+
     it('refuses a height for pixel sprites', async () => {
         writeSpec(dir, {
             version: 1,

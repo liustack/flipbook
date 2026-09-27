@@ -41,6 +41,10 @@ interface ClipSpec {
     paper?: string;
     threshold?: number;
     gap?: number;
+    /** A sheet laid out in equal cells: [columns, rows]. Each cell is a drawing. */
+    grid?: [number, number];
+    /** With grid: the cells to use, [first, last], numbered from 1 in reading order. */
+    cells?: [number, number];
 }
 interface SpriteSpec {
     version: 1;
@@ -52,6 +56,8 @@ interface SpriteSpec {
 
 interface PageClip {
     found: number;
+    /** The grid does not fit the sheet. */
+    gridProblem?: string;
     clipped: number[];
     frames: {
         png: string;
@@ -109,7 +115,18 @@ function validate(
             c.fail(at, 'must be an object with image and frames');
             continue;
         }
-        c.keys(clip, at, ['image', 'frames', 'fps', 'loop', 'walk', 'paper', 'threshold', 'gap']);
+        c.keys(clip, at, [
+            'image',
+            'frames',
+            'fps',
+            'loop',
+            'walk',
+            'paper',
+            'threshold',
+            'gap',
+            'grid',
+            'cells',
+        ]);
         if (c.localFile(clip.image, `${at}.image`)) {
             const rel = (clip.image as string).split(/[\\/]/).join('/');
             const full = path.join(dir, rel);
@@ -132,6 +149,36 @@ function validate(
             c.str(clip.paper, `${at}.paper`, /^#[0-9a-fA-F]{6}$/, 'a color as #rrggbb');
         if (clip.threshold !== undefined) c.int(clip.threshold, `${at}.threshold`, 1, 255);
         if (clip.gap !== undefined) c.num(clip.gap, `${at}.gap`, 0, 0.2);
+        const pair = (v: unknown) =>
+            Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 1);
+        if (clip.grid !== undefined) {
+            if (!pair(clip.grid) || (clip.grid as number[]).some((n) => n > 64)) {
+                c.fail(
+                    `${at}.grid`,
+                    `must be [columns, rows], whole numbers from 1 to 64 (got ${describe(clip.grid)})`,
+                );
+            } else if (clip.gap !== undefined) {
+                c.fail(
+                    `${at}.gap`,
+                    'parts drawings a sheet shows apart, and a grid cuts by cells: leave it out',
+                );
+            }
+        }
+        if (clip.cells !== undefined) {
+            if (clip.grid === undefined) {
+                c.fail(`${at}.cells`, 'numbers the cells of a grid: give grid too');
+            } else if (pair(clip.grid)) {
+                const [cols, rows] = clip.grid as number[];
+                const n = cols * rows;
+                const cells = clip.cells as number[];
+                if (!pair(clip.cells) || cells[0] > cells[1] || cells[1] > n) {
+                    c.fail(
+                        `${at}.cells`,
+                        `must be [first, last], cells numbered 1 to ${n} in reading order, first no later than last (got ${describe(clip.cells)})`,
+                    );
+                }
+            }
+        }
     }
     return c.errors.length > 0
         ? { errors: c.errors }
@@ -206,47 +253,103 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                     // drawing on a big sheet is still a drawing: only pieces much smaller
                     // than a typical drawing (below) are dust. Pixel sheets are packed,
                     // drawings reaching the sheet's edge.
-                    const find = {
-                        paper: c.paper,
-                        threshold: c.threshold,
-                        gap: c.gap ?? 0.004,
-                        minArea: 0,
-                        sheet: o.pixel,
-                        pixelated: o.pixel,
+                    type Target = {
+                        crop: { x: number; y: number; width: number; height: number };
+                        box?: { x: number; y: number; width: number; height: number };
                     };
-                    const found = await rt.specimens(`/${c.image}`, find);
-                    // The drawings are the biggest pieces: a piece counts as one when it is
-                    // at least a third the size of a typical drawing. Anything smaller is dust.
-                    const top = found
-                        .slice(0, c.frames)
-                        .map((f) => f.area)
-                        .sort((a, b) => a - b);
-                    const typical = top.length > 0 ? top[Math.floor(top.length / 2)] : 0;
-                    const drawings = found.filter((f) => f.area >= typical / 3).length;
-                    // Read in order by where each drawing itself lies: the crop's room
-                    // is wide on a big sheet and would blur rows and columns together.
-                    const kept = found
-                        .slice(0, c.frames)
-                        .map((f) => ({ ...f.box, crop: f.crop, box: f.box }));
-                    const ordered = rt.readingOrder(kept);
+                    let ordered: Target[];
+                    let drawings = 0;
+                    if (c.grid) {
+                        // A sheet in equal cells: each cell is a drawing, in reading order,
+                        // however close the drawings sit. Empty cells are found when cut.
+                        const [cols, rows] = c.grid;
+                        const img = new Image();
+                        img.src = `/${c.image}`;
+                        await img.decode();
+                        const sw = img.naturalWidth;
+                        const sh = img.naturalHeight;
+                        if (o.pixel && (sw % cols !== 0 || sh % rows !== 0)) {
+                            clips[clipName] = {
+                                found: 0,
+                                clipped: [],
+                                frames: [],
+                                measured: 0,
+                                gridProblem: `${c.image} is ${sw} by ${sh} px, which does not split into ${cols} by ${rows} cells of whole pixels`,
+                            };
+                            cut[clipName] = [];
+                            continue;
+                        }
+                        const [first, last] = c.cells ?? [1, cols * rows];
+                        ordered = [];
+                        for (let n = first; n <= last; n++) {
+                            const col = (n - 1) % cols;
+                            const row = Math.floor((n - 1) / cols);
+                            ordered.push({
+                                crop: {
+                                    x: col / cols,
+                                    y: row / rows,
+                                    width: 1 / cols,
+                                    height: 1 / rows,
+                                },
+                            });
+                        }
+                    } else {
+                        const find = {
+                            paper: c.paper,
+                            threshold: c.threshold,
+                            gap: c.gap ?? 0.004,
+                            minArea: 0,
+                            sheet: o.pixel,
+                            pixelated: o.pixel,
+                        };
+                        const found = await rt.specimens(`/${c.image}`, find);
+                        // The drawings are the biggest pieces: a piece counts as one when it
+                        // is at least a third the size of a typical drawing. Smaller is dust.
+                        const top = found
+                            .slice(0, c.frames)
+                            .map((f) => f.area)
+                            .sort((a, b) => a - b);
+                        const typical = top.length > 0 ? top[Math.floor(top.length / 2)] : 0;
+                        drawings = found.filter((f) => f.area >= typical / 3).length;
+                        // Read in order by where each drawing itself lies: the crop's room
+                        // is wide on a big sheet and would blur rows and columns together.
+                        const kept = found
+                            .slice(0, c.frames)
+                            .map((f) => ({ ...f.box, crop: f.crop, box: f.box }));
+                        ordered = rt.readingOrder(kept);
+                    }
                     const frames: {
                         canvas: HTMLCanvasElement;
                         m: (typeof cut)[string][number]['m'];
                     }[] = [];
                     const clipped: number[] = [];
                     for (const [i, f] of ordered.entries()) {
-                        const p = await rt.photo(`/${c.image}`, {
-                            crop: f.crop,
-                            cutout: 'paper',
-                            paper: c.paper,
-                            threshold: c.threshold,
-                            // The drawing specimens() found, not a bigger neighbour.
-                            keep: f.box,
-                            sticker: false,
-                            // Pixel art: whole pixels, nothing smoothed, a cell in or out.
-                            ...(o.pixel ? { pixelated: true } : {}),
-                        });
-                        if (p.clipped.length > 0) clipped.push(i);
+                        let p: Awaited<ReturnType<typeof rt.photo>>;
+                        try {
+                            p = await rt.photo(`/${c.image}`, {
+                                crop: f.crop,
+                                // Paper, or the sheet's own transparency when it has
+                                // some: a see-through ground read as paper is black, and
+                                // dark ink reaching the crop's edge would go with it.
+                                cutout: 'auto',
+                                paper: c.paper,
+                                threshold: c.threshold,
+                                // The drawing specimens() found, not a bigger neighbour. A
+                                // grid cell holds one drawing, every piece of it.
+                                keep: f.box ?? 'all',
+                                sticker: false,
+                                // Pixel art: whole pixels, nothing smoothed, a cell in or out.
+                                ...(o.pixel ? { pixelated: true } : {}),
+                            });
+                        } catch (error) {
+                            // An empty cell of a grid: nothing is left once the ground goes.
+                            if (c.grid && /nothing is left/.test(String((error as Error).message)))
+                                continue;
+                            throw error;
+                        }
+                        if (c.grid) drawings++;
+                        // In a grid the cell is the frame: a drawing may touch its edge.
+                        else if (p.clipped.length > 0) clipped.push(i);
                         const w = p.canvas.width;
                         const h = p.canvas.height;
                         const data = (
@@ -483,7 +586,21 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
     for (const [clip, c] of Object.entries(result.clips)) {
         const want = spec.clips[clip].frames;
         const image = spec.clips[clip].image;
-        if (c.found !== want) {
+        const grid = spec.clips[clip].grid;
+        if (c.gridProblem) {
+            failed = true;
+            invalid(`Clip "${clip}": ${c.gridProblem}. Check grid.`, `$.clips.${clip}.grid`, {
+                clip,
+            });
+        } else if (grid && c.found !== want) {
+            failed = true;
+            const [first, last] = spec.clips[clip].cells ?? [1, grid[0] * grid[1]];
+            invalid(
+                `Clip "${clip}": cells ${first} to ${last} of ${image} on a ${grid[0]} by ${grid[1]} grid hold ${c.found} drawings (empty cells do not count), sprite.json asks for ${want}. Check grid, cells and frames.`,
+                `$.clips.${clip}.frames`,
+                { clip, found: c.found, frames: want },
+            );
+        } else if (c.found !== want) {
             failed = true;
             invalid(
                 `Clip "${clip}": ${image} shows ${c.found} separate drawings, sprite.json asks for ${want}. ${c.found < want ? 'Drawings that touch or nearly touch count as one: lower gap (0 keeps close drawings apart), or leave more room between them on the sheet.' : 'Pieces of one drawing count apart: raise gap so they join, or fix frames.'}`,

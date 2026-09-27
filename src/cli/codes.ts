@@ -183,8 +183,8 @@ export const FINDING_CODES = {
     },
     'sprite-invalid': {
         meaning:
-            'flipbook sprite did not start or could not cut a clip: assets/sprites/<name>/sprite.json is missing, is not valid JSON, does not match sprite schema v1, names a sheet outside assets/ or without its source and license (a generated sheet also needs its tool and prompt), shows more or fewer separate drawings than frames says, or has drawings that reach past their crop.',
-        fix: 'Fix the field named in `detail.path` as the message says, see references/characters.md. Too few drawings: those that touch or nearly touch count as one, so lower gap or ask for a sheet with wider gaps. Too many: pieces of one drawing count apart, so raise gap.',
+            'flipbook sprite did not start or could not cut a clip: assets/sprites/<name>/sprite.json is missing, is not valid JSON, does not match sprite schema v1, names a sheet outside assets/ or without its source and license (a generated sheet also needs its tool and prompt), shows more or fewer separate drawings than frames says, has drawings that reach past their crop, or, with grid, holds more or fewer drawings in its cells than frames or, for pixel art, does not split into cells of whole pixels.',
+        fix: 'Fix the field named in `detail.path` as the message says, see references/characters.md. Too few drawings: those that touch or nearly touch count as one, so give grid for a sheet in equal cells, lower gap, or ask for a sheet with wider gaps. Too many: pieces of one drawing count apart, so raise gap.',
     },
     'sprite-drift': {
         meaning:
