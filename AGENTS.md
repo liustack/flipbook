@@ -38,7 +38,7 @@ src/
   stock/           找图找声音：Pexels、Pixabay、Openverse 三家的图片搜索和详情，Openverse 的音频搜索，图片和声音格式嗅探、下载防护（只走 HTTPS、拒内网地址、连接钉在核对过的地址上）
   fonts/           字体清单、码位表、OFL 全文
 scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）、examples-baseline.mjs（记样例的帧摘要）
-skills/flipbook/   SKILL.md（英文）、references/（story、characters、rules、timeline、audio、paper、materials、text、templates、brand、photo、troubleshooting）、scripts/run.sh 和 run.ps1
+skills/flipbook/   SKILL.md（英文）、references/（story、characters、rules、timeline、audio、paper、riso、materials、text、templates、brand、photo、troubleshooting）、scripts/run.sh 和 run.ps1
 docs/              report-schema.md、timeline-schema.md、story-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
 docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
 examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro、long-scroll（三分钟长片）、specimen-board（stock fetch 下的公有领域图版抠成贴纸）、riffle（迈布里奇奔马连拍做成的手翻书，specimens() 自动找格子）、postman（代码画的剪纸纸偶邮差，风把信吹走的故事，puppet() 的样例）、postman-print（同一个故事，部件来自生成的木刻部件图，flipbook puppet 装配），postman-wave（清早的窗里孩子挥手，邮差是生成的逐帧精灵，flipbook sprite 切的），每个例子一份源码加 expected.json，不提交 mp4

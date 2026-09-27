@@ -19,6 +19,7 @@ const outDir = join(root, 'docs', 'samples');
 export const SAMPLES = [
     { name: 'paper', dir: 'docs/samples/src/paper', at: 0.5, width: 960 },
     { name: 'materials', dir: 'docs/samples/src/materials', at: 0.5, width: 960 },
+    { name: 'riso', dir: 'docs/samples/src/riso', at: 0.5, width: 960 },
     { name: 'text', dir: 'docs/samples/src/text', at: 1.5, width: 960 },
     { name: 'templates', dir: 'examples/eggs-five/five', at: 2.6, width: 960 },
     { name: 'page-turn', dir: 'examples/page-turn', at: 6.2, width: 960 },

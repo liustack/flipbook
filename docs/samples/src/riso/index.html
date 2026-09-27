@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>sample: riso</title>
+<style>
+  html, body { margin: 0; width: 960px; height: 540px; overflow: hidden; background: #f3eee3; }
+  canvas { position: absolute; left: 0; top: 0; }
+  #ink { mix-blend-mode: multiply; }
+</style>
+</head>
+<body>
+<canvas id="stock" data-flipbook-layer="paper"></canvas>
+<canvas id="ink"></canvas>
+<canvas id="labels"></canvas>
+<script type="module">
+import { composition, timeline, setupCanvas, drawPaper, riso, RISO_INKS, writeText } from '/__flipbook/runtime.js';
+
+const tl = await timeline();
+const W = tl.width;
+const H = tl.height;
+const ink = setupCanvas(document.getElementById('ink'), W, H);
+const labels = setupCanvas(document.getElementById('labels'), W, H);
+// Three drums: pink printed in grain, blue in halftone, yellow solid. Set a
+// little further off than usual, so the misregistration shows at this size.
+const press = riso(W, H, {
+  seed: tl.seed,
+  misregister: 4,
+  inks: {
+    yellow: { color: RISO_INKS.yellow, screen: 'solid' },
+    pink: { color: RISO_INKS.fluorescentPink, screen: 'grain' },
+    blue: { color: RISO_INKS.blue, screen: 'halftone', cell: 5 },
+  },
+});
+
+function overprint(p) {
+  // A pink sun going down behind blue hills: purple where they cross.
+  p.pink.beginPath();
+  p.pink.arc(160, 250, 105, 0, Math.PI * 2);
+  p.pink.fill();
+  p.blue.beginPath();
+  p.blue.moveTo(20, 420);
+  p.blue.quadraticCurveTo(110, 250, 210, 330);
+  p.blue.quadraticCurveTo(260, 290, 300, 300);
+  p.blue.lineTo(300, 420);
+  p.blue.closePath();
+  p.blue.fill();
+}
+
+function misregistered(p) {
+  // A fish: yellow body, blue line work, printed from two drums that never quite line up.
+  const body = new Path2D();
+  body.ellipse(480, 280, 110, 62, 0, 0, Math.PI * 2);
+  body.moveTo(580, 280);
+  body.lineTo(650, 230);
+  body.lineTo(650, 330);
+  body.closePath();
+  p.yellow.fill(body);
+  p.blue.lineWidth = 6;
+  p.blue.lineJoin = 'round';
+  p.blue.stroke(body);
+  p.blue.beginPath();
+  p.blue.arc(420, 265, 9, 0, Math.PI * 2);
+  p.blue.fill();
+  p.blue.lineWidth = 4;
+  for (const x of [470, 505, 540]) {
+    p.blue.beginPath();
+    p.blue.arc(x - 60, 280, 50, -0.5, 0.5);
+    p.blue.stroke();
+  }
+}
+
+function coverage(p) {
+  // Tints: pink grain and blue dots ramp from paper to solid. Yellow is solid: never quite full, never flat.
+  for (const [plate, y] of [[p.pink, 170], [p.blue, 250]]) {
+    const g = plate.createLinearGradient(700, 0, 930, 0);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 1)');
+    plate.fillStyle = g;
+    plate.fillRect(700, y, 230, 60);
+  }
+  p.yellow.fillRect(700, 330, 230, 90);
+}
+
+composition({
+  setup() {
+    const stock = setupCanvas(document.getElementById('stock'), W, H);
+    drawPaper(stock, W, H, { seed: 4, color: '#f3eee3' });
+  },
+  seek(t) {
+    ink.clearRect(0, 0, W, H);
+    press.print(ink, (p) => {
+      overprint(p);
+      misregistered(p);
+      coverage(p);
+    }, { t });
+    labels.clearRect(0, 0, W, H);
+    for (const [text, x] of [['overprint', 60], ['misregistration', 370], ['coverage, screens', 690]]) {
+      writeText(labels, text, x, 70, { font: '400 22px "LXGW WenKai"', color: '#2b2622' });
+    }
+  },
+});
+</script>
+</body>
+</html>
