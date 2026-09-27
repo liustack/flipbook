@@ -19,11 +19,15 @@ function printed(
     const data = new Uint8ClampedArray(w * h * 4);
     for (let i = 0; i < w * h; i++) data[i * 4 + 3] = Math.round(density * 255);
     screenPlate(data, w, h, screen, { ...grid, seed });
+    // Counted, then checked once: an expect per pixel runs millions of times across the levels.
     let on = 0;
+    let between = 0;
     for (let i = 0; i < w * h; i++) {
-        expect([0, 255]).toContain(data[i * 4 + 3]);
-        if (data[i * 4 + 3] === 255) on++;
+        const a = data[i * 4 + 3];
+        if (a === 255) on++;
+        else if (a !== 0) between++;
     }
+    expect(between).toBe(0);
     return on / (w * h);
 }
 
