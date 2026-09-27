@@ -54,6 +54,44 @@ It fixes three things that go wrong with AI-written web animation: every recordi
 
 > 0.x, so interfaces may change. The default look is paper: a paper ground with grain, handmade materials such as pencil hatching and halftone, handwriting drawn on canvas, and templates that build a glyph out of objects. The default sound is a score the agent writes for each film, played by synthesized instruments (piano, strings, flute, music box and more), plus four sound effects, normalized to -14 LUFS. Three quick presets (pluck, marimba, soft pad) are there for plain clips. You can go silent or bring your own music. Chinese text renders with no missing glyphs.
 
+## Characters and looks
+
+A story needs someone to follow. There are three ways to make one, and they all move on the beat:
+
+- **Cut-paper puppets drawn in code.** `puppet()` hangs paper parts on bones. The walk keeps the planted foot on the ground, and hands and faces swap on cue.
+- **Puppets from a parts sheet.** Draw the parts on one sheet, or have an image model draw them. `flipbook puppet` finds the joints and rigs them: woodcut, gouache, crayon.
+- **Frame-by-frame sprites.** A sheet of whole drawings, from an image model, a game asset pack or your own hand. `flipbook sprite` cuts it and lines the drawings up on the feet. In a walk it follows the planted foot and holds it still, and warns when it cannot. Packed game sheets are cut by their grid.
+
+Paper is the house look, and two more sit beside it. **Riso**: two or three spot inks, overprinted, a little off register, tints printed as grain or halftone dots. **Pixel**: a small grid of cells in a few colors, blown up by a whole number, with a pixel font for the words. On macOS 14 or newer, a photo with a real background can be cut into a paper sticker too, with the Vision framework that comes with the system.
+
+<table>
+<tr>
+<td valign="top">
+
+https://github.com/user-attachments/assets/f942b13d-683a-459b-9f4c-b2b1a6454716
+
+<sub>A woodcut postman rigged from a generated parts sheet. The wind takes his letter and he chases it to the post box. About 17 s.</sub>
+
+</td>
+<td valign="top">
+
+https://github.com/user-attachments/assets/d9371fc1-27c8-4752-b725-7462784b5c25
+
+<sub>A sprite postman from two generated sheets walks past dark windows. One lights up, a child waves, and he waves back. 12 s.</sub>
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
+
+https://github.com/user-attachments/assets/a4ac0370-f154-453a-8777-16283a554194
+
+<sub>A pixel robot waters a mound for three days. On the fourth morning a sprout comes up. 12 s.</sub>
+
+</td>
+</tr>
+</table>
+
 ## Install
 
 Hand this line to your agent:
@@ -120,6 +158,7 @@ Before the 0.3 release, Claude Code with Claude Opus 5.5 ran 8 prompts once each
 | Windows | Not supported, use WSL2. Native Windows exits 78 |
 | Claude Code | Runs inside the sandbox. The first run downloads Chromium and fonts and asks you once to allow it. Everything after that runs inside the sandbox, with no settings to change and no restart |
 | Codex | macOS `workspace-write`: same as Claude Code. On Linux, add `network_access = true` to the Codex config, because Codex's sandbox blocks the socket calls Chromium needs to start. `read-only` mode cannot write files: use `workspace-write` |
+| Photo cutouts | `cutout --subject` needs macOS 14 or newer, as it uses the system's Vision framework. The rest of `cutout`, and everything else, follows the platform rows above |
 | Resources | 1080p rendering needs at least 2 GB of memory and 128 processes. With less it exits 78 with `resource-exhausted` |
 | Model | Needs Claude Opus 5 or a model in its class, in a host that can read images (the agent reviews contact sheets). Gates are set on Claude Opus 5.5 and Claude Opus 5. Published eval numbers so far are for Opus 5.5 |
 
@@ -127,7 +166,7 @@ What each platform was tested on, the sandbox settings and the memory a containe
 
 ## What it does not do
 
-- **3D characters.** Nothing with 3D models or motion capture. Characters are flat cut-out puppets: paper parts on bones, drawn in code.
+- **3D characters.** Nothing with 3D models or motion capture. Characters are flat: cut-out puppets, drawn in code or rigged from a parts sheet, and frame-by-frame sprites.
 - **Editing real footage.** It does not cut video you shot. That is a job for a video editor or ffmpeg.
 - **Video from video models.** Motion is drawn by code, frame by frame. Still images, generated ones included, can be material: a character's parts, a backdrop, a prop, with their source written down in `assets/SOURCES.json`.
 - **Voice-over.** No text-to-speech narration yet, only music and sound effects.
@@ -148,7 +187,9 @@ What each platform was tested on, the sandbox settings and the memory a containe
 | [Timeline](skills/flipbook/references/timeline.md) | Writing timeline.json and hitting a target duration |
 | [Music and sound effects](skills/flipbook/references/audio.md) | Picking a preset, setting dynamics, placing effects, using your own music |
 | [Paper](skills/flipbook/references/paper.md), [materials](skills/flipbook/references/materials.md), [canvas text](skills/flipbook/references/text.md), [templates](skills/flipbook/references/templates.md) | Using the parts of the paper look. Sample sheets are in [docs/samples](docs/samples) |
-| [Photos](skills/flipbook/references/photo.md) | Finding public domain plates, specimen photos and maps, and turning them into paper stickers |
+| [Characters](skills/flipbook/references/characters.md) | Making a character: puppets in code, puppets from a parts sheet, frame-by-frame sprites |
+| [Riso](skills/flipbook/references/riso.md), [pixel](skills/flipbook/references/pixel.md) | Using the riso look or the pixel look |
+| [Photos](skills/flipbook/references/photo.md) | Finding public domain plates, specimen photos and maps, and turning them into paper stickers, photos with a real background included |
 | [Troubleshooting](skills/flipbook/references/troubleshooting.md) | Looking up what a code means and how to fix it |
 | [Report format](docs/report-schema.md) | Parsing the JSON report, its thresholds and the output directory |
 | [timeline.json format](docs/timeline-schema.md) | Looking up every timeline field, its allowed values and how beats become frames |

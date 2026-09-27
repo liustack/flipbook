@@ -54,6 +54,44 @@ flipbook 是一个做讲故事的动画短片的 agent skill。agent 先写故�
 
 > 0.x 阶段，接口可能变。默认是纸感画面（纸底和颗粒、铅笔排线半调等手作材质、画布上的手写字、物件拼字形模板）加 agent 为每条片子写的乐谱配乐（钢琴、弦乐、长笛、八音盒等合成乐器演奏，另有拨弦、马林巴、软铺底三套快捷预设，四种音效，响度统一到 -14 LUFS），也可以换成无声或自己的音乐，中文不缺字。
 
+## 角色和几套皮
+
+故事得有个让人跟着看的角色。有三种做法，都跟着拍子动：
+
+- **代码画的剪纸纸偶**：`puppet()` 把纸做的部件挂在骨骼上，走路时支撑脚踩在地上不滑，手势和表情按节拍换。
+- **部件图装的纸偶**：把部件画在一张图上，自己画或者让生图模型画。`flipbook puppet` 找出关节装好：木刻、水粉、蜡笔都行。
+- **逐帧精灵**：一张表上画好整张的动作，来自生图模型、游戏素材包或者你自己的手。`flipbook sprite` 切开、按脚底对齐，走路时跟着支撑脚让它不动，跟不上时会提醒。排得很紧的游戏素材表按格子切。
+
+纸感是主皮，旁边还有两套。**孔版**：两三种专色叠印，版有点错位，浅色调印成颗粒或网点。**像素**：一小片格子，几种颜色，整数倍放大，字用像素字体。在 macOS 14 或更新的系统上，背景是真实场景的照片也能用系统自带的 Vision 抠成纸贴纸。
+
+<table>
+<tr>
+<td valign="top">
+
+https://github.com/user-attachments/assets/f942b13d-683a-459b-9f4c-b2b1a6454716
+
+<sub>生图模型出的木刻部件图装成的邮差纸偶。风把信吹走，他一路追到邮筒。约 17 秒。</sub>
+
+</td>
+<td valign="top">
+
+https://github.com/user-attachments/assets/d9371fc1-27c8-4752-b725-7462784b5c25
+
+<sub>两张生成的精灵表做的邮差走过一排暗着的窗。一扇窗亮了，窗里的孩子挥手，他也挥手。12 秒。</sub>
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
+
+https://github.com/user-attachments/assets/a4ac0370-f154-453a-8777-16283a554194
+
+<sub>像素小机器人给土包浇了三天水，第四天早上冒出了芽。12 秒。</sub>
+
+</td>
+</tr>
+</table>
+
 ## 安装
 
 把这句话交给你的 agent：
@@ -120,6 +158,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
 | Windows | 不支持，在 WSL2 里用。原生 Windows 退 78 |
 | Claude Code | 沙箱里能跑。首次 check 或 render 要下载 Chromium 和字体，agent 会请你在确认框里点一次允许，之后全在沙箱里跑，不用改设置，也不用重启 |
 | Codex | macOS 的 `workspace-write` 同上。Linux 要在 Codex 配置里加一行 `network_access = true`，因为 Codex 的沙箱把 Chromium 启动要用的 socket 调用挡了。`read-only` 模式不让写文件，用 `workspace-write` |
+| 照片抠图 | `cutout --subject` 要 macOS 14 或更新，用的是系统自带的 Vision 框架。`cutout` 的其他用法和其余功能都按上面几行的平台支持 |
 | 资源 | 1080p 渲染至少 2 GB 内存、128 个进程，不够时退 78 `resource-exhausted` |
 | 模型 | 需要 Claude Opus 5 以上或同级模型，宿主要能读图（agent 要看联系表）。门槛按 Claude Opus 5.5 和 Claude Opus 5 设，目前公布的评测数字是 Opus 5.5 的 |
 
@@ -127,7 +166,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
 
 ## 它不做什么
 
-- **3D 角色**：要三维模型、动捕的那种不做。角色是平面的剪纸纸偶：纸做的部件挂在骨骼上，用代码画。
+- **3D 角色**：要三维模型、动捕的那种不做。角色是平面的：代码画的或部件图装的剪纸纸偶，还有逐帧精灵。
 - **剪真实素材**：你拍的视频它不剪，那是剪辑软件和 ffmpeg 的活。
 - **视频模型出的画面**：画面的运动由代码逐帧画出来。静态图（包括生成的图）可以当素材，比如角色部件、背景、道具，来源记进 `assets/SOURCES.json`。
 - **旁白**：暂时没有 TTS 旁白，只有配乐和音效。
@@ -148,7 +187,9 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
 | [时间轴](skills/flipbook/references/timeline.md) | 写 timeline.json，凑片长 |
 | [配乐和音效](skills/flipbook/references/audio.md) | 挑预设、调和强弱，放音效，用自己的音乐 |
 | [纸](skills/flipbook/references/paper.md)、[材质](skills/flipbook/references/materials.md)、[画布文字](skills/flipbook/references/text.md)、[构图模板](skills/flipbook/references/templates.md) | 纸感画面的各个部件，样张在 [docs/samples](docs/samples) |
-| [图片](skills/flipbook/references/photo.md) | 找公有领域的图鉴、标本照和古地图，抠成纸贴纸 |
+| [角色](skills/flipbook/references/characters.md) | 做角色：代码画的纸偶、部件图装的纸偶、逐帧精灵 |
+| [孔版](skills/flipbook/references/riso.md)、[像素](skills/flipbook/references/pixel.md) | 用孔版或像素的画面 |
+| [图片](skills/flipbook/references/photo.md) | 找公有领域的图鉴、标本照和古地图，抠成纸贴纸，也包括背景是真实场景的照片 |
 | [排错](skills/flipbook/references/troubleshooting.md) | 每个类型码的含义和改法 |
 | [报告格式](docs/report-schema.zh-CN.md) | 解析 JSON 报告、判定阈值、输出目录 |
 | [timeline.json 格式](docs/timeline-schema.zh-CN.md) | timeline 的每个字段、取值范围、拍怎么换算成帧 |
