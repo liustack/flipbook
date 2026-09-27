@@ -70,5 +70,11 @@
         "license": "generated",
         "tool": "Pillow",
         "prompt": "three 8 by 20 pixel figures from top right to bottom left, one per row, a pixel apart, on a 1600 px wide sheet"
+    },
+    "pixel-clear.png": {
+        "source": "drawn by the flipbook tests",
+        "license": "generated",
+        "tool": "Pillow",
+        "prompt": "three 8 by 20 pixel figures outlined in pure black on a transparent sheet, each with a black mark in its own row"
     }
 }

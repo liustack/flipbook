@@ -169,6 +169,36 @@ describe('flipbook cutout', () => {
         }
     });
 
+    it('cuts a plate on a transparent ground by its transparency, keeping dark specimens', async () => {
+        // Dark specimens on a see-through ground whose pixels are black too.
+        const dir = tempDir('cutout');
+        fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
+        fs.writeFileSync(
+            path.join(dir, 'assets', 'plate.svg'),
+            `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260" viewBox="0 0 400 260">
+<circle cx="110" cy="130" r="50" fill="#111111"/>
+<rect x="240" y="80" width="90" height="100" fill="#000000"/>
+</svg>`,
+        );
+        fs.writeFileSync(
+            path.join(dir, 'assets', 'SOURCES.json'),
+            JSON.stringify({
+                'plate.svg': { source: 'https://example.org/plate', license: 'pdm' },
+            }),
+        );
+        const report = await runCutout({
+            dir,
+            image: 'assets/plate.svg',
+            session: await session(),
+        });
+        expect(report.failures).toEqual([]);
+        const out = report.cutout as { kept: { width: number; height: number }[] };
+        expect(out.kept.map((k) => [k.width, k.height])).toEqual([
+            [90, 100],
+            [100, 100],
+        ]);
+    });
+
     it('says so when the ground takes everything, instead of failing', async () => {
         const dir = composition(FAINT);
         const report = await runCutout({

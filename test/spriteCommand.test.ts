@@ -346,6 +346,36 @@ describe('flipbook sprite', () => {
         }
     });
 
+    it('cuts a sheet on a transparent ground by its transparency, black ink and all', async () => {
+        // Three 8 by 20 figures outlined in pure black on a transparent sheet:
+        // the see-through pixels are black too, so read as paper they would
+        // take the outlines with them. No paper is given.
+        writeSpec(dir, {
+            version: 1,
+            pixel: true,
+            clips: { idle: { image: 'assets/pixel-clear.png', frames: 3 } },
+        });
+        const report = await runSprite({ dir, name: 'kid', session: await session() });
+        expect(codes(report)).toEqual([]);
+        const file = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets/sprites/kid/clips.json'), 'utf-8'),
+        ) as SpriteFile;
+        const source = await readRgba(path.join(dir, 'assets/pixel-clear.png'));
+        for (const [i, f] of file.clips.idle.frames.entries()) {
+            expect([f.width, f.height]).toEqual([8, 20]);
+            const frame = await readRgba(path.join(dir, f.file));
+            let wrong = 0;
+            for (let y = 0; y < 20; y++) {
+                for (let x = 0; x < 8; x++) {
+                    const s = ((5 + y) * 60 + [6, 26, 46][i] + x) * 4;
+                    const o = (y * 8 + x) * 4;
+                    for (let c = 0; c < 4; c++) if (frame[o + c] !== source[s + c]) wrong++;
+                }
+            }
+            expect(wrong, `frame ${i + 1}`).toBe(0);
+        }
+    });
+
     it('refuses a height for pixel sprites', async () => {
         writeSpec(dir, {
             version: 1,
