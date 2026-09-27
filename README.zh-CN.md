@@ -97,22 +97,22 @@ https://github.com/user-attachments/assets/a4ac0370-f154-453a-8777-16283a554194
 把这句话交给你的 agent：
 
 ```text
-按 https://github.com/liustack/flipbook/blob/v0.7.5/INSTALL.zh-CN.md 安装 flipbook，装完渲一遍 hello 例子，告诉我结果。
+按 https://github.com/liustack/flipbook/blob/v0.8.0/INSTALL.zh-CN.md 安装 flipbook，装完渲一遍 hello 例子，告诉我结果。
 ```
 
 或者自己装 skill。Claude Code：
 
 ```bash
-npx -y skills add liustack/flipbook#v0.7.5 --skill flipbook --global --agent claude-code -y
+npx -y skills add liustack/flipbook#v0.8.0 --skill flipbook --global --agent claude-code -y
 ```
 
 Codex：
 
 ```bash
-npx -y skills add liustack/flipbook#v0.7.5 --skill flipbook --global --agent codex -y
+npx -y skills add liustack/flipbook#v0.8.0 --skill flipbook --global --agent codex -y
 ```
 
-需要 Node 22.19 起和带 libx264 的 ffmpeg（macOS `brew install ffmpeg`，Debian 和 Ubuntu `sudo apt-get install -y ffmpeg`）。第一次 check 或 render 会下载钉死版本的 Chromium（约 95 MB）和三款字体（两款中文字体和一款像素字体，约 55 MB）到用户缓存目录。想省掉每次 npx 的下载，可以全局装 skill 的渲染器：`npm install -g @liustack/flipbook@0.7.5`。
+需要 Node 22.19 起和带 libx264 的 ffmpeg（macOS `brew install ffmpeg`，Debian 和 Ubuntu `sudo apt-get install -y ffmpeg`）。第一次 check 或 render 会下载钉死版本的 Chromium（约 95 MB）和三款字体（两款中文字体和一款像素字体，约 55 MB）到用户缓存目录。想省掉每次 npx 的下载，可以全局装 skill 的渲染器：`npm install -g @liustack/flipbook@0.8.0`。
 
 ## 从一个想法到一条片
 

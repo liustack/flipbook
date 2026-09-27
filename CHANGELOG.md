@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 - 2026-09-28
 
 ### README 讲清角色和几套皮
 
