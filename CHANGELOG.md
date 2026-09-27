@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### 修复
+
+- **下到的图比说好的小时会说出来**：Openverse 登记的是原图尺寸，有的馆藏其实只给预览图。以前 flipbook 只认得 Flickr、rawpixel 和 Pixabay 这几家，别的一律当作给的是原图：StockSnap 的一张木桌照片搜索结果写着 6144×4069、`servedEdge` 为空，`stock fetch` 实际存下的是 960×636。现在 `stock search` 认出 StockSnap 的预览（长边 960），`stock fetch` 下完以后再和登记的尺寸比一次，明显小了就照样存下，并报新的警告 `stock-smaller`，`detail` 里给出登记的和实际拿到的两个尺寸。
+
 ## 0.8.1 - 2026-09-28
 
 ### 修复
