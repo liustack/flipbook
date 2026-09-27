@@ -37,7 +37,7 @@ The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage
 | `g.line(x0, y0, x1, y1, color)` | a one-cell line, both ends included |
 | `g.circle(cx, cy, r, color)`, `g.disc(cx, cy, r, color)` | a ring, a filled disc |
 | `g.draw(art, x, y, { flip })` | a drawing from `pixelArt()`, top left on cell (x, y) |
-| `g.text(text, x, y, color, { font, align, id, allowOverflow })` | words, the top of the line on row y, see Words |
+| `g.text(text, x, y, color, { font, align, id, allowOverflow, scale })` | words, the top of the line on row y, see Words |
 
 `color` is a palette index (0 is the ground) or a `#rrggbb` color from the palette. Every coordinate is rounded to a whole cell.
 
@@ -74,7 +74,7 @@ Put words on the grid with `g.text()`, never in the DOM over the stage: DOM text
 - It returns the cells it inked, or null when the letters are too thin to ink a single cell: set them larger.
 - Words that would run off the grid throw an error, since the grid cuts them: move them in, shorten them or set them smaller. Pass `allowOverflow: true` only for words sliding in or out on purpose.
 
-- The default font is `400 16px "LXGW WenKai"`: 16 cells tall. Below about 14 cells a Chinese character loses strokes. A pixel font comes later.
+- The default font is the pixel font `"Fusion Pixel 12px Prop zh-Hans"` (`FONTS.pixel`: Chinese, Latin, Japanese and Korean) at 12 cells. It is drawn on a 12 px grid, so each of its pixels lands on one cell and no stroke is lost. For bigger words keep it at 12 and pass `scale: 2` or `3`: each pixel of the letters becomes a block of cells, the same letters bigger. Setting the font at 24 or 36 draws the letters again at that size, which adds a pixel here and there. The other flipbook fonts work from about 14 cells up (`400 16px "LXGW WenKai"`): smaller, a Chinese character loses strokes.
 - Show and hide words a whole character or a whole line at a time (one more character each beat, or on at a cue), not by fading.
 - Keep the text on the ground or a flat color from the palette, and pick an ink from the palette that stands out against it.
 

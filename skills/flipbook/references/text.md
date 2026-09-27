@@ -56,7 +56,7 @@ The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage
 ## Rules
 
 - Call them in every `seek()` that shows the text. Drive `progress` from `cueProgress(tl, t, id)` so the text is complete when its cue settles.
-- Fonts are `"LXGW WenKai"` (400) and `"Noto Serif SC"` (200 to 900). Write the size in px.
+- Fonts are `"LXGW WenKai"` (400) and `"Noto Serif SC"` (200 to 900), and for the pixel look `"Fusion Pixel 12px Prop zh-Hans"` (400, drawn for 12 px: set it at 12 times a whole number). Write the size in px.
 - Keep settled text inside the safe area, as for DOM text.
 
 <!-- check: pass -->
