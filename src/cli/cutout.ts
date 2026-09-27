@@ -30,18 +30,23 @@ export interface CutoutOptions {
     session?: Session;
 }
 
-interface PageResult {
+interface Kept {
+    index: number;
+    png: string;
+    width: number;
+    height: number;
+    crop: { x: number; y: number; width: number; height: number };
+    area: number;
+}
+
+interface Cut {
     found: number;
-    kept: {
-        index: number;
-        png: string;
-        width: number;
-        height: number;
-        crop: unknown;
-        area: number;
-    }[];
+    /** No specimen stood apart, so the plate was cut whole as one. */
+    whole: boolean;
+    kept: Kept[];
     clipped: { index: number; sides: string[] }[];
-    sheet: string | null;
+    /** Specimens the paper cutout left nothing of. */
+    empty: number[];
 }
 
 const SOURCES = path.join('assets', 'SOURCES.json');
@@ -51,6 +56,7 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
     const rb = new ReportBuilder('cutout', dir);
     const ws = Workspace.open(dir);
     const image = options.image.split(path.sep).join('/');
+    const mode = options.mode ?? 'paper';
     const refuse = (message: string) => {
         rb.add(finding('cutout-invalid', message, { element: image, detail: { image } }));
         return rb.finish();
@@ -76,113 +82,37 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
     const sources = read.sources;
     const problem = sourceProblem(sources, key);
     if (problem) return refuse(`${image} ${problem} in assets/SOURCES.json.`);
+    const stem = path.basename(key, path.extname(key));
 
     const session = options.session ?? (await openSession(options.env));
     const tool = await openToolPage(session, dir);
-    let result: PageResult;
+    let cut: Cut;
+    let sheet: string | null = null;
     try {
         rb.report.environment.chromium = session.chromium;
         progress(`cutout: finding specimens on ${image}`);
-        result = await tool.page.evaluate(
-            async (o) => {
-                const rt = (window as unknown as { rt: typeof import('../runtime/index.ts') }).rt;
-                const find = { paper: o.paper, threshold: o.threshold, gap: o.gap };
-                const found = await rt.specimens(o.src, find);
-                const kept: PageResult['kept'] = [];
-                const clipped: PageResult['clipped'] = [];
-                for (const [index, f] of found.slice(0, o.max).entries()) {
-                    const p = await rt.photo(o.src, {
-                        crop: f.crop,
-                        cutout: o.mode,
-                        paper: o.paper,
-                        threshold: o.threshold,
-                        holes: o.holes,
-                        keep: f.box,
-                        size: o.size,
-                        sticker: false,
-                    });
-                    if (p.clipped.length > 0) {
-                        clipped.push({ index, sides: [...p.clipped] });
-                        continue;
-                    }
-                    kept.push({
-                        index,
-                        png: p.canvas.toDataURL('image/png'),
-                        width: p.canvas.width,
-                        height: p.canvas.height,
-                        crop: f.crop,
-                        area: f.area,
-                    });
-                }
-                if (kept.length === 0) return { found: found.length, kept, clipped, sheet: null };
-                // Each cutout on light paper, on dark ground and on a checkerboard, side
-                // by side, so a pale rim, a dark fringe and leftover ground all show.
-                const cellW = 540;
-                const cellH = 240;
-                const cols = 2;
-                const rows = Math.ceil(kept.length / cols);
-                const sheet = document.createElement('canvas');
-                sheet.width = cols * cellW;
-                sheet.height = rows * cellH;
-                const ctx = sheet.getContext('2d') as CanvasRenderingContext2D;
-                const images = await Promise.all(
-                    kept.map(async (k) => {
-                        const img = new Image();
-                        img.src = k.png;
-                        await img.decode();
-                        return img;
-                    }),
-                );
-                images.forEach((img, i) => {
-                    const x0 = (i % cols) * cellW;
-                    const y0 = Math.floor(i / cols) * cellH;
-                    const third = cellW / 3;
-                    ctx.fillStyle = '#efe5d0';
-                    ctx.fillRect(x0, y0, third, cellH);
-                    ctx.fillStyle = '#1e2a28';
-                    ctx.fillRect(x0 + third, y0, third, cellH);
-                    for (let y = 0; y < cellH; y += 12) {
-                        for (let x = 0; x < third; x += 12) {
-                            ctx.fillStyle = (x + y) % 24 === 0 ? '#ffffff' : '#c8c8c8';
-                            ctx.fillRect(x0 + 2 * third + x, y0 + y, 12, 12);
-                        }
-                    }
-                    // One copy on each ground.
-                    const k = Math.min((third * 0.88) / img.width, (cellH * 0.8) / img.height);
-                    const w = img.width * k;
-                    const h = img.height * k;
-                    for (let n = 0; n < 3; n++) {
-                        ctx.drawImage(
-                            img,
-                            x0 + n * third + (third - w) / 2,
-                            y0 + (cellH - h) / 2,
-                            w,
-                            h,
-                        );
-                    }
-                    ctx.fillStyle = '#c8452d';
-                    ctx.font = 'bold 22px sans-serif';
-                    ctx.fillText(String(i + 1).padStart(2, '0'), x0 + 8, y0 + 26);
-                });
-                return { found: found.length, kept, clipped, sheet: sheet.toDataURL('image/png') };
-            },
-            {
-                src: `/${image}`,
-                mode: options.mode ?? 'paper',
-                paper: options.paper,
-                threshold: options.threshold,
-                gap: options.gap,
-                holes: options.holes,
-                max: options.max ?? 12,
-                size: options.size,
-            },
-        );
+        cut = await tool.page.evaluate(cutSpecimens, {
+            src: `/${image}`,
+            mode,
+            paper: options.paper,
+            threshold: options.threshold,
+            gap: options.gap,
+            holes: options.holes,
+            max: options.max ?? 12,
+            size: options.size,
+        });
+        if (cut.kept.length > 0) {
+            sheet = await tool.page.evaluate(
+                drawSheet,
+                cut.kept.map((k) => k.png),
+            );
+        }
     } finally {
         await tool.close();
         if (!options.session) await session.close();
     }
 
-    for (const c of result.clipped) {
+    for (const c of cut.clipped) {
         rb.add(
             finding(
                 'cutout-clipped',
@@ -195,25 +125,30 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
             ),
         );
     }
-    if (result.kept.length === 0) {
+    if (cut.kept.length === 0) {
+        const why = cut.whole
+            ? `No specimen on ${image} stands apart from the others, and cut whole it ${
+                  cut.empty.length > 0
+                      ? 'loses everything with the ground: the ground is not one flat color'
+                      : 'runs off the picture'
+              }.`
+            : `No specimen on ${image} stands apart from the others (${cut.found} found, ${cut.clipped.length} cut by their crop, ${cut.empty.length} lost with the ground).`;
         rb.add(
-            finding(
-                'cutout-none',
-                `No specimen on ${image} stands apart from the others (${result.found} found, ${result.clipped.length} cut by their crop).`,
-                { element: image, detail: { found: result.found } },
-            ),
+            finding('cutout-none', why, {
+                element: image,
+                detail: { found: cut.found, whole: cut.whole, empty: cut.empty.length },
+            }),
         );
         return rb.finish();
     }
 
-    const stem = path.basename(key, path.extname(key));
     const outDir = path.join('assets', 'cut', stem);
     ws.fresh(ws.path(outDir));
     // A rerun replaces the whole set: forget the entries of the old files.
     for (const name of Object.keys(sources)) {
         if (name.startsWith(`cut/${stem}/`)) delete sources[name];
     }
-    const items = result.kept.map((k, i) => {
+    const items = cut.kept.map((k, i) => {
         const name = `${stem}-${String(i + 1).padStart(2, '0')}.png`;
         const file = path.join(outDir, name);
         ws.writeFile(ws.path(file), Buffer.from(k.png.split(',')[1], 'base64'));
@@ -228,12 +163,146 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
     });
     ws.writeFile(
         ws.path(outDir, 'cutout.json'),
-        `${JSON.stringify({ image, mode: options.mode ?? 'paper', paper: options.paper ?? null, items }, null, 2)}\n`,
+        `${JSON.stringify(
+            {
+                image,
+                mode,
+                paper: options.paper ?? null,
+                ...(cut.whole ? { whole: true } : {}),
+                items,
+            },
+            null,
+            2,
+        )}\n`,
     );
     ws.writeFile(ws.path(SOURCES), `${JSON.stringify(sources, null, 4)}\n`);
-    const sheet = path.join('out', 'cutout', `${stem}.png`).split(path.sep).join('/');
-    ws.writeFile(ws.path(sheet), Buffer.from((result.sheet as string).split(',')[1], 'base64'));
-    rb.report.cutout = { image, found: result.found, kept: items, skipped: result.clipped, sheet };
-    rb.report.artifacts.sheet = path.join(dir, sheet);
+    const sheetFile = path.join('out', 'cutout', `${stem}.png`).split(path.sep).join('/');
+    ws.writeFile(ws.path(sheetFile), Buffer.from((sheet as string).split(',')[1], 'base64'));
+    rb.report.cutout = {
+        image,
+        mode,
+        found: cut.found,
+        whole: cut.whole,
+        kept: items,
+        skipped: cut.clipped,
+        sheet: sheetFile,
+    };
+    rb.report.artifacts.sheet = path.join(dir, sheetFile);
     return rb.finish();
+}
+
+// ---------------------------------------------------------------------------
+// In the tool page. These run in the browser, so they reach nothing outside.
+
+/** Paper or ink: the specimens on a plate, or the plate whole when none stands apart. */
+async function cutSpecimens(o: {
+    src: string;
+    mode: 'paper' | 'ink';
+    paper?: string;
+    threshold?: number;
+    gap?: number;
+    holes?: number;
+    max: number;
+    size?: number;
+}): Promise<Cut> {
+    const rt = (window as unknown as { rt: typeof import('../runtime/index.ts') }).rt;
+    const found = await rt.specimens(o.src, {
+        paper: o.paper,
+        threshold: o.threshold,
+        gap: o.gap,
+    });
+    // One subject filling the picture is never a specimen (it could be the
+    // plate's frame): with none found, the picture is tried whole.
+    const whole = found.length === 0;
+    const all = { x: 0, y: 0, width: 1, height: 1 };
+    const tries: { crop: typeof all; box?: typeof all; area: number }[] = whole
+        ? [{ crop: all, area: 1 }]
+        : found.slice(0, o.max);
+    const kept: Kept[] = [];
+    const clipped: Cut['clipped'] = [];
+    const empty: number[] = [];
+    for (const [index, f] of tries.entries()) {
+        let p: Awaited<ReturnType<typeof rt.photo>>;
+        try {
+            p = await rt.photo(o.src, {
+                crop: whole ? undefined : f.crop,
+                cutout: o.mode,
+                paper: o.paper,
+                threshold: o.threshold,
+                holes: o.holes,
+                // The specimen specimens() found, never a neighbour in its crop.
+                keep: f.box ?? 'largest',
+                size: o.size,
+                sticker: false,
+            });
+        } catch (error) {
+            // The ground took everything: the picture is not a plate on flat paper.
+            if (/nothing is left/.test(String((error as Error).message))) {
+                empty.push(index);
+                continue;
+            }
+            throw error;
+        }
+        if (p.clipped.length > 0) {
+            clipped.push({ index, sides: [...p.clipped] });
+            continue;
+        }
+        kept.push({
+            index,
+            png: p.canvas.toDataURL('image/png'),
+            width: p.canvas.width,
+            height: p.canvas.height,
+            crop: f.crop,
+            area: f.area,
+        });
+    }
+    return { found: found.length, whole, kept, clipped, empty };
+}
+
+/**
+ * Each cutout on light paper, on dark ground and on a checkerboard, side by
+ * side, so a pale rim, a dark fringe and leftover ground all show.
+ */
+async function drawSheet(pngs: string[]): Promise<string> {
+    const cellW = 540;
+    const cellH = 240;
+    const cols = 2;
+    const rows = Math.ceil(pngs.length / cols);
+    const sheet = document.createElement('canvas');
+    sheet.width = cols * cellW;
+    sheet.height = rows * cellH;
+    const ctx = sheet.getContext('2d') as CanvasRenderingContext2D;
+    const images = await Promise.all(
+        pngs.map(async (png) => {
+            const img = new Image();
+            img.src = png;
+            await img.decode();
+            return img;
+        }),
+    );
+    images.forEach((img, i) => {
+        const x0 = (i % cols) * cellW;
+        const y0 = Math.floor(i / cols) * cellH;
+        const third = cellW / 3;
+        ctx.fillStyle = '#efe5d0';
+        ctx.fillRect(x0, y0, third, cellH);
+        ctx.fillStyle = '#1e2a28';
+        ctx.fillRect(x0 + third, y0, third, cellH);
+        for (let y = 0; y < cellH; y += 12) {
+            for (let x = 0; x < third; x += 12) {
+                ctx.fillStyle = (x + y) % 24 === 0 ? '#ffffff' : '#c8c8c8';
+                ctx.fillRect(x0 + 2 * third + x, y0 + y, 12, 12);
+            }
+        }
+        const k = Math.min((third * 0.88) / img.width, (cellH * 0.8) / img.height);
+        const w = img.width * k;
+        const h = img.height * k;
+        for (let n = 0; n < 3; n++) {
+            ctx.drawImage(img, x0 + n * third + (third - w) / 2, y0 + (cellH - h) / 2, w, h);
+        }
+        ctx.fillStyle = '#c8452d';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.fillText(String(i + 1).padStart(2, '0'), x0 + 8, y0 + 26);
+    });
+    return sheet.toDataURL('image/png');
 }

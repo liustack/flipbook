@@ -193,8 +193,8 @@ export const FINDING_CODES = {
     },
     'cutout-none': {
         meaning:
-            'flipbook cutout found no specimen standing apart on the plate: they touch one another (tentacles, spines), or the ground color is wrong.',
-        fix: 'Use the plate whole with cutout: none and move the camera over it, pass --paper with the ground color, or search for a plate whose specimens stand apart.',
+            'flipbook cutout cut nothing: no specimen on the plate stands apart (they touch one another, or the ground color is wrong) and the picture cut whole lost everything with the ground or ran off the picture.',
+        fix: 'Use the picture whole with cutout: none and move the camera over it, pass --paper with the ground color, or search for a picture whose subjects stand apart.',
     },
     'cutout-clipped': {
         meaning:

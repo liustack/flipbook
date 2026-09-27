@@ -258,9 +258,9 @@ Fix: Look at the drawing on the sheet (out/sprite/<name>.png, drawn on pink). Le
 
 ### `cutout-none`
 
-flipbook cutout found no specimen standing apart on the plate: they touch one another (tentacles, spines), or the ground color is wrong.
+flipbook cutout cut nothing: no specimen on the plate stands apart (they touch one another, or the ground color is wrong) and the picture cut whole lost everything with the ground or ran off the picture.
 
-Fix: Use the plate whole with cutout: none and move the camera over it, pass --paper with the ground color, or search for a plate whose specimens stand apart.
+Fix: Use the picture whole with cutout: none and move the camera over it, pass --paper with the ground color, or search for a picture whose subjects stand apart.
 
 ### `cutout-clipped`
 

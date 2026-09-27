@@ -169,7 +169,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `stock-rejected` | stock fetch | 文件没存：id 不存在、许可不是 `cc0` 或 `pdm`（Openverse）、地址不是公网 HTTPS、文件不是图片（上限 40 MB）或不是 ffmpeg 读得了的 mp3、Ogg、FLAC、WAV 声音（上限 60 MB）。`detail.reason` 是 `not-found`、`license`、`unsafe-url`、`not-image`、`not-audio` 或 `too-large` | 从 stock search 的结果里另挑一个 |
 | `asset-conflict` | stock fetch | 文件没存：`assets/` 里已有别的图（存声音时是别的声音）用了这个名字（`detail.reason` 为 `name-taken`），或 `assets/SOURCES.json` 不是读得出的 JSON 对象（`sources-invalid`） | 换个 `--as` 名字，或修好 `assets/SOURCES.json` |
 | `cutout-invalid` | cutout | 一张都没抠：图不存在、在合成目录外或不在 `assets/` 下，或 `assets/SOURCES.json` 里没有它的来源和许可（生成的图还要有工具和提示词），或这个文件不是合法 JSON | 用 `stock fetch` 存下的图，或先补上来源和许可 |
-| `cutout-none` | cutout | 图版上没有一个标本是单独分得开的：彼此连着（触手、长刺），或底色给错了。`detail.found` 是被整组拒掉之前找到的组数 | 整张图版用 `cutout: 'none'` 靠镜头动，或给 `--paper`，或换一张图版 |
+| `cutout-none` | cutout | 什么都没抠出来。图版上没有一个标本是单独分得开的（彼此连着，或底色给错了），整张图当一块抠又被底色吃光或跑出了画面。`detail.found` 是找到的组数，`detail.whole` 是有没有试过整张抠，`detail.empty` 是被底色整个吃掉的个数 | 整张图用 `cutout: 'none'` 靠镜头动，或给 `--paper`，或换一张图 |
 | `cutout-clipped` | cutout，警告 | 有个标本超出了它的裁剪框，没收：抠出来会有一条直边。`detail.index` 和 `detail.sides` 说是哪个、哪边 | 收下的够用就不用管。不够就调大 `--gap`，或整张用 |
 | `puppet-invalid` | puppet | 什么都没装配：`assets/puppets/<name>/puppet.json` 不存在、不是合法 JSON 或不合 puppet v1，某个部件的图不在 `assets/` 下或它在 `assets/SOURCES.json` 里的条目不全（同 `asset-unlicensed`），或骨骼接不起来（缺接口、缺部件、不止一个根）。`detail.path` 是出错的字段 | 按提示改那个字段。puppet.json 的写法见 [references/characters.md](../skills/flipbook/references/characters.md) |
 | `puppet-joint-missing` | puppet | 部件指定的那一头找不到圆形关节舌：那头是方的或参差的，或者舌头在另一边。`detail.part`、`detail.joint` 和 `detail.side` 说是哪里。什么都不写 | 把这个关节写成部件自己像素里的 `[x, y]`，从抠好的图上量，或者改成舌头所在的那一边 |
@@ -302,17 +302,19 @@ id 或 `--as` 的名字写错，什么都不下载就退 2。Pexels 或 Pixabay 
 
 ### cutout
 
-`flipbook cutout <dir> <image>` 在渲染之前把 `assets/` 下一张图版上的标本都抠出来。它在一个只加载运行时库和合成目录文件的空白页面里（不跑合成的 `index.html`）调运行时的 `specimens()` 和 `photo()`，每个标本只留它自己（落在它自己框里最多的那一块，不会换成裁剪框带进来的邻居），裁剪框仍然切到的不收。选项：`--ink` 线稿模式，`--paper #rrggbb` 指定底色，`--threshold`，`--gap`（默认 `0.012`，`0` 表示一点不合并），`--holes`，`--max`（默认 12），`--size`（默认按图版上的原尺寸，最大 1200）。
+`flipbook cutout <dir> <image>` 在渲染之前把 `assets/` 下一张图版上的标本都抠出来。它在一个只加载运行时库和合成目录文件的空白页面里（不跑合成的 `index.html`）调运行时的 `specimens()` 和 `photo()`，每个标本只留它自己（落在它自己框里最多的那一块，不会换成裁剪框带进来的邻居），裁剪框仍然切到的不收。一个单独分得开的标本都没有时（一个主体占满整张图，或者标本彼此连着），把整张图当一块来抠，报告里 `cutout.whole` 为真。选项：`--ink` 线稿模式，`--paper #rrggbb` 指定底色，`--threshold`，`--gap`（默认 `0.012`，`0` 表示一点不合并），`--holes`，`--max`（默认 12），`--size`（默认按图版上的原尺寸，最大 1200）。
 
 - 抠图是透明 PNG：`assets/cut/<name>/<name>-01.png`、`-02.png` ……，大的在前。重跑整组替换。
-- `assets/cut/<name>/cutout.json` 列出每个抠图和它来自的裁剪框、面积。
+- `assets/cut/<name>/cutout.json` 列出每个抠图和它来自的裁剪框、面积，还有 `mode`，整张抠时的 `whole`。
 - `assets/SOURCES.json` 给每个抠图记一条 `"cut/<name>/<name>-01.png": { "source", "license", "cutFrom" }`，来源和许可沿用图版的。图版自己要先有条目。
 - `out/cutout/<name>.png` 把每个抠图分别放在浅纸、深底和棋盘格上，用之前先看这张。
 
 | 字段 | 说明 |
 |---|---|
 | `cutout.image` | 图版 |
+| `cutout.mode` | `paper` 或 `ink` |
 | `cutout.found` | 找到的标本数 |
+| `cutout.whole` | 一个标本都分不开、整张图当一块抠时为真 |
 | `cutout.kept` | 写下的抠图：`file`、`width`、`height`（像素）、`crop`（占图版的比例）、`area`（占图版面积的比例） |
 | `cutout.skipped` | 被裁剪框切到而没收的：`index`、`sides` |
 | `cutout.sheet`、`artifacts.sheet` | 联系表 |

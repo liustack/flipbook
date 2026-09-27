@@ -36,7 +36,8 @@ bash <skill-dir>/scripts/run.sh cutout <dir> assets/medusae.jpg --paper '#09330b
 - Open that sheet and pick by looking: a clean cutout has no pale rim on the dark ground, no dark fringe on the light paper and no leftover ground on the checkerboard. Leave out the rest.
 - In the composition, `photo('assets/cut/beetle/beetle-01.png')` takes the file's transparency as it is (`'auto'` becomes `'alpha'`) and only adds the sticker: nothing is cut while rendering.
 - `--ink` is for line art (engravings, pen drawings): the paper turns transparent and the lines keep their weight. `--paper` and `--threshold` set the ground on dark plates, `--holes` clears ground enclosed by a specimen, `--gap` (default `0.012` of the long edge) joins pieces that belong together.
-- `cutout-none` means no specimen stands apart: use the plate whole (see below). `cutout-clipped` warnings name specimens that were left out because their crop cut through them.
+- When no specimen stands apart (one subject filling the picture, or specimens that touch), the picture is cut whole as one piece and the report says `whole`. Look at the sheet: a cluster of touching specimens comes out as one piece.
+- `cutout-none` means even that cut nothing: use the picture whole (see below). `cutout-clipped` warnings name specimens that were left out because their crop cut through them.
 
 ## photo() in the composition
 

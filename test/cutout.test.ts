@@ -32,6 +32,18 @@ const JOINED = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260"
 <circle cx="40" cy="230" r="14"/><circle cx="360" cy="230" r="14"/><circle cx="200" cy="130" r="20"/></g>
 </svg>`;
 
+// One subject filling the picture, on white: no specimen stands apart.
+const WHOLE = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260" viewBox="0 0 400 260">
+<rect width="400" height="260" fill="#ffffff"/>
+<ellipse cx="200" cy="130" rx="170" ry="110" fill="#d9822b"/>
+</svg>`;
+
+// A faint mark on paper: the paper cutout takes it with the ground.
+const FAINT = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260" viewBox="0 0 400 260">
+<rect width="400" height="260" fill="#efe6d2"/>
+<circle cx="200" cy="130" r="90" fill="#e6ddc9"/>
+</svg>`;
+
 function composition(svg: string, sources = true): string {
     const dir = tempDir('cutout');
     fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
@@ -110,13 +122,34 @@ describe('flipbook cutout', () => {
         expect(report.failures[0].element).toBe('assets/SOURCES.json');
     });
 
-    it('says so when the specimens are joined and none can be cut out alone', async () => {
-        const dir = composition(JOINED);
+    it('cuts the picture whole when no specimen stands apart', async () => {
+        for (const svg of [WHOLE, JOINED]) {
+            const dir = composition(svg);
+            const report = await runCutout({
+                dir,
+                image: 'assets/plate.svg',
+                session: await session(),
+            });
+            expect(report.failures).toEqual([]);
+            const out = report.cutout as { whole: boolean; kept: { width: number }[] };
+            expect(out.whole).toBe(true);
+            expect(out.kept).toHaveLength(1);
+            const sidecar = JSON.parse(
+                fs.readFileSync(path.join(dir, 'assets/cut/plate/cutout.json'), 'utf-8'),
+            );
+            expect(sidecar.whole).toBe(true);
+        }
+    });
+
+    it('says so when the ground takes everything, instead of failing', async () => {
+        const dir = composition(FAINT);
         const report = await runCutout({
             dir,
             image: 'assets/plate.svg',
             session: await session(),
         });
         expect(codes(report)).toEqual(['cutout-none']);
+        expect(report.failures[0].message).toContain('loses everything with the ground');
+        expect(fs.existsSync(path.join(dir, 'assets/cut'))).toBe(false);
     });
 });
