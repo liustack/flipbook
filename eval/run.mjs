@@ -32,7 +32,7 @@ const cli = join(repoRoot, 'dist', 'main.js');
 
 /** Appended to every prompt: the run is unattended. */
 export const UNATTENDED =
-    '\n\n（这是无人值守的评测：不要提问，没说的按默认值，做完就交付成片路径。）';
+    '\n\n（这是无人值守的评测：没有人会回答问题，不要提问，没说的按默认值。做完交付成片路径，没交付就说明原因。）';
 
 const HOSTS = {
     'claude-code': {
