@@ -34,7 +34,7 @@ src/
   skillPin.ts      读各宿主 skill 副本钉的版本
   cli/             doctor、check、snapshot、audio、render、stock、cutout、puppet（抠好的部件装成纸偶）、报告和类型码
   engine/          浏览器、页面、时钟、timeline、故事（story.ts）、JSON 校验工具（schema.ts）、截帧、编码、验收、字体和自带字体、品牌资产、缓存、扫描、配乐合成和混音（含文件音效 audioFiles.ts）、图片来源核对（assetSources.ts）、抠图用的工具页、渲染进程监视
-  runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、photo、puppet、rig（部件找关节、削描边、读 rig.json）、audio）
+  runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、photo、puppet、rig（部件找关节、削描边、读 rig.json）、sprite（逐帧精灵）、audio）
   stock/           找图找声音：Pexels、Pixabay、Openverse 三家的图片搜索和详情，Openverse 的音频搜索，图片和声音格式嗅探、下载防护（只走 HTTPS、拒内网地址、连接钉在核对过的地址上）
   fonts/           字体清单、码位表、OFL 全文
 scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）、examples-baseline.mjs（记样例的帧摘要）

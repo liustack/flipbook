@@ -110,6 +110,24 @@ export {
 export type { RigFile, Side } from './rig.ts';
 export { findTab, loadRig, outlineWidth, shave } from './rig.ts';
 export type {
+    FrameMeasure,
+    Sprite,
+    SpriteClip,
+    SpriteDrawOptions,
+    SpriteFile,
+    SpriteFrame,
+    SpriteOptions,
+} from './sprite.ts';
+export {
+    groundRuns,
+    loadSprite,
+    measureFrame,
+    plantedWalk,
+    readingOrder,
+    sprite,
+    walkStride,
+} from './sprite.ts';
+export type {
     ArcCuts,
     ArcCutsOptions,
     ArcGeometry,
