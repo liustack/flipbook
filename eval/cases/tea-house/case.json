@@ -1,0 +1,38 @@
+{
+    "id": "tea-house",
+    "title": "茶室宣传片，资产散在工作区里",
+    "asks": ["story", "film", "brand"],
+    "prompt": "给我们茶室做一条 20 秒的宣传片，三款招牌茶和外卖服务都介绍一下。资料都在工作区里。",
+    "workspace": {
+        "README.md": {
+            "generator": "copy",
+            "from": "files/README.md"
+        },
+        "site/styles.css": {
+            "generator": "copy",
+            "from": "files/site/styles.css"
+        },
+        "site/img/logo.svg": {
+            "generator": "copy",
+            "from": "files/site/img/logo.svg"
+        }
+    },
+    "expect": {
+        "durationSec": [19, 21],
+        "width": 1920,
+        "height": 1080,
+        "audio": "score",
+        "uses": ["brand("],
+        "brand": {
+            "name": "潮汐茶室",
+            "primary": "#1f6f78",
+            "palette": ["#1f6f78", "#e0a94a", "#1c2326", "#f1ece2", "#3a8fb7"],
+            "logo": "site/img/logo.svg"
+        },
+        "review": [
+            "片子讲的是一个故事，茶或外卖推动故事，不是三款茶加外卖挨个亮相",
+            "茶室的名字和 logo 出现在片子里，颜色取自 brand()",
+            "没有照单逐条介绍时，交付的回复里说明了为什么这样做"
+        ]
+    }
+}

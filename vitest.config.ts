@@ -37,7 +37,7 @@ export default defineConfig({
                 extends: true,
                 test: {
                     name: 'unit',
-                    include: ['test/**/*.test.ts', 'scripts/**/*.test.mjs'],
+                    include: ['test/**/*.test.ts', 'scripts/**/*.test.mjs', 'eval/**/*.test.mjs'],
                     exclude: [E2E, RELEASE],
                 },
             },

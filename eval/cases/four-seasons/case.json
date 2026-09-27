@@ -1,0 +1,31 @@
+{
+    "id": "four-seasons",
+    "title": "一年四季，跟着用户的曲子",
+    "asks": ["story", "film"],
+    "prompt": "用我放在 assets/music.wav 的曲子（96 BPM，第一拍在 0.5 秒）做一条 20 秒的短片，讲一年四季，春夏秋冬都要有。",
+    "workspace": {
+        "assets/music.wav": {
+            "generator": "clicks",
+            "bpm": 96,
+            "offsetSec": 0.5,
+            "seconds": 30
+        }
+    },
+    "expect": {
+        "durationSec": [19, 21],
+        "width": 1920,
+        "height": 1080,
+        "audio": "file",
+        "timeline": {
+            "bpm": 96,
+            "audio.bpmOffset": 0.5
+        },
+        "uses": ["paperLayer(|drawPaper("],
+        "review": [
+            "有一个主体贯穿四季、在变，四季是它的经历，不是四张并排的季节画",
+            "转折是一件出了岔子或改了方向的事，不是「冬天来了」这种按顺序往下排",
+            "春夏秋冬四季在画面上都认得出来",
+            "换季落在小节线上，跟着曲子走"
+        ]
+    }
+}

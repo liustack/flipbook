@@ -5,10 +5,10 @@
 //
 //   node eval/run.mjs --dry-run                     validate cases, hosts, install
 //   node eval/run.mjs                               every case, default targets, 1 run
-//   node eval/run.mjs --target flagship --runs 2 countdown city-bars
+//   node eval/run.mjs --target flagship --runs 2 waiting pigeons
 //   node eval/run.mjs --model claude-code:claude-opus-5 --timeout-min 20
 //
-// Criteria for the verdict are in docs/eval.md.
+// What a case checks and how a run is judged: eval/judge.mjs and docs/eval.md.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -20,11 +20,13 @@ import {
     readdirSync,
     readFileSync,
     rmSync,
+    statSync,
     writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspect, judge, sha256File, validateCase, workspaceSource } from './judge.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
@@ -33,6 +35,9 @@ const cli = join(repoRoot, 'dist', 'main.js');
 /** Appended to every prompt: the run is unattended. */
 export const UNATTENDED =
     '\n\n（这是无人值守的评测：没有人会回答问题，不要提问，没说的按默认值。做完交付成片路径，没交付就说明原因。）';
+
+/** Minutes a run may take when neither the case nor --timeout-min says otherwise. */
+const DEFAULT_TIMEOUT_MIN = 30;
 
 const HOSTS = {
     'claude-code': {
@@ -108,7 +113,7 @@ function parseArgs(argv) {
         runs: 1,
         targets: [],
         models: [],
-        timeoutMin: 30,
+        timeoutMin: null,
         keep: false,
         ids: [],
     };
@@ -125,6 +130,8 @@ function parseArgs(argv) {
     }
     if (!Number.isInteger(opts.runs) || opts.runs < 1)
         throw new Error('--runs takes a positive integer');
+    if (opts.timeoutMin !== null && !(opts.timeoutMin > 0))
+        throw new Error('--timeout-min takes a positive number of minutes');
     return opts;
 }
 
@@ -146,38 +153,25 @@ function loadMatrix(opts) {
     return matrix;
 }
 
-const CASE_FIELDS = ['id', 'title', 'prompt', 'expect'];
-
 function loadCases(ids) {
     const casesDir = join(evalDir, 'cases');
-    return readdirSync(casesDir, { withFileTypes: true })
-        .filter((d) => d.isDirectory() && (ids.length === 0 || ids.includes(d.name)))
+    const found = readdirSync(casesDir, { withFileTypes: true }).filter((d) => d.isDirectory());
+    const unknown = ids.filter((id) => !found.some((d) => d.name === id));
+    if (unknown.length > 0) throw new Error(`No case ${unknown.join(', ')} in eval/cases`);
+    return found
+        .filter((d) => ids.length === 0 || ids.includes(d.name))
         .map((d) => {
-            const spec = JSON.parse(readFileSync(join(casesDir, d.name, 'case.json'), 'utf-8'));
-            const problems = CASE_FIELDS.filter((field) => spec[field] === undefined).map(
-                (f) => `missing ${f}`,
-            );
-            if (spec.id !== d.name) problems.push(`id "${spec.id}" does not match the directory`);
-            const range = spec.expect?.durationSec;
-            if (!Array.isArray(range) || range.length !== 2 || range[0] >= range[1])
-                problems.push('expect.durationSec must be [min, max]');
-            if (!['none', 'preset', 'file'].includes(spec.expect?.audio))
-                problems.push('expect.audio must be "none", "preset" or "file"');
-            for (const [rel, item] of Object.entries(spec.workspace ?? {})) {
-                if (item.generator === 'copy') {
-                    if (!existsSync(join(casesDir, d.name, item.from ?? '')) || !item.from)
-                        problems.push(`workspace ${rel}: no file ${item.from} in the case`);
-                } else if (item.generator !== 'clicks') {
-                    problems.push(`workspace ${rel}: unknown generator ${item.generator}`);
-                }
+            const caseDir = join(casesDir, d.name);
+            let spec;
+            try {
+                spec = JSON.parse(readFileSync(join(caseDir, 'case.json'), 'utf-8'));
+            } catch (error) {
+                return { name: d.name, spec: null, problems: [`case.json: ${error.message}`] };
             }
+            const problems = validateCase(spec, { name: d.name, caseDir, repoRoot });
             return { name: d.name, spec, problems };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function sha256File(file) {
-    return createHash('sha256').update(readFileSync(file)).digest('hex');
 }
 
 function commandVersion(bin, args = ['--version']) {
@@ -253,7 +247,11 @@ function envWithBin(dir) {
     return env;
 }
 
-/** A fresh workspace with the repository's skill and a `flipbook` shim on PATH. */
+/**
+ * A fresh workspace with the repository's skill, a `flipbook` shim on PATH
+ * and the case's files, with the size and sha256 of each of those files as
+ * they were before the host started.
+ */
 function prepareWorkspace(entry, host) {
     const ws = mkdtempSync(join(tmpdir(), `flipbook-eval-${entry.name}-`));
     for (const skillDir of HOSTS[host].skillDirs) {
@@ -264,15 +262,19 @@ function prepareWorkspace(entry, host) {
     const bin = join(ws, '.eval-bin');
     mkdirSync(bin, { recursive: true });
     writeShims(bin);
-    for (const [rel, spec] of Object.entries(entry.spec.workspace ?? {})) {
+    const files = {};
+    for (const [rel, item] of Object.entries(entry.spec.workspace ?? {})) {
         const file = join(ws, rel);
         mkdirSync(dirname(file), { recursive: true });
-        if (spec.generator === 'clicks') makeClicks(file, spec);
-        else if (spec.generator === 'copy')
-            cpSync(join(evalDir, 'cases', entry.name, spec.from), file);
-        else throw new Error(`${entry.name}: unknown workspace generator ${spec.generator}`);
+        if (item.generator === 'clicks') makeClicks(file, item);
+        else
+            cpSync(
+                workspaceSource(item, { caseDir: join(evalDir, 'cases', entry.name), repoRoot }),
+                file,
+            );
+        files[rel] = { size: statSync(file).size, sha256: sha256File(file) };
     }
-    return { ws, bin };
+    return { ws, bin, files };
 }
 
 function findCompositions(ws) {
@@ -361,44 +363,6 @@ function readJsonText(text) {
     }
 }
 
-function judge(spec, evidence) {
-    const reasons = [];
-    const e = spec.expect;
-    if (evidence.host.timedOut) reasons.push('host timed out');
-    else if (evidence.host.exitCode !== 0) reasons.push(`host exited ${evidence.host.exitCode}`);
-    if (evidence.compositions.length !== 1)
-        reasons.push(`${evidence.compositions.length} compositions found, expected 1`);
-    const c = evidence.compositions[0];
-    if (c) {
-        if (!c.video) reasons.push('no out/video.mp4');
-        if (!c.lastRender?.ok) reasons.push('last render report is missing or not ok');
-        if (c.lastRender?.stop || c.lastCheck?.stop)
-            reasons.push('the CLI asked the agent to stop');
-        if (c.recheck.exitCode !== 0)
-            reasons.push(`independent check exited ${c.recheck.exitCode}`);
-        if (c.probe) {
-            const [min, max] = e.durationSec;
-            if (c.probe.durationSec < min || c.probe.durationSec > max)
-                reasons.push(
-                    `duration ${c.probe.durationSec.toFixed(2)} s outside [${min}, ${max}]`,
-                );
-            if (e.width && (c.probe.width !== e.width || c.probe.height !== e.height))
-                reasons.push(`size ${c.probe.width}x${c.probe.height}`);
-            if (e.audio !== 'none' && !c.probe.audio) reasons.push('no audio track');
-        }
-        if (e.audio !== 'none' && c.audioMode !== e.audio)
-            reasons.push(`timeline audio.mode is "${c.audioMode}", expected "${e.audio}"`);
-        const missingText = (e.textInSource ?? []).filter((text) => !c.source.includes(text));
-        if (missingText.length > 0)
-            reasons.push(`text missing from the source: ${missingText.join(', ')}`);
-    }
-    return {
-        oneShot: reasons.length === 0,
-        reasons,
-        humanReview: { silentBadFilm: null, movingSlides: null, notes: '' },
-    };
-}
-
 function runHost(target, prompt, ws, bin, timeoutMin) {
     const host = HOSTS[target.host];
     return new Promise((resolve) => {
@@ -435,9 +399,10 @@ function runHost(target, prompt, ws, bin, timeoutMin) {
 
 async function runOnce(entry, target, run, opts, info, resultsDir) {
     const prompt = `${entry.spec.prompt}${UNATTENDED}`;
-    const { ws, bin } = prepareWorkspace(entry, target.host);
+    const timeoutMin = opts.timeoutMin ?? entry.spec.timeoutMin ?? DEFAULT_TIMEOUT_MIN;
+    const { ws, bin, files: workspaceFiles } = prepareWorkspace(entry, target.host);
     process.stderr.write(`eval: ${entry.name} x ${target.name} run ${run} in ${ws}\n`);
-    const host = await runHost(target, prompt, ws, bin, opts.timeoutMin);
+    const host = await runHost(target, prompt, ws, bin, timeoutMin);
     const compositions = findCompositions(ws).map((dir) => {
         const video = join(dir, 'out', 'video.mp4');
         const sheet = join(dir, 'out', 'contact-sheet.png');
@@ -454,16 +419,15 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
             lastRender: readJson(join(dir, '.flipbook', 'reports', 'render.json')),
             attempts: readJson(join(dir, '.flipbook', 'attempts.json')),
             recheck: recheck(dir),
-            audioMode: readJson(join(dir, 'timeline.json'))?.audio?.mode ?? 'none',
-            source: ['index.html', 'timeline.json']
-                .map((f) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf-8') : ''))
-                .join('\n'),
+            ...inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles }),
         };
     });
     const evidence = {
         case: entry.name,
         title: entry.spec.title,
+        asks: entry.spec.asks,
         prompt,
+        timeoutMin,
         target: { name: target.name, host: target.host, model: target.model, label: target.label },
         run,
         startedAt: new Date(Date.now() - host.durationMs).toISOString(),
@@ -473,12 +437,13 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
         node: process.version,
         ffmpeg: info.ffmpeg,
         host,
+        workspaceFiles,
         compositions: compositions.map(({ source, ...rest }) => ({
             ...rest,
             sourceSha256: createHash('sha256').update(source).digest('hex'),
         })),
     };
-    evidence.verdict = judge(entry.spec, { host, compositions });
+    evidence.verdict = judge(entry.spec, { host, compositions, workspaceFiles });
     const slug = `${entry.name}--${target.name.replace(/[^\w.-]+/g, '_')}--run${run}`;
     const films = join(resultsDir, 'films', slug);
     for (const [i, c] of evidence.compositions.entries()) {
@@ -517,8 +482,9 @@ async function main() {
             `flipbook eval (dry run)\nflipbook ${info.flipbook.version} @ ${info.flipbook.commit}${info.flipbook.dirty ? ' (dirty)' : ''}\n\n`,
         );
         for (const c of cases) {
+            const asks = c.problems.length === 0 ? ` (${c.spec.asks.join(', ')})` : '';
             process.stdout.write(
-                `  ${c.problems.length === 0 ? 'ok' : '!!'} ${c.name}${c.problems.length ? `: ${c.problems.join(', ')}` : ''}\n`,
+                `  ${c.problems.length === 0 ? 'ok' : '!!'} ${c.name}${asks}${c.problems.length ? `: ${c.problems.join(', ')}` : ''}\n`,
             );
         }
         for (const target of matrix) {
@@ -526,10 +492,7 @@ async function main() {
             process.stdout.write(
                 `  ${version ? 'ok' : '!!'} ${target.name}: ${target.host} ${version ?? 'not found'}, model ${target.model}\n`,
             );
-            const { ws } = prepareWorkspace(
-                cases.find((c) => c.problems.length === 0) ?? cases[0],
-                target.host,
-            );
+            const { ws } = prepareWorkspace({ name: 'install', spec: {} }, target.host);
             const installed = HOSTS[target.host].skillDirs.every((d) =>
                 existsSync(join(ws, d, 'SKILL.md')),
             );
@@ -580,7 +543,9 @@ async function main() {
                 rows.push({
                     target: target.name,
                     case: entry.name,
+                    asks: entry.spec.asks,
                     run,
+                    delivered: evidence.verdict.delivered,
                     oneShot: evidence.verdict.oneShot,
                     reasons: evidence.verdict.reasons,
                     minutes: (evidence.host.durationMs / 60000).toFixed(1),
@@ -597,13 +562,17 @@ async function main() {
         date: new Date().toISOString(),
         flipbook: info.flipbook,
         hosts: info.hosts,
-        timeoutMin: opts.timeoutMin,
+        timeoutMin: opts.timeoutMin ?? 'per case',
         byTarget: Object.fromEntries(
             matrix.map((t) => {
                 const mine = rows.filter((r) => r.target === t.name);
                 return [
                     t.name,
-                    { runs: mine.length, oneShot: mine.filter((r) => r.oneShot).length },
+                    {
+                        runs: mine.length,
+                        delivered: mine.filter((r) => r.delivered).length,
+                        oneShot: mine.filter((r) => r.oneShot).length,
+                    },
                 ];
             }),
         ),
@@ -614,7 +583,9 @@ async function main() {
         `${JSON.stringify(summary, null, 2)}\n`,
     );
     for (const [name, s] of Object.entries(summary.byTarget))
-        process.stdout.write(`\n${name}: ${s.oneShot}/${s.runs} one-shot\n`);
+        process.stdout.write(
+            `\n${name}: ${s.oneShot}/${s.runs} one-shot, ${s.delivered}/${s.runs} delivered a film\n`,
+        );
     process.stdout.write(`evidence: ${resultsDir}\n`);
 }
 
