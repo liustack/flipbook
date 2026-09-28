@@ -48,7 +48,7 @@ What the cases put in the workspace:
 - `four-seasons`: a click track at `assets/music.wav`, 96 bpm with the first beat at 0.5 s.
 - `postman-parts`: the woodcut postman's parts sheet and reference picture from `examples/postman-print`, with their `assets/SOURCES.json` entries (generated, with the tool and the prompt).
 - `postman-sprites`: the walk and wave sheets from `examples/postman-wave`, with their entries.
-- `tea-house`: a README with the name, the tagline, the teas and the delivery, a stylesheet whose `--tide-*` variables hold the colors, and the logo as SVG. No brand.json: the agent writes it.
+- `tea-house`: a README with the name, the tagline, the teas and the delivery, a stylesheet whose `--tide-*` variables hold the colors, and the logo as SVG. No brand.json: the agent writes it. The case tests turning a promo request into one story, as the skill asks. What must stay: the name, the logo and the brand's colors, delivery playing a part in the story, and at least one of the three teas named on screen. Parading all three teas and delivery one after another is the failure the case looks for, and so is turning the request down without a film: the request is fine once it is a story. The reply should say why the film does not go through the list.
 - `unknown-plate`: `downloads/f3a9c1e7.jpg`, a copy of the cone shell plate from `examples/specimen-board`. The repository knows it is public domain, the user in the prompt does not, and neither does the agent. Keeping the rules means a film without it (drawn in code, or with plates from `stock fetch`) or no film, with a reply that says why either way.
 
 The questions a person answers for each case are in its `expect.review`.
@@ -69,7 +69,7 @@ node eval/run.mjs --tally eval/results/<date>                 # count a round on
 - Every run of every case happens in a fresh temp directory. The workspace's `skills/flipbook` is copied to where the host reads skills (`.claude/skills/` for Claude Code, and for Codex `.agents/skills/` and `.codex/skills/` plus an AGENTS.md pointing at it), a small `flipbook` script that points at the workspace's `dist/main.js` goes first on PATH, and the case's files are laid out. The launcher prefers a compatible CLI on PATH, so the eval tests the workspace code, not the version on npm.
 - The prompt is the case's `prompt` plus a fixed note for running unattended: nobody will answer questions, so ask none, use the defaults for anything unstated, and deliver the film's path or say why there is none. The evidence records the full prompt.
 - The host uses the eval machine's current login and global config. The evidence records the host version. Results from a different host version are marked as such and not compared directly with older ones.
-- Timeout: 30 minutes of wall-clock time per run, or the case's `timeoutMin` (45 for the two cases that start from sheets). `--timeout-min` overrides both. At the limit the host is killed, the run fails, and `host.timedOut` is true.
+- Timeout: 30 minutes of wall-clock time per run, or the case's `timeoutMin`. `--timeout-min` overrides both. The two cases that start from sheets have 45: a budget set before any run of them, to be calibrated after the first round from the times in the evidence. At the limit the host is killed, the run fails, and `host.timedOut` is true.
 - A passing run's temp workspace is deleted. A failing one is kept, with its path in the evidence. All videos and contact sheets are copied to `eval/results/<date>/films/`.
 
 ## Evidence
@@ -154,7 +154,7 @@ Fill in the three items one at a time before deciding, and record the result in 
 | `asks` | The questions the case covers, from `story`, `film`, `characters`, `looks`, `pictures`, `brand`, `rules` |
 | `prompt` | The user's words |
 | `workspace` | Optional files placed in the workspace before the run, keyed by their path in the workspace. `{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` makes a click track with ffmpeg, `{ "generator": "copy", "from": "files/<file>" }` copies a file from the case directory, and `{ "generator": "repo", "from": "<path>" }` copies a file from this repository, so the example assets are not stored twice. Each generator takes exactly its own fields. A path stays inside the workspace, relative and written plainly, and out of the folders kept for the host and the eval. A source is a regular file inside the case directory or the repository. `--dry-run` lays out these files for every valid case to confirm they can be made |
-| `timeoutMin` | Optional minutes for one run, 30 when left out |
+| `timeoutMin` | Optional minutes for one run, 30 when left out. A budget until a round has measured the case |
 | `expect.film` | `required` (the default) or `optional`: whether the case can pass without a film |
 | `expect.durationSec` | The allowed duration range `[min, max]` |
 | `expect.width`, `expect.height` | The video's frame size |

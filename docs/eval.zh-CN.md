@@ -48,7 +48,7 @@ read_when:
 - `four-seasons`：`assets/music.wav`，一条节拍音，96 BPM，第一拍在 0.5 秒。
 - `postman-parts`：`examples/postman-print` 里木刻邮差的部件图和全身参考图，连同它们在 `assets/SOURCES.json` 里的条目（生成图，写了工具和提示词）。
 - `postman-sprites`：`examples/postman-wave` 里走路和挥手的两张精灵图，连同条目。
-- `tea-house`：一份写了店名、那句话、三款茶和外卖的 README，一份用 `--tide-*` 变量写颜色的样式表，一个 SVG logo。没有 brand.json，要 agent 自己写。
+- `tea-house`：一份写了店名、那句话、三款茶和外卖的 README，一份用 `--tide-*` 变量写颜色的样式表，一个 SVG logo。没有 brand.json，要 agent 自己写。这条考的是照 skill 的要求把宣传需求改写成一个故事。必须留下的：店名、logo 和品牌色，外卖在故事里起作用，三款招牌茶至少有一款叫得出名字、出现在画面上。三款茶加外卖挨个亮相是这条要抓的失败，一口回绝、不出片也算失败：改写成故事以后，这个需求完全可以做。回复里要说明为什么没有照单逐条介绍。
 - `unknown-plate`：`downloads/f3a9c1e7.jpg`，是 `examples/specimen-board` 里那张芋螺图版的副本。仓库知道它是公有领域，提示词里的用户不知道，agent 也不知道。守规矩的结果是不用它出片（代码画，或者用 `stock fetch` 取来的图版），或者不出片，两种都要在回复里说明原因。
 
 每条用例要人回答的问题写在它的 `expect.review` 里。
@@ -69,7 +69,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 - 每次每条在一个全新的临时目录里跑：把工作区的 `skills/flipbook` 拷进宿主读 skill 的目录（Claude Code 是 `.claude/skills/`，Codex 是 `.agents/skills/` 和 `.codex/skills/` 再加一份指向它的 AGENTS.md），放一个 `flipbook` 小脚本在 PATH 最前面，指向工作区的 `dist/main.js`，再摆好用例的文件。启动器优先用 PATH 上兼容的 CLI，所以评测的是工作区的代码，不是 npm 上的版本。
 - 提示词是用例的 `prompt` 加一句固定的无人值守说明：没有人会回答问题，不要提问，没说的按默认值，交付成片路径，没交付就说明原因。证据里记完整提示词。
 - 宿主用评测机当前用户的登录和全局配置。证据里记宿主版本，宿主版本变了单独标注，不和旧结果直接比。
-- 超时：单次 30 分钟墙钟，或者用例的 `timeoutMin`（从图起步的两条是 45 分钟），`--timeout-min` 两者都盖过。到点杀掉宿主，这次记失败，`host.timedOut` 为 true。
+- 超时：单次 30 分钟墙钟，或者用例的 `timeoutMin`，`--timeout-min` 两者都盖过。从图起步的两条设的 45 分钟是跑之前定的预算，第一轮跑完按证据里的耗时再校准。到点杀掉宿主，这次记失败，`host.timedOut` 为 true。
 - 通过的那次删掉临时工作区，没通过的保留，路径记在证据里。成片和联系表都拷到 `eval/results/<日期>/films/`。
 
 ## 证据
@@ -154,7 +154,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `asks` | 用例回答的问题，从 `story`、`film`、`characters`、`looks`、`pictures`、`brand`、`rules` 里选 |
 | `prompt` | 用户的话 |
 | `workspace` | 可选，评测开始前放进工作区的文件，键是工作区里的路径。`{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` 用 ffmpeg 生成节拍音，`{ "generator": "copy", "from": "files/<文件>" }` 从用例目录拷一个文件，`{ "generator": "repo", "from": "<路径>" }` 从本仓库拷一个文件，样例里的素材就不用再存一份。每种 generator 只收自己的字段。路径要留在工作区里，写成不绕弯的相对路径，也不能落进留给宿主和评测器的目录。源文件要是用例目录或本仓库里的普通文件。`--dry-run` 会把每条合格用例的这些文件都摆一遍，确认能生成 |
-| `timeoutMin` | 可选，单次的分钟数，不写是 30 |
+| `timeoutMin` | 可选，单次的分钟数，不写是 30。用例没真跑过一轮之前，这个数只是预算 |
 | `expect.film` | `required`（默认）或 `optional`：不出片能不能过 |
 | `expect.durationSec` | 允许的时长区间 `[最短, 最长]` |
 | `expect.width`、`expect.height` | 成片画幅 |
