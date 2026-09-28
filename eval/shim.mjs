@@ -4,9 +4,12 @@
 // Trust: the agent under test runs as the same user as the evaluator, with
 // full permissions, and FLIPBOOK_EVAL_REPORTS tells it where the reports go.
 // Nothing here can stop it from writing, moving or replacing them. What the
-// evaluator can do is notice: it pins the report directory before the host
-// starts and reads nothing from it if the directory or any folder above it
-// changed. The reports are evidence for a person, never grounds for an
+// evaluator can do is notice most changes: it pins the report directory
+// before the host starts, skips the reports when a check before reading
+// finds the directory or a folder above it changed, and throws the batch
+// away when the check after reading does. The checks and the reads and
+// writes are separate steps, not atomic, so a change in between can go
+// unseen. The reports are evidence for a person, never grounds for an
 // automatic pass.
 import { spawnSync } from 'node:child_process';
 import {
@@ -157,9 +160,10 @@ function readPlain(dir, name) {
 
 /**
  * The JSON reports kept in the pinned directory, one per run of the CLI:
- * `{ reports, problem }`. When the directory or a folder above it changed
- * since it was pinned, before or after reading, nothing is read and
- * `problem` says what changed. Only entries that are regular files are
+ * `{ reports, problem }`. When the check before reading finds that the
+ * directory or a folder above it changed since it was pinned, nothing is
+ * read. When the check after reading finds it, what was read is thrown
+ * away. Either way `problem` says what changed. Only entries that are regular files are
  * read, never through a link.
  */
 export function shimReports(pin) {
