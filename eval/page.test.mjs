@@ -274,8 +274,8 @@ describe('reading only inside the workspace', () => {
         expect(page).toMatchObject({ imports: false, calls: [] });
         expect(page.references).not.toHaveProperty(['external-marker.png']);
         expect(page.refused).toEqual([
-            `scene.js leads out of the workspace, to ${away}/scene.js, not read`,
-            `page.css leads out of the workspace, to ${away}/page.css, not read`,
+            `scene.js leads out of the workspace, to ${join(away, 'scene.js')}, not read`,
+            `page.css leads out of the workspace, to ${join(away, 'page.css')}, not read`,
         ]);
         expect(page.notes).toEqual(expect.arrayContaining(page.refused));
     });
@@ -288,7 +288,7 @@ describe('reading only inside the workspace', () => {
         });
         expect(page.calls).toEqual([]);
         expect(page.refused).toEqual([
-            `js/main.js leads out of the workspace, to ${away}/main.js, not read`,
+            `js/main.js leads out of the workspace, to ${join(away, 'main.js')}, not read`,
         ]);
     });
 

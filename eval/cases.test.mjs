@@ -225,7 +225,7 @@ describe('eval case sources behind links', () => {
         const problems = validateCase(spec, { ...dirs, caseDir });
         expect(problems).toHaveLength(1);
         expect(problems[0]).toMatch(
-            /^workspace\["assets\/music\.wav"\]\.from: linked\/music\.wav leads out of the case directory, to .*outside\/music\.wav$/,
+            /^workspace\["assets\/music\.wav"\]\.from: linked\/music\.wav leads out of the case directory, to .*outside[\\/]music\.wav$/,
         );
         const result = dryRun(casesDir);
         expect(result.status).toBe(1);
