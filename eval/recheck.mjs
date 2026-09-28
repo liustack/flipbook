@@ -21,10 +21,24 @@ function readJsonText(text) {
 }
 
 /**
- * Run `flipbook check` on a copy of `wsRoot` at the composition's place in
- * it, and return its exit code and report.
+ * The stage the agent's last render drew, as check flags: text and the safe
+ * area are then checked in the shape the video has, even when the render
+ * used --size or --scale. None without a render report.
  */
-export function recheck(composition, { wsRoot, cli }) {
+export function renderShape(lastRender) {
+    const c = lastRender?.composition;
+    if (!Number.isInteger(c?.width) || !Number.isInteger(c?.height)) return [];
+    const flags = ['--size', `${c.width}x${c.height}`];
+    if (typeof c.scale === 'number' && c.scale !== 1) flags.push('--scale', String(c.scale));
+    return flags;
+}
+
+/**
+ * Run `flipbook check` on a copy of `wsRoot` at the composition's place in
+ * it, with `flags` (such as the ones from renderShape), and return its exit
+ * code and report.
+ */
+export function recheck(composition, { wsRoot, cli, flags = [] }) {
     const copy = mkdtempSync(join(tmpdir(), 'flipbook-eval-recheck-'));
     try {
         cpSync(wsRoot, copy, {
@@ -36,7 +50,7 @@ export function recheck(composition, { wsRoot, cli }) {
         });
         const result = spawnSync(
             process.execPath,
-            [cli, 'check', join(copy, relative(wsRoot, composition))],
+            [cli, 'check', join(copy, relative(wsRoot, composition)), ...flags],
             {
                 encoding: 'utf-8',
                 maxBuffer: 64 * 1024 * 1024,

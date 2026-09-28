@@ -86,7 +86,7 @@ node eval/run.mjs --model claude-code:claude-opus-5 pigeons   # one case on a gi
 
 ## The automatic verdict
 
-A run **delivered** a film when the workspace holds exactly one composition, its `out/video.mp4` exists, its last render report says `ok: true`, no check or render report has `stop: true`, and the evaluator's own check exits 0. That check runs on a fresh copy of the whole workspace without the host's folders, `.flipbook/` and `out/`, so nothing the agent's runs left behind counts, and a brand.json in the workspace root keeps its logo and fonts where the composition finds them.
+A run **delivered** a film when the workspace holds exactly one composition, its `out/video.mp4` exists, its last render report says `ok: true`, no check or render report has `stop: true`, and the evaluator's own check exits 0. That check runs on a fresh copy of the whole workspace without the host's folders, `.flipbook/` and `out/`, so nothing the agent's runs left behind counts, and a brand.json in the workspace root keeps its logo and fonts where the composition finds them. It takes `--size` and `--scale` from the agent's last render report, so text and the safe area are checked in the shape the video has. `recheck.flags` in the evidence shows them.
 
 A run is a **one-shot pass** when all of these hold:
 

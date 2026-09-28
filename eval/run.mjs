@@ -27,7 +27,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOST_DIRS, inspect, judge, sha256File, validateCase, workspaceSource } from './judge.mjs';
-import { recheck } from './recheck.mjs';
+import { recheck, renderShape } from './recheck.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
@@ -371,6 +371,8 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
         const video = join(dir, 'out', 'video.mp4');
         const sheet = join(dir, 'out', 'contact-sheet.png');
         const hashes = readJson(join(dir, '.flipbook', 'frame-hashes.json'));
+        const lastRender = readJson(join(dir, '.flipbook', 'reports', 'render.json'));
+        const flags = renderShape(lastRender);
         return {
             dir: relative(ws, dir) || '.',
             video: existsSync(video) ? video : null,
@@ -380,9 +382,9 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
             probe: existsSync(video) ? probe(video) : null,
             lastCheck: readJson(join(dir, '.flipbook', 'reports', 'check.json')),
             lastSnapshot: readJson(join(dir, '.flipbook', 'reports', 'snapshot.json')),
-            lastRender: readJson(join(dir, '.flipbook', 'reports', 'render.json')),
+            lastRender,
             attempts: readJson(join(dir, '.flipbook', 'attempts.json')),
-            recheck: recheck(dir, { wsRoot: ws, cli }),
+            recheck: { flags, ...recheck(dir, { wsRoot: ws, cli, flags }) },
             ...inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles }),
         };
     });

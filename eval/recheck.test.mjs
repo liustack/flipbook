@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildTestFont } from '../test/fontBuilder.ts';
 import { writeStory } from '../test/story.ts';
-import { recheck } from './recheck.mjs';
+import { recheck, renderShape } from './recheck.mjs';
 
 const cli = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'main.js');
 const temps = [];
@@ -108,5 +108,36 @@ describe('eval recheck', () => {
         expect(result.report?.failures, JSON.stringify(result.report?.failures)).toEqual([]);
         expect(result.exitCode).toBe(0);
         expect(result.report?.composition?.dir).not.toBe(film);
+    });
+});
+
+describe('eval recheck in the rendered shape', () => {
+    it('reads --size and --scale from the last render report', () => {
+        expect(renderShape(null)).toEqual([]);
+        expect(renderShape({ composition: { width: 1080, height: 1920, scale: 1 } })).toEqual([
+            '--size',
+            '1080x1920',
+        ]);
+        expect(renderShape({ composition: { width: 1920, height: 1080, scale: 2 } })).toEqual([
+            '--size',
+            '1920x1080',
+            '--scale',
+            '2',
+        ]);
+    });
+
+    it('checks text at the size the video was rendered, not only the timeline size', () => {
+        const { ws, film } = workspace('inside');
+        write(
+            film,
+            'index.html',
+            PAGE.replace('<p id="name">TIDE</p>', '<p id="name">TIDETIDE</p>'),
+        );
+        const landscape = recheck(film, { wsRoot: ws, cli });
+        expect(landscape.report?.failures, JSON.stringify(landscape.report?.failures)).toEqual([]);
+        const portrait = recheck(film, { wsRoot: ws, cli, flags: ['--size', '180x320'] });
+        expect(portrait.exitCode).toBe(1);
+        expect(portrait.report?.failures.map((f) => f.code)).toContain('text-offstage');
+        expect(portrait.report?.composition).toMatchObject({ width: 180, height: 320 });
     });
 });
