@@ -359,7 +359,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
     const stockReports = kept.reports.filter((r) => r.command === 'stock-fetch');
     const runNotes = kept.problem
         ? [
-              `The evaluator's report directory changed during the run (${kept.problem}), so none of its reports were read. Check what the agent did there.`,
+              `The evaluator's report directory changed during the run (${kept.problem}), so its reports were skipped or discarded and none of them is used as evidence. Check what the agent did there.`,
           ]
         : [];
     const compositions = findCompositions(ws).map((dir) => {

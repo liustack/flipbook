@@ -798,7 +798,7 @@ describe('eval verdict on notes about the run', () => {
         const spec = baseCase();
         const { composition, workspaceFiles } = finishedRun(spec);
         const note =
-            "The evaluator's report directory changed during the run (/x became a link), so none of its reports were read. Check what the agent did there.";
+            "The evaluator's report directory changed during the run (/x became a link), so its reports were skipped or discarded and none of them is used as evidence. Check what the agent did there.";
         const verdict = judge(spec, {
             host: HOST_OK,
             compositions: [composition],
