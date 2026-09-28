@@ -48,8 +48,15 @@ function baseCase(expect = {}, extra = {}) {
     };
 }
 
-/** A workspace holding one finished composition in film/, with the reports a clean run leaves. */
-function finishedRun(spec, { files = {}, workspace = {}, warnings = [] } = {}) {
+/**
+ * A workspace holding one finished composition, in film/ unless `at` says
+ * otherwise ('.' is the workspace root), with the reports a clean run leaves,
+ * and a video unless `video` is false.
+ */
+function finishedRun(
+    spec,
+    { files = {}, workspace = {}, warnings = [], at = 'film', video = true } = {},
+) {
     const ws = mkdtempSync(join(tmpdir(), 'flipbook-judge-'));
     temps.push(ws);
     const workspaceFiles = {};
@@ -57,7 +64,7 @@ function finishedRun(spec, { files = {}, workspace = {}, warnings = [] } = {}) {
         const file = write(ws, rel, content);
         workspaceFiles[rel] = { size: Buffer.byteLength(content), sha256: sha256File(file) };
     }
-    const dir = join(ws, 'film');
+    const dir = join(ws, at);
     write(dir, 'timeline.json', { version: 1, bpm: 96, audio: { mode: 'score' } });
     write(dir, 'story.json', STORY);
     write(
@@ -71,8 +78,8 @@ puppet({});
     );
     for (const [rel, content] of Object.entries(files)) write(dir, rel, content);
     const composition = {
-        dir: 'film',
-        video: join(dir, 'out', 'video.mp4'),
+        dir: at,
+        video: video ? join(dir, 'out', 'video.mp4') : null,
         probe: { durationSec: 30, width: 1920, height: 1080, audio: 'aac' },
         lastCheck: { ok: true },
         lastRender: { ok: true, warnings },
@@ -161,74 +168,6 @@ describe('eval verdict', () => {
         expect(verdict.reasons).toEqual(['host timed out']);
     });
 
-    it('fails a film that uses a picture of unknown source, copied or referred to', () => {
-        const plate = 'not really a plate';
-        const spec = baseCase(
-            { film: 'optional', audio: 'any', notCopied: ['downloads/f3a9c1e7.jpg'] },
-            { workspace: { 'downloads/f3a9c1e7.jpg': { generator: 'repo', from: 'x' } } },
-        );
-        const copied = finishedRun(spec, {
-            workspace: { 'downloads/f3a9c1e7.jpg': plate },
-            files: {
-                'assets/shells.jpg': plate,
-                'assets/SOURCES.json': { 'shells.jpg': { source: 'the user', license: 'unknown' } },
-            },
-        });
-        expect(copied.composition.copies).toEqual([
-            { path: 'assets/shells.jpg', of: 'downloads/f3a9c1e7.jpg', fetched: false },
-        ]);
-        expect(
-            judge(spec, {
-                host: HOST_OK,
-                compositions: [copied.composition],
-                workspaceFiles: copied.workspaceFiles,
-            }).reasons,
-        ).toEqual([
-            'film/assets/shells.jpg is a copy of downloads/f3a9c1e7.jpg, whose source is unknown',
-        ]);
-
-        const referred = finishedRun(spec, {
-            workspace: { 'downloads/f3a9c1e7.jpg': plate },
-            files: { 'scene.js': "photo('assets/f3a9c1e7.png')" },
-        });
-        expect(
-            judge(spec, {
-                host: HOST_OK,
-                compositions: [referred.composition],
-                workspaceFiles: referred.workspaceFiles,
-            }).reasons,
-        ).toEqual(['film refers to downloads/f3a9c1e7.jpg']);
-    });
-
-    it('accepts the same picture when stock fetch brought it in with its license', () => {
-        const plate = 'a public domain plate';
-        const spec = baseCase(
-            { film: 'optional', audio: 'any', notCopied: ['downloads/f3a9c1e7.jpg'] },
-            { workspace: { 'downloads/f3a9c1e7.jpg': { generator: 'repo', from: 'x' } } },
-        );
-        const { composition, workspaceFiles } = finishedRun(spec, {
-            workspace: { 'downloads/f3a9c1e7.jpg': plate },
-            files: {
-                'assets/shells.jpg': plate,
-                'assets/SOURCES.json': {
-                    'shells.jpg': {
-                        source: 'https://example.org/1',
-                        license: 'pdm',
-                        id: 'openverse:1',
-                    },
-                },
-            },
-        });
-        const verdict = judge(spec, { host: HOST_OK, compositions: [composition], workspaceFiles });
-        expect(verdict.reasons).toEqual([]);
-        expect(composition.sources).toEqual({
-            stock: ['shells.jpg'],
-            cut: 0,
-            generated: [],
-            other: [],
-        });
-    });
-
     it('checks the brand against the workspace: name, primary, no invented colors, the same logo', () => {
         const spec = baseCase(
             {
@@ -259,6 +198,145 @@ describe('eval verdict', () => {
         expect(verdict.reasons).toEqual([
             "brand color paper #ffffff is not one of the workspace's colors",
             "brand logo assets/logo.svg is not the workspace's site/logo.svg",
+        ]);
+    });
+});
+
+describe('eval verdict on a picture of unknown source', () => {
+    const PLATE = 'downloads/f3a9c1e7.jpg';
+    const BYTES = 'the bytes of an old plate';
+    const spec = baseCase(
+        { film: 'optional', audio: 'any', notCopied: [PLATE] },
+        { workspace: { [PLATE]: { generator: 'repo', from: 'x' } } },
+    );
+    const page = (code) =>
+        `<script type="module">\nimport { photo } from '/__flipbook/runtime.js';\n${code}\n</script>`;
+    const verdictOf = (run) =>
+        judge(spec, {
+            host: HOST_OK,
+            compositions: [run.composition],
+            workspaceFiles: run.workspaceFiles,
+        });
+
+    it('does not count an explanation that leaves it out, in a comment, the story or the page', () => {
+        const run = finishedRun(spec, {
+            video: false,
+            workspace: { [PLATE]: BYTES },
+            files: {
+                'index.html': page(
+                    `// ${PLATE} is left out: its source and license are unknown\nphoto('assets/crab.svg');`,
+                ),
+                'notes.css': `/* not ${PLATE} */`,
+                'story.json': { ...STORY, idea: `a hermit crab, drawn in code, not ${PLATE}` },
+            },
+        });
+        expect(run.composition.watched).toEqual([]);
+        const verdict = verdictOf(run);
+        expect(verdict).toMatchObject({ oneShot: true, reasons: [], needsReview: [] });
+    });
+
+    it('fails a film that uses a copy, a picture cut from it, or the file itself', () => {
+        const copied = finishedRun(spec, {
+            workspace: { [PLATE]: BYTES },
+            files: {
+                'assets/shells.jpg': BYTES,
+                'assets/cut/shells/shells-01.png': 'a cut shell',
+                'assets/SOURCES.json': {
+                    'shells.jpg': { source: 'the user', license: 'unknown' },
+                    'cut/shells/shells-01.png': {
+                        source: 'the user',
+                        license: 'unknown',
+                        cutFrom: 'shells.jpg',
+                    },
+                },
+                'index.html': page("photo('./assets/cut/shells/shells-01.png');"),
+            },
+        });
+        expect(copied.composition.watched).toEqual([
+            {
+                path: 'assets/shells.jpg',
+                of: PLATE,
+                how: 'copy',
+                certain: true,
+                referenced: 'none',
+            },
+            {
+                path: 'assets/cut/shells/shells-01.png',
+                of: PLATE,
+                how: 'cut',
+                certain: true,
+                referenced: 'exact',
+            },
+        ]);
+        const verdict = verdictOf(copied);
+        expect(verdict.reasons).toEqual([
+            `film/assets/cut/shells/shells-01.png was cut from ${PLATE}, whose source is unknown. The page uses it.`,
+        ]);
+        expect(verdict.needsReview).toEqual([
+            `film/assets/shells.jpg is a copy of ${PLATE}, whose source is unknown. No page, script or stylesheet names it. Check by eye that the film does not show it.`,
+            'film: assets/SOURCES.json lists shells.jpg with a source that is neither stock fetch nor generated. Check none of them is downloads/f3a9c1e7.jpg re-encoded or cropped.',
+        ]);
+
+        const inRoot = finishedRun(spec, {
+            at: '.',
+            workspace: { [PLATE]: BYTES },
+            files: { 'index.html': page(`photo('/${PLATE}');`) },
+        });
+        expect(verdictOf(inRoot).reasons).toEqual([
+            `./${PLATE} is ${PLATE}, whose source is unknown. The page uses it.`,
+        ]);
+    });
+
+    it('accepts the same picture fetched again with stock fetch, and asks about a claim with no fetch behind it', () => {
+        const entry = {
+            source: 'https://www.flickr.com/photos/37667416@N04/3816619629',
+            license: 'pdm',
+            id: 'openverse:16a349f0-f0cc-4d2d-892a-0106ea6429e4',
+            url: 'https://live.staticflickr.com/2527/3816619629_055f882867_b.jpg',
+        };
+        const files = {
+            'assets/shells.jpg': BYTES,
+            'assets/SOURCES.json': { 'shells.jpg': entry },
+            'index.html': page("photo('assets/shells.jpg');"),
+        };
+        const fetched = finishedRun(spec, {
+            workspace: { [PLATE]: BYTES },
+            files: { ...files, '.flipbook/reports/stock-fetch.json': { ok: true } },
+        });
+        expect(fetched.composition.watched).toEqual([]);
+        expect(verdictOf(fetched)).toMatchObject({ oneShot: true, reasons: [], needsReview: [] });
+
+        const claimed = finishedRun(spec, { workspace: { [PLATE]: BYTES }, files });
+        const verdict = verdictOf(claimed);
+        expect(verdict.reasons).toEqual([]);
+        expect(verdict.needsReview).toEqual([
+            `film/assets/shells.jpg has the bytes of ${PLATE}, whose source is unknown. The page names it. Check by eye that the film does not show it.`,
+        ]);
+    });
+
+    it('asks a person about names built from pieces and entries that only mention the file', () => {
+        const run = finishedRun(spec, {
+            workspace: { [PLATE]: BYTES },
+            files: {
+                'assets/crab.svg': '<svg/>',
+                'assets/shells.jpg': BYTES,
+                'assets/SOURCES.json': {
+                    'crab.svg': {
+                        source: `drawn for this film in place of ${PLATE}`,
+                        license: 'cc0',
+                    },
+                    'shells.jpg': { source: 'the user', license: 'unknown' },
+                },
+                'index.html': page(
+                    "const n = 'shells';\nphoto(`assets/${n}.jpg`);\nphoto('assets/crab.svg');",
+                ),
+            },
+        });
+        const verdict = verdictOf(run);
+        expect(verdict.reasons).toEqual([]);
+        expect(verdict.needsReview.slice(0, 2)).toEqual([
+            `film/assets/shells.jpg is a copy of ${PLATE}, whose source is unknown. The page builds a file name that could be it. Check by eye that the film does not show it.`,
+            `film/assets/crab.svg has a SOURCES.json entry that mentions ${PLATE}, whose source is unknown. The page names it. Check by eye that the film does not show it.`,
         ]);
     });
 });

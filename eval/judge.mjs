@@ -1,33 +1,17 @@
 // What a finished workspace shows and the verdict on a run. Reads files
 // only, starts nothing and spends nothing, so the rules can be tested on
 // their own. The case format is in cases.mjs, the criteria in docs/eval.md.
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { HOST_DIRS } from './cases.mjs';
 import { globMatches, listFiles, readJson, sha256File } from './files.mjs';
-import { runtimeUse } from './scripts.mjs';
+import { pageReferences, pageScripts, runtimeUse } from './scripts.mjs';
 
 /** What `stock fetch` writes as an entry's id: the picture came with a known license. */
 const STOCK_ID = /^(openverse|pexels|pixabay):/;
 
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
-
-/**
- * The text a composition is made of: its pages, scripts and styles outside
- * assets/, and every JSON file (timeline, story, brand, SOURCES, puppet and
- * sprite files), so a reference to a file shows up wherever it is written.
- */
-function readSource(dir) {
-    const skip = [...HOST_DIRS, '.flipbook', 'out'];
-    return listFiles(dir, skip)
-        .filter(
-            (rel) =>
-                /\.json$/i.test(rel) ||
-                (!rel.startsWith('assets/') && /\.(html?|m?js|css)$/i.test(rel)),
-        )
-        .map((rel) => readFileSync(join(dir, rel), 'utf-8'))
-        .join('\n');
-}
 
 /** assets/SOURCES.json sorted by where each picture or sound came from. */
 function sourcesSummary(dir) {
@@ -61,47 +45,102 @@ function brandFacts(dir, timeline) {
     };
 }
 
+/** How a file came from a watched workspace file, for the verdict's wording. */
+const HOW = {
+    original: 'is',
+    copy: 'is a copy of',
+    claimed: 'has the bytes of',
+    cut: 'was cut from',
+    named: 'has a SOURCES.json entry that mentions',
+};
+
 /**
- * Files in the composition with the same bytes as a watched workspace file
- * (the original itself aside), and whether `stock fetch` brought them in.
+ * Files in the composition that come from a watched workspace file, and
+ * whether the page names them. `certain` files are the file itself, a byte
+ * copy that `stock fetch` did not bring in, or a picture cut from one of
+ * those. Less certain ones: a byte copy whose entry claims a stock id with
+ * no stock fetch report beside it, an entry whose text mentions the file,
+ * and pictures cut from those. `referenced` is `exact` when a page, script
+ * or stylesheet names the file, `prefix` when a name built from pieces could
+ * be it, `none` otherwise. Comments name nothing.
  */
-function findCopies(dir, wsRoot, watched) {
+function watchedFiles(dir, wsRoot, watched) {
     if (watched.length === 0) return [];
     const sources = readJson(join(dir, 'assets', 'SOURCES.json'));
-    const copies = [];
+    const entries = isObject(sources) ? sources : {};
+    const stockReport = existsSync(join(dir, '.flipbook', 'reports', 'stock-fetch.json'));
+    const stockClaim = (entry) =>
+        isObject(entry) && STOCK_ID.test(String(entry.id ?? '')) && typeof entry.url === 'string';
+    const found = [];
     for (const rel of listFiles(dir, [...HOST_DIRS, '.flipbook', 'out'])) {
         const full = join(dir, rel);
         const wsRel = relative(wsRoot, full).split(sep).join('/');
         const size = statSync(full).size;
         for (const w of watched) {
-            if (w.rel === wsRel || w.size !== size || sha256File(full) !== w.sha256) continue;
-            const entry = rel.startsWith('assets/') ? sources?.[rel.slice('assets/'.length)] : null;
-            copies.push({
-                path: rel,
-                of: w.rel,
-                fetched: isObject(entry) && STOCK_ID.test(String(entry.id ?? '')),
-            });
+            if (w.rel === wsRel) {
+                found.push({ path: rel, of: w.rel, how: 'original', certain: true });
+                continue;
+            }
+            if (w.size !== size || sha256File(full) !== w.sha256) continue;
+            const entry = rel.startsWith('assets/') ? entries[rel.slice('assets/'.length)] : null;
+            if (stockClaim(entry) && stockReport) continue;
+            const how = stockClaim(entry) ? 'claimed' : 'copy';
+            found.push({ path: rel, of: w.rel, how, certain: how === 'copy' });
         }
     }
-    return copies;
+    for (const w of watched) {
+        const stem = basename(w.rel).replace(/\.[^.]+$/, '');
+        const tainted = new Map();
+        for (const f of found) {
+            if (f.of === w.rel && f.path.startsWith('assets/'))
+                tainted.set(f.path.slice('assets/'.length), f.certain);
+        }
+        for (const [key, entry] of Object.entries(entries)) {
+            if (tainted.has(key) || (stockClaim(entry) && stockReport)) continue;
+            if (JSON.stringify(entry).includes(stem)) {
+                tainted.set(key, false);
+                found.push({ path: `assets/${key}`, of: w.rel, how: 'named', certain: false });
+            }
+        }
+        for (let grew = true; grew; ) {
+            grew = false;
+            for (const [key, entry] of Object.entries(entries)) {
+                if (tainted.has(key) || !isObject(entry) || !tainted.has(entry.cutFrom)) continue;
+                const certain = tainted.get(entry.cutFrom);
+                tainted.set(key, certain);
+                found.push({ path: `assets/${key}`, of: w.rel, how: 'cut', certain });
+                grew = true;
+            }
+        }
+    }
+    if (found.length === 0) return [];
+    const refs = pageReferences(dir);
+    return found.map((f) => ({
+        ...f,
+        referenced: refs.exact.includes(f.path)
+            ? 'exact'
+            : refs.prefixes.some((prefix) => f.path.startsWith(prefix))
+              ? 'prefix'
+              : 'none',
+    }));
 }
 
 /**
  * What a composition directory shows, beyond its video and reports: the
- * timeline and story, the runtime functions its page scripts call, where its pictures came
- * from, its brand, which of the case's files exist, and copies of watched
- * workspace files. `source` is for the verdict only and stays out of the
- * evidence.
+ * timeline and story, a hash of its page scripts, the runtime functions they
+ * call, where its pictures came from, its brand, which of the case's files
+ * exist, and the files that come from watched workspace files.
  */
 export function inspect(dir, { spec, wsRoot, workspaceFiles }) {
     const e = spec.expect;
     const timeline = readJson(join(dir, 'timeline.json'));
-    const source = readSource(dir);
+    const scripts = pageScripts(dir).map(({ file, code }) => `${file}\n${code}`);
     const files = listFiles(dir, HOST_DIRS);
     const watched = (e.notCopied ?? []).map((rel) => ({ rel, ...workspaceFiles[rel] }));
     return {
         timeline,
         story: readJson(join(dir, 'story.json')),
+        sourceSha256: createHash('sha256').update(scripts.join('\n')).digest('hex'),
         runtime: runtimeUse(dir),
         sources: sourcesSummary(dir),
         brand: brandFacts(dir, timeline),
@@ -111,8 +150,7 @@ export function inspect(dir, { spec, wsRoot, workspaceFiles }) {
                 files.some((rel) => globMatches(pattern, rel)),
             ]),
         ),
-        copies: findCopies(dir, wsRoot, watched),
-        source,
+        watched: watchedFiles(dir, wsRoot, watched),
     };
 }
 
@@ -226,20 +264,35 @@ function brandReasons(want, got, workspaceFiles) {
     return reasons;
 }
 
-/** Rules that hold whether or not a film came out: watched workspace files stay out of the film. */
-function ruleReasons(e, compositions) {
+/**
+ * Rules that hold whether or not a film came out: watched workspace files
+ * stay out of the film. A file that surely comes from one and that the page
+ * names fails the run. Everything less sure goes to `review`, and so do
+ * pictures whose source entry is neither stock fetch nor generated, which
+ * could be a watched file re-encoded or cropped.
+ */
+function ruleReasons(e, compositions, review) {
     const reasons = [];
-    for (const rel of e.notCopied ?? []) {
-        const stem = basename(rel).replace(/\.[^.]+$/, '');
-        for (const c of compositions) {
-            for (const copy of c.copies ?? []) {
-                if (copy.of === rel && !copy.fetched)
-                    reasons.push(
-                        `${c.dir}/${copy.path} is a copy of ${rel}, whose source is unknown`,
-                    );
-            }
-            if (c.source.includes(stem)) reasons.push(`${c.dir} refers to ${rel}`);
+    if ((e.notCopied ?? []).length === 0) return reasons;
+    const REFERENCED = {
+        exact: 'The page names it.',
+        prefix: 'The page builds a file name that could be it.',
+        none: 'No page, script or stylesheet names it.',
+    };
+    for (const c of compositions) {
+        for (const f of c.watched ?? []) {
+            const what = `${c.dir}/${f.path} ${HOW[f.how]} ${f.of}, whose source is unknown.`;
+            if (f.certain && f.referenced === 'exact') reasons.push(`${what} The page uses it.`);
+            else
+                review.push(
+                    `${what} ${REFERENCED[f.referenced]} Check by eye that the film does not show it.`,
+                );
         }
+        const other = c.sources?.other ?? [];
+        if (other.length > 0)
+            review.push(
+                `${c.dir}: assets/SOURCES.json lists ${other.join(', ')} with a source that is neither stock fetch nor generated. Check none of them is ${e.notCopied.join(' or ')} re-encoded or cropped.`,
+            );
     }
     return reasons;
 }
@@ -258,7 +311,7 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
     const needsReview = [];
     if (host.timedOut) reasons.push('host timed out');
     else if (host.exitCode !== 0) reasons.push(`host exited ${host.exitCode}`);
-    reasons.push(...ruleReasons(e, compositions));
+    reasons.push(...ruleReasons(e, compositions, needsReview));
     const withVideo = compositions.filter((c) => c.video);
     let delivered = false;
     let story = null;

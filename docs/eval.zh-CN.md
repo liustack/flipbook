@@ -82,7 +82,7 @@ node eval/run.mjs --dry-run --cases <目录>                    # 校验放在�
 | `hostVersion`、`node`、`ffmpeg` | 环境 |
 | `host` | 退出码、是否超时、耗时、宿主报的花费和用量、宿主最后的回复、stdout 和 stderr 末尾 |
 | `workspaceFiles` | 用例放进工作区的每个文件的大小和 sha256，在宿主开跑之前取 |
-| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`runtime`（`imports`：有没有页面脚本导入 flipbook 运行时，`calls`：页面脚本调用了运行时的哪些函数，见[怎样读 `uses`](#怎样读-uses)）、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`files`（`expect.files` 每个路径对上没有）、`copies`（和 `notCopied` 文件字节相同的文件） |
+| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`runtime`（`imports`：有没有页面脚本导入 flipbook 运行时，`calls`：页面脚本调用了运行时的哪些函数，见[怎样读 `uses`](#怎样读-uses)）、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`files`（`expect.files` 每个路径对上没有）、`sourceSha256`（页面脚本的哈希）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定、页面有没有点名用它，见下面第 5 条） |
 | `verdict` | `delivered`、`oneShot`、没过的原因、`needsReview`（评测器靠文件定不了、留给人看的事）、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
 
 ## 自动判定
@@ -95,7 +95,7 @@ node eval/run.mjs --dry-run --cases <目录>                    # 校验放在�
 2. 出片了。
 3. 成片符合用例：时长落在 `durationSec` 里，画幅对，timeline 的 `audio.mode` 对（不是 `none` 时成片要有音轨），`timeline` 里的值对，页面脚本调用了 `uses` 里的每个函数，`files` 的每个路径都对得上，用例有 `brand` 时品牌对。
 4. 故事在成片上站得住：story.json 里有拍，render 没报 `story-static-beat`（某一拍头尾两帧看起来一样）。没有转折的故事、和文字 cue 对不上的字，check 已经拦下（`story-arc`、`story-text`），出片就说明过了这两关。
-5. 用例的规矩守住了，出不出片都要守：任何合成里都没有和 `notCopied` 文件字节相同的文件，除非它是 `stock fetch` 取来的（SOURCES.json 里的条目带 `openverse:`、`pexels:` 或 `pixabay:` 开头的 id），也没有哪个合成提到这个文件名。
+5. 用例的规矩守住了，出不出片都要守。对每个 `notCopied` 文件，评测器在每个合成里找确定来自它的文件：它本身，字节相同、又不是 `stock fetch` 取来的副本，以及从这些文件抠出来的图（顺着 SOURCES.json 里的 `cutFrom` 找）。副本的条目带 `openverse:`、`pexels:` 或 `pixabay:` 开头的 id 和 `url`，并且合成里有 `stock fetch` 留下的报告，才算取来的。页面用了这些文件就判失败：页面、脚本或样式表在字符串、属性或 CSS `url()` 里点了它的名。注释、story.json 和宿主的回复里随便提这个文件都不算，说清楚为什么没用它，正是这条用例希望看到的。评测器拿不准的记进 `needsReview`，不判失败：没有任何地方点名的这类文件，用片段拼出来、可能是它的文件名，只在 SOURCES.json 条目里提到它的图，声称取来却没有报告的副本，以及来源既不是 `stock fetch` 也不是生成的图（可能是它重新编码或裁过的版本）。
 6. 人没有改过任何文件。评测器全程无人值守，这条自动满足。
 
 用例的成片是 `optional` 时，第 2 到 4 条只在出了片时才算。
@@ -159,7 +159,7 @@ node eval/run.mjs --dry-run --cases <目录>                    # 校验放在�
 | `expect.uses` | 页面脚本必须调用的运行时函数，写运行时自己的名字，比如 `"puppet"`。`"a\|b"` 表示两个都行。每个名字都必须是运行时导出的函数。怎么找调用见[怎样读 `uses`](#怎样读-uses) |
 | `expect.files` | 合成目录里必须有的路径，`*` 只在一层目录里匹配，比如 `"assets/puppets/*/rig.json"` |
 | `expect.brand` | brand.json 里应有的 `name` 和 `primary`，`palette`（brand.json 里每个颜色都要在其中），`logo`（brand.json 的 logo 必须是这个工作区文件的副本） |
-| `expect.notCopied` | 不许进片子的工作区文件 |
+| `expect.notCopied` | 不许进片子的工作区文件，按[自动判定](#自动判定)第 5 条判 |
 | `expect.review` | 这条用例要复核的人回答的问题 |
 
 ## 结果

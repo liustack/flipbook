@@ -11,7 +11,6 @@
 //
 // What a case checks and how a run is judged: eval/judge.mjs and docs/eval.md.
 import { spawn, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
     chmodSync,
     cpSync,
@@ -411,10 +410,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
         ffmpeg: info.ffmpeg,
         host,
         workspaceFiles,
-        compositions: compositions.map(({ source, ...rest }) => ({
-            ...rest,
-            sourceSha256: createHash('sha256').update(source).digest('hex'),
-        })),
+        compositions,
     };
     evidence.verdict = judge(entry.spec, { host, compositions, workspaceFiles });
     const slug = `${entry.name}--${target.name.replace(/[^\w.-]+/g, '_')}--run${run}`;
