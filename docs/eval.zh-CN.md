@@ -66,7 +66,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 ```
 
 - 目标在 `eval/models.json`：`flagship`（Claude Code 加 Opus 5.5）、`floor`（Claude Code 加 Opus 5）、`astra`（Codex 加 GPT-6 Astra，只公开数字不设线）。
-- 每次每条在一个全新的临时目录里跑：把工作区的 `skills/flipbook` 拷进宿主读 skill 的目录（Claude Code 是 `.claude/skills/`，Codex 是 `.agents/skills/` 和 `.codex/skills/` 再加一份指向它的 AGENTS.md），放一个 `flipbook` 小脚本在 PATH 最前面，指向工作区的 `dist/main.js`，再摆好用例的文件。启动器优先用 PATH 上兼容的 CLI，所以评测的是工作区的代码，不是 npm 上的版本。在 macOS 和 Linux 上，这个小脚本还留下每次运行的 JSON 报告，每次 `stock fetch` 都有自己的证据，后一次覆盖了合成里 flipbook 存的报告也不丢。报告放在 `eval/results/<日期>/reports/<用例>--<目标>--run<N>/`，这是评测器在工作区外面建的目录，经环境变量 `FLIPBOOK_EVAL_REPORTS` 告诉小脚本，工作区里没有评测器自己的报告。评测器怎么守、怎么读这个目录，见[信任边界](#信任边界)。
+- 每次每条在一个全新的临时目录里跑：把工作区的 `skills/flipbook` 拷进宿主读 skill 的目录（Claude Code 是 `.claude/skills/`，Codex 是 `.agents/skills/` 和 `.codex/skills/` 再加一份指向它的 AGENTS.md），放一个 `flipbook` 小脚本在 PATH 最前面，指向工作区的 `dist/main.js`，再摆好用例的文件。启动器优先用 PATH 上兼容的 CLI，所以评测的是工作区的代码，不是 npm 上的版本。这个小脚本是一个 sh 入口（Windows 上是 .cmd），用 Node 跑一份 CommonJS 主体 `.eval-bin/flipbook-shim.cjs`，工作区里的 package.json 改变不了 Node 怎么读它。在 macOS 和 Linux 上，这个小脚本还留下每次运行的 JSON 报告，每次 `stock fetch` 都有自己的证据，后一次覆盖了合成里 flipbook 存的报告也不丢。报告放在 `eval/results/<日期>/reports/<用例>--<目标>--run<N>/`，这是评测器在工作区外面建的目录，经环境变量 `FLIPBOOK_EVAL_REPORTS` 告诉小脚本，工作区里没有评测器自己的报告。评测器怎么守、怎么读这个目录，见[信任边界](#信任边界)。
 - 提示词是用例的 `prompt` 加一句固定的无人值守说明：没有人会回答问题，不要提问，没说的按默认值，交付成片路径，没交付就说明原因。证据里记完整提示词。
 - 宿主用评测机当前用户的登录和全局配置。证据里记宿主版本，宿主版本变了单独标注，不和旧结果直接比。
 - 超时：单次 30 分钟墙钟，或者用例的 `timeoutMin`，`--timeout-min` 两者都盖过。从图起步的两条设的 45 分钟是跑之前定的预算，第一轮跑完按证据里的耗时再校准。到点杀掉宿主，这次记失败，`host.timedOut` 为 true。

@@ -28,17 +28,21 @@ export const REPORTS_ENV = 'FLIPBOOK_EVAL_REPORTS';
 
 const isWindows = process.platform === 'win32';
 
+/** The file the shim's body lives in, next to the `flipbook` entry. */
+const BODY = 'flipbook-shim.cjs';
+
 /**
- * The sh-side shim, a small Node script: it runs the CLI, passes its stdout
- * and exit code through, and keeps the stdout (the JSON report) as a new
- * file in FLIPBOOK_EVAL_REPORTS when that is set and still a real directory
- * at exactly the path given, no link on the way. The file is created with
- * O_EXCL and O_NOFOLLOW, so it never replaces or follows anything. Anything
- * else and no report is kept, the CLI runs all the same.
+ * The shim's body, a small CommonJS script in a .cjs file, so Node runs it
+ * the same way whatever package.json the workspace has: it runs the CLI,
+ * passes its stdout and exit code through, and keeps the stdout (the JSON
+ * report) as a new file in FLIPBOOK_EVAL_REPORTS when, at the moment it
+ * looks, that is set and a real directory at exactly the path given, no
+ * link on the way. It then tries to create the file with O_EXCL and
+ * O_NOFOLLOW, so it never replaces or follows one. Anything else and no
+ * report is kept, the CLI runs all the same.
  */
-function nodeShim(cli) {
-    return `#!${process.execPath}
-'use strict';
+function shimBody(cli) {
+    return `'use strict';
 const { spawnSync } = require('node:child_process');
 const { randomBytes } = require('node:crypto');
 const fs = require('node:fs');
@@ -70,15 +74,18 @@ if (dir && out.length > 0) {
 }
 
 /**
- * `flipbook` shims that run this checkout's CLI: a Node script for POSIX
- * shells (Git Bash included) that also keeps each report (see nodeShim),
- * and, on Windows, a .cmd for everything else, which keeps none.
+ * `flipbook` shims that run this checkout's CLI through the body in
+ * flipbook-shim.cjs (see shimBody): a sh entry for POSIX shells (Git Bash
+ * included) and, on Windows, a .cmd for everything else. Both start Node on
+ * the .cjs file by its full path, so neither depends on the workspace.
  */
 export function writeShims(bin, cli) {
-    writeFileSync(join(bin, 'flipbook'), nodeShim(cli));
+    const body = join(bin, BODY);
+    writeFileSync(body, shimBody(cli));
+    writeFileSync(join(bin, 'flipbook'), `#!/bin/sh\nexec "${process.execPath}" "${body}" "$@"\n`);
     chmodSync(join(bin, 'flipbook'), 0o755);
     if (isWindows) {
-        writeFileSync(join(bin, 'flipbook.cmd'), `@"${process.execPath}" "${cli}" %*\r\n`);
+        writeFileSync(join(bin, 'flipbook.cmd'), `@"${process.execPath}" "${body}" %*\r\n`);
     }
 }
 

@@ -164,3 +164,64 @@ describe.skipIf(process.platform === 'win32')('the flipbook shim', () => {
         expect(readdirSync(pin.real)).toEqual([]);
     });
 });
+
+describe.skipIf(process.platform === 'win32')(
+    'the flipbook shim in a workspace of ES modules',
+    () => {
+        /** A workspace whose package.json makes every .js and extensionless file an ES module. */
+        function esmWorkspace() {
+            const ws = fresh('esm');
+            writeFileSync(join(ws, 'package.json'), JSON.stringify({ type: 'module' }));
+            const bin = join(ws, '.eval-bin');
+            mkdirSync(bin);
+            writeShims(bin, cli);
+            const reports = join(ws, '..', `${ws.split('/').pop()}-reports`);
+            mkdirSync(reports);
+            temps.push(reports);
+            return { ws, bin, pin: pinReports(reports) };
+        }
+
+        it('prints the version', () => {
+            const { bin } = esmWorkspace();
+            expect(shimVersion(bin)).toMatch(/^\d+\.\d+\.\d+$/);
+        });
+
+        it('keeps the report of a normal run', () => {
+            const { ws, bin, pin } = esmWorkspace();
+            const result = spawnSync(join(bin, 'flipbook'), ['--version'], {
+                cwd: ws,
+                encoding: 'utf-8',
+                env: { ...process.env, [REPORTS_ENV]: pin.real },
+            });
+            expect(result.status).toBe(0);
+            const check = spawnSync(join(bin, 'flipbook'), ['check', join(ws, 'missing')], {
+                cwd: ws,
+                encoding: 'utf-8',
+                env: { ...process.env, [REPORTS_ENV]: pin.real },
+            });
+            const kept = shimReports(pin);
+            expect(kept.problem).toBeNull();
+            expect(kept.reports).toEqual([JSON.parse(check.stdout)]);
+        });
+
+        it('passes a CLI error through: its exit code, its report and its message', () => {
+            const { ws, bin, pin } = esmWorkspace();
+            const missing = join(ws, 'missing');
+            const direct = spawnSync(process.execPath, [cli, 'check', missing], {
+                cwd: ws,
+                encoding: 'utf-8',
+            });
+            const shimmed = spawnSync(join(bin, 'flipbook'), ['check', missing], {
+                cwd: ws,
+                encoding: 'utf-8',
+                env: { ...process.env, [REPORTS_ENV]: pin.real },
+            });
+            expect(direct.status).toBe(2);
+            expect(shimmed.status).toBe(2);
+            expect(JSON.parse(shimmed.stdout).usageError).toBe(
+                JSON.parse(direct.stdout).usageError,
+            );
+            expect(shimmed.stderr).toContain('does not exist');
+        });
+    },
+);
