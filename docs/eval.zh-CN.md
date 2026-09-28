@@ -66,7 +66,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 ```
 
 - 目标在 `eval/models.json`：`flagship`（Claude Code 加 Opus 5.5）、`floor`（Claude Code 加 Opus 5）、`astra`（Codex 加 GPT-6 Astra，只公开数字不设线）。
-- 每次每条在一个全新的临时目录里跑：把工作区的 `skills/flipbook` 拷进宿主读 skill 的目录（Claude Code 是 `.claude/skills/`，Codex 是 `.agents/skills/` 和 `.codex/skills/` 再加一份指向它的 AGENTS.md），放一个 `flipbook` 小脚本在 PATH 最前面，指向工作区的 `dist/main.js`，再摆好用例的文件。启动器优先用 PATH 上兼容的 CLI，所以评测的是工作区的代码，不是 npm 上的版本。在 macOS 和 Linux 上，这个小脚本还把每次运行的 JSON 报告留在 `.eval-bin/reports/`，每次 `stock fetch` 都有自己的证据，后一次覆盖了合成里 flipbook 存的报告也不丢。
+- 每次每条在一个全新的临时目录里跑：把工作区的 `skills/flipbook` 拷进宿主读 skill 的目录（Claude Code 是 `.claude/skills/`，Codex 是 `.agents/skills/` 和 `.codex/skills/` 再加一份指向它的 AGENTS.md），放一个 `flipbook` 小脚本在 PATH 最前面，指向工作区的 `dist/main.js`，再摆好用例的文件。启动器优先用 PATH 上兼容的 CLI，所以评测的是工作区的代码，不是 npm 上的版本。在 macOS 和 Linux 上，这个小脚本还留下每次运行的 JSON 报告，每次 `stock fetch` 都有自己的证据，后一次覆盖了合成里 flipbook 存的报告也不丢。报告放在 `eval/results/<日期>/reports/<用例>--<目标>--run<N>/`，这是评测器在工作区外面建的目录，经环境变量 `FLIPBOOK_EVAL_REPORTS` 告诉小脚本，工作区里没有评测器自己的报告。评测器只读这个目录，只读真实路径在目录里的普通文件，里面的链接不跟。
 - 提示词是用例的 `prompt` 加一句固定的无人值守说明：没有人会回答问题，不要提问，没说的按默认值，交付成片路径，没交付就说明原因。证据里记完整提示词。
 - 宿主用评测机当前用户的登录和全局配置。证据里记宿主版本，宿主版本变了单独标注，不和旧结果直接比。
 - 超时：单次 30 分钟墙钟，或者用例的 `timeoutMin`，`--timeout-min` 两者都盖过。从图起步的两条设的 45 分钟是跑之前定的预算，第一轮跑完按证据里的耗时再校准。到点杀掉宿主，这次记失败，`host.timedOut` 为 true。
@@ -83,7 +83,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `hostVersion`、`node`、`ffmpeg` | 环境 |
 | `host` | 退出码、是否超时、耗时、宿主报的花费和用量、宿主最后的回复、stdout 和 stderr 末尾 |
 | `workspaceFiles` | 用例放进工作区的每个文件的大小和 sha256，在宿主开跑之前取 |
-| `stockFetches` | 宿主经评测器的 `flipbook` 小脚本跑过的每次 `stock fetch`：成没成功、哪个合成、id 和文件 |
+| `shimReports`、`stockFetches` | 评测器留下每次 CLI 运行报告的目录（相对仓库），以及其中每次 `stock fetch`：成没成功、哪个合成、id 和文件 |
 | `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`page`（`entries` 和 `modules`：index.html 加载的脚本和它们走到的本地模块，`imports`：其中有没有导入 flipbook 运行时，`calls`：调用了运行时的哪些函数，`passed`：交给别的代码的运行时函数，`references`：页面点到的每个文件和点在哪里，`builtPaths` 和 `computedPaths`：运行时加载函数用片段拼出或算出来的路径，见[来源不明的图](#来源不明的图)，`notes`：评测器跟不下去的地方，见[怎样读 `uses`](#怎样读-uses)），覆盖这些模块的 `sourceSha256`、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`refused`（评测器不读的文件，见[自动判定](#自动判定)）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定，`named`：页面在哪里点到它，`built`：拼出来的路径可不可能是它，见[来源不明的图](#来源不明的图)） |
 | `verdict` | `delivered`、`oneShot`、没过的原因、`needsReview`（评测器靠文件定不了、留给人看的事）、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
 
@@ -103,7 +103,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 
 评测器只查结构、名字和字节。故事值不值得讲、画面有没有讲出来、纸偶和抠图好不好看，归人判。评测器定不了的事也归人判：它们记进 `verdict.needsReview`，不判失败。
 
-评测器判定用到的文件都经同一个读取入口：index.html、它加载的脚本和样式表、timeline.json、story.json、SOURCES.json、brand.json 和它的 logo、音乐文件、flipbook 的报告和成片。只读真实路径（链接跟到底）在工作区里的普通文件，宿主和评测器自己的目录一律不读（agent 自己的文件还不读 `.flipbook/` 和 `out/` 里的）。指向工作区外的链接、断链、落在不读目录里的文件都不读，记在合成的 `refused` 里，并进 `needsReview`。
+评测器判定用到的文件都经同一个读取入口：index.html、它加载的脚本和样式表、timeline.json、story.json、SOURCES.json、brand.json 和它的 logo、音乐文件、flipbook 的报告和成片。只读真实路径（链接跟到底）在工作区里的普通文件，宿主和评测器自己的目录一律不读（agent 自己的文件还不读 `.flipbook/` 和 `out/` 里的）。指向工作区外的链接、断链、落在不读目录里的文件都不读，记在合成的 `refused` 里，并进 `needsReview`。唯一从别处读的是评测器自己留的 CLI 运行报告，它从来不在工作区里（见[跑法](#跑法)）。
 
 ### 来源不明的图
 

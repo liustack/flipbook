@@ -42,7 +42,7 @@ skills/flipbook/   SKILL.md（英文）、references/（story、characters、rul
 docs/              report-schema.md、timeline-schema.md、story-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
 docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
 examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro、long-scroll（三分钟长片）、specimen-board（stock fetch 下的公有领域图版抠成贴纸）、riffle（迈布里奇奔马连拍做成的手翻书，specimens() 自动找格子）、postman（代码画的剪纸纸偶邮差，风把信吹走的故事，puppet() 的样例）、postman-print（同一个故事，部件来自生成的木刻部件图，flipbook puppet 装配），postman-wave（清早的窗里孩子挥手，邮差是生成的逐帧精灵，flipbook sprite 切的）、pixel-sprout（像素小机器人浇了三天水等到发芽，pixel() 的样例），每个例子一份源码加 expected.json，不提交 mp4
-eval/              评测用例、models.json、run.mjs（跑）、cases.mjs（用例格式和校验）、judge.mjs（判）、page.mjs（从 index.html 顺着加载的脚本解析：按绑定认运行时调用，列出页面在哪里点到文件，只作给人看的证据）、shim.mjs（放在 PATH 最前面的 flipbook 小脚本，留下每次运行的报告）、recheck.mjs（在工作区副本上独立复检）、files.mjs（共用的文件小工具，以及判定读工作区文件的唯一入口），测试是同名的 .test.mjs，证据写到 eval/results/（不入库）
+eval/              评测用例、models.json、run.mjs（跑）、cases.mjs（用例格式和校验）、judge.mjs（判）、page.mjs（从 index.html 顺着加载的脚本解析：按绑定认运行时调用，列出页面在哪里点到文件，只作给人看的证据）、shim.mjs（放在 PATH 最前面的 flipbook 小脚本，把每次运行的报告留在工作区外、评测器自己的目录）、recheck.mjs（在工作区副本上独立复检）、files.mjs（共用的文件小工具，以及判定读工作区文件的唯一入口），测试是同名的 .test.mjs，证据写到 eval/results/（不入库）
 test/              vitest 快档，坏片语料在 test/fixtures/bad/
 test/e2e/          vitest 端到端档：坏片语料、reference 片段、每个样例的 check 和帧摘要
 test/release/      vitest 发版档：hello、eggs-five/five、long-scroll 的完整渲染

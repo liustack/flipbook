@@ -32,7 +32,7 @@ import { sha256File } from './files.mjs';
 import { inspect, judge, tally } from './judge.mjs';
 import { runtimeExports } from './page.mjs';
 import { recheck, renderShape } from './recheck.mjs';
-import { shimReports, shimVersion, writeShims } from './shim.mjs';
+import { REPORTS_ENV, shimReports, shimVersion, writeShims } from './shim.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
@@ -311,13 +311,13 @@ function probe(video) {
     };
 }
 
-function runHost(target, prompt, ws, bin, timeoutMin) {
+function runHost(target, prompt, ws, bin, timeoutMin, reports) {
     const host = HOSTS[target.host];
     return new Promise((resolve) => {
         const started = Date.now();
         const child = spawn(host.bin, host.args(target.model, prompt, ws), {
             cwd: ws,
-            env: envWithBin(bin),
+            env: { ...envWithBin(bin), [REPORTS_ENV]: reports },
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         const out = [];
@@ -350,8 +350,11 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
     const timeoutMin = opts.timeoutMin ?? entry.spec.timeoutMin ?? DEFAULT_TIMEOUT_MIN;
     const { ws, bin, files: workspaceFiles } = prepareWorkspace(entry, target.host);
     process.stderr.write(`eval: ${entry.name} x ${target.name} run ${run} in ${ws}\n`);
-    const host = await runHost(target, prompt, ws, bin, timeoutMin);
-    const stockReports = shimReports(bin).filter((r) => r.command === 'stock-fetch');
+    const slug = `${entry.name}--${target.name.replace(/[^\w.-]+/g, '_')}--run${run}`;
+    const reports = join(resultsDir, 'reports', slug);
+    mkdirSync(reports, { recursive: true });
+    const host = await runHost(target, prompt, ws, bin, timeoutMin, reports);
+    const stockReports = shimReports(reports).filter((r) => r.command === 'stock-fetch');
     const compositions = findCompositions(ws).map((dir) => {
         const seen = inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles, stockReports });
         const flags = renderShape(seen.lastRender);
@@ -379,6 +382,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
         ffmpeg: info.ffmpeg,
         host,
         workspaceFiles,
+        shimReports: relative(repoRoot, reports),
         stockFetches: stockReports.map((r) => ({
             ok: r.ok,
             dir: r.composition?.dir ?? null,
@@ -388,7 +392,6 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
         compositions,
     };
     evidence.verdict = judge(entry.spec, { host, compositions, workspaceFiles });
-    const slug = `${entry.name}--${target.name.replace(/[^\w.-]+/g, '_')}--run${run}`;
     const films = join(resultsDir, 'films', slug);
     for (const [i, c] of evidence.compositions.entries()) {
         mkdirSync(films, { recursive: true });
