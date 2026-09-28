@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { sha256File } from './files.mjs';
-import { inspect, judge } from './judge.mjs';
+import { inspect, judge, reviewOutcome, tally } from './judge.mjs';
 
 const temps = [];
 afterAll(() => {
@@ -386,5 +388,149 @@ describe('eval verdict on the user music', () => {
             'timeline audio.mode is "score", expected file',
             'the timeline plays no music file, expected assets/music.wav',
         ]);
+    });
+});
+
+/** Evidence as the runner writes it, with a review filled in by `review`. */
+function evidenceOf({
+    name = 'waiting',
+    run = 1,
+    film = true,
+    oneShot = true,
+    review = {},
+    needsReview = [],
+}) {
+    return {
+        case: name,
+        run,
+        asks: ['story', 'film'],
+        target: { name: 'flagship', label: 'Claude Opus 5.5' },
+        compositions: film ? [{ video: '/x/video.mp4' }] : [],
+        verdict: {
+            delivered: film,
+            oneShot,
+            reasons: oneShot ? [] : ['host exited 1'],
+            needsReview,
+            humanReview: {
+                retold: null,
+                turnOnScreen: null,
+                beatsMatch: null,
+                case: [
+                    { question: 'q1', answer: null },
+                    { question: 'q2', answer: null },
+                ],
+                silentBadFilm: null,
+                movingSlides: null,
+                notes: '',
+                ...review,
+            },
+        },
+    };
+}
+
+const CLEAN = {
+    retold: 'an old man waits, and one pigeon comes back',
+    turnOnScreen: true,
+    beatsMatch: true,
+    silentBadFilm: false,
+    movingSlides: false,
+    case: [
+        { question: 'q1', answer: true },
+        { question: 'q2', answer: 'n/a' },
+    ],
+};
+
+describe('human review', () => {
+    it('passes a run only when it passed automatically and every item that applies is answered well', () => {
+        expect(reviewOutcome(evidenceOf({ review: CLEAN }))).toEqual({
+            complete: true,
+            missing: [],
+            failed: [],
+            passed: true,
+        });
+        expect(reviewOutcome(evidenceOf({ oneShot: false, review: CLEAN })).passed).toBe(false);
+        expect(
+            reviewOutcome(
+                evidenceOf({ review: { ...CLEAN, beatsMatch: false, movingSlides: true } }),
+            ),
+        ).toMatchObject({ complete: true, failed: ['beatsMatch', 'movingSlides'], passed: false });
+    });
+
+    it('waits for every answer, and for notes on what the runner left to a person', () => {
+        const half = reviewOutcome(
+            evidenceOf({ review: { turnOnScreen: true }, needsReview: ['x'] }),
+        );
+        expect(half).toEqual({
+            complete: false,
+            missing: [
+                'retold',
+                'beatsMatch',
+                'silentBadFilm',
+                'movingSlides',
+                'case[0]',
+                'case[1]',
+                'notes',
+            ],
+            failed: [],
+            passed: null,
+        });
+    });
+
+    it('asks only the case questions of a run that made no film', () => {
+        const outcome = reviewOutcome(
+            evidenceOf({
+                film: false,
+                review: {
+                    case: [
+                        { question: 'q1', answer: true },
+                        { question: 'q2', answer: false },
+                    ],
+                },
+            }),
+        );
+        expect(outcome).toEqual({
+            complete: true,
+            missing: [],
+            failed: ['case[1]'],
+            passed: false,
+        });
+    });
+
+    it('counts a round by target and question, and lists what is left to review', () => {
+        const byTarget = tally([
+            evidenceOf({ name: 'waiting', review: CLEAN }),
+            evidenceOf({ name: 'pigeons', oneShot: false, review: CLEAN }),
+            evidenceOf({ name: 'riso-blackout' }),
+        ]);
+        expect(byTarget.flagship).toMatchObject({
+            cases: ['pigeons', 'riso-blackout', 'waiting'],
+            runsPerCase: 1,
+            runs: 3,
+            delivered: 3,
+            oneShot: 2,
+            reviewed: 2,
+            passed: 1,
+            byQuestion: { story: { runs: 3, passed: 1 }, film: { runs: 3, passed: 1 } },
+        });
+        expect(byTarget.flagship.toReview).toEqual([
+            'riso-blackout run 1: retold, turnOnScreen, beatsMatch, silentBadFilm, movingSlides, case[0], case[1]',
+        ]);
+    });
+
+    it('prints the tally of a results directory and writes tally.json there', () => {
+        const dir = mkdtempSync(join(tmpdir(), 'flipbook-tally-'));
+        temps.push(dir);
+        write(dir, 'waiting--flagship--run1.json', evidenceOf({ review: CLEAN }));
+        write(dir, 'pigeons--flagship--run1.json', evidenceOf({ name: 'pigeons' }));
+        write(dir, 'summary-1.json', { rows: [] });
+        const result = spawnSync(
+            process.execPath,
+            [join(dirname(fileURLToPath(import.meta.url)), 'run.mjs'), '--tally', dir],
+            { encoding: 'utf-8' },
+        );
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout).toContain('delivered 2, one-shot 2, reviewed 1, passed 1');
+        expect(result.stdout).toContain('to review: pigeons run 1');
+        expect(JSON.parse(readFileSync(join(dir, 'tally.json'), 'utf-8')).flagship.runs).toBe(2);
     });
 });

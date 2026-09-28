@@ -373,3 +373,89 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
         },
     };
 }
+
+/**
+ * Where a person's review of one run stands. `complete` once every item that
+ * applies has an answer: `retold`, `turnOnScreen`, `beatsMatch`,
+ * `silentBadFilm` and `movingSlides` when a film was made, every case
+ * question (true, false, or "n/a" when it does not apply to this run), and
+ * `notes` when the runner left items in `needsReview`. `passed`: an
+ * automatic one-shot pass whose review is complete and clean, null until
+ * the review is complete.
+ */
+export function reviewOutcome(evidence) {
+    const { verdict } = evidence;
+    const h = verdict.humanReview;
+    const missing = [];
+    const failed = [];
+    const want = (name, value, good) => {
+        if (value === null || value === undefined) missing.push(name);
+        else if (value !== good) failed.push(name);
+    };
+    if ((evidence.compositions ?? []).some((c) => c.video)) {
+        if (!h.retold) missing.push('retold');
+        want('turnOnScreen', h.turnOnScreen, true);
+        want('beatsMatch', h.beatsMatch, true);
+        want('silentBadFilm', h.silentBadFilm, false);
+        want('movingSlides', h.movingSlides, false);
+    }
+    h.case.forEach((q, i) => {
+        if (q.answer !== 'n/a') want(`case[${i}]`, q.answer, true);
+    });
+    if ((verdict.needsReview ?? []).length > 0 && !h.notes) missing.push('notes');
+    const complete = missing.length === 0;
+    return {
+        complete,
+        missing,
+        failed,
+        passed: complete ? verdict.oneShot && failed.length === 0 : null,
+    };
+}
+
+/**
+ * A round's results by target, from its evidence files: runs, films
+ * delivered, automatic one-shot passes, reviews complete, runs passed
+ * (automatic and by eye), and passes by question. `cases` and `runsPerCase`
+ * say which rounds can be compared with it.
+ */
+export function tally(evidences) {
+    const byTarget = {};
+    for (const evidence of evidences) {
+        const name = evidence.target.name;
+        byTarget[name] ??= {
+            label: evidence.target.label,
+            cases: new Set(),
+            runs: 0,
+            delivered: 0,
+            oneShot: 0,
+            reviewed: 0,
+            passed: 0,
+            silentBadFilms: 0,
+            movingSlides: 0,
+            byQuestion: {},
+            toReview: [],
+        };
+        const t = byTarget[name];
+        const outcome = reviewOutcome(evidence);
+        const h = evidence.verdict.humanReview;
+        t.cases.add(evidence.case);
+        t.runs++;
+        if (evidence.verdict.delivered) t.delivered++;
+        if (evidence.verdict.oneShot) t.oneShot++;
+        if (outcome.complete) t.reviewed++;
+        else t.toReview.push(`${evidence.case} run ${evidence.run}: ${outcome.missing.join(', ')}`);
+        if (outcome.passed) t.passed++;
+        if (h.silentBadFilm === true) t.silentBadFilms++;
+        if (h.movingSlides === true) t.movingSlides++;
+        for (const q of evidence.asks ?? []) {
+            t.byQuestion[q] ??= { runs: 0, passed: 0 };
+            t.byQuestion[q].runs++;
+            if (outcome.passed) t.byQuestion[q].passed++;
+        }
+    }
+    for (const t of Object.values(byTarget)) {
+        t.runsPerCase = t.runs / t.cases.size;
+        t.cases = [...t.cases].sort();
+    }
+    return byTarget;
+}

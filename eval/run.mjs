@@ -8,6 +8,7 @@
 //   node eval/run.mjs --target flagship --runs 2 waiting pigeons
 //   node eval/run.mjs --model claude-code:claude-opus-5 --timeout-min 20
 //   node eval/run.mjs --dry-run --cases <dir>       validate cases kept somewhere else
+//   node eval/run.mjs --tally eval/results/<date>   count a round once people have reviewed it
 //
 // What a case checks and how a run is judged: eval/judge.mjs and docs/eval.md.
 import { spawn, spawnSync } from 'node:child_process';
@@ -28,7 +29,7 @@ import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOST_DIRS, validateCase, workspaceSource } from './cases.mjs';
 import { sha256File } from './files.mjs';
-import { inspect, judge } from './judge.mjs';
+import { inspect, judge, tally } from './judge.mjs';
 import { recheck, renderShape } from './recheck.mjs';
 import { runtimeExports } from './scripts.mjs';
 
@@ -114,6 +115,7 @@ const HOSTS = {
 function parseArgs(argv) {
     const opts = {
         dryRun: false,
+        tally: null,
         runs: 1,
         targets: [],
         models: [],
@@ -131,6 +133,7 @@ function parseArgs(argv) {
         else if (arg === '--timeout-min') opts.timeoutMin = Number(argv[++i]);
         else if (arg === '--keep') opts.keep = true;
         else if (arg === '--cases') opts.casesDir = resolve(argv[++i]);
+        else if (arg === '--tally') opts.tally = resolve(argv[++i]);
         else if (arg.startsWith('-')) throw new Error(`Unknown flag: ${arg}`);
         else opts.ids.push(arg);
     }
@@ -434,8 +437,38 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
     return { file, evidence };
 }
 
+/**
+ * Count a round from its evidence files, after people filled in the human
+ * reviews: prints each target's numbers and writes them to tally.json there.
+ */
+function printTally(dir) {
+    const evidences = readdirSync(dir)
+        .filter((f) => f.endsWith('.json') && !/^(summary-.*|tally)\.json$/.test(f))
+        .map((f) => JSON.parse(readFileSync(join(dir, f), 'utf-8')))
+        .filter((e) => e.verdict && e.target);
+    if (evidences.length === 0) throw new Error(`No evidence files in ${dir}`);
+    const byTarget = tally(evidences);
+    for (const [name, t] of Object.entries(byTarget)) {
+        const questions = Object.entries(t.byQuestion)
+            .map(([q, n]) => `${q} ${n.passed}/${n.runs}`)
+            .join(', ');
+        process.stdout.write(
+            `${name} (${t.label}): ${t.runs} runs of ${t.cases.length} cases, ${t.runsPerCase} each\n` +
+                `  delivered ${t.delivered}, one-shot ${t.oneShot}, reviewed ${t.reviewed}, passed ${t.passed}\n` +
+                `  silent bad films ${t.silentBadFilms}, moving slides ${t.movingSlides}\n` +
+                `  passed by question: ${questions}\n` +
+                t.toReview.map((line) => `  to review: ${line}\n`).join(''),
+        );
+    }
+    writeFileSync(join(dir, 'tally.json'), `${JSON.stringify(byTarget, null, 2)}\n`);
+}
+
 async function main() {
     const opts = parseArgs(process.argv.slice(2));
+    if (opts.tally) {
+        printTally(opts.tally);
+        return;
+    }
     const cases = loadCases(opts.ids, opts.casesDir);
     const matrix = loadMatrix(opts);
     const info = {

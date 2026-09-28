@@ -62,6 +62,7 @@ node eval/run.mjs --target flagship                           # B level: flagshi
 node eval/run.mjs --target flagship --target floor --runs 3   # C level: flagship plus floor, three runs each
 node eval/run.mjs --model claude-code:claude-opus-5 pigeons   # one case on a given host and model
 node eval/run.mjs --dry-run --cases <dir>                     # validate cases kept in another directory
+node eval/run.mjs --tally eval/results/<date>                 # count a round once it has been reviewed
 ```
 
 - Targets live in `eval/models.json`: `flagship` (Claude Code with Opus 5.5), `floor` (Claude Code with Opus 5), `astra` (Codex with GPT-6 Astra, numbers published but no bar to clear).
@@ -115,12 +116,12 @@ After the automatic verdict, a person goes through each film, its contact sheet,
 | `retold` | The story in one sentence, retold from the contact sheet alone, before reading story.json |
 | `turnOnScreen` | true when the turn shows in the pictures |
 | `beatsMatch` | true when each beat's first and last pictures show its `change` |
-| `case` | The case's own questions from `expect.review`, each with `answer` true or false, plus a note where it helps |
+| `case` | The case's own questions from `expect.review`, each with `answer` true, false, or `"n/a"` when the question does not apply to this run (a question about the film, when the case allowed none and none was made), plus a note where it helps |
 | `silentBadFilm` | true when the run passed automatically but the film is broken to the eye |
 | `movingSlides` | See below |
 | `notes` | Anything else |
 
-A silent bad film becomes a bad-film fixture in `test/fixtures/bad/` before flipbook gets fixed. A run of `unknown-plate` without a film answers only `case` and `notes`.
+A silent bad film becomes a bad-film fixture in `test/fixtures/bad/` before flipbook gets fixed. A run without a film answers only `case` and `notes`. When a person finds the runner wrong (a sound film failed, or a broken rule missed), the fix goes into the runner or the case with a test, and the round is compared only once it is judged again.
 
 Blind review: hide the model, host and version, shuffle the order, and write `retold` before reading story.json.
 
@@ -138,7 +139,10 @@ Fill in the three items one at a time before deciding, and record the result in 
 
 - B level: the flagship model, every case once. C level: the flagship and floor models, three runs each, for 1.0 and when a supported model gets a new generation.
 - Neither runs for every version. Run one when a change to SKILL.md or its references could change what agents make and the author decides it is worth the money.
-- The first B-level round on these cases sets the baseline. A later round holds up when one-shot passes drop by at most 1 from the round before, `turnOnScreen` is true in at least as many films, no film is a silent bad film and none counts as moving slides.
+- A run **passes** when it is a one-shot pass and its human review is complete and clean: `retold` written, `turnOnScreen` and `beatsMatch` true, `silentBadFilm` and `movingSlides` false (these five only when a film was made), every `case` answer true or `"n/a"`, and a note in `notes` when `needsReview` is not empty. A one-shot pass alone is not a pass, and a person cannot turn an automatic failure into one.
+- `node eval/run.mjs --tally eval/results/<date>` counts a round from its evidence files once people have filled them in: per target, runs, films delivered, one-shot passes, reviews complete, runs passed, silent bad films, moving slides, passes by question in `asks`, and the runs still waiting for review. It also writes the numbers to `tally.json` in that directory.
+- Rounds are compared only when they have the same target, the same cases and the same runs per case (the tally prints all three), and by pass rate, never by raw counts. A B-level and a C-level round are never compared.
+- The first B-level round on these cases becomes the baseline only when every review is complete, no film is a silent bad film or moving slides, and the author has looked at the films and accepts them as the starting point. A later round holds up when its pass rate is at most one run in ten below the baseline's, with no silent bad film and no film counting as moving slides.
 
 ## Case format
 
