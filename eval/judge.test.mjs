@@ -595,8 +595,9 @@ describe('human review', () => {
             evidenceOf({ name: 'riso-blackout' }),
         ]);
         expect(byTarget.flagship).toMatchObject({
-            cases: ['pigeons', 'riso-blackout', 'waiting'],
-            runsPerCase: 1,
+            runsByCase: { pigeons: 1, 'riso-blackout': 1, waiting: 1 },
+            even: true,
+            repeated: [],
             runs: 3,
             delivered: 3,
             oneShot: 2,
@@ -607,6 +608,20 @@ describe('human review', () => {
         expect(byTarget.flagship.toReview).toEqual([
             'riso-blackout run 1: retold, turnOnScreen, beatsMatch, silentBadFilm, movingSlides, case[0], case[1]',
         ]);
+    });
+
+    it('shows how often each case ran, and flags uneven or repeated runs', () => {
+        const byTarget = tally([
+            evidenceOf({ name: 'waiting', run: 1 }),
+            evidenceOf({ name: 'waiting', run: 2 }),
+            evidenceOf({ name: 'waiting', run: 2 }),
+            evidenceOf({ name: 'pigeons', run: 1 }),
+        ]);
+        expect(byTarget.flagship).toMatchObject({
+            runsByCase: { pigeons: 1, waiting: 3 },
+            even: false,
+            repeated: ['waiting run 2'],
+        });
     });
 
     it('prints the tally of a results directory and writes tally.json there', () => {

@@ -70,7 +70,7 @@ node eval/run.mjs --tally eval/results/<date>                 # count a round on
 - The prompt is the case's `prompt` plus a fixed note for running unattended: nobody will answer questions, so ask none, use the defaults for anything unstated, and deliver the film's path or say why there is none. The evidence records the full prompt.
 - The host uses the eval machine's current login and global config. The evidence records the host version. Results from a different host version are marked as such and not compared directly with older ones.
 - Timeout: 30 minutes of wall-clock time per run, or the case's `timeoutMin`. `--timeout-min` overrides both. The two cases that start from sheets have 45: a budget set before any run of them, to be calibrated after the first round from the times in the evidence. At the limit the host is killed, the run fails, and `host.timedOut` is true.
-- A passing run's temp workspace is deleted. A failing one is kept, with its path in the evidence. All videos and contact sheets are copied to `eval/results/<date>/films/`.
+- A run's temp workspace is deleted only when the run passed automatically and left nothing in `needsReview`. Otherwise it is kept, with its path in the evidence. Pass `--keep` for a round people will review, so every workspace stays for checking where pictures came from and for judging a run again. All videos and contact sheets are copied to `eval/results/<date>/films/`.
 
 ## Evidence
 
@@ -142,7 +142,7 @@ Fill in the three items one at a time before deciding, and record the result in 
 - Neither runs for every version. Run one when a change to SKILL.md or its references could change what agents make and the author decides it is worth the money.
 - A run **passes** when it is a one-shot pass and its human review is complete and clean: `retold` written, `turnOnScreen` and `beatsMatch` true, `silentBadFilm` and `movingSlides` false (these five only when a film was made), every `case` answer true or `"n/a"`, and a note in `notes` when `needsReview` is not empty. A one-shot pass alone is not a pass, and a person cannot turn an automatic failure into one.
 - `node eval/run.mjs --tally eval/results/<date>` counts a round from its evidence files once people have filled them in: per target, runs, films delivered, one-shot passes, reviews complete, runs passed, silent bad films, moving slides, passes by question in `asks`, and the runs still waiting for review. It also writes the numbers to `tally.json` in that directory.
-- Rounds are compared only when they have the same target, the same cases and the same runs per case (the tally prints all three), and by pass rate, never by raw counts. A B-level and a C-level round are never compared.
+- Rounds are compared only when they have the same target, the same cases and the same runs per case (the tally prints the target and the runs of each case, and flags cases that ran unevenly or a run number that came twice), and by pass rate, never by raw counts. A B-level and a C-level round are never compared.
 - The first B-level round on these cases becomes the baseline only when every review is complete, no film is a silent bad film or moving slides, and the author has looked at the films and accepts them as the starting point. A later round holds up when its pass rate is at most one run in ten below the baseline's, with no silent bad film and no film counting as moving slides.
 
 ## Case format

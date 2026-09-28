@@ -420,7 +420,8 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
             c.contactSheet = join(films, `contact-sheet${suffix}.png`);
         }
     }
-    evidence.workspaceKept = opts.keep || !evidence.verdict.oneShot;
+    evidence.workspaceKept =
+        opts.keep || !evidence.verdict.oneShot || evidence.verdict.needsReview.length > 0;
     if (!evidence.workspaceKept) rmSync(ws, { recursive: true, force: true });
     const file = join(resultsDir, `${slug}.json`);
     writeFileSync(file, `${JSON.stringify(evidence, null, 2)}\n`);
@@ -443,7 +444,12 @@ function printTally(dir) {
             .map(([q, n]) => `${q} ${n.passed}/${n.runs}`)
             .join(', ');
         process.stdout.write(
-            `${name} (${t.label}): ${t.runs} runs of ${t.cases.length} cases, ${t.runsPerCase} each\n` +
+            `${name} (${t.label}): ${t.runs} runs of ${Object.keys(t.runsByCase).length} cases\n` +
+                `  runs by case: ${Object.entries(t.runsByCase)
+                    .map(([c, n]) => `${c} ${n}`)
+                    .join(', ')}\n` +
+                (t.even ? '' : '  uneven: the cases did not all run as often\n') +
+                t.repeated.map((key) => `  repeated: ${key} comes twice\n`).join('') +
                 `  delivered ${t.delivered}, one-shot ${t.oneShot}, reviewed ${t.reviewed}, passed ${t.passed}\n` +
                 `  silent bad films ${t.silentBadFilms}, moving slides ${t.movingSlides}\n` +
                 `  passed by question: ${questions}\n` +

@@ -494,8 +494,10 @@ export function reviewOutcome(evidence) {
 /**
  * A round's results by target, from its evidence files: runs, films
  * delivered, automatic one-shot passes, reviews complete, runs passed
- * (automatic and by eye), and passes by question. `cases` and `runsPerCase`
- * say which rounds can be compared with it.
+ * (automatic and by eye), and passes by question. `runsByCase` counts the
+ * runs of each case, `even` is true when every case ran as often, and
+ * `repeated` lists a case and run number that came twice: they say which
+ * rounds can be compared with this one.
  */
 export function tally(evidences) {
     const byTarget = {};
@@ -503,7 +505,9 @@ export function tally(evidences) {
         const name = evidence.target.name;
         byTarget[name] ??= {
             label: evidence.target.label,
-            cases: new Set(),
+            runsByCase: {},
+            seen: new Set(),
+            repeated: [],
             runs: 0,
             delivered: 0,
             oneShot: 0,
@@ -517,7 +521,10 @@ export function tally(evidences) {
         const t = byTarget[name];
         const outcome = reviewOutcome(evidence);
         const h = evidence.verdict.humanReview;
-        t.cases.add(evidence.case);
+        t.runsByCase[evidence.case] = (t.runsByCase[evidence.case] ?? 0) + 1;
+        const key = `${evidence.case} run ${evidence.run}`;
+        if (t.seen.has(key)) t.repeated.push(key);
+        t.seen.add(key);
         t.runs++;
         if (evidence.verdict.delivered) t.delivered++;
         if (evidence.verdict.oneShot) t.oneShot++;
@@ -533,8 +540,9 @@ export function tally(evidences) {
         }
     }
     for (const t of Object.values(byTarget)) {
-        t.runsPerCase = t.runs / t.cases.size;
-        t.cases = [...t.cases].sort();
+        delete t.seen;
+        t.runsByCase = Object.fromEntries(Object.entries(t.runsByCase).sort());
+        t.even = new Set(Object.values(t.runsByCase)).size === 1;
     }
     return byTarget;
 }
