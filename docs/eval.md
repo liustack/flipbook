@@ -110,7 +110,7 @@ Only what the page runs counts. The runner starts from `index.html`: its inline 
 
 ## Human review
 
-After the automatic verdict, a person goes through each film, its contact sheet, its story.json and the host's final message, settles each item in `verdict.needsReview` (writing the outcome in `notes`), and fills in `verdict.humanReview`:
+After the automatic verdict, a person goes through each film, its contact sheet, its story.json and the host's final message, and fills in `verdict.humanReview`:
 
 | Field | What to write |
 |---|---|
@@ -118,6 +118,7 @@ After the automatic verdict, a person goes through each film, its contact sheet,
 | `turnOnScreen` | true when the turn shows in the pictures |
 | `beatsMatch` | true when each beat's first and last pictures show its `change` |
 | `case` | The case's own questions from `expect.review`, each with `answer` true, false, or `"n/a"` when the question does not apply to this run (a question about the film, when the case allowed none and none was made), plus a note where it helps |
+| `settle` | One entry per item the runner left in `verdict.needsReview`: `ok` true when a person finds it fine, false when not (the picture of unknown source is in the film, the wanted function is never used, the copy broke the recheck), and a `note` on what was checked. An item the runner could not settle neither fails nor passes the run until a person answers it |
 | `silentBadFilm` | true when the run passed automatically but the film is broken to the eye |
 | `movingSlides` | See below |
 | `notes` | Anything else |
@@ -140,7 +141,7 @@ Fill in the three items one at a time before deciding, and record the result in 
 
 - B level: the flagship model, every case once. C level: the flagship and floor models, three runs each, for 1.0 and when a supported model gets a new generation.
 - Neither runs for every version. Run one when a change to SKILL.md or its references could change what agents make and the author decides it is worth the money.
-- A run **passes** when it is a one-shot pass and its human review is complete and clean: `retold` written, `turnOnScreen` and `beatsMatch` true, `silentBadFilm` and `movingSlides` false (these five only when a film was made), every `case` answer true or `"n/a"`, and a note in `notes` when `needsReview` is not empty. A one-shot pass alone is not a pass, and a person cannot turn an automatic failure into one.
+- A run **passes** when it is a one-shot pass and its human review is complete and clean: `retold` written, `turnOnScreen` and `beatsMatch` true, `silentBadFilm` and `movingSlides` false (these five only when a film was made), every `case` answer true or `"n/a"`, and every `settle` item `ok` true. A one-shot pass alone is not a pass, and a person cannot turn an automatic failure into one.
 - `node eval/run.mjs --tally eval/results/<date>` counts a round from its evidence files once people have filled them in: per target, runs, films delivered, one-shot passes, reviews complete, runs passed, silent bad films, moving slides, passes by question in `asks`, and the runs still waiting for review. It also writes the numbers to `tally.json` in that directory.
 - Rounds are compared only when they have the same target, the same cases and the same runs per case (the tally prints the target and the runs of each case, and flags cases that ran unevenly or a run number that came twice), and by pass rate, never by raw counts. A B-level and a C-level round are never compared.
 - The first B-level round on these cases becomes the baseline only when every review is complete, no film is a silent bad film or moving slides, and the author has looked at the films and accepts them as the starting point. A later round holds up when its pass rate is at most one run in ten below the baseline's, with no silent bad film and no film counting as moving slides.

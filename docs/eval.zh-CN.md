@@ -110,7 +110,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 
 ## 人工复核
 
-自动判完以后，人过一遍每部成片、联系表、story.json 和宿主最后的回复，把 `verdict.needsReview` 里的每一项看清楚（结论写进 `notes`），再填 `verdict.humanReview`：
+自动判完以后，人过一遍每部成片、联系表、story.json 和宿主最后的回复，填 `verdict.humanReview`：
 
 | 字段 | 填什么 |
 |---|---|
@@ -118,6 +118,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `turnOnScreen` | 转折在画面上看得见，填 true |
 | `beatsMatch` | 每一拍的头尾画面都对得上它的 `change`，填 true |
 | `case` | 用例自己的问题，来自 `expect.review`，每条填 `answer` 为 true、false，或者这次用不上这个问题时填 `"n/a"`（比如用例允许不出片、也确实没出片时问片子的那几条），需要时加一句说明 |
+| `settle` | 评测器在 `verdict.needsReview` 里留下的每一项各一条：人看过没问题填 `ok` 为 true，有问题填 false（来源不明的图进了片子、要求的函数根本没用、副本把复检弄坏了），`note` 写看了什么。评测器定不了的项，人答之前既不算这次失败也不算通过 |
 | `silentBadFilm` | 自动判过了但人看是坏的，填 true |
 | `movingSlides` | 见下 |
 | `notes` | 其他 |
@@ -140,7 +141,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 
 - B 级：旗舰模型，每条一次。C 级：旗舰和最低两个模型，每条三次，在 1.0 和支持的模型换代时跑。
 - 两级都不按版本跑。SKILL.md 或 references 的改动可能改变 agent 做出来的东西，作者也觉得值得花这笔钱时再跑。
-- 一次跑通、并且人工复核填完且全都过，这次才算**通过**：写了 `retold`，`turnOnScreen` 和 `beatsMatch` 为 true，`silentBadFilm` 和 `movingSlides` 为 false（这五项只在出了片时要），`case` 每条是 true 或 `"n/a"`，`needsReview` 不空时 `notes` 里写了结论。光一次跑通不算通过，自动判的失败人也不能改判成通过。
+- 一次跑通、并且人工复核填完且全都过，这次才算**通过**：写了 `retold`，`turnOnScreen` 和 `beatsMatch` 为 true，`silentBadFilm` 和 `movingSlides` 为 false（这五项只在出了片时要），`case` 每条是 true 或 `"n/a"`，`settle` 每条 `ok` 为 true。光一次跑通不算通过，自动判的失败人也不能改判成通过。
 - 人填完复核以后，`node eval/run.mjs --tally eval/results/<日期>` 从证据文件数这一轮：按目标列出次数、出片、一次跑通、复核填完、通过、静默坏片、会动的 PPT、按 `asks` 里各个问题算的通过数，以及还没复核的那几次，同时把数字写进该目录的 `tally.json`。
 - 只有目标相同、用例相同、每条次数相同的两轮才比（汇总里打出目标和每条用例跑了几次，各条次数不一样或者同一个 run 号出现两次都会标出来），比的是通过率，不比原始条数。B 级和 C 级不相互比。
 - 这批用例的第一轮 B 级要满足这些才定为基线：复核全部填完，没有静默坏片，没有会动的 PPT，作者看过成片、认可拿它当起点。之后每一轮：通过率比基线低不超过十次里的一次，没有静默坏片，没有一部算会动的 PPT，才算站得住。

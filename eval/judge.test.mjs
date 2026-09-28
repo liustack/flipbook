@@ -514,6 +514,7 @@ function evidenceOf({
                 silentBadFilm: null,
                 movingSlides: null,
                 notes: '',
+                settle: needsReview.map((item) => ({ item, ok: null, note: '' })),
                 ...review,
             },
         },
@@ -548,7 +549,7 @@ describe('human review', () => {
         ).toMatchObject({ complete: true, failed: ['beatsMatch', 'movingSlides'], passed: false });
     });
 
-    it('waits for every answer, and for notes on what the runner left to a person', () => {
+    it('waits for every answer, and for a yes or no on each item the runner left to a person', () => {
         const half = reviewOutcome(
             evidenceOf({ review: { turnOnScreen: true }, needsReview: ['x'] }),
         );
@@ -561,10 +562,26 @@ describe('human review', () => {
                 'movingSlides',
                 'case[0]',
                 'case[1]',
-                'notes',
+                'settle[0]',
             ],
             failed: [],
             passed: null,
+        });
+    });
+
+    it('fails a run a person finds wrong on an item the runner could not settle', () => {
+        const settled = (ok) =>
+            reviewOutcome(
+                evidenceOf({
+                    needsReview: ['film/assets/shells.jpg has the bytes of the plate'],
+                    review: { ...CLEAN, settle: [{ item: 'x', ok, note: 'checked the film' }] },
+                }),
+            );
+        expect(settled(true)).toMatchObject({ complete: true, passed: true });
+        expect(settled(false)).toMatchObject({
+            complete: true,
+            failed: ['settle[0]'],
+            passed: false,
         });
     });
 

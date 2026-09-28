@@ -446,6 +446,7 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
             turnOnScreen: null,
             beatsMatch: null,
             case: e.review.map((question) => ({ question, answer: null })),
+            settle: needsReview.map((item) => ({ item, ok: null, note: '' })),
             silentBadFilm: null,
             movingSlides: null,
             notes: '',
@@ -458,7 +459,8 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
  * applies has an answer: `retold`, `turnOnScreen`, `beatsMatch`,
  * `silentBadFilm` and `movingSlides` when a film was made, every case
  * question (true, false, or "n/a" when it does not apply to this run), and
- * `notes` when the runner left items in `needsReview`. `passed`: an
+ * every item in `settle`, one per item the runner left in `needsReview`
+ * (`ok` true when a person finds it fine, false when not). `passed`: an
  * automatic one-shot pass whose review is complete and clean, null until
  * the review is complete.
  */
@@ -481,7 +483,9 @@ export function reviewOutcome(evidence) {
     h.case.forEach((q, i) => {
         if (q.answer !== 'n/a') want(`case[${i}]`, q.answer, true);
     });
-    if ((verdict.needsReview ?? []).length > 0 && !h.notes) missing.push('notes');
+    (h.settle ?? []).forEach((s, i) => {
+        want(`settle[${i}]`, s.ok, true);
+    });
     const complete = missing.length === 0;
     return {
         complete,
