@@ -468,18 +468,19 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
         }
         delivered = gate.length === 0;
     }
+    const review = [...new Set(needsReview)];
     return {
         delivered,
         oneShot: reasons.length === 0,
         reasons,
-        needsReview,
+        needsReview: review,
         story,
         humanReview: {
             retold: null,
             turnOnScreen: null,
             beatsMatch: null,
             case: e.review.map((question) => ({ question, answer: null })),
-            settle: needsReview.map((item) => ({ item, ok: null, note: '' })),
+            settle: review.map((item) => ({ item, ok: null, note: '' })),
             silentBadFilm: null,
             movingSlides: null,
             notes: '',
@@ -492,10 +493,13 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
  * applies has an answer: `retold`, `turnOnScreen`, `beatsMatch`,
  * `silentBadFilm` and `movingSlides` when a film was made, every case
  * question (true, false, or "n/a" when it does not apply to this run), and
- * every item in `settle`, one per item the runner left in `needsReview`
- * (`ok` true when a person finds it fine, false when not). `passed`: an
- * automatic one-shot pass whose review is complete and clean, null until
- * the review is complete.
+ * one `settle` entry for each item in `needsReview`, the source of what must
+ * be answered: its `item` the item's text, its `ok` true when a person finds
+ * it fine and false when not. A missing `settle`, an item without its entry
+ * or with two, an `ok` that is not true or false, and an entry that matches
+ * no item all leave the review incomplete. `passed`: an automatic one-shot
+ * pass whose review is complete and clean, null until the review is
+ * complete.
  */
 export function reviewOutcome(evidence) {
     const { verdict } = evidence;
@@ -516,9 +520,26 @@ export function reviewOutcome(evidence) {
     h.case.forEach((q, i) => {
         if (q.answer !== 'n/a') want(`case[${i}]`, q.answer, true);
     });
-    (h.settle ?? []).forEach((s, i) => {
-        want(`settle[${i}]`, s.ok, true);
-    });
+    const items = verdict.needsReview;
+    if (!Array.isArray(items)) {
+        missing.push('needsReview (the evidence has none to check settle against)');
+    } else if (items.length > 0 && !Array.isArray(h.settle)) {
+        missing.push('settle');
+    } else {
+        const entries = Array.isArray(h.settle) ? h.settle : [];
+        items.forEach((item, i) => {
+            const answers = entries.filter((entry) => isObject(entry) && entry.item === item);
+            const name = `settle for needsReview[${i}]`;
+            if (answers.length === 0) missing.push(name);
+            else if (answers.length > 1) missing.push(`${name}, given ${answers.length} times`);
+            else if (typeof answers[0].ok !== 'boolean') missing.push(`${name}, ok`);
+            else if (!answers[0].ok) failed.push(name);
+        });
+        entries.forEach((entry, k) => {
+            if (!isObject(entry) || !items.includes(entry.item))
+                missing.push(`settle[${k}], which matches no needsReview item`);
+        });
+    }
     const complete = missing.length === 0;
     return {
         complete,

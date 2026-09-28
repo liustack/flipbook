@@ -595,25 +595,63 @@ describe('human review', () => {
                 'movingSlides',
                 'case[0]',
                 'case[1]',
-                'settle[0]',
+                'settle for needsReview[0], ok',
             ],
             failed: [],
             passed: null,
         });
     });
 
-    it('fails a run a person finds wrong on an item the runner could not settle', () => {
-        const settled = (ok) =>
+    it('counts a review complete only when each needsReview item has exactly one answered settle entry', () => {
+        const ITEMS = [
+            'film/assets/shells.jpg has the bytes of the plate',
+            'film: a link left out',
+        ];
+        const outcome = (settle) =>
             reviewOutcome(
                 evidenceOf({
-                    needsReview: ['film/assets/shells.jpg has the bytes of the plate'],
-                    review: { ...CLEAN, settle: [{ item: 'x', ok, note: 'checked the film' }] },
+                    needsReview: ITEMS,
+                    review: { ...CLEAN, ...(settle === undefined ? {} : { settle }) },
                 }),
             );
-        expect(settled(true)).toMatchObject({ complete: true, passed: true });
-        expect(settled(false)).toMatchObject({
+        const yes = (item) => ({ item, ok: true, note: 'checked the film' });
+        const drop = (evidence) => {
+            delete evidence.verdict.humanReview.settle;
+            return evidence;
+        };
+        expect(
+            reviewOutcome(drop(evidenceOf({ needsReview: ITEMS, review: CLEAN }))),
+        ).toMatchObject({ complete: false, missing: ['settle'], passed: null });
+        expect(outcome([])).toMatchObject({
+            complete: false,
+            missing: ['settle for needsReview[0]', 'settle for needsReview[1]'],
+        });
+        expect(outcome([yes(ITEMS[0])])).toMatchObject({
+            complete: false,
+            missing: ['settle for needsReview[1]'],
+        });
+        expect(outcome([yes(ITEMS[0]), yes('x')])).toMatchObject({
+            complete: false,
+            missing: ['settle for needsReview[1]', 'settle[1], which matches no needsReview item'],
+        });
+        expect(outcome([yes(ITEMS[0]), yes(ITEMS[0]), yes(ITEMS[1])])).toMatchObject({
+            complete: false,
+            missing: ['settle for needsReview[0], given 2 times'],
+        });
+        expect(outcome([yes(ITEMS[0]), { item: ITEMS[1], ok: 'yes' }])).toMatchObject({
+            complete: false,
+            missing: ['settle for needsReview[1], ok'],
+        });
+        expect(outcome([yes(ITEMS[0]), yes(ITEMS[1])])).toEqual({
             complete: true,
-            failed: ['settle[0]'],
+            missing: [],
+            failed: [],
+            passed: true,
+        });
+        expect(outcome([yes(ITEMS[0]), { item: ITEMS[1], ok: false, note: 'it shows' }])).toEqual({
+            complete: true,
+            missing: [],
+            failed: ['settle for needsReview[1]'],
             passed: false,
         });
     });

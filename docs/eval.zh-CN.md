@@ -120,12 +120,12 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `turnOnScreen` | 转折在画面上看得见，填 true |
 | `beatsMatch` | 每一拍的头尾画面都对得上它的 `change`，填 true |
 | `case` | 用例自己的问题，来自 `expect.review`，每条填 `answer` 为 true、false，或者这次用不上这个问题时填 `"n/a"`（比如用例允许不出片、也确实没出片时问片子的那几条），需要时加一句说明 |
-| `settle` | 评测器在 `verdict.needsReview` 里留下的每一项各一条：人看过没问题填 `ok` 为 true，有问题填 false（来源不明的图进了片子、要求的函数根本没用、副本把复检弄坏了），`note` 写看了什么。评测器定不了的项，人答之前既不算这次失败也不算通过 |
+| `settle` | 这里要答什么由 `verdict.needsReview` 定：每一项恰好一条，`item` 就是评测器写的那一项原文，人看过没问题填 `ok` 为 true，有问题填 false（来源不明的图进了片子、要求的函数根本没用、副本把复检弄坏了），`note` 写看了什么。评测器按项预填好，`ok` 为 null。没有 `settle`、某一项缺条目或有两条、`ok` 不是 true 或 false、有条目对不上任何一项，都算复核没填完。评测器定不了的项，人答之前既不算这次失败也不算通过 |
 | `silentBadFilm` | 自动判过了但人看是坏的，填 true |
 | `movingSlides` | 见下 |
 | `notes` | 其他 |
 
-静默坏片要先做成一条坏片语料加进 `test/fixtures/bad/`，再修 flipbook。没出片的那次只填 `case` 和 `notes`。人看出评测器判错了（好片判了失败，或者漏掉了违规），先在评测器或用例里修，配上测试，这一轮重新判过以后才拿去比较。
+静默坏片要先做成一条坏片语料加进 `test/fixtures/bad/`，再修 flipbook。没出片的那次只免掉关于成片的五项（`retold`、`turnOnScreen`、`beatsMatch`、`silentBadFilm`、`movingSlides`），`case` 和 `settle` 仍按适用的项填。人看出评测器判错了（好片判了失败，或者漏掉了违规），先在评测器或用例里修，配上测试，这一轮重新判过以后才拿去比较。
 
 盲看：隐去模型、宿主和版本，打乱顺序，先写 `retold` 再读 story.json。
 
@@ -143,7 +143,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 
 - B 级：旗舰模型，每条一次。C 级：旗舰和最低两个模型，每条三次，在 1.0 和支持的模型换代时跑。
 - 两级都不按版本跑。SKILL.md 或 references 的改动可能改变 agent 做出来的东西，作者也觉得值得花这笔钱时再跑。
-- 一次跑通、并且人工复核填完且全都过，这次才算**通过**：写了 `retold`，`turnOnScreen` 和 `beatsMatch` 为 true，`silentBadFilm` 和 `movingSlides` 为 false（这五项只在出了片时要），`case` 每条是 true 或 `"n/a"`，`settle` 每条 `ok` 为 true。光一次跑通不算通过，自动判的失败人也不能改判成通过。
+- 一次跑通、并且人工复核填完且全都过，这次才算**通过**：写了 `retold`，`turnOnScreen` 和 `beatsMatch` 为 true，`silentBadFilm` 和 `movingSlides` 为 false（这五项只在出了片时要），`case` 每条是 true 或 `"n/a"`，`needsReview` 每一项在 `settle` 里恰好有一条对得上原文、`ok` 为 true 的条目。光一次跑通不算通过，自动判的失败人也不能改判成通过。
 - 人填完复核以后，`node eval/run.mjs --tally eval/results/<日期>` 从证据文件数这一轮：按目标列出次数、出片、一次跑通、复核填完、通过、静默坏片、会动的 PPT、按 `asks` 里各个问题算的通过数，以及还没复核的那几次，同时把数字写进该目录的 `tally.json`。
 - 只有目标相同、用例相同、每条次数相同的两轮才比（汇总里打出目标和每条用例跑了几次，各条次数不一样或者同一个 run 号出现两次都会标出来），比的是通过率，不比原始条数。B 级和 C 级不相互比。
 - 这批用例的第一轮 B 级要满足这些才定为基线：复核全部填完，没有静默坏片，没有会动的 PPT，作者看过成片、认可拿它当起点。之后每一轮：通过率比基线低不超过十次里的一次，没有静默坏片，没有一部算会动的 PPT，才算站得住。
