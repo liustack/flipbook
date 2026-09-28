@@ -9,7 +9,7 @@
     "scenes": [
         { "id": "street", "bars": 2 },
         { "id": "light", "bars": 1 },
-        { "id": "hello", "bars": 2 }
+        { "id": "hello", "bars": 2.5 }
     ],
     "cues": [
         { "id": "click", "scene": "light", "beat": 0.5, "kind": "sfx", "sfx": "drop" },

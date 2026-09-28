@@ -9,7 +9,7 @@
     "scenes": [
         { "id": "open", "bars": 1 },
         { "id": "words", "bars": 3 },
-        { "id": "end", "bars": 1, "hold": true }
+        { "id": "end", "bars": 1.5, "hold": true }
     ],
     "cues": [
         { "id": "flip", "scene": "open", "beat": 1, "kind": "sfx", "sfx": "paper" },

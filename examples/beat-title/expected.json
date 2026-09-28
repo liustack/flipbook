@@ -1,6 +1,6 @@
 {
-    "frames": 288,
-    "durationSec": 12,
+    "frames": 317,
+    "durationSec": 13.208333333333334,
     "fps": 24,
     "width": 1920,
     "height": 1080,
@@ -16,6 +16,6 @@
     "snapshot": {
         "machine": "darwin-arm64 24.3.0 Apple M4",
         "chromium": "1243",
-        "digest": "f797a6924677a3aeb7fa553b7544f9a8a0e83c73840ec5602cb3c1bdd3e3d793"
+        "digest": "923c9bc2b10d54973b497e3eba844e5fb6b5f127ce3ceb396a01fb92ef290c19"
     }
 }

@@ -17,7 +17,7 @@
         },
         {
             "id": "stop",
-            "bars": 1,
+            "bars": 1.5,
             "hold": true
         }
     ],

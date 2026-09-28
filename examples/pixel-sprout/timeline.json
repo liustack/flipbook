@@ -9,7 +9,7 @@
     "scenes": [
         { "id": "days", "bars": 2 },
         { "id": "sprout", "bars": 1 },
-        { "id": "bloom", "bars": 2 }
+        { "id": "bloom", "bars": 2.5 }
     ],
     "cues": [
         { "id": "pop", "scene": "sprout", "beat": 1, "kind": "sfx", "sfx": "drop" },
