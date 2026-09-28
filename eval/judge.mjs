@@ -392,8 +392,17 @@ function brandReasons(want, got, workspaceFiles) {
 }
 
 /**
+ * The item every case with `notCopied` files puts in `needsReview`, found
+ * evidence or not: a person answers it after looking at the film and the
+ * workspace, since static reading may miss a use.
+ */
+export function overallCheck(notCopied) {
+    return `Overall: the film uses none of ${notCopied.join(', ')}, and no copy, cut or crop of it appears in any composition. Check the film and the workspace, whatever the other items say.`;
+}
+
+/**
  * What a case's `notCopied` files leave in the compositions, listed in
- * `review` as evidence for a person: every file that comes from one (see
+ * `review` after the overall check (overallCheck) as evidence for a person: every file that comes from one (see
  * watchedFiles) with where the page names it, runtime loader calls whose
  * path the runner cannot read, and pictures whose source entry is neither
  * stock fetch nor generated, which could be a watched file re-encoded or
@@ -402,6 +411,7 @@ function brandReasons(want, got, workspaceFiles) {
  */
 function watchedEvidence(e, compositions, review) {
     if ((e.notCopied ?? []).length === 0) return;
+    review.push(overallCheck(e.notCopied));
     const STOCK = {
         fetched: 'A successful stock fetch of its SOURCES.json id into this file backs it.',
         claimed: 'Its SOURCES.json entry claims a stock id no successful stock fetch report backs.',

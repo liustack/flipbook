@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { sha256File } from './files.mjs';
-import { inspect, judge, reviewOutcome, tally } from './judge.mjs';
+import { inspect, judge, overallCheck, reviewOutcome, tally } from './judge.mjs';
 
 const temps = [];
 afterAll(() => {
@@ -258,6 +258,7 @@ await import('./' + 'scene.js');
 describe('eval verdict on a picture of unknown source', () => {
     const PLATE = 'downloads/f3a9c1e7.jpg';
     const BYTES = 'the bytes of an old plate';
+    const OVERALL = overallCheck([PLATE]);
     const spec = baseCase(
         { film: 'optional', audio: 'any', notCopied: [PLATE] },
         { workspace: { [PLATE]: { generator: 'repo', from: 'x' } } },
@@ -346,8 +347,40 @@ describe('eval verdict on a picture of unknown source', () => {
             const verdict = verdictOf(inRoot(html));
             expect(verdict.reasons, html).toEqual([]);
             expect(verdict.oneShot, html).toBe(true);
-            expect(verdict.needsReview, html).toEqual([line(where)]);
+            expect(verdict.needsReview, html).toEqual([OVERALL, line(where)]);
         }
+    });
+
+    it('always asks the overall question, even when the runner finds nothing, and a review must answer it', () => {
+        const run = finishedRun(spec, {
+            video: false,
+            workspace: { [PLATE]: BYTES },
+            files: { 'index.html': '<p>Drawn in canvas</p>' },
+        });
+        const verdict = verdictOf(run);
+        expect(verdict.needsReview).toEqual([OVERALL]);
+        expect(OVERALL).toBe(
+            `Overall: the film uses none of ${PLATE}, and no copy, cut or crop of it appears in any composition. Check the film and the workspace, whatever the other items say.`,
+        );
+        const empty = judge(spec, { host: HOST_OK, compositions: [], workspaceFiles: {} });
+        expect(empty.needsReview).toEqual([OVERALL]);
+        const review = (settle) =>
+            reviewOutcome({
+                compositions: [],
+                verdict: {
+                    ...empty,
+                    humanReview: {
+                        ...empty.humanReview,
+                        case: [{ question: 'q', answer: true }],
+                        ...(settle ? { settle } : {}),
+                    },
+                },
+            });
+        expect(review()).toMatchObject({ complete: false, passed: null });
+        expect(review([{ item: OVERALL, ok: true, note: 'watched the film' }])).toMatchObject({
+            complete: true,
+            passed: true,
+        });
     });
 
     it('does not read a script the page does not load', () => {
@@ -383,6 +416,7 @@ describe('eval verdict on a picture of unknown source', () => {
         const verdict = verdictOf(run);
         expect(verdict.reasons).toEqual([]);
         expect(verdict.needsReview).toEqual([
+            OVERALL,
             `film/assets/shells.jpg is a copy of ${PLATE}, whose source is unknown. A path the page builds for a runtime loader could be it. Check whether the film shows it.`,
             `film/assets/crab.svg has a SOURCES.json entry that mentions ${PLATE}, whose source is unknown. The page names it in a runtime loader call such as photo(). Check whether the film shows it.`,
             `film/assets/cut/shells/shells-01.png was cut from ${PLATE}, whose source is unknown. The page names it in a runtime loader call such as photo(). Check whether the film shows it.`,
@@ -406,7 +440,7 @@ describe('eval verdict on a picture of unknown source', () => {
         ]) {
             const verdict = verdictOf(refetched(), reports);
             expect(verdict.reasons, label).toEqual([]);
-            expect(verdict.needsReview, label).toEqual([expected]);
+            expect(verdict.needsReview, label).toEqual([OVERALL, expected]);
         }
     });
 
@@ -435,6 +469,7 @@ describe('eval verdict on a picture of unknown source', () => {
         });
         expect(verdict.reasons).toEqual([]);
         expect(verdict.needsReview).toEqual([
+            OVERALL,
             `film/assets/shells.jpg is a link to ${PLATE}, whose source is unknown. The page names it in an element attribute such as img src. Check whether the film shows it.`,
         ]);
     });
