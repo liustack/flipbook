@@ -1,11 +1,12 @@
-// What a composition's page runs and loads, read from its syntax: the
-// scripts index.html loads (inline scripts and script src tags) and the
-// local modules they import, statically or with import('a literal path'),
-// which flipbook runtime functions those modules call, and which files the
-// page loads. A file the page does not load does not count. Calls are
-// matched by binding with the TypeScript checker, so a parameter, a local or
-// a namespace of the same name is not the runtime function. A string that
-// only names a file is a mention, not a load. Every file is read through
+// What a composition's page runs, read from its syntax: the scripts
+// index.html loads (inline scripts and script src tags) and the local
+// modules they import, statically or with import('a literal path'), and
+// which flipbook runtime functions those modules call. A file the page does
+// not load does not count. Calls are matched by binding with the TypeScript
+// checker, so a parameter, a local or a namespace of the same name is not
+// the runtime function. It also lists where the page names files, as
+// evidence for a person: reading markup and code cannot tell whether the
+// page really loads a file, so nothing here says it does. Every file is read through
 // the workspace reader (files.mjs): nothing outside the workspace or in the
 // folders left out, links included. What the reading cannot settle is
 // listed in `notes`, and the files it would not read in `refused`.
@@ -25,12 +26,13 @@ const RUNTIME_FILE = '/__flipbook_eval__/runtime.d.ts';
 /** Script types a page runs as JavaScript. */
 const JS_TYPES = ['', 'module', 'text/javascript', 'application/javascript'];
 
-/** Runtime functions whose first argument is a file the page loads. */
+/** Runtime functions whose first argument is a file for the page to load. */
 export const LOADERS = ['photo', 'specimens', 'loadRig', 'loadSprite'];
 
 /**
- * The attributes that surely make an element load the file they name, by
- * element. A `link` loads its `href` only as a stylesheet or a preload.
+ * The attributes through which an element usually loads the file it names,
+ * by element: a reference there is listed as `element`, any other attribute
+ * as `attribute`. Whether the element exists in the page is not checked.
  */
 const LOADING_ATTRIBUTES = {
     img: ['src', 'srcset'],
@@ -144,66 +146,49 @@ function moduleSpecifiers(text, file) {
 }
 
 /**
- * What markup and stylesheets surely make the page load: on `img`,
- * `source`, `video`, `audio`, `link` (a stylesheet or a preload), `image`
- * and `use`, the attributes LOADING_ATTRIBUTES names, and CSS `url()` in
- * style blocks, style attributes and stylesheets the page links (with their
- * `@import`s), read through the workspace reader. Anything inside a
- * `<template>` loads nothing until a script uses it, and every other
- * attribute value that reads as a path is only one of the `mentions`. Paths
- * relative to the composition.
+ * Where index.html and the stylesheets it links name files: `element` for
+ * the attributes LOADING_ATTRIBUTES names, `attribute` for any other
+ * attribute, `css` for a CSS `url()` in a style block, a style attribute or
+ * a linked stylesheet (with its `@import`s), read through the workspace
+ * reader. `add(path, kind)` records each. Evidence only: a tag inside a
+ * `<template>` or a `<textarea>`, or a CSS rule no element matches, loads
+ * nothing, and the runner does not try to tell.
  */
-function markupLoads(dir, html, reader) {
-    const loads = new Set();
-    const mentions = new Set();
+function markupReferences(dir, html, reader, add) {
     const stylesheets = [];
-    const add = (set, base, raw) => {
+    const record = (base, raw, kind) => {
         const ref = resolveRef(base, raw);
-        if (ref) set.add(ref);
+        if (ref) add(ref, kind);
     };
-    const urls = (text) =>
-        [
-            ...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi),
-        ].map((m) => m[2]);
+    const clean = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '');
     const css = (text, base) => {
-        for (const url of urls(text)) add(loads, base, url);
-        const clean = text.replace(/\/\*[\s\S]*?\*\//g, '');
-        for (const m of clean.matchAll(/@import\s+(['"])([^'"]+)\1/gi))
+        for (const m of clean(text).matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi))
+            record(base, m[2], 'css');
+        for (const m of clean(text).matchAll(/@import\s+(['"])([^'"]+)\1/gi))
             stylesheets.push([base, m[2]]);
     };
     const attributes = (text) =>
         [...text.matchAll(/(?:^|\s)([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)].map(
             (a) => [a[1].toLowerCase(), a[2] ?? a[3] ?? a[4] ?? ''],
         );
-    const mention = (value) => {
-        for (const part of value.split(',')) {
-            const raw = part.trim().split(/\s+/)[0] ?? '';
-            if (/[./]/.test(raw)) add(mentions, '', raw);
-        }
-    };
-    let page = html.replace(/(<script\b[^>]*>)[\s\S]*?<\/script\s*>/gi, '$1</script>');
-    for (const m of page.matchAll(/<template\b[^>]*>([\s\S]*?)<\/template\s*>/gi)) {
-        for (const tag of m[1].matchAll(/<([a-zA-Z][\w:-]*)\b([^>]*)>/g))
-            for (const [, value] of attributes(tag[2])) mention(value);
-        for (const url of urls(m[1])) mention(url);
-    }
-    page = page.replace(/<template\b[^>]*>[\s\S]*?<\/template\s*>/gi, '');
+    const page = html.replace(/(<script\b[^>]*>)[\s\S]*?<\/script\s*>/gi, '$1</script>');
     for (const m of page.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) css(m[1], '');
     const markup = page.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, '');
     for (const tag of markup.matchAll(/<([a-zA-Z][\w:-]*)\b([^>]*)>/g)) {
         const name = tag[1].toLowerCase();
         const rel = (attribute(tag[2], 'rel') ?? '').toLowerCase().split(/\s+/);
-        const linkLoads = name !== 'link' || rel.includes('stylesheet') || rel.includes('preload');
-        const loading = linkLoads ? (LOADING_ATTRIBUTES[name] ?? []) : [];
         for (const [key, value] of attributes(tag[2])) {
-            if (key === 'style') css(value, '');
-            else if (!loading.includes(key)) mention(value);
-            else if (key === 'srcset')
-                for (const part of value.split(',')) add(loads, '', part.trim().split(/\s+/)[0]);
-            else {
-                add(loads, '', value);
-                if (name === 'link' && rel.includes('stylesheet')) stylesheets.push(['', value]);
+            if (key === 'style') {
+                css(value, '');
+                continue;
             }
+            const kind = (LOADING_ATTRIBUTES[name] ?? []).includes(key) ? 'element' : 'attribute';
+            for (const part of key === 'srcset' ? value.split(',') : [value]) {
+                const raw = part.trim().split(/\s+/)[0] ?? '';
+                if (kind === 'element' || /[./]/.test(raw)) record('', raw, kind);
+            }
+            if (name === 'link' && key === 'href' && rel.includes('stylesheet'))
+                stylesheets.push(['', value]);
         }
     }
     const seen = new Set();
@@ -216,7 +201,6 @@ function markupLoads(dir, html, reader) {
         const text = reader.text(join(dir, rel));
         if (text !== null) css(text, posix.dirname(rel).replace(/^\.$/, ''));
     }
-    return { loads, mentions };
 }
 
 /** A local script the page can load at `rel`, as a full path, when the reader may read it, or null. */
@@ -233,14 +217,14 @@ function localScript(dir, rel, reader) {
  * `dir`, inline scripts as `index.html#1`), `imports` (whether any of them
  * imports the runtime), `calls` (the runtime functions they call, by the
  * runtime's own names), `passed` (runtime functions they use without
- * calling them where the runner can see, handed to other code), `loads`
- * (files the page surely loads: markup and stylesheets as markupLoads says,
- * and in the scripts the literal first argument of a runtime loader bound
- * to the runtime, LOADERS), `possibleLoads` (the fixed start of a template
- * path given to one), `computedLoads` (how many get a path the runner cannot
- * read), `mentions` (every other string and attribute value that reads as a
- * path: `fetch`, `.src`, `setAttribute` and the like count here, since the
- * runner cannot tell what receives them), `notes` (what the reading could not follow), `refused` (files
+ * calling them where the runner can see, handed to other code),
+ * `references` (every file the page names, each with where: `element`,
+ * `attribute` and `css` as markupReferences says, `loader` for the literal
+ * path given to a runtime loader bound to the runtime, LOADERS, and
+ * `script` for any other string in the scripts), `builtPaths` (the fixed
+ * start of a template path given to a runtime loader), `computedPaths` (how
+ * many runtime loader calls get a path the runner cannot read). These are
+ * evidence for a person, not proof that the page loads anything. `notes` (what the reading could not follow), `refused` (files
  * it would not read: links out of the workspace `wsRoot`, broken links,
  * files in the folders left out), and `program`, `files` and `texts` for
  * further reading.
@@ -255,10 +239,9 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
         imports: false,
         calls: [],
         passed: [],
-        loads: [],
-        possibleLoads: [],
-        computedLoads: 0,
-        mentions: [],
+        references: {},
+        builtPaths: [],
+        computedPaths: 0,
         notes,
         refused: reader.refused,
     };
@@ -439,23 +422,28 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
     const calls = new Set();
     const passed = new Set();
     let namespaceLoose = false;
-    const { loads, mentions } = markupLoads(dir, html, reader);
-    const possibleLoads = new Set();
-    let computedLoads = 0;
+    const references = new Map();
+    const reference = (path, kind) => {
+        if (!references.has(path)) references.set(path, new Set());
+        references.get(path).add(kind);
+    };
+    markupReferences(dir, html, reader, reference);
+    const builtPaths = new Set();
+    let computedPaths = 0;
     const consumed = new Set();
-    /** A value the page loads: a literal is a load, a template's fixed start a possible one. */
+    /** The path given to a runtime loader: a literal, a template's fixed start, or neither. */
     const load = (node) => {
         if (!node) return;
         if (ts.isStringLiteralLike(node)) {
             consumed.add(node);
             const ref = resolveRef('', node.text);
-            if (ref) loads.add(ref);
+            if (ref) reference(ref, 'loader');
         } else if (ts.isTemplateExpression(node) && node.head.text) {
             const ref = resolveRef('', node.head.text);
-            if (ref) possibleLoads.add(ref);
-            else computedLoads++;
+            if (ref) builtPaths.add(ref);
+            else computedPaths++;
         } else {
-            computedLoads++;
+            computedPaths++;
         }
     };
     const isModuleSpecifier = (node) => {
@@ -512,7 +500,7 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
         const mention = (node) => {
             if (ts.isStringLiteralLike(node) && !consumed.has(node) && !isModuleSpecifier(node)) {
                 const ref = /[./]/.test(node.text) ? resolveRef('', node.text) : null;
-                if (ref) mentions.add(ref);
+                if (ref) reference(ref, 'script');
             }
             ts.forEachChild(node, mention);
         };
@@ -528,10 +516,13 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
         imports,
         calls: [...calls].sort(),
         passed: [...passed].filter((name) => !calls.has(name)).sort(),
-        loads: [...loads].sort(),
-        possibleLoads: [...possibleLoads].sort(),
-        computedLoads,
-        mentions: [...mentions].filter((ref) => !loads.has(ref)).sort(),
+        references: Object.fromEntries(
+            [...references]
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([path, kinds]) => [path, [...kinds].sort()]),
+        ),
+        builtPaths: [...builtPaths].sort(),
+        computedPaths,
         notes: [...notes, ...reader.refused],
         refused: reader.refused,
         program,

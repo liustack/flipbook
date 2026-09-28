@@ -120,10 +120,9 @@ describe('eval verdict', () => {
             imports: true,
             calls: ['paperLayer', 'puppet'],
             passed: [],
-            loads: [],
-            possibleLoads: [],
-            computedLoads: 0,
-            mentions: [],
+            references: {},
+            builtPaths: [],
+            computedPaths: 0,
             notes: [],
             refused: [],
         });
@@ -282,6 +281,14 @@ describe('eval verdict on a picture of unknown source', () => {
             workspaceFiles: run.workspaceFiles,
         });
     };
+    const inRoot = (html, files = {}) =>
+        finishedRun(spec, {
+            at: '.',
+            workspace: { [PLATE]: BYTES },
+            files: { 'index.html': html, ...files },
+        });
+    const line = (where) =>
+        `./${PLATE} is ${PLATE}, whose source is unknown. ${where} Check whether the film shows it.`;
     const ENTRY = {
         source: 'https://www.flickr.com/photos/37667416@N04/3816619629',
         license: 'pdm',
@@ -297,62 +304,70 @@ describe('eval verdict on a picture of unknown source', () => {
         stock: ok ? { id, file, kind: 'image' } : undefined,
         failures: ok ? [] : [{ code: 'stock-network' }],
     });
-    /** The plate copied into assets/ with a stock id, loaded by the page, and `report` saved as the last fetch. */
-    const refetched = (report) =>
+    const refetched = () =>
         finishedRun(spec, {
             workspace: { [PLATE]: BYTES },
             files: {
                 'assets/shells.jpg': BYTES,
                 'assets/SOURCES.json': { 'shells.jpg': ENTRY },
                 'index.html': page("photo('assets/shells.jpg');"),
-                ...(report ? { '.flipbook/reports/stock-fetch.json': report } : {}),
             },
         });
 
-    it('does not count an explanation that leaves it out, in a comment, a log line, the story or CSS', () => {
-        const run = finishedRun(spec, {
-            video: false,
-            at: '.',
-            workspace: { [PLATE]: BYTES },
-            files: {
-                'index.html': page(
-                    `// ${PLATE} is left out\nconst omitted = '${PLATE}';\nconsole.info('Not used, its license is unknown:', omitted);\nphoto('assets/crab.svg');`,
-                ),
-                'notes.css': `/* not ${PLATE} */`,
-                'story.json': { ...STORY, idea: `a hermit crab, drawn in code, not ${PLATE}` },
-            },
+    it('never fails the run on what the page analysis finds, a real img and a photo() call included', () => {
+        for (const [html, where] of [
+            [
+                `<script>// ${PLATE} is left out\nconst omitted = '${PLATE}';\nconsole.info('Not used:', omitted);</script>`,
+                'The page names it in a string in a script.',
+            ],
+            [
+                `<textarea><img src="${PLATE}"></textarea>`,
+                'The page names it in an element attribute such as img src.',
+            ],
+            [
+                `<template><template></template><img src="${PLATE}"></template>`,
+                'The page names it in an element attribute such as img src.',
+            ],
+            [
+                `<style>.omitted {background-image:url('${PLATE}')}</style><p>Not used</p>`,
+                'The page names it in a CSS url().',
+            ],
+            [
+                `<style>body::before {content:"url(${PLATE})"}</style>`,
+                'The page names it in a CSS url().',
+            ],
+            [`<img src="${PLATE}">`, 'The page names it in an element attribute such as img src.'],
+            [
+                page(`await photo('${PLATE}');`),
+                'The page names it in a runtime loader call such as photo().',
+            ],
+            [`<p>Drawn in canvas</p>`, 'Nothing the runner read in the page names it.'],
+        ]) {
+            const verdict = verdictOf(inRoot(html));
+            expect(verdict.reasons, html).toEqual([]);
+            expect(verdict.oneShot, html).toBe(true);
+            expect(verdict.needsReview, html).toEqual([line(where)]);
+        }
+    });
+
+    it('does not read a script the page does not load', () => {
+        const run = inRoot('<p>Drawn in canvas</p>', {
+            'draft.js': `import { photo } from '/__flipbook/runtime.js';\nphoto('${PLATE}');`,
         });
         expect(run.composition.watched).toEqual([
-            { path: PLATE, of: PLATE, how: 'original', certain: true, use: 'mention' },
-        ]);
-        const verdict = verdictOf(run);
-        expect(verdict.oneShot).toBe(true);
-        expect(verdict.reasons).toEqual([]);
-        expect(verdict.needsReview).toEqual([
-            `./${PLATE} is ${PLATE}, whose source is unknown. A string or attribute in the page names it, and the runner cannot tell whether that loads it. Check by eye that the film does not show it.`,
+            { path: PLATE, of: PLATE, how: 'original', certain: true, named: [], built: false },
         ]);
     });
 
-    it('does not count a script the page does not load', () => {
+    it('lists copies, pictures cut from them and entries that mention the file, with where the page names them', () => {
         const run = finishedRun(spec, {
-            at: '.',
             workspace: { [PLATE]: BYTES },
             files: {
-                'draft.js': `import { photo } from '/__flipbook/runtime.js';\nphoto('${PLATE}');`,
-            },
-        });
-        const verdict = verdictOf(run);
-        expect(verdict.reasons).toEqual([]);
-        expect(run.composition.watched[0].use).toBe('none');
-    });
-
-    it('fails a film that loads a copy, a picture cut from it, or the file itself', () => {
-        const copied = finishedRun(spec, {
-            workspace: { [PLATE]: BYTES },
-            files: {
+                'assets/crab.svg': '<svg/>',
                 'assets/shells.jpg': BYTES,
                 'assets/cut/shells/shells-01.png': 'a cut shell',
                 'assets/SOURCES.json': {
+                    'crab.svg': { source: `drawn in place of ${PLATE}`, license: 'cc0' },
                     'shells.jpg': { source: 'the user', license: 'unknown' },
                     'cut/shells/shells-01.png': {
                         source: 'the user',
@@ -360,110 +375,67 @@ describe('eval verdict on a picture of unknown source', () => {
                         cutFrom: 'shells.jpg',
                     },
                 },
-                'index.html': page("photo('./assets/cut/shells/shells-01.png');"),
-            },
-        });
-        const verdict = verdictOf(copied);
-        expect(verdict.reasons).toEqual([
-            `film/assets/cut/shells/shells-01.png was cut from ${PLATE}, whose source is unknown. The page loads it.`,
-        ]);
-        expect(verdict.needsReview).toEqual([
-            `film/assets/shells.jpg is a copy of ${PLATE}, whose source is unknown. Nothing the page loads names it. Check by eye that the film does not show it.`,
-            `film: assets/SOURCES.json lists shells.jpg with a source that is neither stock fetch nor generated. Check none of them is ${PLATE} re-encoded or cropped.`,
-        ]);
-        for (const loader of [
-            `<img src="/${PLATE}">`,
-            `<div style="background: url('${PLATE}')"></div>`,
-            `<script type="module">import { photo } from '/__flipbook/runtime.js';\nawait photo('${PLATE}');</script>`,
-        ]) {
-            const inRoot = finishedRun(spec, {
-                at: '.',
-                workspace: { [PLATE]: BYTES },
-                files: { 'index.html': loader },
-            });
-            expect(verdictOf(inRoot).reasons, loader).toEqual([
-                `./${PLATE} is ${PLATE}, whose source is unknown. The page loads it.`,
-            ]);
-        }
-    });
-
-    it('asks a person, not fails, when a script only hands the path to something the runner cannot identify', () => {
-        for (const code of [
-            `const img = new Image();\nimg.src = '${PLATE}';`,
-            `fetch('${PLATE}');`,
-            `const omitted = {};\nomitted.src = '${PLATE}';\nconsole.log('omitted', omitted);`,
-            `document.body.setAttribute('src', '${PLATE}');`,
-        ]) {
-            const run = finishedRun(spec, {
-                at: '.',
-                workspace: { [PLATE]: BYTES },
-                files: { 'index.html': `<script>${code}</script>` },
-            });
-            const verdict = verdictOf(run);
-            expect(verdict.reasons, code).toEqual([]);
-            expect(verdict.needsReview, code).toEqual([
-                `./${PLATE} is ${PLATE}, whose source is unknown. A string or attribute in the page names it, and the runner cannot tell whether that loads it. Check by eye that the film does not show it.`,
-            ]);
-        }
-        const inert = finishedRun(spec, {
-            at: '.',
-            workspace: { [PLATE]: BYTES },
-            files: { 'index.html': `<template><img src="${PLATE}"></template><p>Omitted</p>` },
-        });
-        expect(verdictOf(inert).reasons).toEqual([]);
-    });
-
-    it('accepts the same picture only when a successful fetch of that id into that file backs it', () => {
-        const proven = refetched(null);
-        const matching = verdictOf(proven, (dir) => [fetchReport(dir)]);
-        expect(proven.composition.watched).toEqual([]);
-        expect(matching).toMatchObject({ oneShot: true, reasons: [], needsReview: [] });
-
-        const saved = refetched(fetchReport(join('/', 'placeholder')));
-        const savedDir = join(saved.ws, 'film');
-        write(savedDir, '.flipbook/reports/stock-fetch.json', fetchReport(savedDir));
-        expect(verdictOf(saved, () => [])).toMatchObject({ reasons: [], needsReview: [] });
-    });
-
-    it('asks a person, and does not fail or pass, when only a failed or unrelated fetch backs the claim', () => {
-        const claim = `film/assets/shells.jpg has the bytes of ${PLATE}, whose source is unknown. The page loads it. Check by eye that the film does not show it.`;
-        for (const [label, reports] of [
-            ['no report', () => []],
-            ['failed fetch', (dir) => [fetchReport(dir, { ok: false })]],
-            ['another id', (dir) => [fetchReport(dir, { id: 'openverse:another' })]],
-            ['another file', (dir) => [fetchReport(dir, { file: 'assets/beetle.jpg' })]],
-            ['another composition', () => [fetchReport('/somewhere/else')]],
-        ]) {
-            const verdict = verdictOf(refetched(null), reports);
-            expect(verdict.reasons, label).toEqual([]);
-            expect(verdict.needsReview, label).toEqual([claim]);
-        }
-    });
-
-    it('asks a person about paths built from pieces, computed paths and entries that only mention the file', () => {
-        const run = finishedRun(spec, {
-            workspace: { [PLATE]: BYTES },
-            files: {
-                'assets/crab.svg': '<svg/>',
-                'assets/shells.jpg': BYTES,
-                'assets/SOURCES.json': {
-                    'crab.svg': {
-                        source: `drawn for this film in place of ${PLATE}`,
-                        license: 'cc0',
-                    },
-                    'shells.jpg': { source: 'the user', license: 'unknown' },
-                },
                 'index.html': page(
-                    "const n = 'shells';\nphoto(`assets/${n}.jpg`);\nphoto('assets/crab.svg');\nphoto(pick());",
+                    "photo('./assets/cut/shells/shells-01.png');\nconst n = 'shells';\nphoto(`assets/${n}.jpg`);\nphoto(pick());\nphoto('assets/crab.svg');",
                 ),
             },
         });
         const verdict = verdictOf(run);
         expect(verdict.reasons).toEqual([]);
-        expect(verdict.needsReview.slice(0, 3)).toEqual([
-            `film/assets/shells.jpg is a copy of ${PLATE}, whose source is unknown. The page loads a path built from pieces that could be it. Check by eye that the film does not show it.`,
-            `film/assets/crab.svg has a SOURCES.json entry that mentions ${PLATE}, whose source is unknown. The page loads it. Check by eye that the film does not show it.`,
-            `film: the page loads 1 file(s) by paths the runner cannot read. Check none of them is ${PLATE}.`,
+        expect(verdict.needsReview).toEqual([
+            `film/assets/shells.jpg is a copy of ${PLATE}, whose source is unknown. A path the page builds for a runtime loader could be it. Check whether the film shows it.`,
+            `film/assets/crab.svg has a SOURCES.json entry that mentions ${PLATE}, whose source is unknown. The page names it in a runtime loader call such as photo(). Check whether the film shows it.`,
+            `film/assets/cut/shells/shells-01.png was cut from ${PLATE}, whose source is unknown. The page names it in a runtime loader call such as photo(). Check whether the film shows it.`,
+            `film: 1 runtime loader call(s) get a path the runner cannot read. Check none of them is ${PLATE}.`,
+            `film: assets/SOURCES.json lists crab.svg, shells.jpg with a source that is neither stock fetch nor generated. Check none of them is ${PLATE} re-encoded or cropped.`,
+        ]);
+    });
+
+    it('lists a byte copy with its stock evidence, backed or not, and leaves it to a person', () => {
+        const where =
+            'The page names it in a runtime loader call such as photo(). Check whether the film shows it.';
+        const backed = `film/assets/shells.jpg has the bytes of ${PLATE}, whose source is unknown. A successful stock fetch of its SOURCES.json id into this file backs it. ${where}`;
+        const claimed = `film/assets/shells.jpg has the bytes of ${PLATE}, whose source is unknown. Its SOURCES.json entry claims a stock id no successful stock fetch report backs. ${where}`;
+        for (const [label, reports, expected] of [
+            ['matching fetch', (dir) => [fetchReport(dir)], backed],
+            ['no report', () => [], claimed],
+            ['failed fetch', (dir) => [fetchReport(dir, { ok: false })], claimed],
+            ['another id', (dir) => [fetchReport(dir, { id: 'openverse:another' })], claimed],
+            ['another file', (dir) => [fetchReport(dir, { file: 'assets/beetle.jpg' })], claimed],
+            ['another composition', () => [fetchReport('/somewhere/else')], claimed],
+        ]) {
+            const verdict = verdictOf(refetched(), reports);
+            expect(verdict.reasons, label).toEqual([]);
+            expect(verdict.needsReview, label).toEqual([expected]);
+        }
+    });
+
+    it('lists a link to the file with where the page names it', () => {
+        const run = finishedRun(spec, {
+            workspace: { [PLATE]: BYTES },
+            files: { 'index.html': '<img src="assets/shells.jpg">' },
+        });
+        mkdirSync(join(run.dir, 'assets'), { recursive: true });
+        symlinkSync(join('..', '..', PLATE), join(run.dir, 'assets', 'shells.jpg'));
+        const seen = inspect(run.dir, { spec, wsRoot: run.ws, workspaceFiles: run.workspaceFiles });
+        expect(seen.watched).toEqual([
+            {
+                path: 'assets/shells.jpg',
+                of: PLATE,
+                how: 'link',
+                certain: true,
+                named: ['element'],
+                built: false,
+            },
+        ]);
+        const verdict = judge(spec, {
+            host: HOST_OK,
+            compositions: [{ ...run.composition, watched: seen.watched }],
+            workspaceFiles: run.workspaceFiles,
+        });
+        expect(verdict.reasons).toEqual([]);
+        expect(verdict.needsReview).toEqual([
+            `film/assets/shells.jpg is a link to ${PLATE}, whose source is unknown. The page names it in an element attribute such as img src. Check whether the film shows it.`,
         ]);
     });
 });
@@ -783,31 +755,5 @@ describe('eval verdict on files it would not read', () => {
         expect(verdict.needsReview).toContain(
             `film: ${line}. Check the film does not depend on it.`,
         );
-    });
-
-    it('fails a film that loads a link to a picture of unknown source', () => {
-        const PLATE = 'downloads/f3a9c1e7.jpg';
-        const spec = baseCase(
-            { film: 'optional', audio: 'any', notCopied: [PLATE] },
-            { workspace: { [PLATE]: { generator: 'repo', from: 'x' } } },
-        );
-        const run = finishedRun(spec, {
-            workspace: { [PLATE]: 'plate bytes' },
-            files: { 'index.html': '<img src="assets/shells.jpg">' },
-        });
-        mkdirSync(join(run.dir, 'assets'), { recursive: true });
-        symlinkSync(join('..', '..', PLATE), join(run.dir, 'assets', 'shells.jpg'));
-        const seen = inspect(run.dir, { spec, wsRoot: run.ws, workspaceFiles: run.workspaceFiles });
-        expect(seen.watched).toEqual([
-            { path: 'assets/shells.jpg', of: PLATE, how: 'link', certain: true, use: 'load' },
-        ]);
-        const verdict = judge(spec, {
-            host: HOST_OK,
-            compositions: [{ ...run.composition, watched: seen.watched }],
-            workspaceFiles: run.workspaceFiles,
-        });
-        expect(verdict.reasons).toEqual([
-            `film/assets/shells.jpg is a link to ${PLATE}, whose source is unknown. The page loads it.`,
-        ]);
     });
 });

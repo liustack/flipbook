@@ -60,9 +60,19 @@ const HOW = {
     original: 'is',
     copy: 'is a copy of',
     claimed: 'has the bytes of',
+    fetched: 'has the bytes of',
     cut: 'was cut from',
     named: 'has a SOURCES.json entry that mentions',
     link: 'is a link to',
+};
+
+/** Where the page names a file, for the evidence's wording (see page.mjs). */
+const WHERE = {
+    element: 'an element attribute such as img src',
+    attribute: 'another attribute',
+    css: 'a CSS url()',
+    loader: 'a runtime loader call such as photo()',
+    script: 'a string in a script',
 };
 
 /** Whether two directories are the same place, following links. */
@@ -98,16 +108,15 @@ function stockProof(reports, dir, path, entry) {
 }
 
 /**
- * Files in the composition that come from a watched workspace file, and how
- * the page uses them. `certain` files are the file itself, a byte copy that
- * does not even claim a stock id, or a picture cut from one of those. Less
- * certain ones: a byte copy whose stock id no successful stock fetch report
- * backs, an entry whose text mentions the file, and pictures cut from
- * those. A byte copy a matching report proves fetched is no concern.
- * `use` is `load` when the page loads the file (see page.mjs), `possible`
- * when it loads a path built from pieces that could be it, `mention` when a
- * string or attribute only names it, `none` otherwise. Comments name
- * nothing.
+ * Files in the composition that come from a watched workspace file, as
+ * evidence for a person. `how`: the file itself or a link to it, a byte
+ * copy (`copy` with no stock id, `claimed` with a stock id no successful
+ * stock fetch report backs, `fetched` when one does), a picture cut from one
+ * of those, or an entry whose SOURCES.json text mentions the file.
+ * `certain` says whether it surely comes from the watched file. `named`
+ * lists where the page names it (see page.mjs), `built` whether a path the
+ * page builds for a runtime loader could be it. None of this says the page
+ * loads it: comments name nothing, and markup or a string may load nothing.
  */
 function watchedFiles(dir, wsRoot, watched, page, stockReports, readers) {
     if (watched.length === 0) return [];
@@ -140,8 +149,7 @@ function watchedFiles(dir, wsRoot, watched, page, stockReports, readers) {
             }
             if (w.size !== size || reader.sha256(full) !== w.sha256) continue;
             const stock = rel.startsWith('assets/') ? proof(rel.slice('assets/'.length)) : 'none';
-            if (stock === 'proven') continue;
-            const how = stock === 'claimed' ? 'claimed' : 'copy';
+            const how = { proven: 'fetched', claimed: 'claimed', none: 'copy' }[stock];
             found.push({ path: rel, of: w.rel, how, certain: how === 'copy' });
         }
     }
@@ -150,7 +158,7 @@ function watchedFiles(dir, wsRoot, watched, page, stockReports, readers) {
         const tainted = new Map();
         for (const f of found) {
             if (f.of === w.rel && f.path.startsWith('assets/'))
-                tainted.set(f.path.slice('assets/'.length), f.certain);
+                tainted.set(f.path.slice('assets/'.length), f.certain && f.how !== 'fetched');
         }
         for (const [key, entry] of Object.entries(entries)) {
             if (tainted.has(key) || proof(key) === 'proven') continue;
@@ -172,13 +180,8 @@ function watchedFiles(dir, wsRoot, watched, page, stockReports, readers) {
     }
     return found.map((f) => ({
         ...f,
-        use: page.loads.includes(f.path)
-            ? 'load'
-            : page.possibleLoads.some((prefix) => f.path.startsWith(prefix))
-              ? 'possible'
-              : page.mentions.includes(f.path)
-                ? 'mention'
-                : 'none',
+        named: page.references?.[f.path] ?? [],
+        built: (page.builtPaths ?? []).some((prefix) => f.path.startsWith(prefix)),
     }));
 }
 
@@ -389,34 +392,43 @@ function brandReasons(want, got, workspaceFiles) {
 }
 
 /**
- * Rules that hold whether or not a film came out: watched workspace files
- * stay out of the film. A file that surely comes from one and that the page
- * surely loads fails the run. Everything less sure goes to `review`: a
- * possible load, a mere mention, a copy nothing loads, pictures loaded by
- * paths the runner cannot read, and pictures whose source entry is neither
+ * What a case's `notCopied` files leave in the compositions, listed in
+ * `review` as evidence for a person: every file that comes from one (see
+ * watchedFiles) with where the page names it, runtime loader calls whose
+ * path the runner cannot read, and pictures whose source entry is neither
  * stock fetch nor generated, which could be a watched file re-encoded or
- * cropped.
+ * cropped. Reading markup and code cannot tell whether the page really
+ * loads a file, so none of it fails the run.
  */
-function ruleReasons(e, compositions, review) {
-    const reasons = [];
-    if ((e.notCopied ?? []).length === 0) return reasons;
-    const USE = {
-        load: 'The page loads it.',
-        possible: 'The page loads a path built from pieces that could be it.',
-        mention:
-            'A string or attribute in the page names it, and the runner cannot tell whether that loads it.',
-        none: 'Nothing the page loads names it.',
+function watchedEvidence(e, compositions, review) {
+    if ((e.notCopied ?? []).length === 0) return;
+    const STOCK = {
+        fetched: 'A successful stock fetch of its SOURCES.json id into this file backs it.',
+        claimed: 'Its SOURCES.json entry claims a stock id no successful stock fetch report backs.',
     };
     for (const c of compositions) {
         for (const f of c.watched ?? []) {
-            const what = `${c.dir}/${f.path} ${HOW[f.how]} ${f.of}, whose source is unknown.`;
-            if (f.certain && f.use === 'load') reasons.push(`${what} ${USE.load}`);
-            else review.push(`${what} ${USE[f.use]} Check by eye that the film does not show it.`);
+            const where =
+                f.named.length > 0
+                    ? `The page names it in ${f.named.map((kind) => WHERE[kind]).join(', ')}.`
+                    : f.built
+                      ? 'A path the page builds for a runtime loader could be it.'
+                      : 'Nothing the runner read in the page names it.';
+            review.push(
+                [
+                    `${c.dir}/${f.path} ${HOW[f.how]} ${f.of}, whose source is unknown.`,
+                    STOCK[f.how],
+                    where,
+                    'Check whether the film shows it.',
+                ]
+                    .filter(Boolean)
+                    .join(' '),
+            );
         }
-        const computed = c.page?.computedLoads ?? 0;
+        const computed = c.page?.computedPaths ?? 0;
         if (computed > 0)
             review.push(
-                `${c.dir}: the page loads ${computed} file(s) by paths the runner cannot read. Check none of them is ${e.notCopied.join(' or ')}.`,
+                `${c.dir}: ${computed} runtime loader call(s) get a path the runner cannot read. Check none of them is ${e.notCopied.join(' or ')}.`,
             );
         const other = c.sources?.other ?? [];
         if (other.length > 0)
@@ -424,14 +436,13 @@ function ruleReasons(e, compositions, review) {
                 `${c.dir}: assets/SOURCES.json lists ${other.join(', ')} with a source that is neither stock fetch nor generated. Check none of them is ${e.notCopied.join(' or ')} re-encoded or cropped.`,
             );
     }
-    return reasons;
 }
 
 /**
  * The verdict on one run. `delivered`: exactly one composition with a video
  * that passed acceptance. `oneShot`: the run met everything the case checks
  * automatically, with nobody stepping in. A case whose film is optional
- * passes without a film as long as its rules hold. `needsReview` lists
+ * passes without a film. `needsReview` lists
  * what the runner could not settle from the files, and `humanReview` is
  * left for a person to fill in.
  */
@@ -445,7 +456,7 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
         for (const line of c.refused ?? [])
             needsReview.push(`${c.dir}: ${line}. Check the film does not depend on it.`);
     }
-    reasons.push(...ruleReasons(e, compositions, needsReview));
+    watchedEvidence(e, compositions, needsReview);
     const withVideo = compositions.filter((c) => c.video);
     let delivered = false;
     let story = null;

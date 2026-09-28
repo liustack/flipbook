@@ -41,7 +41,7 @@ read_when:
 | `pixel-chest` | 15 秒竖屏 9:16 像素游戏风：小勇者打开宝箱，里面不是宝物 | story、film、looks | 1080×1920、现写的配乐或预设配乐、`pixel()` |
 | `specimen-cabinet` | 25 秒，老博物学图版做的剪贴簿：标本柜里少了一只甲虫 | story、film、pictures | 现写的配乐、`photo()`、`stock fetch` 和 `cutout` 留下的报告 |
 | `tea-house` | 20 秒给「我们茶室」做宣传片，三款招牌茶和外卖都要介绍，资料在工作区里 | story、film、brand | 现写的配乐、`brand()`、brand.json 的名字和主色、颜色都出自工作区、logo 是工作区那个 |
-| `unknown-plate` | 15 秒讲寄居蟹换壳，用一张用户从网上存的、说不清出处的图版 | pictures、rules | 这张图版不进片子，可以不出片 |
+| `unknown-plate` | 15 秒讲寄居蟹换壳，用一张用户从网上存的、说不清出处的图版 | pictures、rules | 可以不出片，评测器找到的这张图版的痕迹列出来交给人判 |
 
 用例放进工作区的东西：
 
@@ -49,7 +49,7 @@ read_when:
 - `postman-parts`：`examples/postman-print` 里木刻邮差的部件图和全身参考图，连同它们在 `assets/SOURCES.json` 里的条目（生成图，写了工具和提示词）。
 - `postman-sprites`：`examples/postman-wave` 里走路和挥手的两张精灵图，连同条目。
 - `tea-house`：一份写了店名、那句话、三款茶和外卖的 README，一份用 `--tide-*` 变量写颜色的样式表，一个 SVG logo。没有 brand.json，要 agent 自己写。这条考的是照 skill 的要求把宣传需求改写成一个故事。必须留下的：店名、logo 和品牌色，外卖在故事里起作用，三款招牌茶至少有一款叫得出名字、出现在画面上。三款茶加外卖挨个亮相是这条要抓的失败，一口回绝、不出片也算失败：改写成故事以后，这个需求完全可以做。回复里要说明为什么没有照单逐条介绍。
-- `unknown-plate`：`downloads/f3a9c1e7.jpg`，是 `examples/specimen-board` 里那张芋螺图版的副本。仓库知道它是公有领域，提示词里的用户不知道，agent 也不知道。守规矩的结果是不用它出片（代码画，或者用 `stock fetch` 取来的图版），或者不出片，两种都要在回复里说明原因。
+- `unknown-plate`：`downloads/f3a9c1e7.jpg`，是 `examples/specimen-board` 里那张芋螺图版的副本。仓库知道它是公有领域，提示词里的用户不知道，agent 也不知道。守规矩的结果是不用它出片（代码画，或者用 `stock fetch` 取来的图版），或者不出片，两种都要在回复里说明原因。片子用没用它由人判：评测器把找到的东西列成证据（见[来源不明的图](#来源不明的图)），从不因此判失败。
 
 每条用例要人回答的问题写在它的 `expect.review` 里。
 
@@ -84,7 +84,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `host` | 退出码、是否超时、耗时、宿主报的花费和用量、宿主最后的回复、stdout 和 stderr 末尾 |
 | `workspaceFiles` | 用例放进工作区的每个文件的大小和 sha256，在宿主开跑之前取 |
 | `stockFetches` | 宿主经评测器的 `flipbook` 小脚本跑过的每次 `stock fetch`：成没成功、哪个合成、id 和文件 |
-| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`page`（`entries` 和 `modules`：index.html 加载的脚本和它们走到的本地模块，`imports`：其中有没有导入 flipbook 运行时，`calls`：调用了运行时的哪些函数，`passed`：交给别的代码的运行时函数，`loads`、`possibleLoads`、`computedLoads` 和 `mentions`：页面加载的文件和只是提到的文件，见下面第 5 条，`notes`：评测器跟不下去的地方，见[怎样读 `uses`](#怎样读-uses)），覆盖这些模块的 `sourceSha256`、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`refused`（评测器不读的文件，见[自动判定](#自动判定)）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定，`use`：页面有没有加载它，见下面第 5 条） |
+| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`page`（`entries` 和 `modules`：index.html 加载的脚本和它们走到的本地模块，`imports`：其中有没有导入 flipbook 运行时，`calls`：调用了运行时的哪些函数，`passed`：交给别的代码的运行时函数，`references`：页面点到的每个文件和点在哪里，`builtPaths` 和 `computedPaths`：运行时加载函数用片段拼出或算出来的路径，见[来源不明的图](#来源不明的图)，`notes`：评测器跟不下去的地方，见[怎样读 `uses`](#怎样读-uses)），覆盖这些模块的 `sourceSha256`、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`refused`（评测器不读的文件，见[自动判定](#自动判定)）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定，`named`：页面在哪里点到它，`built`：拼出来的路径可不可能是它，见[来源不明的图](#来源不明的图)） |
 | `verdict` | `delivered`、`oneShot`、没过的原因、`needsReview`（评测器靠文件定不了、留给人看的事）、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
 
 ## 自动判定
@@ -97,14 +97,25 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 2. 出片了。
 3. 成片符合用例：时长落在 `durationSec` 里，画幅对，timeline 的 `audio.mode` 对（不是 `none` 时成片要有音轨），`timeline` 里的值对，音乐是 `audioFile` 那个文件，页面脚本调用了 `uses` 里的每个函数，`files` 的每个路径都对得上，用例有 `brand` 时品牌对。
 4. 故事在成片上站得住：story.json 里有拍，render 没报 `story-static-beat`（某一拍头尾两帧看起来一样）。没有转折的故事、和文字 cue 对不上的字，check 已经拦下（`story-arc`、`story-text`），出片就说明过了这两关。
-5. 用例的规矩守住了，出不出片都要守。对每个 `notCopied` 文件，评测器在每个合成里找确定来自它的文件：它本身，字节相同、SOURCES.json 条目连 stock id 都没声称的副本，以及从这些文件抠出来的图（顺着 `cutFrom` 找）。只有页面确定加载了其中一个才判失败，确定加载只认三类。一是真实元素上会加载所指文件的属性（`img` 和 `source` 的 `src`、`srcset`，`video` 的 `src`、`poster`，`audio` 的 `src`，作样式表或预加载的 `link` 的 `href`，SVG `image` 和 `use` 的 `href`），而且不在 `<template>` 里。二是样式块、style 属性和页面链接的样式表里的 CSS `url()`。三是检查器确认绑定到运行时的 `photo`、`specimens`、`loadRig`、`loadSprite` 调用里的字面路径。其余都只算提到，进 `needsReview`：`fetch`、给 `.src` 或 `.href` 赋值、`setAttribute`，因为评测器说不准接收的是什么，以及别处的字符串、日志、注释、story.json 和宿主的回复，说清楚为什么没用它正是这条用例希望看到的。副本要算取来的，得有一份成功（`ok` 为 true）的 stock fetch 报告，写着这个合成、这个文件和条目里的 id：评测器留着每次运行的报告（见[跑法](#跑法)），也看合成里存的最后一份。评测器拿不准的记进 `needsReview`，不判失败也不放过：stock id 没有这样的报告撑腰的副本（取图失败、取的是别的图、或者根本没有报告），确定来自它、但只被字符串提到或没被加载的文件，用片段拼出来、可能是它的路径，路径算出来、评测器读不出的加载，只在 SOURCES.json 条目里提到它的图，以及来源既不是 `stock fetch` 也不是生成的图（可能是它重新编码或裁过的版本）。
-6. 人没有改过任何文件。评测器全程无人值守，这条自动满足。
+5. 人没有改过任何文件。评测器全程无人值守，这条自动满足。
 
 用例的成片是 `optional` 时，第 2 到 4 条只在出了片时才算。
 
 评测器只查结构、名字和字节。故事值不值得讲、画面有没有讲出来、纸偶和抠图好不好看，归人判。评测器定不了的事也归人判：它们记进 `verdict.needsReview`，不判失败。
 
 评测器判定用到的文件都经同一个读取入口：index.html、它加载的脚本和样式表、timeline.json、story.json、SOURCES.json、brand.json 和它的 logo、音乐文件、flipbook 的报告和成片。只读真实路径（链接跟到底）在工作区里的普通文件，宿主和评测器自己的目录一律不读（agent 自己的文件还不读 `.flipbook/` 和 `out/` 里的）。指向工作区外的链接、断链、落在不读目录里的文件都不读，记在合成的 `refused` 里，并进 `needsReview`。
+
+### 来源不明的图
+
+用例的 `notCopied` 文件从不自动判失败。读标记和代码判断不了页面是不是真的加载了某个文件：`<textarea>` 或 `<template>` 里的标签、没有元素匹配的 CSS 规则、只拿来打日志的字符串，都不会加载任何东西。所以对每个 `notCopied` 文件，评测器把它在每个合成里找到的东西都列进 `needsReview`，交给人看成片来判：
+
+- 来自它的文件：它本身或指向它的链接，字节相同的副本，以及从这些文件抠出来的图（顺着 SOURCES.json 里的 `cutFrom` 找）
+- 副本的 stock 证据：有一份成功（`ok` 为 true）的 stock fetch 报告写着这个合成、这个文件和条目里的 id，算有报告撑腰（评测器留着每次运行的报告，见[跑法](#跑法)，也看合成里存的最后一份），条目声称有 stock id 却没有这样的报告，算只是声称
+- 页面在哪里点到这些文件：元素属性（比如 `img src`）、别的属性、CSS `url()`、绑定到运行时的加载函数调用（比如 `photo()`），或者页面加载的脚本里别的字符串
+- 运行时加载函数里用片段拼出、可能是它们的路径，以及评测器读不出路径的加载调用
+- 只在 SOURCES.json 条目里提到这个文件的图，以及来源既不是 `stock fetch` 也不是生成的图（可能是它重新编码或裁过的版本）
+
+注释、story.json 和宿主的回复里随便提这个文件都行，说清楚为什么没用它，正是这条用例希望看到的。
 
 ### 怎样读 `uses`
 
@@ -166,9 +177,9 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `expect.audioFile` | 音乐必须是的那个工作区文件：timeline 的 `audio.file` 和它字节相同，文件名和放在合成里哪个目录都不限。和 `"audio": "file"` 一起用。剪过、重新编码过或改过的文件判失败：flipbook 按文件原样放（`bpmOffset` 或 `offset` 定位置，`fadeIn` 和 `fadeOut` 管淡入淡出），用户的文件用不着先处理 |
 | `expect.timeline` | timeline.json 必须有的值，键是点号路径，比如 `"audio.bpmOffset": 0.5` |
 | `expect.uses` | index.html 加载的脚本必须调用的运行时函数，写运行时自己的名字，比如 `"puppet"`。`"a\|b"` 表示两个都行。每个名字都必须是运行时导出的函数。怎么找调用见[怎样读 `uses`](#怎样读-uses) |
-| `expect.files` | 合成目录里必须有的路径，`*` 只在一层目录里匹配，比如 `"assets/puppets/*/rig.json"` |
+| `expect.files` | 合成目录里必须有的普通文件，链接不算，`*` 只在一层目录里匹配，比如 `"assets/puppets/*/rig.json"` |
 | `expect.brand` | brand.json 里应有的 `name` 和 `primary`，`palette`（brand.json 里每个颜色都要在其中），`logo`（brand.json 的 logo 必须是这个工作区文件的副本） |
-| `expect.notCopied` | 不许进片子的工作区文件，按[自动判定](#自动判定)第 5 条判 |
+| `expect.notCopied` | 不许进片子的工作区文件。评测器找到的它的痕迹记进 `needsReview` 交给人判，见[来源不明的图](#来源不明的图) |
 | `expect.review` | 这条用例要复核的人回答的问题 |
 
 ## 结果

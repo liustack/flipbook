@@ -145,8 +145,8 @@ ${inline(`${IMPORT}puppet({});`)}`,
     });
 });
 
-describe('files the page loads, and files it only names', () => {
-    it('reads loads from markup and linked stylesheets, and not from comments or links to other pages', () => {
+describe('where the page names files, as evidence', () => {
+    it('records markup, CSS and linked stylesheets, each with where the file is named', () => {
         const page = model({
             'index.html': `<!doctype html><head>
 <link rel="stylesheet" href="css/page.css">
@@ -161,21 +161,21 @@ describe('files the page loads, and files it only names', () => {
             'css/page.css': "@import 'more.css';\nh1 { background: url(../assets/grain.png); }",
             'css/more.css': 'p { background: url("/assets/dots.png"); }',
         });
-        expect(page.loads).toEqual([
-            'assets/a.png',
-            'assets/b.png',
-            'assets/dots.png',
-            'assets/grain.png',
-            'assets/paper.jpg',
-            'assets/plate.png',
-            'assets/poster.jpg',
-            'assets/tile.png',
-            'css/page.css',
-        ]);
-        expect(page.mentions).toEqual(['assets/credits.html']);
+        expect(page.references).toEqual({
+            'assets/a.png': ['element'],
+            'assets/b.png': ['element'],
+            'assets/credits.html': ['attribute'],
+            'assets/dots.png': ['css'],
+            'assets/grain.png': ['css'],
+            'assets/paper.jpg': ['css'],
+            'assets/plate.png': ['element'],
+            'assets/poster.jpg': ['element'],
+            'assets/tile.png': ['css'],
+            'css/page.css': ['element'],
+        });
     });
 
-    it('reads loads only from runtime loaders, and fetch, .src and setAttribute only as mentions', () => {
+    it('records runtime loader paths, built paths and other strings in the scripts', () => {
         const page = model({
             'index.html': inline(`import { photo, loadRig } from '/__flipbook/runtime.js';
 await photo('assets/a.png');
@@ -190,43 +190,41 @@ const note = 'assets/left-out.png';
 console.info('not used:', note);`),
         });
         expect(page).toMatchObject({
-            loads: ['assets/a.png', 'assets/puppets/man/rig.json'],
-            possibleLoads: ['assets/cut/'],
-            computedLoads: 1,
-            mentions: ['assets/b.png', 'assets/c.png', 'assets/data.json', 'assets/left-out.png'],
+            references: {
+                'assets/a.png': ['loader'],
+                'assets/b.png': ['script'],
+                'assets/c.png': ['script'],
+                'assets/data.json': ['script'],
+                'assets/left-out.png': ['script'],
+                'assets/puppets/man/rig.json': ['loader'],
+            },
+            builtPaths: ['assets/cut/'],
+            computedPaths: 1,
         });
     });
 
-    it('does not take a plain object, a method of the same name or a template for a load', () => {
+    it('records a plain object, a method of the same name, a template and a local photo as they are, without telling them apart from loads', () => {
         const page = model({
-            'index.html': `<template><img src="assets/in-template.png"><div style="background: url(assets/t.png)"></div></template>
+            'index.html': `<template><img src="assets/in-template.png"></template>
+<textarea><img src="assets/in-textarea.png"></textarea>
+<style>.unused { background: url('assets/unused.png'); } body::before { content: "url(assets/in-string.png)"; }</style>
 ${inline(`import { photo } from '/__flipbook/runtime.js';
 const omitted = {};
 omitted.src = 'assets/omitted.png';
-console.log('omitted', omitted);
 const album = { photo(path) { return path; } };
 album.photo('assets/album.png');
 await photo('assets/real.png');`)}
 <img src="assets/plate.png">`,
         });
-        expect(page).toMatchObject({
-            loads: ['assets/plate.png', 'assets/real.png'],
-            mentions: [
-                'assets/album.png',
-                'assets/in-template.png',
-                'assets/omitted.png',
-                'assets/t.png',
-            ],
+        expect(page.references).toMatchObject({
+            'assets/album.png': ['script'],
+            'assets/in-template.png': ['element'],
+            'assets/in-textarea.png': ['element'],
+            'assets/omitted.png': ['script'],
+            'assets/plate.png': ['element'],
+            'assets/real.png': ['loader'],
+            'assets/unused.png': ['css'],
         });
-    });
-
-    it('does not take a local function named photo or fetch for a loader', () => {
-        const page = model({
-            'index.html': inline(
-                "function photo(p) { return p; }\nconst fetch = (p) => p;\nphoto('assets/a.png');\nfetch('assets/b.png');",
-            ),
-        });
-        expect(page).toMatchObject({ loads: [], mentions: ['assets/a.png', 'assets/b.png'] });
     });
 
     it('takes nothing from a script the page does not load', () => {
@@ -234,7 +232,7 @@ await photo('assets/real.png');`)}
             'index.html': '<p>Drawn in canvas</p>',
             'draft.js': "import { photo } from '/__flipbook/runtime.js';\nphoto('assets/a.png');",
         });
-        expect(page).toMatchObject({ loads: [], mentions: [] });
+        expect(page.references).toEqual({});
     });
 });
 
@@ -274,7 +272,7 @@ describe('reading only inside the workspace', () => {
             links: { 'scene.js': '<away>/scene.js', 'page.css': '<away>/page.css' },
         });
         expect(page).toMatchObject({ imports: false, calls: [] });
-        expect(page.loads).not.toContain('external-marker.png');
+        expect(page.references).not.toHaveProperty(['external-marker.png']);
         expect(page.refused).toEqual([
             `scene.js leads out of the workspace, to ${away}/scene.js, not read`,
             `page.css leads out of the workspace, to ${away}/page.css, not read`,
@@ -331,6 +329,6 @@ describe('reading only inside the workspace', () => {
             links: { 'scene.js': 'lib/scene.js', 'page.css': 'styles/page.css' },
         });
         expect(page).toMatchObject({ calls: ['puppet'], refused: [] });
-        expect(page.loads).toContain('assets/paper.jpg');
+        expect(page.references['assets/paper.jpg']).toEqual(['css']);
     });
 });
