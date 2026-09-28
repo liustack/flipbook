@@ -11,7 +11,7 @@
 // folders left out, links included. What the reading cannot settle is
 // listed in `notes`, and the files it would not read in `refused`.
 import { readFileSync } from 'node:fs';
-import { dirname, join, posix, relative, sep } from 'node:path';
+import { dirname, extname, join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { HOST_DIRS } from './cases.mjs';
@@ -297,7 +297,21 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
     const runtimeText = [...runtimeNames]
         .map((name) => `export declare function ${name}(...args: any[]): any;`)
         .join('\n');
-    const all = new Map([...texts, [RUNTIME_FILE, runtimeText]]);
+    // TypeScript sees each module under a name of its own with forward slashes:
+    // it rewrites Windows paths that way, and a lookup by the real path would miss.
+    const virtualOf = new Map();
+    const realOf = new Map();
+    [...texts.keys()].forEach((file, k) => {
+        const name = `/__flipbook_eval__/m${k}${extname(file) === '.mjs' ? '.mjs' : '.js'}`;
+        virtualOf.set(file, name);
+        realOf.set(name, file);
+    });
+    const virtual = (file) => (file === RUNTIME_FILE ? RUNTIME_FILE : virtualOf.get(file));
+    const real = (name) => realOf.get(name) ?? name;
+    const all = new Map([
+        ...[...texts].map(([file, text]) => [virtual(file), text]),
+        [RUNTIME_FILE, runtimeText],
+    ]);
     const options = {
         allowJs: true,
         checkJs: false,
@@ -321,7 +335,7 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
                 : undefined,
         getDefaultLibFileName: () => '/__flipbook_eval__/lib.d.ts',
         writeFile: () => {},
-        getCurrentDirectory: () => dir,
+        getCurrentDirectory: () => '/__flipbook_eval__',
         getCanonicalFileName: (name) => name,
         useCaseSensitiveFileNames: () => true,
         getNewLine: () => '\n',
@@ -329,7 +343,7 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
         readFile: (name) => all.get(name),
         resolveModuleNameLiterals: (literals, containing) =>
             literals.map((literal) => {
-                const to = resolutions.get(containing)?.get(literal.text);
+                const to = resolutions.get(real(containing))?.get(literal.text);
                 if (!to) return { resolvedModule: undefined };
                 const extension =
                     to === RUNTIME_FILE
@@ -339,7 +353,7 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
                           : ts.Extension.Js;
                 return {
                     resolvedModule: {
-                        resolvedFileName: to,
+                        resolvedFileName: virtual(to),
                         extension,
                         isExternalLibraryImport: false,
                     },
@@ -347,7 +361,11 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
             }),
     };
     const modules = [...texts.keys()];
-    const program = ts.createProgram({ rootNames: [...modules, RUNTIME_FILE], options, host });
+    const program = ts.createProgram({
+        rootNames: [...modules.map(virtual), RUNTIME_FILE],
+        options,
+        host,
+    });
     const checker = program.getTypeChecker();
     const runtimeImport = (node, file) => {
         const call = ts.isAwaitExpression(node) ? node.expression : node;
@@ -386,7 +404,7 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
         }
         const declaration = symbol.valueDeclaration;
         if (!declaration) return null;
-        const home = declaration.getSourceFile().fileName;
+        const home = real(declaration.getSourceFile().fileName);
         if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
             if (!(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)) return null;
             if (ts.isIdentifier(declaration.name) && runtimeImport(declaration.initializer, home))
@@ -455,7 +473,7 @@ export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames()
         );
     };
     for (const file of modules) {
-        const source = program.getSourceFile(file);
+        const source = program.getSourceFile(virtual(file));
         const visit = (node) => {
             if (
                 (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
