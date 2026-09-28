@@ -39,6 +39,18 @@ Each beat is `{ id, role, at, change }`, plus `text`, `sound`, `callback` or `ho
 - `sound` names the sfx cue that marks the beat. `callback` names an earlier beat this one answers: an ending that returns to the opening. `hold: true` marks the one beat that stands still on purpose, at most one.
 - No times in the story: bars and beats live in the timeline only.
 
+## Land the ending
+
+The ending is where the viewer decides what they felt, and a rushed ending is the most common flaw: the last words appear and the film cuts off. Give it room.
+
+- Show the resolution, then stay on it. Once the last change lands, keep the picture on screen before the film stops: at least 2 seconds after the last words settle, longer before a title or a brand. check warns with `story-ending-short` when the film stops sooner, or, with no words, when the last beat is shorter than 2.5 seconds (both scaled down for a very short film).
+- Answer the opening. The strongest endings come back to an image from the start, changed: the same window now lit, the same road now walked. Mark that beat with `callback`.
+- After the main action, one small last action tells the viewer the story is over: a blink, a leaf settling, a door clicking shut. Keep it small: a new event at the end starts a new story.
+- Let the movement come to rest instead of stopping: the camera eases to a stop, the light dims or warms a little, the last moving thing settles. Something small may keep living in the hold (snow falling, a flame, a breath), which also keeps render's `freeze` check quiet. Don't end mid-motion, and don't let a cut or a fade to black stand in for an ending.
+- A title or end card comes after the story, not over the last action, and is made of the film's own material: the same paper, ink or pixels. Hold it at least 2 seconds, 3 to 5 for a brand. An end card that stands still on purpose gets its own scene with `"hold": true` in the timeline.
+- The music ends on its home chord (the key's first chord, as in C for C major), reached from the chord a fifth above it (G in C major), and the last bar or two let it ring out instead of starting new notes.
+- Don't put words on what the picture already shows. A caption saying "made it" over a picture of it making it takes the moment away from the viewer.
+
 ## Order of work
 
 1. Write `story.json`.

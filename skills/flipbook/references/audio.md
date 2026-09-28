@@ -83,7 +83,7 @@ With `"mode": "score"` you write the music and flipbook plays it note for note w
 | building, triumphant | minor turning major | 96 to 120 | `strings` `pulse`, `piano` `octaves` in the bass, `drums` kick on every beat in the last scene, level `full` |
 | clean product tour | major | 110 to 124 | `pluck` `offbeat`, `bass` `octaves`, `bells` accents, `drums` kick and hat |
 
-Keep one mood per film and move it with `level` and with parts entering and leaving: start with two parts, add the melody on the second scene, add drums at the peak, drop back to two parts at the end.
+Keep one mood per film and move it with `level` and with parts entering and leaving: start with two parts, add the melody on the second scene, add drums at the peak, drop back to two parts at the end. End on the home chord: write the last scene's chords so they close on the key's fifth chord then its first (`G` then `C` in C major), and give the last chord a whole bar or more so it rings out as the picture comes to rest.
 
 ### Shape
 
