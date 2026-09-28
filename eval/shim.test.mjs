@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,5 +27,31 @@ describe.skipIf(process.platform === 'win32')('the flipbook shim', () => {
         const kept = shimReports(bin);
         expect(kept).toHaveLength(1);
         expect(kept[0]).toEqual(JSON.parse(shimmed.stdout));
+    });
+
+    it('keeps the report of every run, a success and a failure alike', () => {
+        const bin = mkdtempSync(join(tmpdir(), 'flipbook-shim-'));
+        temps.push(bin);
+        const fake = join(bin, 'fake-cli.mjs');
+        writeFileSync(
+            fake,
+            `const ok = process.argv[2] === 'ok';
+console.log(JSON.stringify({ schema: 'flipbook.report/1', command: 'stock-fetch', ok, stock: { id: process.argv[3], file: 'assets/a.jpg' } }));
+process.exit(ok ? 0 : 1);`,
+        );
+        writeShims(bin, fake);
+        const runs = [
+            ['ok', 'openverse:one'],
+            ['fail', 'openverse:two'],
+        ].map((args) => spawnSync(join(bin, 'flipbook'), args, { encoding: 'utf-8' }).status);
+        expect(runs).toEqual([0, 1]);
+        const kept = shimReports(bin).map((r) => [r.ok, r.stock.id]);
+        expect(kept).toHaveLength(2);
+        expect(kept).toEqual(
+            expect.arrayContaining([
+                [true, 'openverse:one'],
+                [false, 'openverse:two'],
+            ]),
+        );
     });
 });
