@@ -1,10 +1,20 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    realpathSync,
+    renameSync,
+    rmSync,
+    symlinkSync,
+    writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { REPORTS_ENV, shimReports, shimVersion, writeShims } from './shim.mjs';
+import { pinReports, REPORTS_ENV, shimReports, shimVersion, writeShims } from './shim.mjs';
 
 const cli = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'main.js');
 const temps = [];
@@ -12,7 +22,7 @@ afterAll(() => {
     for (const dir of temps) rmSync(dir, { recursive: true, force: true });
 });
 const fresh = (name) => {
-    const dir = mkdtempSync(join(tmpdir(), `flipbook-shim-${name}-`));
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), `flipbook-shim-${name}-`)));
     temps.push(dir);
     return dir;
 };
@@ -21,6 +31,8 @@ const run = (bin, args, reports) =>
         encoding: 'utf-8',
         env: { ...process.env, [REPORTS_ENV]: reports ?? '' },
     });
+const report = (marker) =>
+    JSON.stringify({ schema: 'flipbook.report/1', command: 'stock-fetch', ok: true, marker });
 
 /** A stand-in CLI that prints one stock fetch report and exits 0 when told `ok`, 1 otherwise. */
 function fakeCli(dir) {
@@ -34,43 +46,55 @@ process.exit(ok ? 0 : 1);`,
     return file;
 }
 
+/** An evaluator results root with a pinned report directory, a shim, and a folder outside both. */
+function setup() {
+    const root = fresh('root');
+    const reports = join(root, 'results', 'reports', 'case--target--run1');
+    mkdirSync(reports, { recursive: true });
+    const away = join(root, 'away');
+    mkdirSync(away);
+    writeFileSync(join(away, 'external.json'), report('outside'));
+    const bin = join(root, 'workspace', '.eval-bin');
+    mkdirSync(bin, { recursive: true });
+    writeShims(bin, fakeCli(root));
+    return { root, reports, away, bin, pin: pinReports(reports) };
+}
+
 describe.skipIf(process.platform === 'win32')('the flipbook shim', () => {
-    it('runs this checkout, passes stdout and the exit code through, and keeps each report where the evaluator says', () => {
+    it('runs this checkout, passes stdout and the exit code through, and keeps each report in the pinned directory', () => {
         const bin = fresh('bin');
         const reports = fresh('reports');
+        const pin = pinReports(reports);
         writeShims(bin, cli);
         expect(shimVersion(bin)).toMatch(/^\d+\.\d+\.\d+$/);
         const missing = join(bin, 'no-such-composition');
         const direct = spawnSync(process.execPath, [cli, 'check', missing], { encoding: 'utf-8' });
-        const shimmed = run(bin, ['check', missing], reports);
+        const shimmed = run(bin, ['check', missing], pin.real);
         expect(shimmed.status).toBe(direct.status);
         expect(shimmed.status).not.toBe(0);
         expect(JSON.parse(shimmed.stdout).schema).toBe('flipbook.report/1');
-        expect(shimReports(reports)).toEqual([JSON.parse(shimmed.stdout)]);
+        expect(shimReports(pin)).toEqual({ reports: [JSON.parse(shimmed.stdout)], problem: null });
         expect(existsSync(join(bin, 'reports'))).toBe(false);
     });
 
     it('keeps nothing when the evaluator names no directory', () => {
-        const bin = fresh('bin');
-        writeShims(bin, fakeCli(bin));
+        const { bin, reports } = setup();
         const result = run(bin, ['ok', 'openverse:one']);
         expect(result.status).toBe(0);
         expect(JSON.parse(result.stdout).ok).toBe(true);
-        expect(existsSync(join(bin, 'reports'))).toBe(false);
+        expect(readdirSync(reports)).toEqual([]);
     });
 
     it('keeps the report of every run, a success and a failure alike', () => {
-        const bin = fresh('bin');
-        const reports = fresh('reports');
-        writeShims(bin, fakeCli(bin));
+        const { bin, pin } = setup();
         const codes = [
             ['ok', 'openverse:one'],
             ['fail', 'openverse:two'],
-        ].map((args) => run(bin, args, reports).status);
+        ].map((args) => run(bin, args, pin.real).status);
         expect(codes).toEqual([0, 1]);
-        const kept = shimReports(reports).map((r) => [r.ok, r.stock.id]);
-        expect(kept).toHaveLength(2);
-        expect(kept).toEqual(
+        const kept = shimReports(pin);
+        expect(kept.problem).toBeNull();
+        expect(kept.reports.map((r) => [r.ok, r.stock.id])).toEqual(
             expect.arrayContaining([
                 [true, 'openverse:one'],
                 [false, 'openverse:two'],
@@ -78,24 +102,65 @@ describe.skipIf(process.platform === 'win32')('the flipbook shim', () => {
         );
     });
 
-    it('never reads reports from the workspace, nor through a link in its own directory', () => {
-        const ws = fresh('ws');
-        const away = fresh('away');
-        const reports = fresh('reports');
-        const planted = {
-            schema: 'flipbook.report/1',
-            command: 'stock-fetch',
-            ok: true,
-            marker: 'planted outside',
-        };
-        writeFileSync(join(away, 'report.json'), JSON.stringify(planted));
-        mkdirSync(join(ws, '.eval-bin'));
-        symlinkSync(away, join(ws, '.eval-bin', 'reports'));
-        writeShims(join(ws, '.eval-bin'), fakeCli(ws));
-        run(join(ws, '.eval-bin'), ['ok', 'openverse:one'], reports);
-        symlinkSync(join(away, 'report.json'), join(reports, 'linked.json'));
-        const kept = shimReports(reports);
-        expect(kept.map((r) => r.stock?.id)).toEqual(['openverse:one']);
-        expect(kept.some((r) => r.marker)).toBe(false);
+    it('never reads the workspace, nor a report that is a link in the pinned directory', () => {
+        const { root, bin, away, pin } = setup();
+        symlinkSync(away, join(root, 'workspace', '.eval-bin', 'reports'));
+        run(bin, ['ok', 'openverse:one'], pin.real);
+        symlinkSync(join(away, 'external.json'), join(pin.real, 'linked.json'));
+        const kept = shimReports(pin);
+        expect(kept.problem).toBeNull();
+        expect(kept.reports.map((r) => r.stock?.id ?? r.marker)).toEqual(['openverse:one']);
+    });
+
+    it('reads nothing once the pinned directory is swapped for a link, and the shim writes nothing through it', () => {
+        const { bin, away, pin } = setup();
+        run(bin, ['ok', 'openverse:before'], pin.real);
+        renameSync(pin.real, `${pin.real}.moved`);
+        symlinkSync(away, pin.real);
+        expect(shimReports(pin)).toEqual({
+            reports: [],
+            problem: `${pin.real} became a link`,
+        });
+        const result = run(bin, ['ok', 'openverse:after'], pin.real);
+        expect(result.status).toBe(0);
+        expect(JSON.parse(result.stdout).stock.id).toBe('openverse:after');
+        expect(readdirSync(away)).toEqual(['external.json']);
+    });
+
+    it('reads nothing once a folder above the pinned directory is swapped for a link, and the shim writes nothing', () => {
+        const { root, bin, away, pin } = setup();
+        const results = join(root, 'results');
+        mkdirSync(join(away, 'reports', 'case--target--run1'), { recursive: true });
+        writeFileSync(
+            join(away, 'reports', 'case--target--run1', 'planted.json'),
+            report('planted'),
+        );
+        renameSync(results, `${results}.moved`);
+        symlinkSync(away, results);
+        expect(shimReports(pin)).toEqual({ reports: [], problem: `${results} became a link` });
+        const result = run(bin, ['fail', 'openverse:after'], pin.real);
+        expect(result.status).toBe(1);
+        expect(readdirSync(join(away, 'reports', 'case--target--run1'))).toEqual(['planted.json']);
+    });
+
+    it('reads nothing once the pinned directory is replaced by another real one', () => {
+        const { pin } = setup();
+        renameSync(pin.real, `${pin.real}.old`);
+        mkdirSync(pin.real);
+        writeFileSync(join(pin.real, 'planted.json'), report('planted'));
+        expect(shimReports(pin)).toEqual({ reports: [], problem: `${pin.real} was replaced` });
+    });
+
+    it('writes nothing when the directory it is given is reached through a link', () => {
+        const { root, bin, pin } = setup();
+        const linked = join(root, 'linked-results');
+        symlinkSync(join(root, 'results'), linked);
+        const result = run(
+            bin,
+            ['ok', 'openverse:one'],
+            join(linked, 'reports', 'case--target--run1'),
+        );
+        expect(result.status).toBe(0);
+        expect(readdirSync(pin.real)).toEqual([]);
     });
 });

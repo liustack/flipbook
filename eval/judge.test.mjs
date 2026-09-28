@@ -757,3 +757,21 @@ describe('eval verdict on files it would not read', () => {
         );
     });
 });
+
+describe('eval verdict on notes about the run', () => {
+    it('puts notes about the run first in needsReview, where a person must settle them', () => {
+        const spec = baseCase();
+        const { composition, workspaceFiles } = finishedRun(spec);
+        const note =
+            "The evaluator's report directory changed during the run (/x became a link), so none of its reports were read. Check what the agent did there.";
+        const verdict = judge(spec, {
+            host: HOST_OK,
+            compositions: [composition],
+            workspaceFiles,
+            runNotes: [note],
+        });
+        expect(verdict.reasons).toEqual([]);
+        expect(verdict.needsReview).toEqual([note]);
+        expect(verdict.humanReview.settle).toEqual([{ item: note, ok: null, note: '' }]);
+    });
+});

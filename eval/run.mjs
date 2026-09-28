@@ -32,7 +32,7 @@ import { sha256File } from './files.mjs';
 import { inspect, judge, tally } from './judge.mjs';
 import { runtimeExports } from './page.mjs';
 import { recheck, renderShape } from './recheck.mjs';
-import { REPORTS_ENV, shimReports, shimVersion, writeShims } from './shim.mjs';
+import { pinReports, REPORTS_ENV, shimReports, shimVersion, writeShims } from './shim.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
@@ -353,8 +353,15 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
     const slug = `${entry.name}--${target.name.replace(/[^\w.-]+/g, '_')}--run${run}`;
     const reports = join(resultsDir, 'reports', slug);
     mkdirSync(reports, { recursive: true });
-    const host = await runHost(target, prompt, ws, bin, timeoutMin, reports);
-    const stockReports = shimReports(reports).filter((r) => r.command === 'stock-fetch');
+    const pin = pinReports(reports);
+    const host = await runHost(target, prompt, ws, bin, timeoutMin, pin.real);
+    const kept = shimReports(pin);
+    const stockReports = kept.reports.filter((r) => r.command === 'stock-fetch');
+    const runNotes = kept.problem
+        ? [
+              `The evaluator's report directory changed during the run (${kept.problem}), so none of its reports were read. Check what the agent did there.`,
+          ]
+        : [];
     const compositions = findCompositions(ws).map((dir) => {
         const seen = inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles, stockReports });
         const flags = renderShape(seen.lastRender);
@@ -383,6 +390,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
         host,
         workspaceFiles,
         shimReports: relative(repoRoot, reports),
+        shimReportsProblem: kept.problem,
         stockFetches: stockReports.map((r) => ({
             ok: r.ok,
             dir: r.composition?.dir ?? null,
@@ -391,7 +399,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
         })),
         compositions,
     };
-    evidence.verdict = judge(entry.spec, { host, compositions, workspaceFiles });
+    evidence.verdict = judge(entry.spec, { host, compositions, workspaceFiles, runNotes });
     const films = join(resultsDir, 'films', slug);
     for (const [i, c] of evidence.compositions.entries()) {
         mkdirSync(films, { recursive: true });

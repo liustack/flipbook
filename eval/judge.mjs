@@ -443,13 +443,14 @@ function watchedEvidence(e, compositions, review) {
  * that passed acceptance. `oneShot`: the run met everything the case checks
  * automatically, with nobody stepping in. A case whose film is optional
  * passes without a film. `needsReview` lists
- * what the runner could not settle from the files, and `humanReview` is
+ * what the runner could not settle from the files, starting with `runNotes`
+ * about the run itself, and `humanReview` is
  * left for a person to fill in.
  */
-export function judge(spec, { host, compositions, workspaceFiles }) {
+export function judge(spec, { host, compositions, workspaceFiles, runNotes = [] }) {
     const e = spec.expect;
     const reasons = [];
-    const needsReview = [];
+    const needsReview = [...runNotes];
     if (host.timedOut) reasons.push('host timed out');
     else if (host.exitCode !== 0) reasons.push(`host exited ${host.exitCode}`);
     for (const c of compositions) {
