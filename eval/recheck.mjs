@@ -4,9 +4,18 @@
 // composition reaches by a relative path (a brand.json in the workspace root,
 // the logo and fonts it names) keeps its place next to it.
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+    copyFileSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    realpathSync,
+    rmSync,
+    statSync,
+    symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { HOST_DIRS } from './cases.mjs';
 
 /** Folders left out of the copy: the host's and the eval's own, and what flipbook wrote. */
@@ -18,6 +27,62 @@ function readJsonText(text) {
     } catch {
         return null;
     }
+}
+
+/**
+ * Copy the workspace `wsRoot` to `dest`, leaving out the LEFT_OUT folders.
+ * A link whose real target lies in the workspace, outside those folders,
+ * becomes a link to the same place in the copy, so the copy never reaches
+ * back into the original. A link that leads out of the workspace, into a
+ * folder left out, or nowhere is not followed: it stays out of the copy,
+ * and a note says so. Returns the notes.
+ */
+export function copyWorkspace(wsRoot, dest) {
+    const realRoot = realpathSync(wsRoot);
+    const notes = [];
+    const walk = (rel) => {
+        for (const entry of readdirSync(join(wsRoot, rel), { withFileTypes: true })) {
+            if (LEFT_OUT.includes(entry.name)) continue;
+            const childRel = rel ? join(rel, entry.name) : entry.name;
+            const from = join(wsRoot, childRel);
+            const to = join(dest, childRel);
+            const shown = childRel.split(sep).join('/');
+            if (entry.isSymbolicLink()) {
+                let target;
+                try {
+                    target = realpathSync(from);
+                } catch {
+                    notes.push(
+                        `${shown} is a link that leads nowhere, left out of the recheck copy`,
+                    );
+                    continue;
+                }
+                const back = relative(realRoot, target);
+                if (back === '' || back.startsWith('..') || isAbsolute(back)) {
+                    notes.push(
+                        `${shown} is a link out of the workspace, to ${target}, left out of the recheck copy`,
+                    );
+                    continue;
+                }
+                const into = back.split(sep).find((part) => LEFT_OUT.includes(part));
+                if (into) {
+                    notes.push(
+                        `${shown} is a link into ${into}/, which the recheck leaves out, so it is left out too`,
+                    );
+                    continue;
+                }
+                const type = statSync(target).isDirectory() ? 'dir' : 'file';
+                symlinkSync(relative(dirname(to), join(dest, back)), to, type);
+            } else if (entry.isDirectory()) {
+                mkdirSync(to);
+                walk(childRel);
+            } else if (entry.isFile()) {
+                copyFileSync(from, to);
+            }
+        }
+    };
+    walk('');
+    return notes;
 }
 
 /**
@@ -35,19 +100,13 @@ export function renderShape(lastRender) {
 
 /**
  * Run `flipbook check` on a copy of `wsRoot` at the composition's place in
- * it, with `flags` (such as the ones from renderShape), and return its exit
- * code and report.
+ * it, with `flags` (such as the ones from renderShape). Returns its exit code
+ * and report, and `notes` on links the copy did not follow.
  */
 export function recheck(composition, { wsRoot, cli, flags = [] }) {
     const copy = mkdtempSync(join(tmpdir(), 'flipbook-eval-recheck-'));
     try {
-        cpSync(wsRoot, copy, {
-            recursive: true,
-            filter: (src) =>
-                !relative(wsRoot, src)
-                    .split(sep)
-                    .some((part) => LEFT_OUT.includes(part)),
-        });
+        const notes = copyWorkspace(wsRoot, copy);
         const result = spawnSync(
             process.execPath,
             [cli, 'check', join(copy, relative(wsRoot, composition)), ...flags],
@@ -57,7 +116,7 @@ export function recheck(composition, { wsRoot, cli, flags = [] }) {
                 env: { ...process.env, FLIPBOOK_QUIET: '1' },
             },
         );
-        return { exitCode: result.status, report: readJsonText(result.stdout) };
+        return { exitCode: result.status, report: readJsonText(result.stdout), notes };
     } finally {
         rmSync(copy, { recursive: true, force: true });
     }

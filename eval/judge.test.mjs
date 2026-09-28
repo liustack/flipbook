@@ -534,3 +534,35 @@ describe('human review', () => {
         expect(JSON.parse(readFileSync(join(dir, 'tally.json'), 'utf-8')).flagship.runs).toBe(2);
     });
 });
+
+describe('eval verdict on the recheck copy', () => {
+    const spec = baseCase();
+    const verdictWith = (recheck) => {
+        const { composition, workspaceFiles } = finishedRun(spec);
+        return judge(spec, {
+            host: HOST_OK,
+            compositions: [{ ...composition, recheck }],
+            workspaceFiles,
+        });
+    };
+    const LINK =
+        'film/plate.jpg is a link out of the workspace, to /x/plate.jpg, left out of the recheck copy';
+
+    it('fails a film whose recheck fails on a faithful copy', () => {
+        const verdict = verdictWith({ exitCode: 1, notes: [] });
+        expect(verdict.reasons).toEqual(['independent check exited 1']);
+        expect(verdict.delivered).toBe(false);
+    });
+
+    it('asks a person when the copy left links out, and does not fail the film for it', () => {
+        const passed = verdictWith({ exitCode: 0, notes: [LINK] });
+        expect(passed.reasons).toEqual([]);
+        expect(passed.needsReview).toEqual([`film: ${LINK}. Check the film does not need it.`]);
+        const failed = verdictWith({ exitCode: 1, notes: [LINK] });
+        expect(failed.reasons).toEqual([]);
+        expect(failed.needsReview).toEqual([
+            `film: ${LINK}. Check the film does not need it.`,
+            'film: independent check exited 1 on a copy that left out the links above. Check whether the film fails without them or for another reason.',
+        ]);
+    });
+});

@@ -88,7 +88,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 
 ## 自动判定
 
-**出片**：工作区里恰好一个合成，`out/video.mp4` 存在，最后一次 render 报告 `ok: true`，check 和 render 报告里都没有 `stop: true`，评测器自己跑的 check 退出码 0。这次 check 跑在整个工作区的新副本上，去掉宿主的目录、`.flipbook/` 和 `out/`：agent 之前跑出来的东西都不算，放在工作区根目录的 brand.json 连同它的 logo 和字体也还在合成找得到的位置。它按 agent 最后一次 render 报告里的画幅带上 `--size` 和 `--scale`，文字和安全区按成片的形状查，证据里的 `recheck.flags` 记着这两个参数。
+**出片**：工作区里恰好一个合成，`out/video.mp4` 存在，最后一次 render 报告 `ok: true`，check 和 render 报告里都没有 `stop: true`，评测器自己跑的 check 退出码 0。这次 check 跑在整个工作区的新副本上，去掉宿主的目录、`.flipbook/` 和 `out/`：agent 之前跑出来的东西都不算，放在工作区根目录的 brand.json 连同它的 logo 和字体也还在合成找得到的位置。复制时逐个解析链接：真实目标在工作区里、又不在去掉的目录里的，在副本里变成指向副本对应位置的链接，副本不会再指回原工作区。指向工作区外、指向去掉的目录或者指不到东西的链接不跟进，不进副本，记进 `needsReview`。这时 check 要是失败，失败也记进 `needsReview`，不判这次失败，因为坏的可能是副本。它按 agent 最后一次 render 报告里的画幅带上 `--size` 和 `--scale`，文字和安全区按成片的形状查，证据里的 `recheck.flags` 记着这两个参数。
 
 下面全部满足才算**一次跑通**：
 

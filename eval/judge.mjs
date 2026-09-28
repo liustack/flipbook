@@ -170,13 +170,26 @@ function getPath(object, dotted) {
     return dotted.split('.').reduce((at, key) => (isObject(at) ? at[key] : undefined), object);
 }
 
-/** Why the delivered film falls short of acceptance, or nothing. */
-function filmGate(c) {
+/**
+ * Why the delivered film falls short of acceptance, or nothing. Links the
+ * recheck copy did not follow go to `review`, and when the recheck then
+ * fails, the failure does too: the copy, not the film, may be what broke.
+ */
+function filmGate(c, review) {
     const reasons = [];
     if (!c.video) reasons.push('no out/video.mp4');
     if (!c.lastRender?.ok) reasons.push('last render report is missing or not ok');
     if (c.lastRender?.stop || c.lastCheck?.stop) reasons.push('the CLI asked the agent to stop');
-    if (c.recheck?.exitCode !== 0) reasons.push(`independent check exited ${c.recheck?.exitCode}`);
+    const notes = c.recheck?.notes ?? [];
+    for (const note of notes) review.push(`${c.dir}: ${note}. Check the film does not need it.`);
+    if (c.recheck?.exitCode !== 0) {
+        const failed = `independent check exited ${c.recheck?.exitCode}`;
+        if (notes.length > 0)
+            review.push(
+                `${c.dir}: ${failed} on a copy that left out the links above. Check whether the film fails without them or for another reason.`,
+            );
+        else reasons.push(failed);
+    }
     return reasons;
 }
 
@@ -343,7 +356,7 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
             gate.push(`${compositions.length} compositions found, expected 1`);
         const c = withVideo[0] ?? compositions[0];
         if (c) {
-            gate.push(...filmGate(c));
+            gate.push(...filmGate(c, needsReview));
             const told = storyVerdict(c);
             story = told.facts;
             reasons.push(

@@ -1,14 +1,23 @@
 // The evaluator's recheck through its real copy: a brand.json beside the
 // composition or in the workspace root, with its logo and font, must check
 // the same on the copy as where the agent left it.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    realpathSync,
+    rmSync,
+    symlinkSync,
+    unlinkSync,
+    writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildTestFont } from '../test/fontBuilder.ts';
 import { writeStory } from '../test/story.ts';
-import { recheck, renderShape } from './recheck.mjs';
+import { copyWorkspace, recheck, renderShape } from './recheck.mjs';
 
 const cli = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'main.js');
 const temps = [];
@@ -139,5 +148,60 @@ describe('eval recheck in the rendered shape', () => {
         expect(portrait.exitCode).toBe(1);
         expect(portrait.report?.failures.map((f) => f.code)).toContain('text-offstage');
         expect(portrait.report?.composition).toMatchObject({ width: 180, height: 320 });
+    });
+});
+
+describe('eval recheck copy and links', () => {
+    const inside = (root, file) =>
+        !relative(realpathSync(root), realpathSync(file)).startsWith('..');
+
+    it('turns links inside the workspace into links inside the copy, relative or absolute, to files or folders', () => {
+        const ws = mkdtempSync(join(tmpdir(), 'flipbook-copy-'));
+        const dest = mkdtempSync(join(tmpdir(), 'flipbook-copy-dest-'));
+        temps.push(ws, dest);
+        write(ws, 'images/logo.svg', LOGO);
+        symlinkSync('images/logo.svg', join(ws, 'logo.svg'));
+        symlinkSync(join(ws, 'images', 'logo.svg'), join(ws, 'absolute.svg'));
+        symlinkSync('images', join(ws, 'brand'));
+        expect(copyWorkspace(ws, dest)).toEqual([]);
+        for (const name of ['logo.svg', 'absolute.svg', 'brand/logo.svg']) {
+            expect(inside(dest, join(dest, name)), name).toBe(true);
+        }
+    });
+
+    it('leaves out links that lead out of the workspace, into a folder it leaves out, or nowhere, and says so', () => {
+        const ws = mkdtempSync(join(tmpdir(), 'flipbook-copy-'));
+        const outside = mkdtempSync(join(tmpdir(), 'flipbook-copy-outside-'));
+        const dest = mkdtempSync(join(tmpdir(), 'flipbook-copy-dest-'));
+        temps.push(ws, outside, dest);
+        write(outside, 'plate.jpg', 'outside the workspace');
+        write(ws, 'film/out/contact-sheet.png', 'rendered');
+        write(ws, 'film/index.html', '<!doctype html>');
+        symlinkSync(join(outside, 'plate.jpg'), join(ws, 'film', 'plate.jpg'));
+        symlinkSync('out/contact-sheet.png', join(ws, 'film', 'sheet.png'));
+        symlinkSync('missing.png', join(ws, 'film', 'gone.png'));
+        const notes = copyWorkspace(ws, dest);
+        expect(notes).toEqual([
+            'film/gone.png is a link that leads nowhere, left out of the recheck copy',
+            `film/plate.jpg is a link out of the workspace, to ${realpathSync(join(outside, 'plate.jpg'))}, left out of the recheck copy`,
+            'film/sheet.png is a link into out/, which the recheck leaves out, so it is left out too',
+        ]);
+        expect(existsSync(join(dest, 'film', 'index.html'))).toBe(true);
+        for (const name of ['plate.jpg', 'sheet.png', 'gone.png', 'out']) {
+            expect(existsSync(join(dest, 'film', name)), name).toBe(false);
+        }
+    });
+
+    it('checks a brand whose logo is a link in the workspace root, relative or absolute', () => {
+        for (const absolute of [false, true]) {
+            const { ws, film } = workspace('root');
+            const logo = join(ws, 'brand', 'logo.svg');
+            write(ws, 'art/logo.svg', LOGO);
+            unlinkSync(logo);
+            symlinkSync(absolute ? join(ws, 'art', 'logo.svg') : '../art/logo.svg', logo);
+            const result = recheck(film, { wsRoot: ws, cli });
+            expect(result.report?.failures, JSON.stringify(result.report?.failures)).toEqual([]);
+            expect(result).toMatchObject({ exitCode: 0, notes: [] });
+        }
     });
 });
