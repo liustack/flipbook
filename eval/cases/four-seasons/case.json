@@ -16,6 +16,7 @@
         "width": 1920,
         "height": 1080,
         "audio": "file",
+        "audioFile": "assets/music.wav",
         "timeline": {
             "bpm": 96,
             "audio.bpmOffset": 0.5

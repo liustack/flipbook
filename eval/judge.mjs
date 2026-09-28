@@ -27,6 +27,17 @@ function sourcesSummary(dir) {
     return out;
 }
 
+/** The music file the timeline plays, when its audio mode is `file`, with its sha256. */
+function audioFacts(dir, timeline) {
+    const audio = timeline?.audio;
+    if (audio?.mode !== 'file' || typeof audio.file !== 'string') return null;
+    const file = resolve(dir, audio.file);
+    return {
+        file: audio.file,
+        sha256: existsSync(file) && statSync(file).isFile() ? sha256File(file) : null,
+    };
+}
+
 /** The brand.json timeline.json names, as far as the verdict needs it. */
 function brandFacts(dir, timeline) {
     if (typeof timeline?.brand !== 'string') return null;
@@ -144,6 +155,7 @@ export function inspect(dir, { spec, wsRoot, workspaceFiles }) {
         runtime: runtimeUse(dir),
         sources: sourcesSummary(dir),
         brand: brandFacts(dir, timeline),
+        audioFile: audioFacts(dir, timeline),
         files: Object.fromEntries(
             (e.files ?? []).map((pattern) => [
                 pattern,
@@ -210,6 +222,16 @@ function expectations(e, c, workspaceFiles, review) {
         if (!allowed.includes(mode))
             reasons.push(`timeline audio.mode is "${mode}", expected ${allowed.join(' or ')}`);
         if (mode !== 'none' && c.probe && !c.probe.audio) reasons.push('no audio track');
+    }
+    if (e.audioFile !== undefined) {
+        const want = workspaceFiles[e.audioFile]?.sha256;
+        if (!c.audioFile) reasons.push(`the timeline plays no music file, expected ${e.audioFile}`);
+        else if (!c.audioFile.sha256)
+            reasons.push(`the timeline plays ${c.audioFile.file}, which is not a file`);
+        else if (c.audioFile.sha256 !== want)
+            reasons.push(
+                `the timeline plays ${c.audioFile.file}, whose bytes differ from ${e.audioFile}`,
+            );
     }
     for (const [path, value] of Object.entries(e.timeline ?? {})) {
         const got = getPath(c.timeline, path);

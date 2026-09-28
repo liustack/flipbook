@@ -19,6 +19,7 @@ const EXPECT_KEYS = [
     'width',
     'height',
     'audio',
+    'audioFile',
     'timeline',
     'uses',
     'files',
@@ -194,6 +195,12 @@ function validateExpect(e, workspace, runtimeNames, add) {
             new Set(modes).size !== modes.length)
     )
         add('expect.audio', `must be "any", or one or a list of ${AUDIO_MODES.join(', ')}`);
+    if (e.audioFile !== undefined) {
+        if (!isText(e.audioFile) || !workspace[e.audioFile])
+            add('expect.audioFile', `${JSON.stringify(e.audioFile)} is not a workspace file`);
+        if (!modes.every((m) => m === 'file'))
+            add('expect.audioFile', 'goes with expect.audio "file"');
+    }
     if (e.timeline !== undefined) {
         if (!isObject(e.timeline)) {
             add('expect.timeline', 'must map dotted paths to values');

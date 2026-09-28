@@ -340,3 +340,51 @@ describe('eval verdict on a picture of unknown source', () => {
         ]);
     });
 });
+
+describe('eval verdict on the user music', () => {
+    const MUSIC = 'assets/music.wav';
+    const BYTES = 'the user music';
+    const spec = baseCase(
+        { audio: 'file', audioFile: MUSIC },
+        { workspace: { [MUSIC]: { generator: 'clicks', bpm: 96, offsetSec: 0.5, seconds: 30 } } },
+    );
+    const run = (file, content) =>
+        finishedRun(spec, {
+            workspace: { [MUSIC]: BYTES },
+            files: {
+                'timeline.json': { version: 1, audio: { mode: 'file', file, bpmOffset: 0.5 } },
+                [file]: content,
+            },
+        });
+    const reasons = ({ composition, workspaceFiles }) =>
+        judge(spec, { host: HOST_OK, compositions: [composition], workspaceFiles }).reasons;
+
+    it('passes the user file copied in, or copied under another name', () => {
+        expect(reasons(run('assets/music.wav', BYTES))).toEqual([]);
+        expect(reasons(run('assets/seasons-theme.wav', BYTES))).toEqual([]);
+    });
+
+    it('fails another piece of music in its place', () => {
+        expect(reasons(run('assets/unrelated.wav', 'some other music'))).toEqual([
+            'the timeline plays assets/unrelated.wav, whose bytes differ from assets/music.wav',
+        ]);
+    });
+
+    it('fails a timeline that names a file that is not there, or plays no file at all', () => {
+        const missing = run('assets/music.wav', BYTES);
+        rmSync(join(missing.ws, 'film', 'assets', 'music.wav'));
+        missing.composition.audioFile = inspect(join(missing.ws, 'film'), {
+            spec,
+            wsRoot: missing.ws,
+            workspaceFiles: missing.workspaceFiles,
+        }).audioFile;
+        expect(reasons(missing)).toEqual([
+            'the timeline plays assets/music.wav, which is not a file',
+        ]);
+        const scored = finishedRun(spec, { workspace: { [MUSIC]: BYTES } });
+        expect(reasons(scored)).toEqual([
+            'timeline audio.mode is "score", expected file',
+            'the timeline plays no music file, expected assets/music.wav',
+        ]);
+    });
+});

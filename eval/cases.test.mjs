@@ -66,6 +66,7 @@ describe('eval case validation', () => {
     it('keeps workspace files inside the workspace and their sources inside the case or the repository', () => {
         const spec = fourSeasons((s) => {
             const clicks = s.workspace['assets/music.wav'];
+            delete s.expect.audioFile;
             s.workspace = {
                 '../escaped.wav': clicks,
                 '/tmp/abs.wav': clicks,
@@ -169,5 +170,18 @@ describe('eval case uses', () => {
         expect(runtimeNames.has('loadSprite')).toBe(true);
         expect(runtimeNames.has('paperLayer')).toBe(true);
         expect(runtimeNames.has('Puppet')).toBe(false);
+    });
+});
+
+describe('eval case audioFile', () => {
+    it('names a workspace file and goes with the file audio mode', () => {
+        const spec = fourSeasons((s) => {
+            s.expect.audioFile = 'assets/other.wav';
+            s.expect.audio = ['file', 'score'];
+        });
+        expect(validateCase(spec, dirs)).toEqual([
+            'expect.audioFile: "assets/other.wav" is not a workspace file',
+            'expect.audioFile: goes with expect.audio "file"',
+        ]);
     });
 });
