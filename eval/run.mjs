@@ -31,8 +31,8 @@ import { fileURLToPath } from 'node:url';
 import { HOST_DIRS, validateCase, workspaceSource } from './cases.mjs';
 import { sha256File } from './files.mjs';
 import { inspect, judge, tally } from './judge.mjs';
+import { runtimeExports } from './page.mjs';
 import { recheck, renderShape } from './recheck.mjs';
-import { runtimeExports } from './scripts.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');

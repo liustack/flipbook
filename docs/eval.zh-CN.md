@@ -83,7 +83,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `hostVersion`、`node`、`ffmpeg` | 环境 |
 | `host` | 退出码、是否超时、耗时、宿主报的花费和用量、宿主最后的回复、stdout 和 stderr 末尾 |
 | `workspaceFiles` | 用例放进工作区的每个文件的大小和 sha256，在宿主开跑之前取 |
-| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`runtime`（`imports`：有没有页面脚本导入 flipbook 运行时，`calls`：页面脚本调用了运行时的哪些函数，见[怎样读 `uses`](#怎样读-uses)）、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`sourceSha256`（页面脚本的哈希）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定、页面有没有点名用它，见下面第 5 条） |
+| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`page`（`entries` 和 `modules`：index.html 加载的脚本和它们走到的本地模块，`imports`：其中有没有导入 flipbook 运行时，`calls`：调用了运行时的哪些函数，`passed`：交给别的代码的运行时函数，`notes`：评测器跟不下去的地方，见[怎样读 `uses`](#怎样读-uses)），覆盖这些模块的 `sourceSha256`、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定、页面有没有点名用它，见下面第 5 条） |
 | `verdict` | `delivered`、`oneShot`、没过的原因、`needsReview`（评测器靠文件定不了、留给人看的事）、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
 
 ## 自动判定
@@ -105,7 +105,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 
 ### 怎样读 `uses`
 
-页面脚本指合成里 HTML 页面的每个内联 `<script>`（HTML 注释里的、带 `src` 的、`application/json` 这类不是 JavaScript 的都不算）和合成里的每个 `.js`、`.mjs` 文件。评测器用 TypeScript 编译器解析它们，从 `/__flipbook/runtime.js` 导入的函数被调用了才算：`import { puppet } from ...` 后 `puppet({})`，`import { puppet as makeMan } from ...` 后 `makeMan({})`（记作 `puppet`），`import * as fb from ...` 后 `fb.riso()`，经 `await import(...)` 也一样。空格换行不影响，注释和字符串里的永远不算。先存进变量、或者经另一个模块转手的函数认不出来，没过的原因里会写明找的是哪个函数。页面脚本一个都没导入运行时时，`uses` 不查，记进 `needsReview`。
+只算页面真正运行的。评测器从 `index.html` 出发：它里面按 JavaScript 运行的内联 `<script>` 和 `<script src>`，HTML 注释里的和 `application/json` 这类类型不算。再顺着它们导入的本地模块往下走：静态导入、转手导出，以及路径写死的 `import()`。页面没加载的文件，不管里面调了什么都不算。评测器用 TypeScript 编译器读这些模块，调用的名字被检查器绑定到 flipbook 运行时才算：从 `/__flipbook/runtime.js` 导入的，原名或改名（`import { puppet as makeMan }`），整体导入（`import * as fb` 后 `fb.riso()`），`await import(...)` 解构或不解构，存着这些东西的 `const`，以及转手导出运行时的本地模块。同名的参数、局部变量或同名的命名空间是另一个绑定，不算，注释、字符串和空格换行也都不算。评测器看不到的记进 `needsReview`，不判失败：交给别的代码的运行时函数（存进 `let`、当参数传、放进对象），整个命名空间被交出去，路径算出来的 `import()`，裸模块名，找不到的脚本。页面加载的脚本一个都没导入运行时时，`uses` 不查，记进 `needsReview`。所有脚本都跟到了、页面既没调用也没交出去的函数，判失败。
 
 ## 人工复核
 
@@ -161,7 +161,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `expect.audio` | `any`（不查），或者 `score`、`preset`、`file`、`none` 之一，或者它们的列表：timeline 的 `audio.mode` 要在其中，不是 `none` 时成片要有音轨 |
 | `expect.audioFile` | 音乐必须是的那个工作区文件：timeline 的 `audio.file` 和它字节相同，文件名和放在合成里哪个目录都不限。和 `"audio": "file"` 一起用。剪过、重新编码过或改过的文件判失败：flipbook 按文件原样放（`bpmOffset` 或 `offset` 定位置，`fadeIn` 和 `fadeOut` 管淡入淡出），用户的文件用不着先处理 |
 | `expect.timeline` | timeline.json 必须有的值，键是点号路径，比如 `"audio.bpmOffset": 0.5` |
-| `expect.uses` | 页面脚本必须调用的运行时函数，写运行时自己的名字，比如 `"puppet"`。`"a\|b"` 表示两个都行。每个名字都必须是运行时导出的函数。怎么找调用见[怎样读 `uses`](#怎样读-uses) |
+| `expect.uses` | index.html 加载的脚本必须调用的运行时函数，写运行时自己的名字，比如 `"puppet"`。`"a\|b"` 表示两个都行。每个名字都必须是运行时导出的函数。怎么找调用见[怎样读 `uses`](#怎样读-uses) |
 | `expect.files` | 合成目录里必须有的路径，`*` 只在一层目录里匹配，比如 `"assets/puppets/*/rig.json"` |
 | `expect.brand` | brand.json 里应有的 `name` 和 `primary`，`palette`（brand.json 里每个颜色都要在其中），`logo`（brand.json 的 logo 必须是这个工作区文件的副本） |
 | `expect.notCopied` | 不许进片子的工作区文件，按[自动判定](#自动判定)第 5 条判 |

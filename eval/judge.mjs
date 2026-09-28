@@ -6,7 +6,8 @@ import { existsSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { HOST_DIRS } from './cases.mjs';
 import { globMatches, listFiles, readJson, sha256File } from './files.mjs';
-import { pageReferences, pageScripts, runtimeUse } from './scripts.mjs';
+import { pageModel } from './page.mjs';
+import { pageReferences } from './scripts.mjs';
 
 /** What `stock fetch` writes as an entry's id: the picture came with a known license. */
 const STOCK_ID = /^(openverse|pexels|pixabay):/;
@@ -145,14 +146,17 @@ function watchedFiles(dir, wsRoot, watched) {
 export function inspect(dir, { spec, wsRoot, workspaceFiles }) {
     const e = spec.expect;
     const timeline = readJson(join(dir, 'timeline.json'));
-    const scripts = pageScripts(dir).map(({ file, code }) => `${file}\n${code}`);
+    const { program, files: moduleFiles, texts, ...page } = pageModel(dir);
+    const loaded = [...(moduleFiles ?? new Map())].map(
+        ([file, label]) => `${label}\n${texts.get(file)}`,
+    );
     const files = listFiles(dir, HOST_DIRS);
     const watched = (e.notCopied ?? []).map((rel) => ({ rel, ...workspaceFiles[rel] }));
     return {
         timeline,
         story: readJson(join(dir, 'story.json')),
-        sourceSha256: createHash('sha256').update(scripts.join('\n')).digest('hex'),
-        runtime: runtimeUse(dir),
+        sourceSha256: createHash('sha256').update(loaded.join('\n')).digest('hex'),
+        page,
         sources: sourcesSummary(dir),
         brand: brandFacts(dir, timeline),
         audioFile: audioFacts(dir, timeline),
@@ -253,23 +257,47 @@ function expectations(e, c, workspaceFiles, review) {
                 `timeline ${path} is ${JSON.stringify(got)}, expected ${JSON.stringify(value)}`,
             );
     }
-    if ((e.uses ?? []).length > 0 && !c.runtime?.imports) {
-        review.push(
-            `no page script imports /__flipbook/runtime.js, so expect.uses (${e.uses.join(', ')}) was not checked`,
-        );
-    } else {
-        const calls = c.runtime?.calls ?? [];
-        const missing = (e.uses ?? []).filter(
-            (token) => !token.split('|').some((name) => calls.includes(name)),
-        );
-        if (missing.length > 0)
-            reasons.push(`the page scripts never call ${missing.join(', ')} from the runtime`);
-    }
+    reasons.push(...usesReasons(e.uses ?? [], c, review));
     for (const [pattern, found] of Object.entries(c.files ?? {})) {
         if (!found) reasons.push(`no file matches ${pattern}`);
     }
     if (e.brand) reasons.push(...brandReasons(e.brand, c.brand, workspaceFiles));
     return reasons;
+}
+
+/**
+ * Runtime functions the case wants called and the page never calls. When
+ * the page hands a wanted function to other code, or the runner could not
+ * follow all its scripts, the call may be out of sight: that goes to
+ * `review` with the page's notes instead of failing.
+ */
+function usesReasons(uses, c, review) {
+    if (uses.length === 0) return [];
+    const page = c.page;
+    if (!page?.imports) {
+        review.push(
+            `${c.dir}: no script index.html loads imports /__flipbook/runtime.js, so expect.uses (${uses.join(', ')}) was not checked`,
+        );
+        return [];
+    }
+    const missing = [];
+    for (const token of uses) {
+        const names = token.split('|');
+        if (names.some((name) => page.calls.includes(name))) continue;
+        const handed = names.filter((name) => page.passed.includes(name));
+        if (handed.length > 0)
+            review.push(
+                `${c.dir}: the page hands ${handed.join(', ')} to other code instead of calling it where the runner can see. Check the film uses it.`,
+            );
+        else if (page.notes.length > 0)
+            review.push(
+                `${c.dir}: no call to ${token} found, but the runner could not follow all the page's scripts (${page.notes.join('. ')}). Check the film uses it.`,
+            );
+        else missing.push(token);
+    }
+    return missing.length > 0
+        ? [`the scripts index.html loads never call ${missing.join(', ')} from the runtime`]
+        : [];
 }
 
 function brandReasons(want, got, workspaceFiles) {

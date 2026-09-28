@@ -16,28 +16,6 @@ const RUNTIME = /(^|\/)__flipbook\/runtime\.js$/;
 /** Script types a page runs as JavaScript. */
 const JS_TYPES = ['', 'module', 'text/javascript', 'application/javascript'];
 
-/** The names src/runtime/index.ts exports as values, the ones a page can call. */
-export function runtimeExports(repoRoot) {
-    const file = join(repoRoot, 'src', 'runtime', 'index.ts');
-    const source = ts.createSourceFile(
-        file,
-        readFileSync(file, 'utf-8'),
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TS,
-    );
-    const names = new Set();
-    for (const node of source.statements) {
-        if (!ts.isExportDeclaration(node) || node.isTypeOnly) continue;
-        const clause = node.exportClause;
-        if (!clause || !ts.isNamedExports(clause)) continue;
-        for (const element of clause.elements) {
-            if (!element.isTypeOnly) names.add(element.name.text);
-        }
-    }
-    return names;
-}
-
 const isRuntimeSpecifier = (node) =>
     node !== undefined && ts.isStringLiteralLike(node) && RUNTIME.test(node.text);
 
@@ -147,22 +125,6 @@ export function pageScripts(dir) {
         }
     }
     return scripts;
-}
-
-/**
- * What the page scripts of a composition call from the runtime, all scripts
- * together: `imports` is false when none of them imports the runtime, and
- * then `calls` says nothing either way.
- */
-export function runtimeUse(dir) {
-    let imports = false;
-    const calls = new Set();
-    for (const { file, code } of pageScripts(dir)) {
-        const one = analyzeScript(code, file);
-        imports ||= one.imports;
-        for (const name of one.calls) calls.add(name);
-    }
-    return { imports, calls: [...calls].sort() };
 }
 
 /**

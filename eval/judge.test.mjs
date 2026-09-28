@@ -105,7 +105,14 @@ describe('eval verdict', () => {
             beats: 3,
             roles: ['opening', 'turn', 'resolution'],
         });
-        expect(composition.runtime).toEqual({ imports: true, calls: ['paperLayer', 'puppet'] });
+        expect(composition.page).toEqual({
+            entries: ['index.html#1'],
+            modules: ['index.html#1'],
+            imports: true,
+            calls: ['paperLayer', 'puppet'],
+            passed: [],
+            notes: [],
+        });
         expect(verdict.humanReview.case).toEqual([{ question: '老人是纸偶', answer: null }]);
     });
 
@@ -137,12 +144,12 @@ describe('eval verdict', () => {
         expect(verdict.reasons).toEqual([
             'timeline audio.mode is "score", expected file',
             'timeline bpm is 96, expected 100',
-            'the page scripts never call riso from the runtime',
+            'the scripts index.html loads never call riso from the runtime',
             'no file matches assets/sprites/*/clips.json',
         ]);
     });
 
-    it('leaves uses to a person when no page script imports the runtime', () => {
+    it('leaves uses to a person when no script the page loads imports the runtime', () => {
         const spec = baseCase({ uses: ['riso'] });
         const { composition, workspaceFiles } = finishedRun(spec, {
             files: { 'index.html': '<script type="module">riso(1, 2);</script>' },
@@ -150,7 +157,38 @@ describe('eval verdict', () => {
         const verdict = judge(spec, { host: HOST_OK, compositions: [composition], workspaceFiles });
         expect(verdict.reasons).toEqual([]);
         expect(verdict.needsReview).toEqual([
-            'no page script imports /__flipbook/runtime.js, so expect.uses (riso) was not checked',
+            'film: no script index.html loads imports /__flipbook/runtime.js, so expect.uses (riso) was not checked',
+        ]);
+    });
+
+    it('asks a person, not fails, when a wanted function may be called out of sight', () => {
+        const spec = baseCase({ uses: ['riso', 'photo'] });
+        const { composition, workspaceFiles } = finishedRun(spec, {
+            files: {
+                'index.html': `<script type="module">
+import { riso, photo } from '/__flipbook/runtime.js';
+let print = riso;
+print(1, 2);
+await import('./' + 'scene.js');
+</script>`,
+            },
+        });
+        const verdict = judge(spec, { host: HOST_OK, compositions: [composition], workspaceFiles });
+        expect(verdict.reasons).toEqual([]);
+        expect(verdict.needsReview).toEqual([
+            'film: the page hands riso to other code instead of calling it where the runner can see. Check the film uses it.',
+            "film: no call to photo found, but the runner could not follow all the page's scripts (index.html#1 imports a module by a path it computes, not followed). Check the film uses it.",
+        ]);
+    });
+
+    it('fails a film whose only call to a wanted function is in a script the page does not load', () => {
+        const spec = baseCase({ uses: ['riso'] });
+        const { composition, workspaceFiles } = finishedRun(spec, {
+            files: { 'draft.js': "import { riso } from '/__flipbook/runtime.js';\nriso(1, 2);" },
+        });
+        const verdict = judge(spec, { host: HOST_OK, compositions: [composition], workspaceFiles });
+        expect(verdict.reasons).toEqual([
+            'the scripts index.html loads never call riso from the runtime',
         ]);
     });
 

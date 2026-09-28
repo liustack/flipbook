@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { validateCase } from './cases.mjs';
-import { runtimeExports } from './scripts.mjs';
+import { runtimeExports } from './page.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
