@@ -1,5 +1,14 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+    mkdirSync,
+    mkdtempSync,
+    readFileSync,
+    realpathSync,
+    rmSync,
+    symlinkSync,
+    unlinkSync,
+    writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,13 +89,13 @@ puppet({});
     );
     for (const [rel, content] of Object.entries(files)) write(dir, rel, content);
     const composition = {
+        ...inspect(dir, { spec, wsRoot: ws, workspaceFiles }),
         dir: at,
         video: video ? join(dir, 'out', 'video.mp4') : null,
         probe: { durationSec: 30, width: 1920, height: 1080, audio: 'aac' },
         lastCheck: { ok: true },
         lastRender: { ok: true, warnings },
         recheck: { exitCode: 0 },
-        ...inspect(dir, { spec, wsRoot: ws, workspaceFiles }),
     };
     return { ws, dir, workspaceFiles, composition };
 }
@@ -116,6 +125,7 @@ describe('eval verdict', () => {
             computedLoads: 0,
             mentions: [],
             notes: [],
+            refused: [],
         });
         expect(verdict.humanReview.case).toEqual([{ question: '老人是纸偶', answer: null }]);
     });
@@ -258,15 +268,13 @@ describe('eval verdict on a picture of unknown source', () => {
     const verdictOf = (run, stockReports) => {
         if (stockReports) {
             const dir = join(run.ws, run.composition.dir);
-            Object.assign(
-                run.composition,
-                inspect(dir, {
-                    spec,
-                    wsRoot: run.ws,
-                    workspaceFiles: run.workspaceFiles,
-                    stockReports: stockReports(dir),
-                }),
-            );
+            const seen = inspect(dir, {
+                spec,
+                wsRoot: run.ws,
+                workspaceFiles: run.workspaceFiles,
+                stockReports: stockReports(dir),
+            });
+            Object.assign(run.composition, { watched: seen.watched, refused: seen.refused });
         }
         return judge(spec, {
             host: HOST_OK,
@@ -687,6 +695,56 @@ describe('eval verdict on the recheck copy', () => {
         expect(failed.needsReview).toEqual([
             `film: ${LINK}. Check the film does not need it.`,
             'film: independent check exited 1 on a copy that left out the links above. Check whether the film fails without them or for another reason.',
+        ]);
+    });
+});
+
+describe('eval verdict on files it would not read', () => {
+    it('does not read a timeline that is a link out of the workspace, and asks a person about it', () => {
+        const spec = baseCase();
+        const away = mkdtempSync(join(tmpdir(), 'flipbook-judge-away-'));
+        temps.push(away);
+        write(away, 'timeline.json', { version: 1, bpm: 96, audio: { mode: 'score' } });
+        const run = finishedRun(spec);
+        unlinkSync(join(run.dir, 'timeline.json'));
+        symlinkSync(join(away, 'timeline.json'), join(run.dir, 'timeline.json'));
+        const seen = inspect(run.dir, { spec, wsRoot: run.ws, workspaceFiles: {} });
+        expect(seen.timeline).toBeNull();
+        const line = `film/timeline.json leads out of the workspace, to ${realpathSync(join(away, 'timeline.json'))}, not read`;
+        expect(seen.refused).toEqual([line]);
+        const verdict = judge(spec, {
+            host: HOST_OK,
+            compositions: [{ ...run.composition, ...seen, video: run.composition.video }],
+            workspaceFiles: {},
+        });
+        expect(verdict.needsReview).toContain(
+            `film: ${line}. Check the film does not depend on it.`,
+        );
+    });
+
+    it('fails a film that loads a link to a picture of unknown source', () => {
+        const PLATE = 'downloads/f3a9c1e7.jpg';
+        const spec = baseCase(
+            { film: 'optional', audio: 'any', notCopied: [PLATE] },
+            { workspace: { [PLATE]: { generator: 'repo', from: 'x' } } },
+        );
+        const run = finishedRun(spec, {
+            workspace: { [PLATE]: 'plate bytes' },
+            files: { 'index.html': '<img src="assets/shells.jpg">' },
+        });
+        mkdirSync(join(run.dir, 'assets'), { recursive: true });
+        symlinkSync(join('..', '..', PLATE), join(run.dir, 'assets', 'shells.jpg'));
+        const seen = inspect(run.dir, { spec, wsRoot: run.ws, workspaceFiles: run.workspaceFiles });
+        expect(seen.watched).toEqual([
+            { path: 'assets/shells.jpg', of: PLATE, how: 'link', certain: true, use: 'load' },
+        ]);
+        const verdict = judge(spec, {
+            host: HOST_OK,
+            compositions: [{ ...run.composition, watched: seen.watched }],
+            workspaceFiles: run.workspaceFiles,
+        });
+        expect(verdict.reasons).toEqual([
+            `film/assets/shells.jpg is a link to ${PLATE}, whose source is unknown. The page loads it.`,
         ]);
     });
 });

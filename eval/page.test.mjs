@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -218,5 +218,102 @@ console.info('not used:', note);`),
             'draft.js': "import { photo } from '/__flipbook/runtime.js';\nphoto('assets/a.png');",
         });
         expect(page).toMatchObject({ loads: [], mentions: [] });
+    });
+});
+
+describe('reading only inside the workspace', () => {
+    /** A workspace and a folder outside it, with `files` in each and `links` from the workspace. */
+    function linked({ inside = {}, outside = {}, links = {} }) {
+        const ws = mkdtempSync(join(tmpdir(), 'flipbook-page-ws-'));
+        const away = mkdtempSync(join(tmpdir(), 'flipbook-page-away-'));
+        temps.push(ws, away);
+        const put = (root, files) => {
+            for (const [rel, text] of Object.entries(files)) {
+                mkdirSync(dirname(join(root, rel)), { recursive: true });
+                writeFileSync(join(root, rel), text);
+            }
+        };
+        put(ws, inside);
+        put(away, outside);
+        for (const [rel, to] of Object.entries(links)) {
+            mkdirSync(dirname(join(ws, rel)), { recursive: true });
+            symlinkSync(to.replace('<away>', away), join(ws, rel));
+        }
+        const { program, files: _files, texts, ...page } = pageModel(ws);
+        return { page, away: realpathSync(away) };
+    }
+    const PUPPET = `${IMPORT}puppet({});`;
+
+    it('does not read a script or stylesheet that is a link out of the workspace', () => {
+        const { page, away } = linked({
+            inside: {
+                'index.html':
+                    '<script type="module" src="scene.js"></script><link rel="stylesheet" href="page.css">',
+            },
+            outside: {
+                'scene.js': PUPPET,
+                'page.css': "body { background: url('external-marker.png'); }",
+            },
+            links: { 'scene.js': '<away>/scene.js', 'page.css': '<away>/page.css' },
+        });
+        expect(page).toMatchObject({ imports: false, calls: [] });
+        expect(page.loads).not.toContain('external-marker.png');
+        expect(page.refused).toEqual([
+            `scene.js leads out of the workspace, to ${away}/scene.js, not read`,
+            `page.css leads out of the workspace, to ${away}/page.css, not read`,
+        ]);
+        expect(page.notes).toEqual(expect.arrayContaining(page.refused));
+    });
+
+    it('does not read through a folder that is a link out of the workspace', () => {
+        const { page, away } = linked({
+            inside: { 'index.html': '<script type="module" src="js/main.js"></script>' },
+            outside: { 'main.js': PUPPET },
+            links: { js: '<away>' },
+        });
+        expect(page.calls).toEqual([]);
+        expect(page.refused).toEqual([
+            `js/main.js leads out of the workspace, to ${away}/main.js, not read`,
+        ]);
+    });
+
+    it('does not read a link into a folder left out, a broken link, or an index.html from outside', () => {
+        const excluded = linked({
+            inside: {
+                'index.html': '<script type="module" src="scene.js"></script>',
+                'out/scene.js': PUPPET,
+            },
+            links: { 'scene.js': 'out/scene.js' },
+        });
+        expect(excluded.page.refused).toEqual([
+            'scene.js lies in out/, a folder left out, not read',
+        ]);
+        const broken = linked({
+            inside: { 'index.html': '<script type="module" src="scene.js"></script>' },
+            links: { 'scene.js': 'missing.js' },
+        });
+        expect(broken.page.refused).toEqual(['scene.js is a link that leads nowhere, not read']);
+        const page = linked({
+            outside: { 'index.html': inline(PUPPET) },
+            links: { 'index.html': '<away>/index.html' },
+        });
+        expect(page.page).toMatchObject({
+            calls: [],
+            notes: expect.arrayContaining(['index.html cannot be read']),
+        });
+    });
+
+    it('reads a link that stays inside the workspace', () => {
+        const { page } = linked({
+            inside: {
+                'index.html':
+                    '<script type="module" src="scene.js"></script><link rel="stylesheet" href="page.css">',
+                'lib/scene.js': PUPPET,
+                'styles/page.css': "body { background: url('/assets/paper.jpg'); }",
+            },
+            links: { 'scene.js': 'lib/scene.js', 'page.css': 'styles/page.css' },
+        });
+        expect(page).toMatchObject({ calls: ['puppet'], refused: [] });
+        expect(page.loads).toContain('assets/paper.jpg');
     });
 });

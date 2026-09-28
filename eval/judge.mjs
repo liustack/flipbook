@@ -2,10 +2,10 @@
 // only, starts nothing and spends nothing, so the rules can be tested on
 // their own. The case format is in cases.mjs, the criteria in docs/eval.md.
 import { createHash } from 'node:crypto';
-import { existsSync, realpathSync, statSync } from 'node:fs';
+import { lstatSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { HOST_DIRS } from './cases.mjs';
-import { globMatches, listFiles, readJson, sha256File } from './files.mjs';
+import { globMatches, listFiles, workspaceReader } from './files.mjs';
 import { pageModel } from './page.mjs';
 
 /** What `stock fetch` writes as an entry's id: the picture came with a known license. */
@@ -13,9 +13,12 @@ const STOCK_ID = /^(openverse|pexels|pixabay):/;
 
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** Folders whose files the judging code does not read as the agent's work. */
+const LEFT_OUT = [...HOST_DIRS, '.flipbook', 'out'];
+
 /** assets/SOURCES.json sorted by where each picture or sound came from. */
-function sourcesSummary(dir) {
-    const sources = readJson(join(dir, 'assets', 'SOURCES.json'));
+function sourcesSummary(dir, reader) {
+    const sources = reader.json(join(dir, 'assets', 'SOURCES.json'));
     if (!isObject(sources)) return null;
     const out = { stock: [], cut: 0, generated: [], other: [] };
     for (const [key, entry] of Object.entries(sources)) {
@@ -28,21 +31,17 @@ function sourcesSummary(dir) {
 }
 
 /** The music file the timeline plays, when its audio mode is `file`, with its sha256. */
-function audioFacts(dir, timeline) {
+function audioFacts(dir, timeline, reader) {
     const audio = timeline?.audio;
     if (audio?.mode !== 'file' || typeof audio.file !== 'string') return null;
-    const file = resolve(dir, audio.file);
-    return {
-        file: audio.file,
-        sha256: existsSync(file) && statSync(file).isFile() ? sha256File(file) : null,
-    };
+    return { file: audio.file, sha256: reader.sha256(resolve(dir, audio.file)) };
 }
 
 /** The brand.json timeline.json names, as far as the verdict needs it. */
-function brandFacts(dir, timeline) {
+function brandFacts(dir, timeline, reader) {
     if (typeof timeline?.brand !== 'string') return null;
     const file = resolve(dir, timeline.brand);
-    const data = readJson(file);
+    const data = reader.json(file);
     if (!isObject(data)) return { file, readable: false };
     const logo = isObject(data.logo) && typeof data.logo.file === 'string' ? data.logo.file : null;
     const logoFile = logo ? resolve(dirname(file), logo) : null;
@@ -52,7 +51,7 @@ function brandFacts(dir, timeline) {
         name: data.name ?? null,
         colors: isObject(data.colors) ? data.colors : null,
         logo,
-        logoSha256: logoFile && existsSync(logoFile) ? sha256File(logoFile) : null,
+        logoSha256: logoFile ? reader.sha256(logoFile) : null,
     };
 }
 
@@ -63,6 +62,7 @@ const HOW = {
     claimed: 'has the bytes of',
     cut: 'was cut from',
     named: 'has a SOURCES.json entry that mentions',
+    link: 'is a link to',
 };
 
 /** Whether two directories are the same place, following links. */
@@ -109,24 +109,36 @@ function stockProof(reports, dir, path, entry) {
  * string or attribute only names it, `none` otherwise. Comments name
  * nothing.
  */
-function watchedFiles(dir, wsRoot, watched, page, stockReports) {
+function watchedFiles(dir, wsRoot, watched, page, stockReports, readers) {
     if (watched.length === 0) return [];
-    const sources = readJson(join(dir, 'assets', 'SOURCES.json'));
+    const { reader, outputs } = readers;
+    const sources = reader.json(join(dir, 'assets', 'SOURCES.json'));
     const entries = isObject(sources) ? sources : {};
-    const saved = readJson(join(dir, '.flipbook', 'reports', 'stock-fetch.json'));
+    const saved = outputs.json(join(dir, '.flipbook', 'reports', 'stock-fetch.json'));
     const reports = saved ? [...stockReports, saved] : stockReports;
     const proof = (key) => stockProof(reports, dir, `assets/${key}`, entries[key]);
+    const originals = watched.map((w) => {
+        try {
+            return realpathSync(join(wsRoot, w.rel));
+        } catch {
+            return null;
+        }
+    });
     const found = [];
-    for (const rel of listFiles(dir, [...HOST_DIRS, '.flipbook', 'out'])) {
+    for (const rel of listFiles(dir, LEFT_OUT, { links: true })) {
         const full = join(dir, rel);
         const wsRel = relative(wsRoot, full).split(sep).join('/');
-        const size = statSync(full).size;
-        for (const w of watched) {
-            if (w.rel === wsRel) {
-                found.push({ path: rel, of: w.rel, how: 'original', certain: true });
+        const isLink = lstatSync(full).isSymbolicLink();
+        const target = reader.real(full);
+        if (!target) continue;
+        const size = reader.size(full);
+        for (const [i, w] of watched.entries()) {
+            if (w.rel === wsRel || target === originals[i]) {
+                const how = w.rel === wsRel ? 'original' : isLink ? 'link' : 'original';
+                found.push({ path: rel, of: w.rel, how, certain: true });
                 continue;
             }
-            if (w.size !== size || sha256File(full) !== w.sha256) continue;
+            if (w.size !== size || reader.sha256(full) !== w.sha256) continue;
             const stock = rel.startsWith('assets/') ? proof(rel.slice('assets/'.length)) : 'none';
             if (stock === 'proven') continue;
             const how = stock === 'claimed' ? 'claimed' : 'copy';
@@ -171,35 +183,51 @@ function watchedFiles(dir, wsRoot, watched, page, stockReports) {
 }
 
 /**
- * What a composition directory shows, beyond its video and reports: the
- * timeline and story, a hash of its page scripts, the runtime functions they
+ * What a composition directory shows: its video and contact sheet (real
+ * paths), flipbook's last reports and frame digest, the timeline and story, a hash of its page scripts, the runtime functions they
  * call, where its pictures came from, its brand, which of the case's files
- * exist, and the files that come from watched workspace files.
+ * exist, and the files that come from watched workspace files. Everything
+ * is read through the workspace reader (files.mjs), and `refused` lists the
+ * files it would not read: links out of the workspace, broken links, files
+ * in folders left out.
  */
 export function inspect(dir, { spec, wsRoot, workspaceFiles, stockReports = [] }) {
     const e = spec.expect;
-    const timeline = readJson(join(dir, 'timeline.json'));
-    const { program, files: moduleFiles, texts, ...page } = pageModel(dir);
+    const reader = workspaceReader(wsRoot, { leftOut: LEFT_OUT });
+    const outputs = workspaceReader(wsRoot, { leftOut: HOST_DIRS });
+    const timeline = reader.json(join(dir, 'timeline.json'));
+    const { program, files: moduleFiles, texts, ...page } = pageModel(dir, { wsRoot });
     const loaded = [...(moduleFiles ?? new Map())].map(
         ([file, label]) => `${label}\n${texts.get(file)}`,
     );
     const files = listFiles(dir, HOST_DIRS);
     const watched = (e.notCopied ?? []).map((rel) => ({ rel, ...workspaceFiles[rel] }));
+    const video = outputs.real(join(dir, 'out', 'video.mp4'));
+    const sheet = outputs.real(join(dir, 'out', 'contact-sheet.png'));
+    const report = (name) => outputs.json(join(dir, '.flipbook', 'reports', `${name}.json`));
     return {
+        video,
+        contactSheet: sheet,
+        frameDigest: outputs.json(join(dir, '.flipbook', 'frame-hashes.json'))?.digest ?? null,
+        lastCheck: report('check'),
+        lastSnapshot: report('snapshot'),
+        lastRender: report('render'),
+        attempts: outputs.json(join(dir, '.flipbook', 'attempts.json')),
         timeline,
-        story: readJson(join(dir, 'story.json')),
+        story: reader.json(join(dir, 'story.json')),
         sourceSha256: createHash('sha256').update(loaded.join('\n')).digest('hex'),
         page,
-        sources: sourcesSummary(dir),
-        brand: brandFacts(dir, timeline),
-        audioFile: audioFacts(dir, timeline),
+        sources: sourcesSummary(dir, reader),
+        brand: brandFacts(dir, timeline, reader),
+        audioFile: audioFacts(dir, timeline, reader),
         files: Object.fromEntries(
             (e.files ?? []).map((pattern) => [
                 pattern,
                 files.some((rel) => globMatches(pattern, rel)),
             ]),
         ),
-        watched: watchedFiles(dir, wsRoot, watched, page, stockReports),
+        watched: watchedFiles(dir, wsRoot, watched, page, stockReports, { reader, outputs }),
+        refused: [...new Set([...page.refused, ...reader.refused, ...outputs.refused])],
     };
 }
 
@@ -412,6 +440,10 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
     const needsReview = [];
     if (host.timedOut) reasons.push('host timed out');
     else if (host.exitCode !== 0) reasons.push(`host exited ${host.exitCode}`);
+    for (const c of compositions) {
+        for (const line of c.refused ?? [])
+            needsReview.push(`${c.dir}: ${line}. Check the film does not depend on it.`);
+    }
     reasons.push(...ruleReasons(e, compositions, needsReview));
     const withVideo = compositions.filter((c) => c.video);
     let delivered = false;

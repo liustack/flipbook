@@ -39,7 +39,9 @@ export function writeShims(bin, cli) {
 export function shimReports(bin) {
     const dir = join(bin, 'reports');
     if (!existsSync(dir)) return [];
-    return readdirSync(dir)
+    return readdirSync(dir, { withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => entry.name)
         .sort()
         .map((name) => readJson(join(dir, name)))
         .filter((report) => report?.schema === 'flipbook.report/1');

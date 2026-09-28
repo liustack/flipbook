@@ -5,13 +5,16 @@
 // page loads. A file the page does not load does not count. Calls are
 // matched by binding with the TypeScript checker, so a parameter, a local or
 // a namespace of the same name is not the runtime function. A string that
-// only names a file is a mention, not a load. What the reading cannot settle
-// is listed in `notes`.
-import { existsSync, readFileSync, statSync } from 'node:fs';
+// only names a file is a mention, not a load. Every file is read through
+// the workspace reader (files.mjs): nothing outside the workspace or in the
+// folders left out, links included. What the reading cannot settle is
+// listed in `notes`, and the files it would not read in `refused`.
+import { readFileSync } from 'node:fs';
 import { dirname, join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { HOST_DIRS } from './cases.mjs';
+import { workspaceReader } from './files.mjs';
 
 /** Where the page imports the runtime from, relative to the composition. */
 const RUNTIME_REL = '__flipbook/runtime.js';
@@ -136,7 +139,7 @@ function moduleSpecifiers(text, file) {
  * their `@import`s). Other attribute values that read as paths are only
  * `mentions`. Paths relative to the composition.
  */
-function markupLoads(dir, html) {
+function markupLoads(dir, html, reader) {
     const loads = new Set();
     const mentions = new Set();
     const stylesheets = [];
@@ -181,19 +184,18 @@ function markupLoads(dir, html) {
         if (!rel || seen.has(rel) || rel.split('/').some((part) => LEFT_OUT.includes(part)))
             continue;
         seen.add(rel);
-        const file = join(dir, rel);
-        if (existsSync(file) && statSync(file).isFile())
-            css(readFileSync(file, 'utf-8'), posix.dirname(rel).replace(/^\.$/, ''));
+        const text = reader.text(join(dir, rel));
+        if (text !== null) css(text, posix.dirname(rel).replace(/^\.$/, ''));
     }
     return { loads, mentions };
 }
 
-/** A local script the page can load at `rel`, as a full path, or null. */
-function localScript(dir, rel) {
+/** A local script the page can load at `rel`, as a full path, when the reader may read it, or null. */
+function localScript(dir, rel, reader) {
     if (!rel || rel.split('/').some((part) => LEFT_OUT.includes(part))) return null;
     if (!/\.m?js$/i.test(rel)) return null;
     const file = join(dir, rel);
-    return existsSync(file) && statSync(file).isFile() ? file : null;
+    return reader.real(file) ? file : null;
 }
 
 /**
@@ -209,11 +211,14 @@ function localScript(dir, rel) {
  * for one of them), `possibleLoads` (the fixed start of a template path in
  * those places), `computedLoads` (how many load a path the runner cannot
  * read), `mentions` (other strings and attribute values that read as
- * paths), `notes` (what the reading could not follow), and `program`,
- * `files` and `texts` for further reading.
+ * paths), `notes` (what the reading could not follow), `refused` (files
+ * it would not read: links out of the workspace `wsRoot`, broken links,
+ * files in the folders left out), and `program`, `files` and `texts` for
+ * further reading.
  */
-export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
+export function pageModel(dir, { wsRoot = dir, runtimeNames = repoRuntimeNames() } = {}) {
     const notes = [];
+    const reader = workspaceReader(wsRoot, { leftOut: LEFT_OUT });
     const index = join(dir, 'index.html');
     const empty = {
         entries: [],
@@ -226,12 +231,14 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
         computedLoads: 0,
         mentions: [],
         notes,
+        refused: reader.refused,
     };
-    if (!existsSync(index)) {
-        notes.push('there is no index.html');
+    const page = reader.text(index);
+    if (page === null) {
+        notes.push('index.html cannot be read');
         return empty;
     }
-    const html = readFileSync(index, 'utf-8').replace(/<!--[\s\S]*?-->/g, '');
+    const html = page.replace(/<!--[\s\S]*?-->/g, '');
     const texts = new Map();
     const labels = new Map();
     const bases = new Map();
@@ -239,7 +246,7 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
     let inline = 0;
     for (const tag of scriptTags(html)) {
         if (tag.src !== null) {
-            const file = localScript(dir, resolveRef('', tag.src));
+            const file = localScript(dir, resolveRef('', tag.src), reader);
             if (file) entries.push(file);
             else notes.push(`index.html loads the script ${tag.src}, which the runner cannot find`);
             continue;
@@ -256,7 +263,7 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
     const queue = [...entries];
     while (queue.length > 0) {
         const file = queue.shift();
-        if (!texts.has(file)) texts.set(file, readFileSync(file, 'utf-8'));
+        if (!texts.has(file)) texts.set(file, reader.text(file) ?? '');
         else if (resolutions.has(file)) continue;
         resolutions.set(file, new Map());
         const base = bases.get(file) ?? posix.dirname(label(file)).replace(/^\.$/, '');
@@ -266,7 +273,7 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
                 resolutions.get(file).set(fileName, RUNTIME_FILE);
                 continue;
             }
-            const target = localScript(dir, rel);
+            const target = localScript(dir, rel, reader);
             if (!target) {
                 notes.push(`${label(file)} imports ${fileName}, which the runner cannot follow`);
                 continue;
@@ -403,7 +410,7 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
     const calls = new Set();
     const passed = new Set();
     let namespaceLoose = false;
-    const { loads, mentions } = markupLoads(dir, html);
+    const { loads, mentions } = markupLoads(dir, html, reader);
     const possibleLoads = new Set();
     let computedLoads = 0;
     const consumed = new Set();
@@ -525,7 +532,8 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
         possibleLoads: [...possibleLoads].sort(),
         computedLoads,
         mentions: [...mentions].filter((ref) => !loads.has(ref)).sort(),
-        notes,
+        notes: [...notes, ...reader.refused],
+        refused: reader.refused,
         program,
         files: new Map(modules.map((file) => [file, label(file)])),
         texts,

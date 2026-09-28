@@ -284,14 +284,6 @@ function findCompositions(ws) {
     return found;
 }
 
-function readJson(file) {
-    try {
-        return JSON.parse(readFileSync(file, 'utf-8'));
-    } catch {
-        return null;
-    }
-}
-
 function probe(video) {
     const result = spawnSync(
         'ffprobe',
@@ -361,24 +353,14 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
     const host = await runHost(target, prompt, ws, bin, timeoutMin);
     const stockReports = shimReports(bin).filter((r) => r.command === 'stock-fetch');
     const compositions = findCompositions(ws).map((dir) => {
-        const video = join(dir, 'out', 'video.mp4');
-        const sheet = join(dir, 'out', 'contact-sheet.png');
-        const hashes = readJson(join(dir, '.flipbook', 'frame-hashes.json'));
-        const lastRender = readJson(join(dir, '.flipbook', 'reports', 'render.json'));
-        const flags = renderShape(lastRender);
+        const seen = inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles, stockReports });
+        const flags = renderShape(seen.lastRender);
         return {
             dir: relative(ws, dir) || '.',
-            video: existsSync(video) ? video : null,
-            videoSha256: existsSync(video) ? sha256File(video) : null,
-            contactSheet: existsSync(sheet) ? sheet : null,
-            frameDigest: hashes?.digest ?? null,
-            probe: existsSync(video) ? probe(video) : null,
-            lastCheck: readJson(join(dir, '.flipbook', 'reports', 'check.json')),
-            lastSnapshot: readJson(join(dir, '.flipbook', 'reports', 'snapshot.json')),
-            lastRender,
-            attempts: readJson(join(dir, '.flipbook', 'attempts.json')),
+            ...seen,
+            videoSha256: seen.video ? sha256File(seen.video) : null,
+            probe: seen.video ? probe(seen.video) : null,
             recheck: { flags, ...recheck(dir, { wsRoot: ws, cli, flags }) },
-            ...inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles, stockReports }),
         };
     });
     const evidence = {

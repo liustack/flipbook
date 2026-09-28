@@ -84,7 +84,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `host` | 退出码、是否超时、耗时、宿主报的花费和用量、宿主最后的回复、stdout 和 stderr 末尾 |
 | `workspaceFiles` | 用例放进工作区的每个文件的大小和 sha256，在宿主开跑之前取 |
 | `stockFetches` | 宿主经评测器的 `flipbook` 小脚本跑过的每次 `stock fetch`：成没成功、哪个合成、id 和文件 |
-| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`page`（`entries` 和 `modules`：index.html 加载的脚本和它们走到的本地模块，`imports`：其中有没有导入 flipbook 运行时，`calls`：调用了运行时的哪些函数，`passed`：交给别的代码的运行时函数，`loads`、`possibleLoads`、`computedLoads` 和 `mentions`：页面加载的文件和只是提到的文件，见下面第 5 条，`notes`：评测器跟不下去的地方，见[怎样读 `uses`](#怎样读-uses)），覆盖这些模块的 `sourceSha256`、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定，`use`：页面有没有加载它，见下面第 5 条） |
+| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`page`（`entries` 和 `modules`：index.html 加载的脚本和它们走到的本地模块，`imports`：其中有没有导入 flipbook 运行时，`calls`：调用了运行时的哪些函数，`passed`：交给别的代码的运行时函数，`loads`、`possibleLoads`、`computedLoads` 和 `mentions`：页面加载的文件和只是提到的文件，见下面第 5 条，`notes`：评测器跟不下去的地方，见[怎样读 `uses`](#怎样读-uses)），覆盖这些模块的 `sourceSha256`、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`refused`（评测器不读的文件，见[自动判定](#自动判定)）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定，`use`：页面有没有加载它，见下面第 5 条） |
 | `verdict` | `delivered`、`oneShot`、没过的原因、`needsReview`（评测器靠文件定不了、留给人看的事）、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
 
 ## 自动判定
@@ -103,6 +103,8 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 用例的成片是 `optional` 时，第 2 到 4 条只在出了片时才算。
 
 评测器只查结构、名字和字节。故事值不值得讲、画面有没有讲出来、纸偶和抠图好不好看，归人判。评测器定不了的事也归人判：它们记进 `verdict.needsReview`，不判失败。
+
+评测器判定用到的文件都经同一个读取入口：index.html、它加载的脚本和样式表、timeline.json、story.json、SOURCES.json、brand.json 和它的 logo、音乐文件、flipbook 的报告和成片。只读真实路径（链接跟到底）在工作区里的普通文件，宿主和评测器自己的目录一律不读（agent 自己的文件还不读 `.flipbook/` 和 `out/` 里的）。指向工作区外的链接、断链、落在不读目录里的文件都不读，记在合成的 `refused` 里，并进 `needsReview`。
 
 ### 怎样读 `uses`
 
