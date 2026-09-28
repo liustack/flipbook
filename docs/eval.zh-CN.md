@@ -153,7 +153,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `id`、`title` | 和目录名相同的 id，中文标题 |
 | `asks` | 用例回答的问题，从 `story`、`film`、`characters`、`looks`、`pictures`、`brand`、`rules` 里选 |
 | `prompt` | 用户的话 |
-| `workspace` | 可选，评测开始前放进工作区的文件，键是工作区里的路径。`{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` 用 ffmpeg 生成节拍音，`{ "generator": "copy", "from": "files/<文件>" }` 从用例目录拷一个文件，`{ "generator": "repo", "from": "<路径>" }` 从本仓库拷一个文件，样例里的素材就不用再存一份。每种 generator 只收自己的字段。路径要留在工作区里，写成不绕弯的相对路径，也不能落进留给宿主和评测器的目录。源文件要是用例目录或本仓库里的普通文件。`--dry-run` 会把每条合格用例的这些文件都摆一遍，确认能生成 |
+| `workspace` | 可选，评测开始前放进工作区的文件，键是工作区里的路径。`{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` 用 ffmpeg 生成节拍音，`{ "generator": "copy", "from": "files/<文件>" }` 从用例目录拷一个文件，`{ "generator": "repo", "from": "<路径>" }` 从本仓库拷一个文件，样例里的素材就不用再存一份。每种 generator 只收自己的字段。路径要留在工作区里，写成不绕弯的相对路径，也不能落进留给宿主和评测器的目录。源文件要是用例目录或本仓库里的普通文件，按真实路径查：文件名本身或上层任何一级目录是链接的，先跟到底再查，哪条链接都带不出去，拷过去的也是链接最终指向的那个文件。`--dry-run` 会把每条合格用例的这些文件都摆一遍，确认能生成 |
 | `timeoutMin` | 可选，单次的分钟数，不写是 30。用例没真跑过一轮之前，这个数只是预算 |
 | `expect.film` | `required`（默认）或 `optional`：不出片能不能过 |
 | `expect.durationSec` | 允许的时长区间 `[最短, 最长]` |

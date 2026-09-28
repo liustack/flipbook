@@ -14,6 +14,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
     chmodSync,
+    copyFileSync,
     cpSync,
     existsSync,
     mkdirSync,
@@ -281,7 +282,12 @@ function prepareWorkspace(entry, host) {
         const file = join(ws, rel);
         mkdirSync(dirname(file), { recursive: true });
         if (item.generator === 'clicks') makeClicks(file, item);
-        else cpSync(workspaceSource(item, { caseDir: entry.caseDir, repoRoot }), file);
+        else {
+            const source = workspaceSource(item, { caseDir: entry.caseDir, repoRoot });
+            if (source.problem)
+                throw new Error(`${entry.name}: workspace ${rel} ${source.problem}`);
+            copyFileSync(source.file, file);
+        }
         files[rel] = { size: statSync(file).size, sha256: sha256File(file) };
     }
     return { ws, bin, files };

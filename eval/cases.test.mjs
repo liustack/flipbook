@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    symlinkSync,
+    writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -182,6 +190,66 @@ describe('eval case audioFile', () => {
         expect(validateCase(spec, dirs)).toEqual([
             'expect.audioFile: "assets/other.wav" is not a workspace file',
             'expect.audioFile: goes with expect.audio "file"',
+        ]);
+    });
+});
+
+describe('eval case sources behind links', () => {
+    /** A cases directory with four-seasons whose music is copied from `from`, set up by `arrange`. */
+    function linkedCase(from, arrange) {
+        const root = mkdtempSync(join(tmpdir(), 'flipbook-eval-links-'));
+        temps.push(root);
+        const casesDir = join(root, 'cases');
+        const caseDir = join(casesDir, 'four-seasons');
+        mkdirSync(join(caseDir, 'files'), { recursive: true });
+        mkdirSync(join(root, 'outside'));
+        writeFileSync(join(root, 'outside', 'music.wav'), 'outside the case');
+        writeFileSync(join(caseDir, 'files', 'music.wav'), 'inside the case');
+        arrange({ root, caseDir });
+        const spec = fourSeasons((s) => {
+            s.workspace['assets/music.wav'] = { generator: 'copy', from };
+        });
+        writeFileSync(join(caseDir, 'case.json'), JSON.stringify(spec));
+        return { casesDir, caseDir, spec };
+    }
+    const dryRun = (casesDir) =>
+        spawnSync(process.execPath, [join(evalDir, 'run.mjs'), '--dry-run', '--cases', casesDir], {
+            encoding: 'utf-8',
+            timeout: 60_000,
+        });
+
+    it('refuses a source whose folder is a link out of the case directory', () => {
+        const { casesDir, caseDir, spec } = linkedCase('linked/music.wav', ({ root, caseDir }) =>
+            symlinkSync(join(root, 'outside'), join(caseDir, 'linked')),
+        );
+        const problems = validateCase(spec, { ...dirs, caseDir });
+        expect(problems).toHaveLength(1);
+        expect(problems[0]).toMatch(
+            /^workspace\["assets\/music\.wav"\]\.from: linked\/music\.wav leads out of the case directory, to .*outside\/music\.wav$/,
+        );
+        const result = dryRun(casesDir);
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain('leads out of the case directory');
+        expect(result.stdout).toContain('0/1 cases valid');
+    });
+
+    it('follows a link that stays inside the case directory, and copies the file it leads to', () => {
+        const { casesDir, caseDir, spec } = linkedCase('shared/music.wav', ({ caseDir }) =>
+            symlinkSync('files', join(caseDir, 'shared')),
+        );
+        expect(validateCase(spec, { ...dirs, caseDir })).toEqual([]);
+        const result = dryRun(casesDir);
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        expect(result.stdout).toContain('ok four-seasons workspace files');
+    });
+
+    it('names a generator that is no generator, even one an object inherits', () => {
+        const spec = fourSeasons((s) => {
+            s.workspace['assets/music.wav'] = { generator: 'constructor', from: 'x' };
+            delete s.expect.audioFile;
+        });
+        expect(validateCase(spec, dirs)).toEqual([
+            'workspace["assets/music.wav"].generator: must be one of clicks, copy, repo, not "constructor"',
         ]);
     });
 });

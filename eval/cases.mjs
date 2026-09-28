@@ -1,7 +1,7 @@
 // The format of eval/cases/<id>/case.json and what makes one valid. Every
 // problem names the field it is about, so --dry-run points at the typo.
 // docs/eval.md describes the fields.
-import { lstatSync } from 'node:fs';
+import { realpathSync, statSync } from 'node:fs';
 import { isAbsolute, posix, relative, resolve } from 'node:path';
 
 /** The questions the eval answers. Each case lists the ones it covers in `asks`. */
@@ -39,18 +39,37 @@ const isObject = (value) => typeof value === 'object' && value !== null && !Arra
 const isText = (value) => typeof value === 'string' && value.trim() !== '';
 const key = (name) => `[${JSON.stringify(name)}]`;
 
-/** A path inside `root`, or null when `rel` leaves it. */
-function inside(root, rel) {
-    const full = resolve(root, rel);
+/** Whether `full` lies inside `root`, both real paths. */
+function within(root, full) {
     const back = relative(root, full);
-    return back && !back.startsWith('..') && !isAbsolute(back) ? full : null;
+    return back !== '' && !back.startsWith('..') && !isAbsolute(back);
 }
 
-/** Where a workspace file comes from, for `copy` (the case directory) and `repo` (this repository). */
+/**
+ * Where a workspace file comes from, for `copy` (the case directory) and
+ * `repo` (this repository): `{ file }`, the real path of a regular file
+ * inside the real root, or `{ problem }`. Links, in the file's own name or
+ * any folder above it, are followed first, so none can lead out of the root.
+ */
 export function workspaceSource(item, { caseDir, repoRoot }) {
-    if (item.generator === 'copy') return inside(caseDir, item.from);
-    if (item.generator === 'repo') return inside(repoRoot, item.from);
-    return null;
+    const [root, base] =
+        item.generator === 'copy'
+            ? [caseDir, 'the case directory']
+            : item.generator === 'repo'
+              ? [repoRoot, 'the repository']
+              : [null, null];
+    if (!root) return { problem: `has no source for ${item.generator}` };
+    if (!within(root, resolve(root, item.from))) return { problem: `leaves ${base}` };
+    let file;
+    try {
+        file = realpathSync(resolve(root, item.from));
+    } catch {
+        return { problem: `no file ${item.from} in ${base}` };
+    }
+    if (!within(realpathSync(root), file))
+        return { problem: `${item.from} leads out of ${base}, to ${file}` };
+    if (!statSync(file).isFile()) return { problem: `${item.from} is not a regular file` };
+    return { file };
 }
 
 /** Why `rel` cannot name a file in the workspace or the composition, or null. */
@@ -93,7 +112,10 @@ function validateWorkspace(workspace, dirs, add) {
             add(at, 'must be an object');
             continue;
         }
-        const fields = GENERATORS[item.generator];
+        const fields =
+            typeof item.generator === 'string' && Object.hasOwn(GENERATORS, item.generator)
+                ? GENERATORS[item.generator]
+                : null;
         if (!fields) {
             add(
                 `${at}.generator`,
@@ -124,20 +146,8 @@ function validateWorkspace(workspace, dirs, add) {
             add(`${at}.from`, 'must be a non-empty path');
             continue;
         }
-        const from = workspaceSource(item, dirs);
-        const base = item.generator === 'copy' ? 'the case directory' : 'the repository';
-        if (!from) {
-            add(`${at}.from`, `leaves ${base}`);
-            continue;
-        }
-        let stat = null;
-        try {
-            stat = lstatSync(from);
-        } catch {
-            add(`${at}.from`, `no file ${item.from} in ${base}`);
-            continue;
-        }
-        if (!stat.isFile()) add(`${at}.from`, `${item.from} is not a regular file`);
+        const source = workspaceSource(item, dirs);
+        if (source.problem) add(`${at}.from`, source.problem);
     }
 }
 
