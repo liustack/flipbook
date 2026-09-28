@@ -31,7 +31,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const STOCK_ID = /^(openverse|pexels|pixabay):/;
 
 /** Directories that hold the host's copy of the skill, the eval's shims or tool output. */
-const HOST_DIRS = ['.claude', '.agents', '.codex', '.eval-bin', 'node_modules', '.git'];
+export const HOST_DIRS = ['.claude', '.agents', '.codex', '.eval-bin', 'node_modules', '.git'];
 
 /** Runtime calls worth recording for a reviewer: which look, character and material a film used. */
 const FEATURES = {

@@ -81,12 +81,12 @@ node eval/run.mjs --model claude-code:claude-opus-5 pigeons   # 指定宿主和�
 | `hostVersion`、`node`、`ffmpeg` | 环境 |
 | `host` | 退出码、是否超时、耗时、宿主报的花费和用量、宿主最后的回复、stdout 和 stderr 末尾 |
 | `workspaceFiles` | 用例放进工作区的每个文件的大小和 sha256，在宿主开跑之前取 |
-| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、评测器在副本上独立重跑的 check、agent 留下的 `timeline` 和 `story`、`features`（源码里找到的运行时调用：纸感、孔版、像素几套皮，纸偶、部件装配、精灵、照片、品牌、构图模板）、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`files`（`expect.files` 每个路径对上没有）、`copies`（和 `notCopied` 文件字节相同的文件） |
+| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`features`（源码里找到的运行时调用：纸感、孔版、像素几套皮，纸偶、部件装配、精灵、照片、品牌、构图模板）、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`files`（`expect.files` 每个路径对上没有）、`copies`（和 `notCopied` 文件字节相同的文件） |
 | `verdict` | `delivered`、`oneShot`、没过的原因、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
 
 ## 自动判定
 
-**出片**：工作区里恰好一个合成，`out/video.mp4` 存在，最后一次 render 报告 `ok: true`，check 和 render 报告里都没有 `stop: true`，评测器把它拷到新目录独立跑 check，退出码 0。
+**出片**：工作区里恰好一个合成，`out/video.mp4` 存在，最后一次 render 报告 `ok: true`，check 和 render 报告里都没有 `stop: true`，评测器自己跑的 check 退出码 0。这次 check 跑在整个工作区的新副本上，去掉宿主的目录、`.flipbook/` 和 `out/`：agent 之前跑出来的东西都不算，放在工作区根目录的 brand.json 连同它的 logo 和字体也还在合成找得到的位置。
 
 下面全部满足才算**一次跑通**：
 

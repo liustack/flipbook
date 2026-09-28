@@ -26,7 +26,8 @@ import {
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inspect, judge, sha256File, validateCase, workspaceSource } from './judge.mjs';
+import { HOST_DIRS, inspect, judge, sha256File, validateCase, workspaceSource } from './judge.mjs';
+import { recheck } from './recheck.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
@@ -281,20 +282,7 @@ function findCompositions(ws) {
     const found = [];
     const walk = (dir) => {
         for (const e of readdirSync(dir, { withFileTypes: true })) {
-            if (
-                !e.isDirectory() ||
-                [
-                    '.claude',
-                    '.agents',
-                    '.codex',
-                    '.eval-bin',
-                    'node_modules',
-                    '.flipbook',
-                    'out',
-                    '.git',
-                ].includes(e.name)
-            )
-                continue;
+            if (!e.isDirectory() || [...HOST_DIRS, '.flipbook', 'out'].includes(e.name)) continue;
             walk(join(dir, e.name));
         }
         if (existsSync(join(dir, 'timeline.json')) && existsSync(join(dir, 'index.html')))
@@ -337,30 +325,6 @@ function probe(video) {
         frames: Number(videoStream?.nb_frames ?? 0),
         audio: audioStream ? audioStream.codec_name : null,
     };
-}
-
-/** Independent check on a copy, so the evidence never trusts the agent's own last run. */
-function recheck(composition) {
-    const copy = mkdtempSync(join(tmpdir(), 'flipbook-eval-recheck-'));
-    cpSync(composition, copy, {
-        recursive: true,
-        filter: (src) => !/[\\/](\.flipbook|out)([\\/]|$)/.test(src),
-    });
-    const result = spawnSync(process.execPath, [cli, 'check', copy], {
-        encoding: 'utf-8',
-        maxBuffer: 64 * 1024 * 1024,
-        env: { ...process.env, FLIPBOOK_QUIET: '1' },
-    });
-    rmSync(copy, { recursive: true, force: true });
-    return { exitCode: result.status, report: readJsonText(result.stdout) };
-}
-
-function readJsonText(text) {
-    try {
-        return JSON.parse(text);
-    } catch {
-        return null;
-    }
 }
 
 function runHost(target, prompt, ws, bin, timeoutMin) {
@@ -418,7 +382,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
             lastSnapshot: readJson(join(dir, '.flipbook', 'reports', 'snapshot.json')),
             lastRender: readJson(join(dir, '.flipbook', 'reports', 'render.json')),
             attempts: readJson(join(dir, '.flipbook', 'attempts.json')),
-            recheck: recheck(dir),
+            recheck: recheck(dir, { wsRoot: ws, cli }),
             ...inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles }),
         };
     });
