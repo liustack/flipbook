@@ -77,6 +77,36 @@ describe.skipIf(process.platform === 'win32')('the flipbook shim', () => {
         expect(existsSync(join(bin, 'reports'))).toBe(false);
     });
 
+    it('works from a path with spaces and passes stdin and arguments through', () => {
+        const root = fresh('spaces');
+        const bin = join(root, 'a workspace', '.eval-bin');
+        mkdirSync(bin, { recursive: true });
+        const echo = join(root, 'echo cli.mjs');
+        writeFileSync(
+            echo,
+            `let input = '';
+process.stdin.on('data', (d) => { input += d; });
+process.stdin.on('end', () => {
+  console.log(JSON.stringify({ schema: 'flipbook.report/1', command: 'echo', ok: true, input, args: process.argv.slice(2) }));
+  process.exit(3);
+});`,
+        );
+        writeShims(bin, echo);
+        const reports = join(root, 'the reports');
+        mkdirSync(reports);
+        const pin = pinReports(reports);
+        const got = spawnSync(join(bin, 'flipbook'), ['a b', 'c'], {
+            encoding: 'utf-8',
+            input: 'hello from stdin',
+            env: { ...process.env, [REPORTS_ENV]: pin.real },
+        });
+        expect(got.status).toBe(3);
+        const printed = JSON.parse(got.stdout);
+        expect(printed.input).toBe('hello from stdin');
+        expect(printed.args).toEqual(['a b', 'c']);
+        expect(shimReports(pin).reports).toEqual([printed]);
+    });
+
     it('keeps nothing when the evaluator names no directory', () => {
         const { bin, reports } = setup();
         const result = run(bin, ['ok', 'openverse:one']);
