@@ -1,10 +1,12 @@
-// What a composition's page runs, read from its syntax: the scripts
-// index.html loads (inline scripts and script src tags) and the local
-// modules they import, statically or with import('a literal path'), and
-// which flipbook runtime functions those modules call. A file the page does
-// not load does not count. Calls are matched by binding with the TypeScript
-// checker, so a parameter, a local or a namespace of the same name is not
-// the runtime function. What the reading cannot settle is listed in `notes`.
+// What a composition's page runs and loads, read from its syntax: the
+// scripts index.html loads (inline scripts and script src tags) and the
+// local modules they import, statically or with import('a literal path'),
+// which flipbook runtime functions those modules call, and which files the
+// page loads. A file the page does not load does not count. Calls are
+// matched by binding with the TypeScript checker, so a parameter, a local or
+// a namespace of the same name is not the runtime function. A string that
+// only names a file is a mention, not a load. What the reading cannot settle
+// is listed in `notes`.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +21,12 @@ const RUNTIME_FILE = '/__flipbook_eval__/runtime.d.ts';
 
 /** Script types a page runs as JavaScript. */
 const JS_TYPES = ['', 'module', 'text/javascript', 'application/javascript'];
+
+/** Runtime functions whose first argument is a file the page loads. */
+export const LOADERS = ['photo', 'specimens', 'loadRig', 'loadSprite'];
+
+/** Element properties and attributes that make the page load the file they name. */
+const LOAD_PROPERTIES = ['src', 'href', 'srcset'];
 
 /** Folders whose files a page never loads for the eval's purposes. */
 const LEFT_OUT = [...HOST_DIRS, '.flipbook', 'out'];
@@ -121,6 +129,65 @@ function moduleSpecifiers(text, file) {
     return found;
 }
 
+/**
+ * What markup and stylesheets make the page load: `src`, `srcset` and
+ * `poster` on any element, `href` on `link`, `image` and `use`, and CSS
+ * `url()` in style blocks, style attributes and linked stylesheets (with
+ * their `@import`s). Other attribute values that read as paths are only
+ * `mentions`. Paths relative to the composition.
+ */
+function markupLoads(dir, html) {
+    const loads = new Set();
+    const mentions = new Set();
+    const stylesheets = [];
+    const add = (set, base, raw) => {
+        const ref = resolveRef(base, raw);
+        if (ref) set.add(ref);
+    };
+    const css = (text, base) => {
+        const clean = text.replace(/\/\*[\s\S]*?\*\//g, '');
+        for (const m of clean.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi)) add(loads, base, m[2]);
+        for (const m of clean.matchAll(/@import\s+(['"])([^'"]+)\1/gi))
+            stylesheets.push([base, m[2]]);
+    };
+    const page = html.replace(/(<script\b[^>]*>)[\s\S]*?<\/script\s*>/gi, '$1</script>');
+    for (const m of page.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) css(m[1], '');
+    const markup = page.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, '');
+    for (const tag of markup.matchAll(/<([a-zA-Z][\w:-]*)\b([^>]*)>/g)) {
+        const name = tag[1].toLowerCase();
+        for (const a of tag[2].matchAll(
+            /(?:^|\s)([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g,
+        )) {
+            const key = a[1].toLowerCase();
+            const value = a[2] ?? a[3] ?? a[4] ?? '';
+            if (key === 'style') css(value, '');
+            else if (key === 'srcset')
+                for (const part of value.split(',')) add(loads, '', part.trim().split(/\s+/)[0]);
+            else if (key === 'src' || key === 'poster') add(loads, '', value);
+            else if (
+                (key === 'href' || key === 'xlink:href') &&
+                ['link', 'image', 'use'].includes(name)
+            ) {
+                add(loads, '', value);
+                if (name === 'link' && /stylesheet/i.test(attribute(tag[2], 'rel') ?? ''))
+                    stylesheets.push(['', value]);
+            } else if (/[./]/.test(value)) add(mentions, '', value);
+        }
+    }
+    const seen = new Set();
+    while (stylesheets.length > 0) {
+        const [base, raw] = stylesheets.shift();
+        const rel = resolveRef(base, raw);
+        if (!rel || seen.has(rel) || rel.split('/').some((part) => LEFT_OUT.includes(part)))
+            continue;
+        seen.add(rel);
+        const file = join(dir, rel);
+        if (existsSync(file) && statSync(file).isFile())
+            css(readFileSync(file, 'utf-8'), posix.dirname(rel).replace(/^\.$/, ''));
+    }
+    return { loads, mentions };
+}
+
 /** A local script the page can load at `rel`, as a full path, or null. */
 function localScript(dir, rel) {
     if (!rel || rel.split('/').some((part) => LEFT_OUT.includes(part))) return null;
@@ -135,14 +202,31 @@ function localScript(dir, rel) {
  * `dir`, inline scripts as `index.html#1`), `imports` (whether any of them
  * imports the runtime), `calls` (the runtime functions they call, by the
  * runtime's own names), `passed` (runtime functions they use without
- * calling them where the runner can see, handed to other code), `notes`
- * (what the reading could not follow), and `program` and `files` for
- * further reading.
+ * calling them where the runner can see, handed to other code), `loads`
+ * (files the page loads: markup and stylesheets as markupLoads says, and in
+ * the scripts the literal first argument of a runtime loader, of fetch, a
+ * literal assigned to `src`, `href` or `srcset`, or given to setAttribute
+ * for one of them), `possibleLoads` (the fixed start of a template path in
+ * those places), `computedLoads` (how many load a path the runner cannot
+ * read), `mentions` (other strings and attribute values that read as
+ * paths), `notes` (what the reading could not follow), and `program`,
+ * `files` and `texts` for further reading.
  */
 export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
     const notes = [];
     const index = join(dir, 'index.html');
-    const empty = { entries: [], modules: [], imports: false, calls: [], passed: [], notes };
+    const empty = {
+        entries: [],
+        modules: [],
+        imports: false,
+        calls: [],
+        passed: [],
+        loads: [],
+        possibleLoads: [],
+        computedLoads: 0,
+        mentions: [],
+        notes,
+    };
     if (!existsSync(index)) {
         notes.push('there is no index.html');
         return empty;
@@ -319,6 +403,45 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
     const calls = new Set();
     const passed = new Set();
     let namespaceLoose = false;
+    const { loads, mentions } = markupLoads(dir, html);
+    const possibleLoads = new Set();
+    let computedLoads = 0;
+    const consumed = new Set();
+    /** A value the page loads: a literal is a load, a template's fixed start a possible one. */
+    const load = (node) => {
+        if (!node) return;
+        if (ts.isStringLiteralLike(node)) {
+            consumed.add(node);
+            const ref = resolveRef('', node.text);
+            if (ref) loads.add(ref);
+        } else if (ts.isTemplateExpression(node) && node.head.text) {
+            const ref = resolveRef('', node.head.text);
+            if (ref) possibleLoads.add(ref);
+            else computedLoads++;
+        } else {
+            computedLoads++;
+        }
+    };
+    /** The global fetch, not a binding of the same name. */
+    const isGlobalFetch = (callee) => {
+        if (ts.isIdentifier(callee))
+            return callee.text === 'fetch' && !checker.getSymbolAtLocation(callee);
+        return (
+            ts.isPropertyAccessExpression(callee) &&
+            callee.name.text === 'fetch' &&
+            ts.isIdentifier(callee.expression) &&
+            ['window', 'globalThis', 'self'].includes(callee.expression.text) &&
+            !checker.getSymbolAtLocation(callee.expression)
+        );
+    };
+    const isModuleSpecifier = (node) => {
+        const parent = node.parent;
+        return (
+            ((ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) &&
+                parent.moduleSpecifier === node) ||
+            (ts.isCallExpression(parent) && parent.expression.kind === ts.SyntaxKind.ImportKeyword)
+        );
+    };
     for (const file of modules) {
         const source = program.getSourceFile(file);
         const visit = (node) => {
@@ -340,7 +463,26 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
             if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
                 const called = target(node.expression, file);
                 if (called?.fn) calls.add(called.fn);
+                const args = node.arguments ?? [];
+                if (called?.fn && LOADERS.includes(called.fn)) load(args[0]);
+                else if (ts.isCallExpression(node) && isGlobalFetch(node.expression)) load(args[0]);
+                else if (
+                    ts.isCallExpression(node) &&
+                    ts.isPropertyAccessExpression(node.expression) &&
+                    node.expression.name.text === 'setAttribute' &&
+                    args[0] !== undefined &&
+                    ts.isStringLiteralLike(args[0]) &&
+                    LOAD_PROPERTIES.includes(args[0].text.toLowerCase())
+                )
+                    load(args[1]);
             }
+            if (
+                ts.isBinaryExpression(node) &&
+                node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+                ts.isPropertyAccessExpression(node.left) &&
+                LOAD_PROPERTIES.includes(node.left.name.text)
+            )
+                load(node.right);
             if (
                 (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) &&
                 !(ts.isIdentifier(node) && isNameOfDeclaration(node))
@@ -360,6 +502,14 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
             ts.forEachChild(node, visit);
         };
         visit(source);
+        const mention = (node) => {
+            if (ts.isStringLiteralLike(node) && !consumed.has(node) && !isModuleSpecifier(node)) {
+                const ref = /[./]/.test(node.text) ? resolveRef('', node.text) : null;
+                if (ref) mentions.add(ref);
+            }
+            ts.forEachChild(node, mention);
+        };
+        mention(source);
     }
     if (namespaceLoose)
         notes.push(
@@ -371,6 +521,10 @@ export function pageModel(dir, runtimeNames = repoRuntimeNames()) {
         imports,
         calls: [...calls].sort(),
         passed: [...passed].filter((name) => !calls.has(name)).sort(),
+        loads: [...loads].sort(),
+        possibleLoads: [...possibleLoads].sort(),
+        computedLoads,
+        mentions: [...mentions].filter((ref) => !loads.has(ref)).sort(),
         notes,
         program,
         files: new Map(modules.map((file) => [file, label(file)])),

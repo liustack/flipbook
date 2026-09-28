@@ -2,12 +2,11 @@
 // only, starts nothing and spends nothing, so the rules can be tested on
 // their own. The case format is in cases.mjs, the criteria in docs/eval.md.
 import { createHash } from 'node:crypto';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { HOST_DIRS } from './cases.mjs';
 import { globMatches, listFiles, readJson, sha256File } from './files.mjs';
 import { pageModel } from './page.mjs';
-import { pageReferences } from './scripts.mjs';
 
 /** What `stock fetch` writes as an entry's id: the picture came with a known license. */
 const STOCK_ID = /^(openverse|pexels|pixabay):/;
@@ -66,23 +65,57 @@ const HOW = {
     named: 'has a SOURCES.json entry that mentions',
 };
 
+/** Whether two directories are the same place, following links. */
+function sameDir(a, b) {
+    try {
+        return realpathSync(a) === realpathSync(b);
+    } catch {
+        return false;
+    }
+}
+
 /**
- * Files in the composition that come from a watched workspace file, and
- * whether the page names them. `certain` files are the file itself, a byte
- * copy that `stock fetch` did not bring in, or a picture cut from one of
- * those. Less certain ones: a byte copy whose entry claims a stock id with
- * no stock fetch report beside it, an entry whose text mentions the file,
- * and pictures cut from those. `referenced` is `exact` when a page, script
- * or stylesheet names the file, `prefix` when a name built from pieces could
- * be it, `none` otherwise. Comments name nothing.
+ * How sure it is that `stock fetch` brought in the file at `path` of the
+ * composition in `dir`, whose SOURCES.json entry is `entry`: `proven` when a
+ * stock fetch report that succeeded (`ok` true) names this composition,
+ * this file and the entry's id, `claimed` when the entry has a stock id but
+ * no such report backs it, `none` when it does not even claim one.
+ * `reports` are every stock fetch report the eval kept, one per run of the
+ * command, plus the last one saved in the composition.
  */
-function watchedFiles(dir, wsRoot, watched) {
+function stockProof(reports, dir, path, entry) {
+    if (!isObject(entry) || !STOCK_ID.test(String(entry.id ?? ''))) return 'none';
+    const backed = reports.some(
+        (r) =>
+            r?.command === 'stock-fetch' &&
+            r.ok === true &&
+            r.stock?.id === entry.id &&
+            r.stock?.file === path &&
+            typeof r.composition?.dir === 'string' &&
+            sameDir(r.composition.dir, dir),
+    );
+    return backed ? 'proven' : 'claimed';
+}
+
+/**
+ * Files in the composition that come from a watched workspace file, and how
+ * the page uses them. `certain` files are the file itself, a byte copy that
+ * does not even claim a stock id, or a picture cut from one of those. Less
+ * certain ones: a byte copy whose stock id no successful stock fetch report
+ * backs, an entry whose text mentions the file, and pictures cut from
+ * those. A byte copy a matching report proves fetched is no concern.
+ * `use` is `load` when the page loads the file (see page.mjs), `possible`
+ * when it loads a path built from pieces that could be it, `mention` when a
+ * string or attribute only names it, `none` otherwise. Comments name
+ * nothing.
+ */
+function watchedFiles(dir, wsRoot, watched, page, stockReports) {
     if (watched.length === 0) return [];
     const sources = readJson(join(dir, 'assets', 'SOURCES.json'));
     const entries = isObject(sources) ? sources : {};
-    const stockReport = existsSync(join(dir, '.flipbook', 'reports', 'stock-fetch.json'));
-    const stockClaim = (entry) =>
-        isObject(entry) && STOCK_ID.test(String(entry.id ?? '')) && typeof entry.url === 'string';
+    const saved = readJson(join(dir, '.flipbook', 'reports', 'stock-fetch.json'));
+    const reports = saved ? [...stockReports, saved] : stockReports;
+    const proof = (key) => stockProof(reports, dir, `assets/${key}`, entries[key]);
     const found = [];
     for (const rel of listFiles(dir, [...HOST_DIRS, '.flipbook', 'out'])) {
         const full = join(dir, rel);
@@ -94,9 +127,9 @@ function watchedFiles(dir, wsRoot, watched) {
                 continue;
             }
             if (w.size !== size || sha256File(full) !== w.sha256) continue;
-            const entry = rel.startsWith('assets/') ? entries[rel.slice('assets/'.length)] : null;
-            if (stockClaim(entry) && stockReport) continue;
-            const how = stockClaim(entry) ? 'claimed' : 'copy';
+            const stock = rel.startsWith('assets/') ? proof(rel.slice('assets/'.length)) : 'none';
+            if (stock === 'proven') continue;
+            const how = stock === 'claimed' ? 'claimed' : 'copy';
             found.push({ path: rel, of: w.rel, how, certain: how === 'copy' });
         }
     }
@@ -108,7 +141,7 @@ function watchedFiles(dir, wsRoot, watched) {
                 tainted.set(f.path.slice('assets/'.length), f.certain);
         }
         for (const [key, entry] of Object.entries(entries)) {
-            if (tainted.has(key) || (stockClaim(entry) && stockReport)) continue;
+            if (tainted.has(key) || proof(key) === 'proven') continue;
             if (JSON.stringify(entry).includes(stem)) {
                 tainted.set(key, false);
                 found.push({ path: `assets/${key}`, of: w.rel, how: 'named', certain: false });
@@ -125,15 +158,15 @@ function watchedFiles(dir, wsRoot, watched) {
             }
         }
     }
-    if (found.length === 0) return [];
-    const refs = pageReferences(dir);
     return found.map((f) => ({
         ...f,
-        referenced: refs.exact.includes(f.path)
-            ? 'exact'
-            : refs.prefixes.some((prefix) => f.path.startsWith(prefix))
-              ? 'prefix'
-              : 'none',
+        use: page.loads.includes(f.path)
+            ? 'load'
+            : page.possibleLoads.some((prefix) => f.path.startsWith(prefix))
+              ? 'possible'
+              : page.mentions.includes(f.path)
+                ? 'mention'
+                : 'none',
     }));
 }
 
@@ -143,7 +176,7 @@ function watchedFiles(dir, wsRoot, watched) {
  * call, where its pictures came from, its brand, which of the case's files
  * exist, and the files that come from watched workspace files.
  */
-export function inspect(dir, { spec, wsRoot, workspaceFiles }) {
+export function inspect(dir, { spec, wsRoot, workspaceFiles, stockReports = [] }) {
     const e = spec.expect;
     const timeline = readJson(join(dir, 'timeline.json'));
     const { program, files: moduleFiles, texts, ...page } = pageModel(dir);
@@ -166,7 +199,7 @@ export function inspect(dir, { spec, wsRoot, workspaceFiles }) {
                 files.some((rel) => globMatches(pattern, rel)),
             ]),
         ),
-        watched: watchedFiles(dir, wsRoot, watched),
+        watched: watchedFiles(dir, wsRoot, watched, page, stockReports),
     };
 }
 
@@ -330,27 +363,32 @@ function brandReasons(want, got, workspaceFiles) {
 /**
  * Rules that hold whether or not a film came out: watched workspace files
  * stay out of the film. A file that surely comes from one and that the page
- * names fails the run. Everything less sure goes to `review`, and so do
- * pictures whose source entry is neither stock fetch nor generated, which
- * could be a watched file re-encoded or cropped.
+ * surely loads fails the run. Everything less sure goes to `review`: a
+ * possible load, a mere mention, a copy nothing loads, pictures loaded by
+ * paths the runner cannot read, and pictures whose source entry is neither
+ * stock fetch nor generated, which could be a watched file re-encoded or
+ * cropped.
  */
 function ruleReasons(e, compositions, review) {
     const reasons = [];
     if ((e.notCopied ?? []).length === 0) return reasons;
-    const REFERENCED = {
-        exact: 'The page names it.',
-        prefix: 'The page builds a file name that could be it.',
-        none: 'No page, script or stylesheet names it.',
+    const USE = {
+        load: 'The page loads it.',
+        possible: 'The page loads a path built from pieces that could be it.',
+        mention: 'A string or attribute in the page names it, but nothing loads it there.',
+        none: 'Nothing the page loads names it.',
     };
     for (const c of compositions) {
         for (const f of c.watched ?? []) {
             const what = `${c.dir}/${f.path} ${HOW[f.how]} ${f.of}, whose source is unknown.`;
-            if (f.certain && f.referenced === 'exact') reasons.push(`${what} The page uses it.`);
-            else
-                review.push(
-                    `${what} ${REFERENCED[f.referenced]} Check by eye that the film does not show it.`,
-                );
+            if (f.certain && f.use === 'load') reasons.push(`${what} ${USE.load}`);
+            else review.push(`${what} ${USE[f.use]} Check by eye that the film does not show it.`);
         }
+        const computed = c.page?.computedLoads ?? 0;
+        if (computed > 0)
+            review.push(
+                `${c.dir}: the page loads ${computed} file(s) by paths the runner cannot read. Check none of them is ${e.notCopied.join(' or ')}.`,
+            );
         const other = c.sources?.other ?? [];
         if (other.length > 0)
             review.push(

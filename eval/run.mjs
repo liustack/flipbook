@@ -13,7 +13,6 @@
 // What a case checks and how a run is judged: eval/judge.mjs and docs/eval.md.
 import { spawn, spawnSync } from 'node:child_process';
 import {
-    chmodSync,
     copyFileSync,
     cpSync,
     existsSync,
@@ -33,6 +32,7 @@ import { sha256File } from './files.mjs';
 import { inspect, judge, tally } from './judge.mjs';
 import { runtimeExports } from './page.mjs';
 import { recheck, renderShape } from './recheck.mjs';
+import { shimReports, shimVersion, writeShims } from './shim.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
@@ -227,29 +227,6 @@ function makeClicks(file, { bpm, offsetSec, seconds }) {
     if (result.status !== 0) throw new Error(`ffmpeg could not make ${file}: ${result.stderr}`);
 }
 
-const isWindows = process.platform === 'win32';
-
-/**
- * `flipbook` shims that run this checkout's CLI: a sh script for POSIX shells
- * (Git Bash included) and, on Windows, a .cmd for everything else.
- */
-function writeShims(bin) {
-    writeFileSync(join(bin, 'flipbook'), `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`);
-    chmodSync(join(bin, 'flipbook'), 0o755);
-    if (isWindows) {
-        writeFileSync(join(bin, 'flipbook.cmd'), `@"${process.execPath}" "${cli}" %*\r\n`);
-    }
-}
-
-/** What `flipbook --version` prints through the shim this platform starts, or ''. */
-function shimVersion(bin) {
-    const result = isWindows
-        ? // Node starts a .cmd only through a shell.
-          spawnSync(`"${join(bin, 'flipbook.cmd')}" --version`, { shell: true, encoding: 'utf-8' })
-        : spawnSync(join(bin, 'flipbook'), ['--version'], { encoding: 'utf-8' });
-    return result.status === 0 ? result.stdout.trim() : '';
-}
-
 /** process.env with `dir` first on PATH, whatever case the PATH key has. */
 function envWithBin(dir) {
     const env = {};
@@ -276,7 +253,7 @@ function prepareWorkspace(entry, host) {
     if (HOSTS[host].agentsNote) writeFileSync(join(ws, 'AGENTS.md'), HOSTS[host].agentsNote);
     const bin = join(ws, '.eval-bin');
     mkdirSync(bin, { recursive: true });
-    writeShims(bin);
+    writeShims(bin, cli);
     const files = {};
     for (const [rel, item] of Object.entries(entry.spec.workspace ?? {})) {
         const file = join(ws, rel);
@@ -382,6 +359,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
     const { ws, bin, files: workspaceFiles } = prepareWorkspace(entry, target.host);
     process.stderr.write(`eval: ${entry.name} x ${target.name} run ${run} in ${ws}\n`);
     const host = await runHost(target, prompt, ws, bin, timeoutMin);
+    const stockReports = shimReports(bin).filter((r) => r.command === 'stock-fetch');
     const compositions = findCompositions(ws).map((dir) => {
         const video = join(dir, 'out', 'video.mp4');
         const sheet = join(dir, 'out', 'contact-sheet.png');
@@ -400,7 +378,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
             lastRender,
             attempts: readJson(join(dir, '.flipbook', 'attempts.json')),
             recheck: { flags, ...recheck(dir, { wsRoot: ws, cli, flags }) },
-            ...inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles }),
+            ...inspect(dir, { spec: entry.spec, wsRoot: ws, workspaceFiles, stockReports }),
         };
     });
     const evidence = {
@@ -419,6 +397,12 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
         ffmpeg: info.ffmpeg,
         host,
         workspaceFiles,
+        stockFetches: stockReports.map((r) => ({
+            ok: r.ok,
+            dir: r.composition?.dir ?? null,
+            id: r.stock?.id ?? null,
+            file: r.stock?.file ?? null,
+        })),
         compositions,
     };
     evidence.verdict = judge(entry.spec, { host, compositions, workspaceFiles });

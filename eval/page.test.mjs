@@ -144,3 +144,79 @@ ${inline(`${IMPORT}puppet({});`)}`,
         expect(resolveRef('', 'lodash', { bare: false })).toBeNull();
     });
 });
+
+describe('files the page loads, and files it only names', () => {
+    it('reads loads from markup and linked stylesheets, and not from comments or links to other pages', () => {
+        const page = model({
+            'index.html': `<!doctype html><head>
+<link rel="stylesheet" href="css/page.css">
+<style>body { background: url('assets/paper.jpg'); } /* url(assets/old.png) */</style>
+</head><body>
+<!-- <img src="assets/commented.png"> -->
+<img src="assets/plate.png" srcset="assets/a.png 1x, assets/b.png 2x">
+<video poster="assets/poster.jpg"></video>
+<div style="background-image: url(assets/tile.png)"></div>
+<a href="assets/credits.html">credits</a>
+</body>`,
+            'css/page.css': "@import 'more.css';\nh1 { background: url(../assets/grain.png); }",
+            'css/more.css': 'p { background: url("/assets/dots.png"); }',
+        });
+        expect(page.loads).toEqual([
+            'assets/a.png',
+            'assets/b.png',
+            'assets/dots.png',
+            'assets/grain.png',
+            'assets/paper.jpg',
+            'assets/plate.png',
+            'assets/poster.jpg',
+            'assets/tile.png',
+            'css/page.css',
+        ]);
+        expect(page.mentions).toEqual(['assets/credits.html']);
+    });
+
+    it('reads loads from runtime loaders, fetch, src and setAttribute, and the rest as mentions', () => {
+        const page = model({
+            'index.html': inline(`import { photo, loadRig } from '/__flipbook/runtime.js';
+await photo('assets/a.png');
+await loadRig('./assets/puppets/man/rig.json');
+await fetch('assets/data.json');
+const img = new Image();
+img.src = '/assets/b.png';
+document.body.setAttribute('src', 'assets/c.png');
+photo(\`assets/cut/\${name}-01.png\`);
+photo(pick());
+const note = 'assets/left-out.png';
+console.info('not used:', note);`),
+        });
+        expect(page).toMatchObject({
+            loads: [
+                'assets/a.png',
+                'assets/b.png',
+                'assets/c.png',
+                'assets/data.json',
+                'assets/puppets/man/rig.json',
+            ],
+            possibleLoads: ['assets/cut/'],
+            computedLoads: 1,
+            mentions: ['assets/left-out.png'],
+        });
+    });
+
+    it('does not take a local function named photo or fetch for a loader', () => {
+        const page = model({
+            'index.html': inline(
+                "function photo(p) { return p; }\nconst fetch = (p) => p;\nphoto('assets/a.png');\nfetch('assets/b.png');",
+            ),
+        });
+        expect(page).toMatchObject({ loads: [], mentions: ['assets/a.png', 'assets/b.png'] });
+    });
+
+    it('takes nothing from a script the page does not load', () => {
+        const page = model({
+            'index.html': '<p>Drawn in canvas</p>',
+            'draft.js': "import { photo } from '/__flipbook/runtime.js';\nphoto('assets/a.png');",
+        });
+        expect(page).toMatchObject({ loads: [], mentions: [] });
+    });
+});

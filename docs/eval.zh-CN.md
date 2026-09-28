@@ -66,7 +66,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 ```
 
 - 目标在 `eval/models.json`：`flagship`（Claude Code 加 Opus 5.5）、`floor`（Claude Code 加 Opus 5）、`astra`（Codex 加 GPT-6 Astra，只公开数字不设线）。
-- 每次每条在一个全新的临时目录里跑：把工作区的 `skills/flipbook` 拷进宿主读 skill 的目录（Claude Code 是 `.claude/skills/`，Codex 是 `.agents/skills/` 和 `.codex/skills/` 再加一份指向它的 AGENTS.md），放一个 `flipbook` 小脚本在 PATH 最前面，指向工作区的 `dist/main.js`，再摆好用例的文件。启动器优先用 PATH 上兼容的 CLI，所以评测的是工作区的代码，不是 npm 上的版本。
+- 每次每条在一个全新的临时目录里跑：把工作区的 `skills/flipbook` 拷进宿主读 skill 的目录（Claude Code 是 `.claude/skills/`，Codex 是 `.agents/skills/` 和 `.codex/skills/` 再加一份指向它的 AGENTS.md），放一个 `flipbook` 小脚本在 PATH 最前面，指向工作区的 `dist/main.js`，再摆好用例的文件。启动器优先用 PATH 上兼容的 CLI，所以评测的是工作区的代码，不是 npm 上的版本。在 macOS 和 Linux 上，这个小脚本还把每次运行的 JSON 报告留在 `.eval-bin/reports/`，每次 `stock fetch` 都有自己的证据，后一次覆盖了合成里 flipbook 存的报告也不丢。
 - 提示词是用例的 `prompt` 加一句固定的无人值守说明：没有人会回答问题，不要提问，没说的按默认值，交付成片路径，没交付就说明原因。证据里记完整提示词。
 - 宿主用评测机当前用户的登录和全局配置。证据里记宿主版本，宿主版本变了单独标注，不和旧结果直接比。
 - 超时：单次 30 分钟墙钟，或者用例的 `timeoutMin`，`--timeout-min` 两者都盖过。从图起步的两条设的 45 分钟是跑之前定的预算，第一轮跑完按证据里的耗时再校准。到点杀掉宿主，这次记失败，`host.timedOut` 为 true。
@@ -83,7 +83,8 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 | `hostVersion`、`node`、`ffmpeg` | 环境 |
 | `host` | 退出码、是否超时、耗时、宿主报的花费和用量、宿主最后的回复、stdout 和 stderr 末尾 |
 | `workspaceFiles` | 用例放进工作区的每个文件的大小和 sha256，在宿主开跑之前取 |
-| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`page`（`entries` 和 `modules`：index.html 加载的脚本和它们走到的本地模块，`imports`：其中有没有导入 flipbook 运行时，`calls`：调用了运行时的哪些函数，`passed`：交给别的代码的运行时函数，`notes`：评测器跟不下去的地方，见[怎样读 `uses`](#怎样读-uses)），覆盖这些模块的 `sourceSha256`、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定、页面有没有点名用它，见下面第 5 条） |
+| `stockFetches` | 宿主经评测器的 `flipbook` 小脚本跑过的每次 `stock fetch`：成没成功、哪个合成、id 和文件 |
+| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`page`（`entries` 和 `modules`：index.html 加载的脚本和它们走到的本地模块，`imports`：其中有没有导入 flipbook 运行时，`calls`：调用了运行时的哪些函数，`passed`：交给别的代码的运行时函数，`loads`、`possibleLoads`、`computedLoads` 和 `mentions`：页面加载的文件和只是提到的文件，见下面第 5 条，`notes`：评测器跟不下去的地方，见[怎样读 `uses`](#怎样读-uses)），覆盖这些模块的 `sourceSha256`、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`audioFile`（`file` 模式下 timeline 放的音乐文件和它的 sha256）、`files`（`expect.files` 每个路径对上没有）、`watched`（来自 `notCopied` 文件的文件：怎么来的、有多确定，`use`：页面有没有加载它，见下面第 5 条） |
 | `verdict` | `delivered`、`oneShot`、没过的原因、`needsReview`（评测器靠文件定不了、留给人看的事）、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
 
 ## 自动判定
@@ -96,7 +97,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 2. 出片了。
 3. 成片符合用例：时长落在 `durationSec` 里，画幅对，timeline 的 `audio.mode` 对（不是 `none` 时成片要有音轨），`timeline` 里的值对，音乐是 `audioFile` 那个文件，页面脚本调用了 `uses` 里的每个函数，`files` 的每个路径都对得上，用例有 `brand` 时品牌对。
 4. 故事在成片上站得住：story.json 里有拍，render 没报 `story-static-beat`（某一拍头尾两帧看起来一样）。没有转折的故事、和文字 cue 对不上的字，check 已经拦下（`story-arc`、`story-text`），出片就说明过了这两关。
-5. 用例的规矩守住了，出不出片都要守。对每个 `notCopied` 文件，评测器在每个合成里找确定来自它的文件：它本身，字节相同、又不是 `stock fetch` 取来的副本，以及从这些文件抠出来的图（顺着 SOURCES.json 里的 `cutFrom` 找）。副本的条目带 `openverse:`、`pexels:` 或 `pixabay:` 开头的 id 和 `url`，并且合成里有 `stock fetch` 留下的报告，才算取来的。页面用了这些文件就判失败：页面、脚本或样式表在字符串、属性或 CSS `url()` 里点了它的名。注释、story.json 和宿主的回复里随便提这个文件都不算，说清楚为什么没用它，正是这条用例希望看到的。评测器拿不准的记进 `needsReview`，不判失败：没有任何地方点名的这类文件，用片段拼出来、可能是它的文件名，只在 SOURCES.json 条目里提到它的图，声称取来却没有报告的副本，以及来源既不是 `stock fetch` 也不是生成的图（可能是它重新编码或裁过的版本）。
+5. 用例的规矩守住了，出不出片都要守。对每个 `notCopied` 文件，评测器在每个合成里找确定来自它的文件：它本身，字节相同、SOURCES.json 条目连 stock id 都没声称的副本，以及从这些文件抠出来的图（顺着 `cutFrom` 找）。只有页面确定加载了其中一个才判失败：标记里的 `src`、`srcset`、`poster`，`link`、`image`、`use` 上的 `href`，样式块、style 属性和链接的样式表里的 CSS `url()`。在 index.html 加载的脚本里，传给运行时加载函数（`photo`、`specimens`、`loadRig`、`loadSprite`）或 `fetch` 的字面路径，赋给 `src`、`href`、`srcset` 的字面路径（比如 `new Image().src`），以及用 `setAttribute` 设的。别处的字符串、日志、注释、story.json 和宿主的回复只是提到这个文件，说清楚为什么没用它正是这条用例希望看到的。副本要算取来的，得有一份成功（`ok` 为 true）的 stock fetch 报告，写着这个合成、这个文件和条目里的 id：评测器留着每次运行的报告（见[跑法](#跑法)），也看合成里存的最后一份。评测器拿不准的记进 `needsReview`，不判失败也不放过：stock id 没有这样的报告撑腰的副本（取图失败、取的是别的图、或者根本没有报告），确定来自它、但只被字符串提到或没被加载的文件，用片段拼出来、可能是它的路径，路径算出来、评测器读不出的加载，只在 SOURCES.json 条目里提到它的图，以及来源既不是 `stock fetch` 也不是生成的图（可能是它重新编码或裁过的版本）。
 6. 人没有改过任何文件。评测器全程无人值守，这条自动满足。
 
 用例的成片是 `optional` 时，第 2 到 4 条只在出了片时才算。
