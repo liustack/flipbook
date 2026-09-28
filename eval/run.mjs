@@ -7,6 +7,7 @@
 //   node eval/run.mjs                               every case, default targets, 1 run
 //   node eval/run.mjs --target flagship --runs 2 waiting pigeons
 //   node eval/run.mjs --model claude-code:claude-opus-5 --timeout-min 20
+//   node eval/run.mjs --dry-run --cases <dir>       validate cases kept somewhere else
 //
 // What a case checks and how a run is judged: eval/judge.mjs and docs/eval.md.
 import { spawn, spawnSync } from 'node:child_process';
@@ -24,9 +25,10 @@ import {
     writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, relative } from 'node:path';
+import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HOST_DIRS, inspect, judge, sha256File, validateCase, workspaceSource } from './judge.mjs';
+import { HOST_DIRS, validateCase, workspaceSource } from './cases.mjs';
+import { inspect, judge, sha256File } from './judge.mjs';
 import { recheck, renderShape } from './recheck.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
@@ -116,6 +118,7 @@ function parseArgs(argv) {
         models: [],
         timeoutMin: null,
         keep: false,
+        casesDir: join(evalDir, 'cases'),
         ids: [],
     };
     for (let i = 0; i < argv.length; i++) {
@@ -126,6 +129,7 @@ function parseArgs(argv) {
         else if (arg === '--model') opts.models.push(argv[++i]);
         else if (arg === '--timeout-min') opts.timeoutMin = Number(argv[++i]);
         else if (arg === '--keep') opts.keep = true;
+        else if (arg === '--cases') opts.casesDir = resolve(argv[++i]);
         else if (arg.startsWith('-')) throw new Error(`Unknown flag: ${arg}`);
         else opts.ids.push(arg);
     }
@@ -154,11 +158,10 @@ function loadMatrix(opts) {
     return matrix;
 }
 
-function loadCases(ids) {
-    const casesDir = join(evalDir, 'cases');
+function loadCases(ids, casesDir) {
     const found = readdirSync(casesDir, { withFileTypes: true }).filter((d) => d.isDirectory());
     const unknown = ids.filter((id) => !found.some((d) => d.name === id));
-    if (unknown.length > 0) throw new Error(`No case ${unknown.join(', ')} in eval/cases`);
+    if (unknown.length > 0) throw new Error(`No case ${unknown.join(', ')} in ${casesDir}`);
     return found
         .filter((d) => ids.length === 0 || ids.includes(d.name))
         .map((d) => {
@@ -167,10 +170,15 @@ function loadCases(ids) {
             try {
                 spec = JSON.parse(readFileSync(join(caseDir, 'case.json'), 'utf-8'));
             } catch (error) {
-                return { name: d.name, spec: null, problems: [`case.json: ${error.message}`] };
+                return {
+                    name: d.name,
+                    caseDir,
+                    spec: null,
+                    problems: [`case.json: ${error.message}`],
+                };
             }
             const problems = validateCase(spec, { name: d.name, caseDir, repoRoot });
-            return { name: d.name, spec, problems };
+            return { name: d.name, caseDir, spec, problems };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -268,11 +276,7 @@ function prepareWorkspace(entry, host) {
         const file = join(ws, rel);
         mkdirSync(dirname(file), { recursive: true });
         if (item.generator === 'clicks') makeClicks(file, item);
-        else
-            cpSync(
-                workspaceSource(item, { caseDir: join(evalDir, 'cases', entry.name), repoRoot }),
-                file,
-            );
+        else cpSync(workspaceSource(item, { caseDir: entry.caseDir, repoRoot }), file);
         files[rel] = { size: statSync(file).size, sha256: sha256File(file) };
     }
     return { ws, bin, files };
@@ -433,7 +437,7 @@ async function runOnce(entry, target, run, opts, info, resultsDir) {
 
 async function main() {
     const opts = parseArgs(process.argv.slice(2));
-    const cases = loadCases(opts.ids);
+    const cases = loadCases(opts.ids, opts.casesDir);
     const matrix = loadMatrix(opts);
     const info = {
         flipbook: repoInfo(),

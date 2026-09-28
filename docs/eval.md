@@ -61,6 +61,7 @@ node eval/run.mjs --dry-run                                   # validate cases, 
 node eval/run.mjs --target flagship                           # B level: flagship model, every case once
 node eval/run.mjs --target flagship --target floor --runs 3   # C level: flagship plus floor, three runs each
 node eval/run.mjs --model claude-code:claude-opus-5 pigeons   # one case on a given host and model
+node eval/run.mjs --dry-run --cases <dir>                     # validate cases kept in another directory
 ```
 
 - Targets live in `eval/models.json`: `flagship` (Claude Code with Opus 5.5), `floor` (Claude Code with Opus 5), `astra` (Codex with GPT-6 Astra, numbers published but no bar to clear).
@@ -137,14 +138,14 @@ Fill in the three items one at a time before deciding, and record the result in 
 
 ## Case format
 
-`eval/cases/<id>/case.json`. Unknown fields are refused, so a misspelled one never passes unnoticed:
+`eval/cases/<id>/case.json`. `eval/cases.mjs` validates it, and `--dry-run` prints every problem as `field: problem`, such as `workspace["assets/music.wav"].offsetSecs: unknown field for clicks`. Unknown fields are refused at every level, so a misspelled one never passes unnoticed. Text fields are non-empty strings, sizes positive even whole numbers, durations `0 < min < max`, and a field of the wrong type is reported without looking inside it:
 
 | Field | Contents |
 |---|---|
 | `id`, `title` | An id matching the directory name, and a Chinese title |
 | `asks` | The questions the case covers, from `story`, `film`, `characters`, `looks`, `pictures`, `brand`, `rules` |
 | `prompt` | The user's words |
-| `workspace` | Optional files placed in the workspace before the run, keyed by their path in the workspace. `{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` makes a click track with ffmpeg, `{ "generator": "copy", "from": "files/<file>" }` copies a file from the case directory, and `{ "generator": "repo", "from": "<path>" }` copies a file from this repository, so the example assets are not stored twice. `--dry-run` lays out these files for every case to confirm they can be made |
+| `workspace` | Optional files placed in the workspace before the run, keyed by their path in the workspace. `{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` makes a click track with ffmpeg, `{ "generator": "copy", "from": "files/<file>" }` copies a file from the case directory, and `{ "generator": "repo", "from": "<path>" }` copies a file from this repository, so the example assets are not stored twice. Each generator takes exactly its own fields. A path stays inside the workspace, relative and written plainly, and out of the folders kept for the host and the eval. A source is a regular file inside the case directory or the repository. `--dry-run` lays out these files for every valid case to confirm they can be made |
 | `timeoutMin` | Optional minutes for one run, 30 when left out |
 | `expect.film` | `required` (the default) or `optional`: whether the case can pass without a film |
 | `expect.durationSec` | The allowed duration range `[min, max]` |

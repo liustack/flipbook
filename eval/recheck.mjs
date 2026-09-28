@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
-import { HOST_DIRS } from './judge.mjs';
+import { HOST_DIRS } from './cases.mjs';
 
 /** Folders left out of the copy: the host's and the eval's own, and what flipbook wrote. */
 const LEFT_OUT = [...HOST_DIRS, '.flipbook', 'out'];

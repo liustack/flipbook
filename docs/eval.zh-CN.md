@@ -61,6 +61,7 @@ node eval/run.mjs --dry-run                                   # 校验用例、�
 node eval/run.mjs --target flagship                           # B 级：旗舰模型，每条一次
 node eval/run.mjs --target flagship --target floor --runs 3   # C 级：旗舰加最低，每条三次
 node eval/run.mjs --model claude-code:claude-opus-5 pigeons   # 指定宿主和模型，只跑一条
+node eval/run.mjs --dry-run --cases <目录>                    # 校验放在别处的用例
 ```
 
 - 目标在 `eval/models.json`：`flagship`（Claude Code 加 Opus 5.5）、`floor`（Claude Code 加 Opus 5）、`astra`（Codex 加 GPT-6 Astra，只公开数字不设线）。
@@ -137,14 +138,14 @@ node eval/run.mjs --model claude-code:claude-opus-5 pigeons   # 指定宿主和�
 
 ## 用例格式
 
-`eval/cases/<id>/case.json`。不认识的字段直接报错，拼错的字段不会悄悄放过：
+`eval/cases/<id>/case.json`。由 `eval/cases.mjs` 校验，`--dry-run` 把每个问题按「字段: 问题」打出来，比如 `workspace["assets/music.wav"].offsetSecs: unknown field for clicks`。每一层不认识的字段都直接报错，拼错的字段不会悄悄放过。文字字段是非空字符串，尺寸是正的偶数，时长满足 `0 < 最短 < 最长`，类型不对的字段只报它本身，不再往里查：
 
 | 字段 | 内容 |
 |---|---|
 | `id`、`title` | 和目录名相同的 id，中文标题 |
 | `asks` | 用例回答的问题，从 `story`、`film`、`characters`、`looks`、`pictures`、`brand`、`rules` 里选 |
 | `prompt` | 用户的话 |
-| `workspace` | 可选，评测开始前放进工作区的文件，键是工作区里的路径。`{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` 用 ffmpeg 生成节拍音，`{ "generator": "copy", "from": "files/<文件>" }` 从用例目录拷一个文件，`{ "generator": "repo", "from": "<路径>" }` 从本仓库拷一个文件，样例里的素材就不用再存一份。`--dry-run` 会把每条用例的这些文件都摆一遍，确认能生成 |
+| `workspace` | 可选，评测开始前放进工作区的文件，键是工作区里的路径。`{ "generator": "clicks", "bpm", "offsetSec", "seconds" }` 用 ffmpeg 生成节拍音，`{ "generator": "copy", "from": "files/<文件>" }` 从用例目录拷一个文件，`{ "generator": "repo", "from": "<路径>" }` 从本仓库拷一个文件，样例里的素材就不用再存一份。每种 generator 只收自己的字段。路径要留在工作区里，写成不绕弯的相对路径，也不能落进留给宿主和评测器的目录。源文件要是用例目录或本仓库里的普通文件。`--dry-run` 会把每条合格用例的这些文件都摆一遍，确认能生成 |
 | `timeoutMin` | 可选，单次的分钟数，不写是 30 |
 | `expect.film` | `required`（默认）或 `optional`：不出片能不能过 |
 | `expect.durationSec` | 允许的时长区间 `[最短, 最长]` |

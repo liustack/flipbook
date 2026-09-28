@@ -1,12 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { inspect, judge, sha256File, sourceUses, validateCase } from './judge.mjs';
+import { inspect, judge, sha256File, sourceUses } from './judge.mjs';
 
-const evalDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(evalDir, '..');
 const temps = [];
 afterAll(() => {
     for (const dir of temps) rmSync(dir, { recursive: true, force: true });
@@ -77,44 +74,6 @@ function finishedRun(spec, { files = {}, workspace = {}, warnings = [] } = {}) {
 }
 
 const HOST_OK = { exitCode: 0, timedOut: false };
-
-describe('eval case validation', () => {
-    const dirs = { name: 'pigeons', caseDir: join(evalDir, 'cases', 'pigeons'), repoRoot };
-
-    it('accepts a complete case', () => {
-        expect(validateCase(baseCase(), dirs)).toEqual([]);
-    });
-
-    it('names misspelled or retired fields instead of ignoring them', () => {
-        const problems = validateCase(baseCase({ textInSource: ['x'] }, { notes: 'x' }), dirs);
-        expect(problems).toContain('unknown field expect.textInSource');
-        expect(problems).toContain('unknown field notes');
-    });
-
-    it('refuses audio modes, questions and review lists it does not know', () => {
-        const problems = validateCase(
-            baseCase({ audio: 'music', review: [] }, { asks: ['vibes'] }),
-            dirs,
-        );
-        expect(problems.some((p) => p.startsWith('expect.audio'))).toBe(true);
-        expect(problems.some((p) => p.startsWith('asks'))).toBe(true);
-        expect(problems.some((p) => p.startsWith('expect.review'))).toBe(true);
-    });
-
-    it('checks that watched files and the brand logo are workspace files that exist', () => {
-        const problems = validateCase(
-            baseCase(
-                { notCopied: ['downloads/a.jpg'], brand: { logo: 'logo.svg', primary: 'teal' } },
-                { workspace: { 'b.png': { generator: 'repo', from: '../outside.png' } } },
-            ),
-            dirs,
-        );
-        expect(problems).toContain('expect.notCopied: downloads/a.jpg is not a workspace file');
-        expect(problems).toContain('expect.brand.logo: logo.svg is not a workspace file');
-        expect(problems).toContain('expect.brand.primary must be #rrggbb');
-        expect(problems).toContain('workspace b.png: no file ../outside.png for repo');
-    });
-});
 
 describe('eval verdict', () => {
     it('passes a film that meets every expectation', () => {
