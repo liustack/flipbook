@@ -403,7 +403,8 @@ function ruleReasons(e, compositions, review) {
     const USE = {
         load: 'The page loads it.',
         possible: 'The page loads a path built from pieces that could be it.',
-        mention: 'A string or attribute in the page names it, but nothing loads it there.',
+        mention:
+            'A string or attribute in the page names it, and the runner cannot tell whether that loads it.',
         none: 'Nothing the page loads names it.',
     };
     for (const c of compositions) {

@@ -175,7 +175,7 @@ describe('files the page loads, and files it only names', () => {
         expect(page.mentions).toEqual(['assets/credits.html']);
     });
 
-    it('reads loads from runtime loaders, fetch, src and setAttribute, and the rest as mentions', () => {
+    it('reads loads only from runtime loaders, and fetch, .src and setAttribute only as mentions', () => {
         const page = model({
             'index.html': inline(`import { photo, loadRig } from '/__flipbook/runtime.js';
 await photo('assets/a.png');
@@ -190,16 +190,33 @@ const note = 'assets/left-out.png';
 console.info('not used:', note);`),
         });
         expect(page).toMatchObject({
-            loads: [
-                'assets/a.png',
-                'assets/b.png',
-                'assets/c.png',
-                'assets/data.json',
-                'assets/puppets/man/rig.json',
-            ],
+            loads: ['assets/a.png', 'assets/puppets/man/rig.json'],
             possibleLoads: ['assets/cut/'],
             computedLoads: 1,
-            mentions: ['assets/left-out.png'],
+            mentions: ['assets/b.png', 'assets/c.png', 'assets/data.json', 'assets/left-out.png'],
+        });
+    });
+
+    it('does not take a plain object, a method of the same name or a template for a load', () => {
+        const page = model({
+            'index.html': `<template><img src="assets/in-template.png"><div style="background: url(assets/t.png)"></div></template>
+${inline(`import { photo } from '/__flipbook/runtime.js';
+const omitted = {};
+omitted.src = 'assets/omitted.png';
+console.log('omitted', omitted);
+const album = { photo(path) { return path; } };
+album.photo('assets/album.png');
+await photo('assets/real.png');`)}
+<img src="assets/plate.png">`,
+        });
+        expect(page).toMatchObject({
+            loads: ['assets/plate.png', 'assets/real.png'],
+            mentions: [
+                'assets/album.png',
+                'assets/in-template.png',
+                'assets/omitted.png',
+                'assets/t.png',
+            ],
         });
     });
 

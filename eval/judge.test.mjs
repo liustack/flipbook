@@ -329,7 +329,7 @@ describe('eval verdict on a picture of unknown source', () => {
         expect(verdict.oneShot).toBe(true);
         expect(verdict.reasons).toEqual([]);
         expect(verdict.needsReview).toEqual([
-            `./${PLATE} is ${PLATE}, whose source is unknown. A string or attribute in the page names it, but nothing loads it there. Check by eye that the film does not show it.`,
+            `./${PLATE} is ${PLATE}, whose source is unknown. A string or attribute in the page names it, and the runner cannot tell whether that loads it. Check by eye that the film does not show it.`,
         ]);
     });
 
@@ -374,8 +374,7 @@ describe('eval verdict on a picture of unknown source', () => {
         for (const loader of [
             `<img src="/${PLATE}">`,
             `<div style="background: url('${PLATE}')"></div>`,
-            `<script>const img = new Image();\nimg.src = '${PLATE}';</script>`,
-            `<script>fetch('${PLATE}');</script>`,
+            `<script type="module">import { photo } from '/__flipbook/runtime.js';\nawait photo('${PLATE}');</script>`,
         ]) {
             const inRoot = finishedRun(spec, {
                 at: '.',
@@ -386,6 +385,32 @@ describe('eval verdict on a picture of unknown source', () => {
                 `./${PLATE} is ${PLATE}, whose source is unknown. The page loads it.`,
             ]);
         }
+    });
+
+    it('asks a person, not fails, when a script only hands the path to something the runner cannot identify', () => {
+        for (const code of [
+            `const img = new Image();\nimg.src = '${PLATE}';`,
+            `fetch('${PLATE}');`,
+            `const omitted = {};\nomitted.src = '${PLATE}';\nconsole.log('omitted', omitted);`,
+            `document.body.setAttribute('src', '${PLATE}');`,
+        ]) {
+            const run = finishedRun(spec, {
+                at: '.',
+                workspace: { [PLATE]: BYTES },
+                files: { 'index.html': `<script>${code}</script>` },
+            });
+            const verdict = verdictOf(run);
+            expect(verdict.reasons, code).toEqual([]);
+            expect(verdict.needsReview, code).toEqual([
+                `./${PLATE} is ${PLATE}, whose source is unknown. A string or attribute in the page names it, and the runner cannot tell whether that loads it. Check by eye that the film does not show it.`,
+            ]);
+        }
+        const inert = finishedRun(spec, {
+            at: '.',
+            workspace: { [PLATE]: BYTES },
+            files: { 'index.html': `<template><img src="${PLATE}"></template><p>Omitted</p>` },
+        });
+        expect(verdictOf(inert).reasons).toEqual([]);
     });
 
     it('accepts the same picture only when a successful fetch of that id into that file backs it', () => {
