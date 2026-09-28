@@ -64,11 +64,11 @@ Change the story only when the user changes it. Once the timeline is written, th
     "scenes": [
         { "id": "sun", "bars": 2 },
         { "id": "rain", "bars": 1 },
-        { "id": "snow", "bars": 2 }
+        { "id": "snow", "bars": 3 }
     ],
     "cues": [
         { "id": "drop", "scene": "rain", "beat": 0, "kind": "sfx", "sfx": "drop" },
-        { "id": "end", "scene": "snow", "beat": 5, "kind": "text", "text": "撑过去", "settleBeats": 1 }
+        { "id": "end", "scene": "snow", "beat": 6, "kind": "text", "text": "撑过去", "settleBeats": 1 }
     ]
 }
 ```
@@ -108,7 +108,7 @@ document.body.append(words);
 composition({
   seek(t) {
     const grey = progress(t, sun.start + 1, sun.end);
-    const sink = ease.inOutSine(progress(t, rain.start, rain.end)) * (1 - ease.outBack(progress(t, lift.start, lift.end)));
+    const sink = ease.inOutSine(progress(t, rain.start, rain.end)) * (1 - ease.outBack(progress(t, lift.start, lift.start + 1.2)));
     const pile = progress(t, snow.start, lift.start) * (1 - progress(t, lift.start, lift.start + 0.6));
     ctx.fillStyle = `rgb(${214 - 90 * grey}, ${226 - 80 * grey}, ${236 - 60 * grey})`;
     ctx.fillRect(0, 0, tl.width, tl.height);

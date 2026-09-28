@@ -64,6 +64,12 @@ A beat puts more words on screen than a viewer can read in its time.
 
 Fix: Cut words, or give the beat more bars in timeline.json.
 
+### `story-ending-short`
+
+The film stops too soon after its story lands: the last words settle less than 2 s before the end (less for a very short film), or with no words the last beat is shorter than 2.5 s.
+
+Fix: Give the ending room, see the ending in references/story.md: lengthen the last scene or bring the last words in earlier, and use the time for a last small action, the camera and light settling and the music landing on its home chord.
+
 ### `story-static-beat`
 
 A beat's first and last frames look the same: the change the story promises does not show.

@@ -26,6 +26,14 @@ export const MAX_BEATS = 6;
  * a CJK character is one unit, a word in a spaced script two (about 3.5 words a second).
  */
 export const READ_UNITS_PER_SEC = 7;
+/**
+ * The ending needs room: the film goes on at least this long after its last
+ * words settle (or, with no words, its last beat lasts this long), scaled down
+ * for very short films by the share of their length.
+ */
+export const ENDING_AFTER_WORDS_SEC = 2;
+export const ENDING_BEAT_SEC = 2.5;
+export const ENDING_SHARE = 0.15;
 
 const TEXT_MAX = 300;
 
@@ -55,7 +63,8 @@ type StoryCode =
     | 'story-coverage'
     | 'story-arc'
     | 'story-text'
-    | 'story-text-fast';
+    | 'story-text-fast'
+    | 'story-ending-short';
 
 /** Units of reading in `text`: CJK characters count one, words of other scripts two. */
 export function readingUnits(text: string): number {
@@ -401,6 +410,39 @@ export function validateStory(
             }
         }
     });
+    // The ending: once the story has landed, the picture needs time before the film stops.
+    const film = timeline.durationSec;
+    const last = beats[beats.length - 1];
+    const words = timeline.cues
+        .filter((cue) => cue.kind === 'text')
+        .map((cue) => ({ cue, settled: cue.settleFrame / timeline.fps }))
+        .sort((a, b) => a.settled - b.settled)
+        .at(-1);
+    if (words) {
+        const room = Math.min(ENDING_AFTER_WORDS_SEC, film * ENDING_SHARE);
+        const after = film - words.settled;
+        if (after < room - 1e-9) {
+            add(
+                'story-ending-short',
+                `$.beats[${beats.length - 1}]`,
+                `ends ${after.toFixed(2)} s after its last words ("${words.cue.text ?? ''}") settle: hold the final picture at least ${room.toFixed(1)} s after them, with a last small action, the light or camera settling and the music landing on its home chord`,
+                { beat: last.id, cue: words.cue.id, after, room },
+                'warning',
+            );
+        }
+    } else {
+        const room = Math.min(ENDING_BEAT_SEC, film * ENDING_SHARE);
+        const length = last.end - last.start;
+        if (length < room - 1e-9) {
+            add(
+                'story-ending-short',
+                `$.beats[${beats.length - 1}]`,
+                `the last beat "${last.id}" lasts ${length.toFixed(2)} s: give the resolution at least ${room.toFixed(1)} s on screen before the film stops`,
+                { beat: last.id, length, room },
+                'warning',
+            );
+        }
+    }
     if (problems.some((p) => p.severity === 'error')) return { problems };
     const { idea, leave, subject, device } = story;
     return { problems, story: { idea, leave, subject, device, beats } };

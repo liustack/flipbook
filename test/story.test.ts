@@ -1,7 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { loadStory, READ_UNITS_PER_SEC, readingUnits, validateStory } from '../src/engine/story.ts';
+import {
+    ENDING_AFTER_WORDS_SEC,
+    loadStory,
+    READ_UNITS_PER_SEC,
+    readingUnits,
+    validateStory,
+} from '../src/engine/story.ts';
 import { validateTimeline } from '../src/engine/timeline.ts';
 import { resolveTimeline } from '../src/engine/timelineResolve.ts';
 import { cleanTemps, tempDir } from './helpers.ts';
@@ -25,7 +31,7 @@ const TIMELINE = {
     cues: [
         { id: 'title', scene: 'sun', beat: 1, kind: 'text', text: '纸船' },
         { id: 'drop', scene: 'rain', beat: 0, kind: 'sfx', sfx: 'drop' },
-        { id: 'end', scene: 'snow', beat: 2, kind: 'text', text: '撑过去' },
+        { id: 'end', scene: 'snow', beat: 1, kind: 'text', text: '撑过去' },
     ],
 };
 
@@ -166,6 +172,55 @@ describe('story.json', () => {
             resolved,
         );
         expect(problems.map((p) => [p.code, p.severity])).toEqual([['story-text-fast', 'warning']]);
+    });
+
+    it('warns when the film stops right after its last words or its last beat', () => {
+        // 8 s at 120 bpm: the room after the last words is 15% of it, 1.2 s.
+        const late = structuredClone(TIMELINE);
+        late.cues[2].beat = 2.5; // settles 0.75 s before the end
+        const { timeline: v } = validateTimeline(late);
+        const lateProblems = validateStory(
+            story(),
+            resolveTimeline(v as NonNullable<typeof v>),
+        ).problems;
+        expect(lateProblems.map((p) => [p.code, p.severity, p.path])).toEqual([
+            ['story-ending-short', 'warning', '$.beats[2]'],
+        ]);
+        expect(lateProblems[0].detail).toMatchObject({ cue: 'end', room: 1.2 });
+        // A longer film asks for the full two seconds.
+        const long = structuredClone(TIMELINE);
+        long.scenes[0].bars = 8;
+        long.cues[2].beat = 0;
+        const { timeline: l } = validateTimeline(long);
+        const longResolved = resolveTimeline(l as NonNullable<typeof l>);
+        const settled = validateStory(
+            story((s) => (s.beats[2].at = 'snow')),
+            longResolved,
+        ).problems;
+        expect(settled).toEqual([]);
+        long.cues[2].beat = 3;
+        const { timeline: l2 } = validateTimeline(long);
+        const short = validateStory(
+            story((s) => (s.beats[2].at = 'snow')),
+            resolveTimeline(l2 as NonNullable<typeof l2>),
+        ).problems;
+        expect(short.map((p) => p.code)).toEqual(['story-ending-short']);
+        expect(short[0].detail).toMatchObject({ room: ENDING_AFTER_WORDS_SEC });
+        // No words at all: the last beat itself needs the room.
+        const silent = structuredClone(TIMELINE);
+        silent.cues = silent.cues.filter((c) => c.kind !== 'text');
+        const { timeline: s0 } = validateTimeline(silent);
+        const quiet = validateStory(
+            story((s) => {
+                s.beats[0].text = [];
+                s.beats[2].text = [];
+                s.beats[2].at = { scene: 'snow', beat: 3 };
+            }),
+            resolveTimeline(s0 as NonNullable<typeof s0>),
+        ).problems;
+        expect(quiet.map((p) => [p.code, p.detail?.beat])).toEqual([
+            ['story-ending-short', 'lift'],
+        ]);
     });
 
     it('refuses references that do not hold', () => {

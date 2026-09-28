@@ -179,6 +179,13 @@ describe('bad composition corpus', () => {
         expect(checked.warnings.map((w) => w.code)).toContain('story-text-fast');
     });
 
+    it('story-ending-short: the last words land a quarter second before the film stops', async () => {
+        const checked = await check('story-ending-short');
+        expect(codes(checked)).toEqual([]);
+        const ending = checked.warnings.filter((w) => w.code === 'story-ending-short');
+        expect(ending.map((w) => [w.detail?.path, w.detail?.cue])).toEqual([['$.beats[2]', 'end']]);
+    });
+
     it('story-static-beat: the story says the boat sinks, the picture stands still', async () => {
         const checked = await check('story-static');
         expect(codes(checked)).toEqual([]);

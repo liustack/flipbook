@@ -69,6 +69,7 @@ A field not listed here is `story-invalid`. Every sentence (`idea`, `leave`, `su
 | `story-arc` | The first beat is not `opening`, the last is not `resolution`, or no `turn` lies between them. Warning: more than six beats |
 | `story-text` | A beat's `text` differs from the text cues that start inside it |
 | `story-text-fast` (warning) | A beat's words take longer to read than the beat lasts: above 7 reading units a second, where a CJK character is 1 unit and a word in a spaced script is 2 |
+| `story-ending-short` (warning) | The film stops too soon after its story lands. With text cues: the last one settles less than 2 s before the end. Without: the last beat lasts less than 2.5 s. Either floor is capped at 15% of the film's length, so a very short film asks for less |
 | `story-static-beat` (warning) | Outside a `hold` beat, the beat's first and last frames differ in less than 0.2% of their pixels: the change the story promises does not show. Both frames are compared as gray copies scaled, with the stage's proportions kept, to about as many pixels as 320×180 (both sides even: 180×320 for a portrait stage, 240×240 for a square one), and a pixel counts as changed when its gray level moves by more than 16. check compares the two frames on the page, render on the finished video |
 
 Only the structure is checked. Whether the idea is worth a film, whether the device means something and whether each beat's picture shows its `change` are for the agent to judge on the contact sheet and for the person asking to decide.
