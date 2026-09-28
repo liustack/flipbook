@@ -8,7 +8,7 @@
         "width": 1920,
         "height": 1080,
         "audio": "score",
-        "uses": ["photo("],
+        "uses": ["photo"],
         "files": [".flipbook/reports/stock-fetch.json", ".flipbook/reports/cutout.json"],
         "review": [
             "图都是 stock fetch 取来的（证据里 sources.other 为空，或其中每一项都是代码自己画的）",

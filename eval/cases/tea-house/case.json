@@ -22,7 +22,7 @@
         "width": 1920,
         "height": 1080,
         "audio": "score",
-        "uses": ["brand("],
+        "uses": ["brand"],
         "brand": {
             "name": "潮汐茶室",
             "primary": "#1f6f78",

@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { validateCase } from './cases.mjs';
+import { runtimeExports } from './scripts.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
@@ -13,7 +14,13 @@ afterAll(() => {
     for (const dir of temps) rmSync(dir, { recursive: true, force: true });
 });
 
-const dirs = { name: 'four-seasons', caseDir: join(evalDir, 'cases', 'four-seasons'), repoRoot };
+const runtimeNames = runtimeExports(repoRoot);
+const dirs = {
+    name: 'four-seasons',
+    caseDir: join(evalDir, 'cases', 'four-seasons'),
+    repoRoot,
+    runtimeNames,
+};
 
 /** four-seasons as shipped, changed by `edit`. */
 function fourSeasons(edit = () => {}) {
@@ -27,7 +34,7 @@ describe('eval case validation', () => {
         for (const name of readdirSync(join(evalDir, 'cases'))) {
             const caseDir = join(evalDir, 'cases', name);
             const spec = JSON.parse(readFileSync(join(caseDir, 'case.json'), 'utf-8'));
-            expect(validateCase(spec, { name, caseDir, repoRoot }), name).toEqual([]);
+            expect(validateCase(spec, { name, caseDir, repoRoot, runtimeNames }), name).toEqual([]);
         }
     });
 
@@ -136,5 +143,31 @@ describe('eval case validation', () => {
             '!! four-seasons: workspace["assets/music.wav"].offsetSecs: unknown field for clicks',
         );
         expect(result.stdout).toContain('0/1 cases valid');
+    });
+});
+
+describe('eval case uses', () => {
+    it('takes runtime function names, alone or as alternatives, and refuses others', () => {
+        const spec = fourSeasons((s) => {
+            s.expect.uses = [
+                'puppet',
+                'paperLayer|drawPaper',
+                'puppet(',
+                'loadRigs',
+                'riso|nothing',
+            ];
+        });
+        expect(validateCase(spec, dirs)).toEqual([
+            'expect.uses[2]: "puppet(" is not a function name',
+            'expect.uses[3]: "loadRigs" is not a function the runtime exports',
+            'expect.uses[4]: "nothing" is not a function the runtime exports',
+        ]);
+    });
+
+    it('reads the runtime exports, not its types', () => {
+        expect(runtimeNames.has('puppet')).toBe(true);
+        expect(runtimeNames.has('loadSprite')).toBe(true);
+        expect(runtimeNames.has('paperLayer')).toBe(true);
+        expect(runtimeNames.has('Puppet')).toBe(false);
     });
 });

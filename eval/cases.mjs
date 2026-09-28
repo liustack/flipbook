@@ -165,7 +165,7 @@ function validateBrand(brand, workspace, add) {
         add('expect.brand.logo', `${JSON.stringify(brand.logo)} is not a workspace file`);
 }
 
-function validateExpect(e, workspace, add) {
+function validateExpect(e, workspace, runtimeNames, add) {
     for (const name of Object.keys(e)) {
         if (!EXPECT_KEYS.includes(name)) add(`expect.${name}`, 'unknown field');
     }
@@ -213,7 +213,18 @@ function validateExpect(e, workspace, add) {
             }
         }
     }
-    if (e.uses !== undefined) stringList(e.uses, 'expect.uses', add);
+    if (e.uses !== undefined) {
+        stringList(e.uses, 'expect.uses', add);
+        (Array.isArray(e.uses) ? e.uses : []).forEach((token, i) => {
+            if (!isText(token)) return;
+            for (const name of token.split('|')) {
+                if (!/^[A-Za-z_$][\w$]*$/.test(name))
+                    add(`expect.uses[${i}]`, `"${name}" is not a function name`);
+                else if (runtimeNames && !runtimeNames.has(name))
+                    add(`expect.uses[${i}]`, `"${name}" is not a function the runtime exports`);
+            }
+        });
+    }
     if (e.files !== undefined) {
         stringList(e.files, 'expect.files', add);
         (Array.isArray(e.files) ? e.files : []).forEach((pattern, i) => {
@@ -231,8 +242,12 @@ function validateExpect(e, workspace, add) {
         add('expect.review', 'must list at least one question for the person reviewing');
 }
 
-/** Why a case.json falls short, as `field: problem` lines. Empty when it holds. */
-export function validateCase(spec, { name, caseDir, repoRoot }) {
+/**
+ * Why a case.json falls short, as `field: problem` lines. Empty when it
+ * holds. `runtimeNames`, the functions the runtime exports, lets `expect.uses`
+ * be checked for names that do not exist.
+ */
+export function validateCase(spec, { name, caseDir, repoRoot, runtimeNames }) {
     const problems = [];
     const add = (path, message) => problems.push(`${path}: ${message}`);
     if (!isObject(spec)) return ['case.json: must be an object'];
@@ -256,6 +271,6 @@ export function validateCase(spec, { name, caseDir, repoRoot }) {
     const workspace = spec.workspace ?? {};
     validateWorkspace(workspace, { caseDir, repoRoot }, add);
     if (!isObject(spec.expect)) add('expect', 'must be an object');
-    else validateExpect(spec.expect, isObject(workspace) ? workspace : {}, add);
+    else validateExpect(spec.expect, isObject(workspace) ? workspace : {}, runtimeNames, add);
     return problems;
 }

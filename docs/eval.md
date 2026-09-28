@@ -82,8 +82,8 @@ node eval/run.mjs --dry-run --cases <dir>                     # validate cases k
 | `hostVersion`, `node`, `ffmpeg` | Environment |
 | `host` | Exit code, whether it timed out, duration, cost and usage as the host reported them, the host's final message, the tail of stdout and stderr |
 | `workspaceFiles` | Size and sha256 of each file the case put in the workspace, taken before the host started |
-| `compositions[]` | Every composition found in the workspace: `video` and its sha256, `contactSheet`, `frameDigest` (summary of the raw frame hashes), `probe` (duration, size, frame count, audio track), the agent's last check, snapshot and render reports, `attempts`, `recheck` (the evaluator's own check, see below), `timeline` and `story` as the agent left them, `features` (runtime calls found in the source: the paper, riso and pixel looks, puppets, rigs, sprites, photos, brand, templates), `sources` (`assets/SOURCES.json` sorted into `stock`, `cut`, `generated` and `other`), `brand` (the brand.json the timeline names: name, colors, logo and the logo's sha256), `files` (each `expect.files` pattern and whether it matched), `copies` (files with the same bytes as a `notCopied` file) |
-| `verdict` | `delivered`, `oneShot`, the reasons a run failed, `story` (beats, roles, beats the video shows no change in, beats whose words are too fast), and `humanReview` for a person to fill in |
+| `compositions[]` | Every composition found in the workspace: `video` and its sha256, `contactSheet`, `frameDigest` (summary of the raw frame hashes), `probe` (duration, size, frame count, audio track), the agent's last check, snapshot and render reports, `attempts`, `recheck` (the evaluator's own check, see below), `timeline` and `story` as the agent left them, `runtime` (`imports`: whether any page script imports the flipbook runtime, `calls`: the runtime functions the page scripts call, see [How `uses` is read](#how-uses-is-read)), `sources` (`assets/SOURCES.json` sorted into `stock`, `cut`, `generated` and `other`), `brand` (the brand.json the timeline names: name, colors, logo and the logo's sha256), `files` (each `expect.files` pattern and whether it matched), `copies` (files with the same bytes as a `notCopied` file) |
+| `verdict` | `delivered`, `oneShot`, the reasons a run failed, `needsReview` (what the runner could not settle from the files), `story` (beats, roles, beats the video shows no change in, beats whose words are too fast), and `humanReview` for a person to fill in |
 
 ## The automatic verdict
 
@@ -93,18 +93,22 @@ A run is a **one-shot pass** when all of these hold:
 
 1. The host finishes within the timeout with exit code 0.
 2. The film was delivered.
-3. The film fits the case: duration inside `durationSec`, the frame size, the timeline's `audio.mode` (and an audio track unless the mode is `none`), the `timeline` values, every call in `uses` somewhere in the composition's pages and scripts, a match for every `files` pattern, and the `brand` when the case has one.
+3. The film fits the case: duration inside `durationSec`, the frame size, the timeline's `audio.mode` (and an audio track unless the mode is `none`), the `timeline` values, a call to every function in `uses` in the page scripts, a match for every `files` pattern, and the `brand` when the case has one.
 4. The story holds on the video: story.json has beats, and render reported no `story-static-beat` (a beat whose first and last frames look the same). check already refuses a story without a turn and words that differ from the text cues (`story-arc`, `story-text`), so a delivered film has passed those.
 5. The case's rules hold, film or no film: no composition holds a file with the bytes of a `notCopied` file unless `stock fetch` brought it in (its SOURCES.json entry has an `openverse:`, `pexels:` or `pixabay:` id), and no composition mentions that file's name.
 6. No person edited any file. The evaluator runs unattended, so this always holds.
 
 When a case's film is `optional`, points 2 to 4 apply only if a film was made.
 
-The runner checks structure, names and bytes. Whether the story is worth telling, whether the pictures tell it and whether a puppet or a cutout looks right are for a person.
+The runner checks structure, names and bytes. Whether the story is worth telling, whether the pictures tell it and whether a puppet or a cutout looks right are for a person. So is whatever the runner could not settle: it goes to `verdict.needsReview` instead of failing the run.
+
+### How `uses` is read
+
+The page scripts are every inline `<script>` in the composition's HTML pages (HTML comments, `src` tags and non-JavaScript types such as `application/json` left out) and every `.js` and `.mjs` file in it. The runner parses them with the TypeScript compiler and counts a function as called when a call names it after an import from `/__flipbook/runtime.js`: `import { puppet } from ...` then `puppet({})`, `import { puppet as makeMan } from ...` then `makeMan({})` (counted as `puppet`), `import * as fb from ...` then `fb.riso()`, and the same through `await import(...)`. Spacing does not matter, and comments and strings never count. A function reached another way, stored in a variable first or passed on through another module, is not recognized, and the reason names the function that was looked for. When no page script imports the runtime at all, `uses` is not checked and goes to `needsReview`.
 
 ## Human review
 
-After the automatic verdict, a person goes through each film, its contact sheet, its story.json and the host's final message, and fills in `verdict.humanReview`:
+After the automatic verdict, a person goes through each film, its contact sheet, its story.json and the host's final message, settles each item in `verdict.needsReview` (writing the outcome in `notes`), and fills in `verdict.humanReview`:
 
 | Field | What to write |
 |---|---|
@@ -152,7 +156,7 @@ Fill in the three items one at a time before deciding, and record the result in 
 | `expect.width`, `expect.height` | The video's frame size |
 | `expect.audio` | `any` (not checked), or one of `score`, `preset`, `file` and `none`, or a list of them: the timeline's `audio.mode` must be one of them, and the video must have an audio track unless it is `none` |
 | `expect.timeline` | Values timeline.json must hold, by dotted path, such as `"audio.bpmOffset": 0.5` |
-| `expect.uses` | Runtime calls the composition's pages and scripts must make, such as `"puppet("`. `"a(\|b("` takes either. A call counts only as a whole name: `pixel(` does not match `pixelArt(` |
+| `expect.uses` | Runtime functions the page scripts must call, by the runtime's own names, such as `"puppet"`. `"a\|b"` takes either. Each name must be one the runtime exports. How calls are found: [How `uses` is read](#how-uses-is-read) |
 | `expect.files` | Paths that must exist in the composition directory. `*` matches within one folder, as in `"assets/puppets/*/rig.json"` |
 | `expect.brand` | `name` and `primary` as brand.json must hold them, `palette` (every color in brand.json must be one of these), `logo` (the workspace file brand.json's logo must be a copy of) |
 | `expect.notCopied` | Workspace files that must stay out of the film |

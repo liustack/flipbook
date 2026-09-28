@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { inspect, judge, sha256File, sourceUses } from './judge.mjs';
+import { sha256File } from './files.mjs';
+import { inspect, judge } from './judge.mjs';
 
 const temps = [];
 afterAll(() => {
@@ -59,7 +60,15 @@ function finishedRun(spec, { files = {}, workspace = {}, warnings = [] } = {}) {
     const dir = join(ws, 'film');
     write(dir, 'timeline.json', { version: 1, bpm: 96, audio: { mode: 'score' } });
     write(dir, 'story.json', STORY);
-    write(dir, 'index.html', '<script type="module">paperLayer(1, 2); puppet({});</script>');
+    write(
+        dir,
+        'index.html',
+        `<script type="module">
+import { paperLayer, puppet } from '/__flipbook/runtime.js';
+paperLayer(1, 2);
+puppet({});
+</script>`,
+    );
     for (const [rel, content] of Object.entries(files)) write(dir, rel, content);
     const composition = {
         dir: 'film',
@@ -77,7 +86,7 @@ const HOST_OK = { exitCode: 0, timedOut: false };
 
 describe('eval verdict', () => {
     it('passes a film that meets every expectation', () => {
-        const spec = baseCase({ uses: ['puppet(', 'paperLayer(|drawPaper('] });
+        const spec = baseCase({ uses: ['puppet', 'paperLayer|drawPaper'] });
         const { composition, workspaceFiles } = finishedRun(spec);
         const verdict = judge(spec, { host: HOST_OK, compositions: [composition], workspaceFiles });
         expect(verdict.reasons).toEqual([]);
@@ -87,7 +96,7 @@ describe('eval verdict', () => {
             beats: 3,
             roles: ['opening', 'turn', 'resolution'],
         });
-        expect(composition.features).toEqual(['paper', 'puppet']);
+        expect(composition.runtime).toEqual({ imports: true, calls: ['paperLayer', 'puppet'] });
         expect(verdict.humanReview.case).toEqual([{ question: '老人是纸偶', answer: null }]);
     });
 
@@ -108,7 +117,7 @@ describe('eval verdict', () => {
     it('names runtime calls, files, audio and timeline values the case asks for and the film lacks', () => {
         const spec = baseCase({
             audio: 'file',
-            uses: ['riso('],
+            uses: ['riso'],
             files: ['assets/sprites/*/clips.json', 'assets/puppets/*/rig.json'],
             timeline: { bpm: 100 },
         });
@@ -119,15 +128,21 @@ describe('eval verdict', () => {
         expect(verdict.reasons).toEqual([
             'timeline audio.mode is "score", expected file',
             'timeline bpm is 96, expected 100',
-            'the source never calls riso(',
+            'the page scripts never call riso from the runtime',
             'no file matches assets/sprites/*/clips.json',
         ]);
     });
 
-    it('tells a call from the tail of a longer name', () => {
-        expect(sourceUses('const g = pixel(320, 180);', 'pixel(')).toBe(true);
-        expect(sourceUses('pixelArt(rows); toPixel(3);', 'pixel(')).toBe(false);
-        expect(sourceUses('drawPaper(ctx)', 'paperLayer(|drawPaper(')).toBe(true);
+    it('leaves uses to a person when no page script imports the runtime', () => {
+        const spec = baseCase({ uses: ['riso'] });
+        const { composition, workspaceFiles } = finishedRun(spec, {
+            files: { 'index.html': '<script type="module">riso(1, 2);</script>' },
+        });
+        const verdict = judge(spec, { host: HOST_OK, compositions: [composition], workspaceFiles });
+        expect(verdict.reasons).toEqual([]);
+        expect(verdict.needsReview).toEqual([
+            'no page script imports /__flipbook/runtime.js, so expect.uses (riso) was not checked',
+        ]);
     });
 
     it('lets a case whose film is optional pass without a film', () => {

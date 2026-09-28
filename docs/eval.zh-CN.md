@@ -82,8 +82,8 @@ node eval/run.mjs --dry-run --cases <目录>                    # 校验放在�
 | `hostVersion`、`node`、`ffmpeg` | 环境 |
 | `host` | 退出码、是否超时、耗时、宿主报的花费和用量、宿主最后的回复、stdout 和 stderr 末尾 |
 | `workspaceFiles` | 用例放进工作区的每个文件的大小和 sha256，在宿主开跑之前取 |
-| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`features`（源码里找到的运行时调用：纸感、孔版、像素几套皮，纸偶、部件装配、精灵、照片、品牌、构图模板）、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`files`（`expect.files` 每个路径对上没有）、`copies`（和 `notCopied` 文件字节相同的文件） |
-| `verdict` | `delivered`、`oneShot`、没过的原因、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
+| `compositions[]` | 工作区里找到的每个合成：`video` 和 sha256、`contactSheet`、`frameDigest`（原始帧哈希汇总）、`probe`（时长、尺寸、帧数、音轨）、agent 最后一次的 check、snapshot、render 报告、`attempts`、`recheck`（评测器自己跑的 check，见下）、agent 留下的 `timeline` 和 `story`、`runtime`（`imports`：有没有页面脚本导入 flipbook 运行时，`calls`：页面脚本调用了运行时的哪些函数，见[怎样读 `uses`](#怎样读-uses)）、`sources`（`assets/SOURCES.json` 按 `stock`、`cut`、`generated`、`other` 分好）、`brand`（timeline 指向的 brand.json：名字、颜色、logo 和 logo 的 sha256）、`files`（`expect.files` 每个路径对上没有）、`copies`（和 `notCopied` 文件字节相同的文件） |
+| `verdict` | `delivered`、`oneShot`、没过的原因、`needsReview`（评测器靠文件定不了、留给人看的事）、`story`（拍数、角色、成片里没变化的拍、字读不完的拍）、留给人填的 `humanReview` |
 
 ## 自动判定
 
@@ -93,18 +93,22 @@ node eval/run.mjs --dry-run --cases <目录>                    # 校验放在�
 
 1. 宿主在超时内正常结束，退出码 0。
 2. 出片了。
-3. 成片符合用例：时长落在 `durationSec` 里，画幅对，timeline 的 `audio.mode` 对（不是 `none` 时成片要有音轨），`timeline` 里的值对，`uses` 里的每个调用都出现在合成的页面和脚本里，`files` 的每个路径都对得上，用例有 `brand` 时品牌对。
+3. 成片符合用例：时长落在 `durationSec` 里，画幅对，timeline 的 `audio.mode` 对（不是 `none` 时成片要有音轨），`timeline` 里的值对，页面脚本调用了 `uses` 里的每个函数，`files` 的每个路径都对得上，用例有 `brand` 时品牌对。
 4. 故事在成片上站得住：story.json 里有拍，render 没报 `story-static-beat`（某一拍头尾两帧看起来一样）。没有转折的故事、和文字 cue 对不上的字，check 已经拦下（`story-arc`、`story-text`），出片就说明过了这两关。
 5. 用例的规矩守住了，出不出片都要守：任何合成里都没有和 `notCopied` 文件字节相同的文件，除非它是 `stock fetch` 取来的（SOURCES.json 里的条目带 `openverse:`、`pexels:` 或 `pixabay:` 开头的 id），也没有哪个合成提到这个文件名。
 6. 人没有改过任何文件。评测器全程无人值守，这条自动满足。
 
 用例的成片是 `optional` 时，第 2 到 4 条只在出了片时才算。
 
-评测器只查结构、名字和字节。故事值不值得讲、画面有没有讲出来、纸偶和抠图好不好看，归人判。
+评测器只查结构、名字和字节。故事值不值得讲、画面有没有讲出来、纸偶和抠图好不好看，归人判。评测器定不了的事也归人判：它们记进 `verdict.needsReview`，不判失败。
+
+### 怎样读 `uses`
+
+页面脚本指合成里 HTML 页面的每个内联 `<script>`（HTML 注释里的、带 `src` 的、`application/json` 这类不是 JavaScript 的都不算）和合成里的每个 `.js`、`.mjs` 文件。评测器用 TypeScript 编译器解析它们，从 `/__flipbook/runtime.js` 导入的函数被调用了才算：`import { puppet } from ...` 后 `puppet({})`，`import { puppet as makeMan } from ...` 后 `makeMan({})`（记作 `puppet`），`import * as fb from ...` 后 `fb.riso()`，经 `await import(...)` 也一样。空格换行不影响，注释和字符串里的永远不算。先存进变量、或者经另一个模块转手的函数认不出来，没过的原因里会写明找的是哪个函数。页面脚本一个都没导入运行时时，`uses` 不查，记进 `needsReview`。
 
 ## 人工复核
 
-自动判完以后，人过一遍每部成片、联系表、story.json 和宿主最后的回复，填 `verdict.humanReview`：
+自动判完以后，人过一遍每部成片、联系表、story.json 和宿主最后的回复，把 `verdict.needsReview` 里的每一项看清楚（结论写进 `notes`），再填 `verdict.humanReview`：
 
 | 字段 | 填什么 |
 |---|---|
@@ -152,7 +156,7 @@ node eval/run.mjs --dry-run --cases <目录>                    # 校验放在�
 | `expect.width`、`expect.height` | 成片画幅 |
 | `expect.audio` | `any`（不查），或者 `score`、`preset`、`file`、`none` 之一，或者它们的列表：timeline 的 `audio.mode` 要在其中，不是 `none` 时成片要有音轨 |
 | `expect.timeline` | timeline.json 必须有的值，键是点号路径，比如 `"audio.bpmOffset": 0.5` |
-| `expect.uses` | 合成的页面和脚本里必须有的运行时调用，比如 `"puppet("`。`"a(\|b("` 表示两个都行。只认完整的名字：`pixel(` 不算 `pixelArt(` |
+| `expect.uses` | 页面脚本必须调用的运行时函数，写运行时自己的名字，比如 `"puppet"`。`"a\|b"` 表示两个都行。每个名字都必须是运行时导出的函数。怎么找调用见[怎样读 `uses`](#怎样读-uses) |
 | `expect.files` | 合成目录里必须有的路径，`*` 只在一层目录里匹配，比如 `"assets/puppets/*/rig.json"` |
 | `expect.brand` | brand.json 里应有的 `name` 和 `primary`，`palette`（brand.json 里每个颜色都要在其中），`logo`（brand.json 的 logo 必须是这个工作区文件的副本） |
 | `expect.notCopied` | 不许进片子的工作区文件 |

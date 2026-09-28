@@ -23,7 +23,7 @@
         "width": 1920,
         "height": 1080,
         "audio": "score",
-        "uses": ["loadSprite("],
+        "uses": ["loadSprite"],
         "files": ["assets/sprites/*/clips.json"],
         "review": [
             "走路时着地的脚钉在地上不打滑，走完停在一轮的第一张上",

@@ -8,7 +8,7 @@
         "width": 1920,
         "height": 1080,
         "audio": "score",
-        "uses": ["puppet(", "paperLayer(|drawPaper("],
+        "uses": ["puppet", "paperLayer|drawPaper"],
         "review": [
             "老人是一个纸偶：关节处没有断口，一组部件只描一圈外边",
             "脸是点眼睛加一笔嘴，或者没有脸，没有写实五官，也没有四分之三侧脸",

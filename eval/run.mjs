@@ -28,8 +28,10 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOST_DIRS, validateCase, workspaceSource } from './cases.mjs';
-import { inspect, judge, sha256File } from './judge.mjs';
+import { sha256File } from './files.mjs';
+import { inspect, judge } from './judge.mjs';
 import { recheck, renderShape } from './recheck.mjs';
+import { runtimeExports } from './scripts.mjs';
 
 const evalDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(evalDir, '..');
@@ -159,6 +161,7 @@ function loadMatrix(opts) {
 }
 
 function loadCases(ids, casesDir) {
+    const runtimeNames = runtimeExports(repoRoot);
     const found = readdirSync(casesDir, { withFileTypes: true }).filter((d) => d.isDirectory());
     const unknown = ids.filter((id) => !found.some((d) => d.name === id));
     if (unknown.length > 0) throw new Error(`No case ${unknown.join(', ')} in ${casesDir}`);
@@ -177,7 +180,7 @@ function loadCases(ids, casesDir) {
                     problems: [`case.json: ${error.message}`],
                 };
             }
-            const problems = validateCase(spec, { name: d.name, caseDir, repoRoot });
+            const problems = validateCase(spec, { name: d.name, caseDir, repoRoot, runtimeNames });
             return { name: d.name, caseDir, spec, problems };
         })
         .sort((a, b) => a.name.localeCompare(b.name));

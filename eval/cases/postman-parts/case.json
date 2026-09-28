@@ -23,7 +23,7 @@
         "width": 1920,
         "height": 1080,
         "audio": "score",
-        "uses": ["loadRig(", "puppet("],
+        "uses": ["loadRig", "puppet"],
         "files": ["assets/puppets/*/rig.json"],
         "review": [
             "装好的纸偶和参考图是同一个人，比例对，零件没有装反",

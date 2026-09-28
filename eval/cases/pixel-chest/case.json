@@ -8,7 +8,7 @@
         "width": 1080,
         "height": 1920,
         "audio": ["score", "preset"],
-        "uses": ["pixel("],
+        "uses": ["pixel"],
         "review": [
             "格子是硬边，一格一个颜色，色数少，没有模糊、渐变和半透明",
             "画面上的字用的是像素字体",

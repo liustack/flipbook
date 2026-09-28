@@ -8,7 +8,7 @@
         "width": 1920,
         "height": 1080,
         "audio": "score",
-        "uses": ["paperLayer(|drawPaper("],
+        "uses": ["paperLayer|drawPaper"],
         "review": [
             "故事落到了具体的人或物上（谁在等什么），不是在图解「等」这个词",
             "转折是一件发生的事，不是换个场景、换个季节或换句字幕",

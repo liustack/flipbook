@@ -1,85 +1,16 @@
 // What a finished workspace shows and the verdict on a run. Reads files
 // only, starts nothing and spends nothing, so the rules can be tested on
 // their own. The case format is in cases.mjs, the criteria in docs/eval.md.
-import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { HOST_DIRS } from './cases.mjs';
+import { globMatches, listFiles, readJson, sha256File } from './files.mjs';
+import { runtimeUse } from './scripts.mjs';
 
 /** What `stock fetch` writes as an entry's id: the picture came with a known license. */
 const STOCK_ID = /^(openverse|pexels|pixabay):/;
 
-/** Runtime calls worth recording for a reviewer: which look, character and material a film used. */
-const FEATURES = {
-    paper: ['paperLayer(', 'drawPaper('],
-    grain: ['grainLayer(', 'drawGrain('],
-    riso: ['riso('],
-    pixel: ['pixel('],
-    puppet: ['puppet('],
-    rig: ['loadRig('],
-    sprite: ['loadSprite('],
-    photo: ['photo('],
-    specimens: ['specimens('],
-    brand: ['brand('],
-    pageTurn: ['pageTurn('],
-    arcCuts: ['arcCuts('],
-    lens: ['lens('],
-    assemble: ['assemble('],
-};
-
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
-
-export function sha256File(file) {
-    return createHash('sha256').update(readFileSync(file)).digest('hex');
-}
-
-function readJson(file) {
-    try {
-        return JSON.parse(readFileSync(file, 'utf-8'));
-    } catch {
-        return null;
-    }
-}
-
-/** Files under `dir`, as paths relative to it with forward slashes, skipping `skip` directories. */
-export function listFiles(dir, skip) {
-    const out = [];
-    const walk = (folder, prefix) => {
-        let entries;
-        try {
-            entries = readdirSync(folder, { withFileTypes: true });
-        } catch {
-            return;
-        }
-        for (const entry of entries) {
-            const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-            if (entry.isDirectory()) {
-                if (!skip.includes(entry.name)) walk(join(folder, entry.name), rel);
-            } else if (entry.isFile()) {
-                out.push(rel);
-            }
-        }
-    };
-    walk(dir, '');
-    return out.sort();
-}
-
-/** `*` matches within one path segment, nothing else is special. */
-export function globMatches(pattern, rel) {
-    const re = pattern
-        .split('*')
-        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-        .join('[^/]*');
-    return new RegExp(`^${re}$`).test(rel);
-}
-
-/** Whether `source` calls `token`: `a(|b(` means either. A call must not be the tail of a longer name. */
-export function sourceUses(source, token) {
-    return token.split('|').some((one) => {
-        const escaped = one.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        return new RegExp(`(^|[^\\w$])${escaped}`).test(source);
-    });
-}
 
 /**
  * The text a composition is made of: its pages, scripts and styles outside
@@ -157,7 +88,7 @@ function findCopies(dir, wsRoot, watched) {
 
 /**
  * What a composition directory shows, beyond its video and reports: the
- * timeline and story, the runtime calls it makes, where its pictures came
+ * timeline and story, the runtime functions its page scripts call, where its pictures came
  * from, its brand, which of the case's files exist, and copies of watched
  * workspace files. `source` is for the verdict only and stays out of the
  * evidence.
@@ -171,9 +102,7 @@ export function inspect(dir, { spec, wsRoot, workspaceFiles }) {
     return {
         timeline,
         story: readJson(join(dir, 'story.json')),
-        features: Object.entries(FEATURES)
-            .filter(([, tokens]) => sourceUses(source, tokens.join('|')))
-            .map(([name]) => name),
+        runtime: runtimeUse(dir),
         sources: sourcesSummary(dir),
         brand: brandFacts(dir, timeline),
         files: Object.fromEntries(
@@ -222,8 +151,11 @@ function storyVerdict(c) {
     };
 }
 
-/** Why the film misses what this case asks of it. */
-function expectations(e, c, workspaceFiles) {
+/**
+ * Why the film misses what this case asks of it. What cannot be settled
+ * from the files goes to `review` for a person instead.
+ */
+function expectations(e, c, workspaceFiles, review) {
     const reasons = [];
     if (c.probe) {
         const [min, max] = e.durationSec;
@@ -248,8 +180,18 @@ function expectations(e, c, workspaceFiles) {
                 `timeline ${path} is ${JSON.stringify(got)}, expected ${JSON.stringify(value)}`,
             );
     }
-    const missing = (e.uses ?? []).filter((token) => !sourceUses(c.source, token));
-    if (missing.length > 0) reasons.push(`the source never calls ${missing.join(', ')}`);
+    if ((e.uses ?? []).length > 0 && !c.runtime?.imports) {
+        review.push(
+            `no page script imports /__flipbook/runtime.js, so expect.uses (${e.uses.join(', ')}) was not checked`,
+        );
+    } else {
+        const calls = c.runtime?.calls ?? [];
+        const missing = (e.uses ?? []).filter(
+            (token) => !token.split('|').some((name) => calls.includes(name)),
+        );
+        if (missing.length > 0)
+            reasons.push(`the page scripts never call ${missing.join(', ')} from the runtime`);
+    }
     for (const [pattern, found] of Object.entries(c.files ?? {})) {
         if (!found) reasons.push(`no file matches ${pattern}`);
     }
@@ -306,12 +248,14 @@ function ruleReasons(e, compositions) {
  * The verdict on one run. `delivered`: exactly one composition with a video
  * that passed acceptance. `oneShot`: the run met everything the case checks
  * automatically, with nobody stepping in. A case whose film is optional
- * passes without a film as long as its rules hold. `humanReview` is left
- * for a person to fill in.
+ * passes without a film as long as its rules hold. `needsReview` lists
+ * what the runner could not settle from the files, and `humanReview` is
+ * left for a person to fill in.
  */
 export function judge(spec, { host, compositions, workspaceFiles }) {
     const e = spec.expect;
     const reasons = [];
+    const needsReview = [];
     if (host.timedOut) reasons.push('host timed out');
     else if (host.exitCode !== 0) reasons.push(`host exited ${host.exitCode}`);
     reasons.push(...ruleReasons(e, compositions));
@@ -327,7 +271,11 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
             gate.push(...filmGate(c));
             const told = storyVerdict(c);
             story = told.facts;
-            reasons.push(...gate, ...told.reasons, ...expectations(e, c, workspaceFiles));
+            reasons.push(
+                ...gate,
+                ...told.reasons,
+                ...expectations(e, c, workspaceFiles, needsReview),
+            );
         } else {
             reasons.push(...gate);
         }
@@ -337,6 +285,7 @@ export function judge(spec, { host, compositions, workspaceFiles }) {
         delivered,
         oneShot: reasons.length === 0,
         reasons,
+        needsReview,
         story,
         humanReview: {
             retold: null,
