@@ -6,7 +6,7 @@
 // puppet posed standing, striding and waving, next to its reference picture.
 import * as fs from 'fs';
 import * as path from 'path';
-import { cutEntry, parseSources, sourceProblem } from '../engine/assetSources.ts';
+import { cutEntry, parseSources, sourceProblem, updateSources } from '../engine/assetSources.ts';
 import { Checker, describe, ID_PATTERN, isNum, isObject, type Json } from '../engine/schema.ts';
 import { compositionDir, openSession, type Session } from '../engine/session.ts';
 import { openToolPage } from '../engine/toolPage.ts';
@@ -598,15 +598,14 @@ export async function runPuppet(options: PuppetOptions): Promise<Report> {
     if (result.missing.length > 0 || result.error || result.emptied) return rb.finish();
 
     ws.fresh(ws.path(folder, 'parts'));
-    for (const key of Object.keys(sources)) {
-        if (key.startsWith(`puppets/${name}/parts/`)) delete sources[key];
-    }
+    // The old parts' entries go when SOURCES.json is written.
+    const added: Record<string, unknown> = {};
     const rig: Record<string, unknown> = { version: 1, parts: {}, bones: result.bones };
     for (const [part, p] of Object.entries(result.parts)) {
         const file = path.join(folder, 'parts', `${part}.png`).split(path.sep).join('/');
         ws.writeFile(ws.path(file), Buffer.from(p.png.split(',')[1], 'base64'));
         const from = spec.parts[part].image.split(/[\\/]/).join('/').slice('assets/'.length);
-        sources[file.slice('assets/'.length)] = cutEntry(sources, from);
+        added[file.slice('assets/'.length)] = cutEntry(sources, from);
         (rig.parts as Record<string, unknown>)[part] = {
             file,
             width: p.width,
@@ -619,7 +618,21 @@ export async function runPuppet(options: PuppetOptions): Promise<Report> {
     }
     const rigFile = path.join(folder, 'rig.json').split(path.sep).join('/');
     ws.writeFile(ws.path(rigFile), `${JSON.stringify(rig, null, 2)}\n`);
-    ws.writeFile(ws.path(SOURCES), `${JSON.stringify(sources, null, 4)}\n`);
+    const written = await updateSources(ws, (current) => {
+        for (const key of Object.keys(current)) {
+            if (key.startsWith(`puppets/${name}/parts/`)) delete current[key];
+        }
+        Object.assign(current, added);
+    });
+    if ('problem' in written) {
+        rb.add(
+            finding('puppet-invalid', written.problem, {
+                element: 'assets/SOURCES.json',
+                detail: { path: '$' },
+            }),
+        );
+        return rb.finish();
+    }
     const sheet = path.join('out', 'puppet', `${name}.png`).split(path.sep).join('/');
     ws.writeFile(ws.path(sheet), Buffer.from((result.sheet as string).split(',')[1], 'base64'));
     rb.report.puppet = {

@@ -6,8 +6,10 @@ import * as path from 'path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runCutout } from '../src/cli/cutout.ts';
 import { runPuppet } from '../src/cli/puppet.ts';
+import { updateSources } from '../src/engine/assetSources.ts';
 import { requireFfmpeg } from '../src/engine/ffmpeg.ts';
 import { run } from '../src/engine/proc.ts';
+import { Workspace } from '../src/engine/workspace.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, codes, copyFixture } from './helpers.ts';
 
@@ -61,6 +63,28 @@ describe('flipbook puppet', () => {
         dir = copyFixture('puppet');
         const cut = await runCutout({ dir, image: 'assets/limbs.png', session: await session() });
         expect(codes(cut)).toEqual([]);
+    });
+
+    it('keeps an entry another command writes to SOURCES.json while it rigs', async () => {
+        // puppet reads SOURCES.json first and writes it at the end: a fetch
+        // that finishes in between must keep its entry.
+        writeSpec(dir, ARM);
+        const other = (async () => {
+            await new Promise((resolve) => setTimeout(resolve, 30));
+            await updateSources(Workspace.open(dir), (sources) => {
+                sources['fetched.png'] = { source: 'https://example.org/p', license: 'cc0' };
+            });
+        })();
+        const [rigged] = await Promise.all([
+            runPuppet({ dir, name: 'arm', session: await session() }),
+            other,
+        ]);
+        expect(codes(rigged)).toEqual([]);
+        const sources = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets', 'SOURCES.json'), 'utf-8'),
+        );
+        expect(sources['fetched.png']).toEqual({ source: 'https://example.org/p', license: 'cc0' });
+        expect(sources['puppets/arm/parts/upper.png']).toBeTruthy();
     });
 
     it('finds the round tabs, shaves the outline and writes the rig', async () => {
