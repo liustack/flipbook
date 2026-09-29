@@ -7,7 +7,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { cutEntry, parseSources, sourceProblem } from '../engine/assetSources.ts';
+import { cutEntry, parseSources, sourceProblem, updateSources } from '../engine/assetSources.ts';
 import { compositionDir, openSession, type Session } from '../engine/session.ts';
 import { openToolPage } from '../engine/toolPage.ts';
 import { type VisionMasks, visionMasks } from '../engine/vision.ts';
@@ -185,10 +185,8 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
 
     const outDir = path.join('assets', 'cut', stem);
     ws.fresh(ws.path(outDir));
-    // A rerun replaces the whole set: forget the entries of the old files.
-    for (const name of Object.keys(sources)) {
-        if (name.startsWith(`cut/${stem}/`)) delete sources[name];
-    }
+    // A rerun replaces the whole set: the entries of the old files go when SOURCES.json is written.
+    const added: Record<string, unknown> = {};
     const cutWith = vision
         ? `macOS Vision foreground instance mask, revision ${vision.revision}, macOS ${vision.os}`
         : undefined;
@@ -196,7 +194,7 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
         const name = `${stem}-${String(i + 1).padStart(2, '0')}.png`;
         const file = path.join(outDir, name);
         ws.writeFile(ws.path(file), Buffer.from(k.png.split(',')[1], 'base64'));
-        sources[`cut/${stem}/${name}`] = cutWith
+        added[`cut/${stem}/${name}`] = cutWith
             ? { ...cutEntry(sources, key), cutWith }
             : cutEntry(sources, key);
         return {
@@ -223,7 +221,21 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
             2,
         )}\n`,
     );
-    ws.writeFile(ws.path(SOURCES), `${JSON.stringify(sources, null, 4)}\n`);
+    const written = await updateSources(ws, (current) => {
+        for (const name of Object.keys(current)) {
+            if (name.startsWith(`cut/${stem}/`)) delete current[name];
+        }
+        Object.assign(current, added);
+    });
+    if ('problem' in written) {
+        rb.add(
+            finding('cutout-invalid', written.problem, {
+                element: 'assets/SOURCES.json',
+                detail: { image },
+            }),
+        );
+        return rb.finish();
+    }
     const sheetFile = path.join('out', 'cutout', `${stem}.png`).split(path.sep).join('/');
     ws.writeFile(ws.path(sheetFile), Buffer.from((sheet as string).split(',')[1], 'base64'));
     rb.report.cutout = {

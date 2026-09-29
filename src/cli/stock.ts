@@ -2,8 +2,10 @@
 // for a composition, look at them on one contact sheet, and save the chosen
 // one under assets/ with its source and license in assets/SOURCES.json.
 // With --audio the same two commands find and save public domain sounds.
+import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { updateSources } from '../engine/assetSources.ts';
 import { SOURCES_FILE } from '../engine/brand.ts';
 import { sandboxHost } from '../engine/browser.ts';
 import { requireFfmpeg } from '../engine/ffmpeg.ts';
@@ -397,6 +399,36 @@ export interface StockFetchOptions {
 
 type SourcesFile = Record<string, unknown>;
 
+/** A scratch folder of this run's own, so fetches side by side never share one. */
+function scratch(ws: Workspace): string {
+    return ws.path('.flipbook', 'tmp', `stock-${process.pid}-${randomBytes(4).toString('hex')}`);
+}
+
+/** Record `entry` for assets/<file> in SOURCES.json, next to whatever others wrote meanwhile. */
+async function recordSource(
+    rb: ReportBuilder,
+    ws: Workspace,
+    file: string,
+    entry: Record<string, string>,
+): Promise<string | null> {
+    const written = await updateSources(ws, (sources) => {
+        sources[file] = entry;
+    });
+    if ('path' in written) return written.path;
+    const shown = SOURCES_FILE.split(path.sep).join('/');
+    rb.add(
+        finding(
+            'asset-conflict',
+            `${shown} ${written.problem.replace(/^assets\/SOURCES\.json /, '')}`,
+            {
+                element: shown,
+                detail: { reason: 'sources-invalid', file: shown },
+            },
+        ),
+    );
+    return null;
+}
+
 function readSources(ws: Workspace): { sources: SourcesFile } | { problem: string } {
     const text = ws.readText(ws.path(SOURCES_FILE));
     if (text === null) return { sources: {} };
@@ -442,7 +474,7 @@ async function normalize(
     const long = Math.max(info.width, info.height);
     if (info.format !== 'tiff' && long <= MAX_EDGE) return { bytes, info, resized: false };
     const { ffmpeg } = await requireFfmpeg([], env);
-    const work = ws.fresh(ws.path('.flipbook', 'tmp', 'stock'));
+    const work = ws.fresh(scratch(ws));
     try {
         const input = path.join(work, `in${EXTENSION[info.format]}`);
         ws.writeFile(input, bytes);
@@ -594,7 +626,7 @@ export async function runStockFetch(
 
     const net = netFor(deps, keys);
     if (ref.kind === 'audio') {
-        await fetchAudio(rb, ws, { ref, id, as: options.as, sources }, deps, keys, net, env);
+        await fetchAudio(rb, ws, { ref, id, as: options.as }, deps, keys, net, env);
         return rb.finish();
     }
     let image: StockImage;
@@ -684,11 +716,8 @@ export async function runStockFetch(
     if (image.title) entry.title = image.title;
     if (image.creator) entry.creator = image.creator;
     entry.url = image.url;
-    sources[fileName] = entry;
-    const sourcesPath = ws.writeFile(
-        ws.path(SOURCES_FILE),
-        `${JSON.stringify(sources, null, 4)}\n`,
-    );
+    const sourcesPath = await recordSource(rb, ws, fileName, entry);
+    if (!sourcesPath) return rb.finish();
 
     rb.report.stock = {
         id,
@@ -732,7 +761,7 @@ async function probeSound(
     env: NodeJS.ProcessEnv,
 ): Promise<SoundProbe | null> {
     const { ffprobe } = await requireFfmpeg([], env);
-    const work = ws.fresh(ws.path('.flipbook', 'tmp', 'stock'));
+    const work = ws.fresh(scratch(ws));
     try {
         const input = path.join(work, `in${AUDIO_EXTENSION[format]}`);
         ws.writeFile(input, bytes);
@@ -782,13 +811,13 @@ async function probeSound(
 async function fetchAudio(
     rb: ReportBuilder,
     ws: Workspace,
-    target: { ref: StockRef; id: string; as: string; sources: SourcesFile },
+    target: { ref: StockRef; id: string; as: string },
     deps: StockDeps,
     keys: StockKeys,
     net: Net,
     env: NodeJS.ProcessEnv,
 ): Promise<void> {
-    const { ref, id, sources } = target;
+    const { ref, id } = target;
     let sound: AudioHit;
     let bytes: Buffer;
     try {
@@ -823,11 +852,8 @@ async function fetchAudio(
     if (sound.title) entry.title = sound.title;
     if (sound.creator) entry.creator = sound.creator;
     entry.url = sound.preview;
-    sources[fileName] = entry;
-    const sourcesPath = ws.writeFile(
-        ws.path(SOURCES_FILE),
-        `${JSON.stringify(sources, null, 4)}\n`,
-    );
+    const sourcesPath = await recordSource(rb, ws, fileName, entry);
+    if (!sourcesPath) return;
     rb.report.stock = {
         id,
         provider: ref.provider,

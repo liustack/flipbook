@@ -19,7 +19,7 @@ bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse:<id> --as beetle
 - `--source` searches one Openverse collection: `bio_diversity` (Biodiversity Heritage Library plates), `smithsonian_national_museum_of_natural_history`, `wikimedia`, `met`, `rijksmuseum`, `wellcome_collection`, `nasa`, `phylopic` (transparent silhouettes).
 - `--orientation landscape`, `portrait` or `square`, `--count` up to 20.
 - With `PEXELS_API_KEY` or `PIXABAY_API_KEY` set, those two are asked first for modern photos. Without keys only Openverse is asked, and only for public domain (`cc0`, `pdm`).
-- `stock fetch` saves `assets/<name>.jpg` (or `.png`, `.webp`, `.gif`) and records its source and license in `assets/SOURCES.json`. Fetching the same id under the same name again does nothing.
+- `stock fetch` saves `assets/<name>.jpg` (or `.png`, `.webp`, `.gif`) and records its source and license in `assets/SOURCES.json`. Fetching the same id under the same name again does nothing. Several fetches can run side by side in one composition: each adds its entry without dropping the others'.
 - When no result fits after two or three queries, leave the picture out and tell the user. Never download images by other means, from other sites, or from search result pages, and never write a source or license you did not get from `stock fetch` or the user.
 - Images the user supplies go in `assets/` too, with an entry in `assets/SOURCES.json` written from what the user says: `"plate.jpg": { "source": "...", "license": "..." }`. Ask when the license is unknown.
 - `stock search` and `stock fetch` need the network. Inside a sandbox, exit 78 with `stock-unreachable` means: run that one command outside the sandbox after the user approves.

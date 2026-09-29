@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process';
 // stock search and stock fetch: provider order, license filter, key handling,
 // the download guard, and what lands in assets/ and assets/SOURCES.json. Every
 // network call goes through injected fakes: nothing here reaches the network.
@@ -390,6 +391,88 @@ function openverseDetail(detail: Record<string, unknown>, image: Buffer | null =
 }
 
 describe('stock fetch', () => {
+    it('keeps every entry when several fetches write assets/SOURCES.json at once', async () => {
+        // Each fetch reads the file, waits on the network, then writes it back:
+        // run side by side they must not drop each other's entries.
+        const dir = tempDir('stock');
+        const details = Array.from({ length: 4 }, (_, k) => ({
+            ...DETAIL,
+            id: `ov-${k + 1}`,
+            url: `https://img.example.org/p${k + 1}.png`,
+        }));
+        const { deps } = fake(
+            {
+                'api.openverse.org': (url) =>
+                    json(details.find((d) => url.pathname.includes(`/${d.id}/`)) ?? details[0]),
+            },
+            Object.fromEntries(details.map((d) => [d.url, RED])),
+        );
+        const reports = await Promise.all(
+            details.map((d, k) =>
+                runStockFetch({ dir, id: `openverse:${d.id}`, as: `plate${k + 1}` }, deps),
+            ),
+        );
+        expect(reports.map((r) => r.exitCode)).toEqual([0, 0, 0, 0]);
+        const sources = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets', 'SOURCES.json'), 'utf-8'),
+        );
+        expect(Object.keys(sources).sort()).toEqual([
+            'plate1.png',
+            'plate2.png',
+            'plate3.png',
+            'plate4.png',
+        ]);
+        expect(
+            Object.values(sources)
+                .map((e) => (e as { id: string }).id)
+                .sort(),
+        ).toEqual(['openverse:ov-1', 'openverse:ov-2', 'openverse:ov-3', 'openverse:ov-4']);
+    });
+
+    it('gives each fetch its own scratch folder, so two conversions at once do not collide', async () => {
+        // TIFF is always converted with ffmpeg in a scratch folder under .flipbook/tmp.
+        const dir = tempDir('stock');
+        const tiffs = ['red', 'blue'].map((color) => {
+            const file = path.join(tempDir('tiff'), `${color}.tiff`);
+            execFileSync('ffmpeg', [
+                '-v',
+                'error',
+                '-y',
+                '-f',
+                'lavfi',
+                '-i',
+                `color=${color}:s=40x30`,
+                '-frames:v',
+                '1',
+                file,
+            ]);
+            return fs.readFileSync(file);
+        });
+        const details = tiffs.map((_, k) => ({
+            ...DETAIL,
+            id: `ov-${k + 1}`,
+            url: `https://img.example.org/t${k + 1}.tif`,
+        }));
+        const { deps } = fake(
+            {
+                'api.openverse.org': (url) =>
+                    json(details.find((d) => url.pathname.includes(`/${d.id}/`)) ?? details[0]),
+            },
+            Object.fromEntries(details.map((d, k) => [d.url, tiffs[k]])),
+        );
+        const reports = await Promise.all(
+            details.map((d, k) =>
+                runStockFetch({ dir, id: `openverse:${d.id}`, as: `tiff${k + 1}` }, deps),
+            ),
+        );
+        expect(reports.map((r) => [r.exitCode, r.failures.map((f) => f.code)])).toEqual([
+            [0, []],
+            [0, []],
+        ]);
+        expect(fs.existsSync(path.join(dir, 'assets', 'tiff1.jpg'))).toBe(true);
+        expect(fs.existsSync(path.join(dir, 'assets', 'tiff2.jpg'))).toBe(true);
+    });
+
     it('saves the image under assets/ and records its source and license', async () => {
         const dir = tempDir('stock');
         fs.mkdirSync(path.join(dir, 'assets'));

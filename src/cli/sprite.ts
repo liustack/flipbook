@@ -7,7 +7,7 @@
 // one another on their anchor (drift shows as a blur) and side by side.
 import * as fs from 'fs';
 import * as path from 'path';
-import { cutEntry, parseSources, sourceProblem } from '../engine/assetSources.ts';
+import { cutEntry, parseSources, sourceProblem, updateSources } from '../engine/assetSources.ts';
 import { Checker, describe, ID_PATTERN, isObject, type Json } from '../engine/schema.ts';
 import { compositionDir, openSession, type Session } from '../engine/session.ts';
 import { openToolPage } from '../engine/toolPage.ts';
@@ -672,9 +672,8 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
     }
 
     ws.fresh(ws.path(folder, 'frames'));
-    for (const key of Object.keys(sources)) {
-        if (key.startsWith(`sprites/${name}/frames/`)) delete sources[key];
-    }
+    // The old frames' entries go when SOURCES.json is written.
+    const added: Record<string, unknown> = {};
     const file: SpriteFile = {
         version: 1,
         height: result.height,
@@ -690,7 +689,7 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
                 .split(path.sep)
                 .join('/');
             ws.writeFile(ws.path(out), Buffer.from(f.png.split(',')[1], 'base64'));
-            sources[out.slice('assets/'.length)] = cutEntry(sources, from);
+            added[out.slice('assets/'.length)] = cutEntry(sources, from);
             return { file: out, width: f.width, height: f.height, anchor: f.anchor };
         });
         // A walk moves its even advance once per drawing: the frames were shifted so the
@@ -719,7 +718,21 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
     }
     const clipsFile = path.join(folder, 'clips.json').split(path.sep).join('/');
     ws.writeFile(ws.path(clipsFile), `${JSON.stringify(file, null, 2)}\n`);
-    ws.writeFile(ws.path(SOURCES), `${JSON.stringify(sources, null, 4)}\n`);
+    const written = await updateSources(ws, (current) => {
+        for (const key of Object.keys(current)) {
+            if (key.startsWith(`sprites/${name}/frames/`)) delete current[key];
+        }
+        Object.assign(current, added);
+    });
+    if ('problem' in written) {
+        rb.add(
+            finding('sprite-invalid', written.problem, {
+                element: 'assets/SOURCES.json',
+                detail: { path: '$' },
+            }),
+        );
+        return rb.finish();
+    }
     const sheet = path.join('out', 'sprite', `${name}.png`).split(path.sep).join('/');
     ws.writeFile(ws.path(sheet), Buffer.from(result.sheet.split(',')[1], 'base64'));
     rb.report.sprite = { name, height: result.height, clips: report, file: clipsFile, sheet };

@@ -5,6 +5,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
 import { isObject } from './schema.ts';
+import { withTicketLock } from './ticketLock.ts';
+import type { Workspace } from './workspace.ts';
 
 const IMAGES = /\.(png|jpe?g|webp|gif|svg|avif)$/i;
 
@@ -25,6 +27,29 @@ export function parseSources(
         return { problem: 'assets/SOURCES.json must be a JSON object of entries, one per file' };
     }
     return { sources: parsed };
+}
+
+/**
+ * Change assets/SOURCES.json: read it afresh holding the sources lock (.flipbook/sources.d),
+ * apply `edit`, write it back. Commands that run side by side (several stock
+ * fetches, a cutout next to a fetch) each see the others' entries. Returns the
+ * file's path, or why the file as it is now cannot be read.
+ */
+export async function updateSources(
+    ws: Workspace,
+    edit: (sources: Record<string, unknown>) => void,
+): Promise<{ path: string } | { problem: string }> {
+    return withTicketLock(ws.path(), 'sources', () => {
+        const read = parseSources(ws.readText(ws.path('assets', 'SOURCES.json')));
+        if ('problem' in read) return read;
+        edit(read.sources);
+        return {
+            path: ws.writeFile(
+                ws.path('assets', 'SOURCES.json'),
+                `${JSON.stringify(read.sources, null, 4)}\n`,
+            ),
+        };
+    });
 }
 
 /**

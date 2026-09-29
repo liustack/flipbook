@@ -303,7 +303,8 @@ export class Workspace {
     }
 }
 
-function pidAlive(pid: number): boolean {
+/** True while a process with this pid exists (EPERM: it exists, owned by someone else). */
+export function pidAlive(pid: number): boolean {
     try {
         process.kill(pid, 0);
         return true;
