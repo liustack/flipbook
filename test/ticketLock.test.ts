@@ -3,6 +3,7 @@
 import { type ChildProcess, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { pathToFileURL } from 'url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { updateSources } from '../src/engine/assetSources.ts';
 import { withTicketLock } from '../src/engine/ticketLock.ts';
@@ -43,8 +44,8 @@ function writer(
         const dir = ${JSON.stringify(dir)};
         const clock = new Int32Array(new SharedArrayBuffer(4));
         const wait = (f) => { const end = Date.now() + 20000; while (!fs.existsSync(path.join(dir, f))) { if (Date.now() > end) throw new Error('no ' + f); Atomics.wait(clock, 0, 0, 5); } };
-        const { updateSources } = await import(${JSON.stringify(path.join(src, 'engine', 'assetSources.ts'))});
-        const { Workspace } = await import(${JSON.stringify(path.join(src, 'engine', 'workspace.ts'))});
+        const { updateSources } = await import(${JSON.stringify(pathToFileURL(path.join(src, 'engine', 'assetSources.ts')).href)});
+        const { Workspace } = await import(${JSON.stringify(pathToFileURL(path.join(src, 'engine', 'workspace.ts')).href)});
         for (let k = 0; k < ${count}; k++) {
             await updateSources(Workspace.open(dir), (s) => {
                 if (${hold} && k === 0) { fs.writeFileSync(path.join(dir, '${name}-in'), ''); wait('${name}-go'); }
