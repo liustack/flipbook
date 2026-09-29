@@ -170,7 +170,7 @@ With the user's music (100 bpm, first beat 0.42 s into the file):
 
 ## hold
 
-render reports `freeze` when the picture stops changing for more than 1.5 seconds. Set `"hold": true` on a scene that is meant to stand still, such as an end card. Scenes without `hold` need something moving.
+render reports `freeze` when the picture stops changing for more than 1.5 seconds. Set `"hold": true` on a scene that is meant to stand still, such as an end card. Scenes without `hold` need something moving. Change is judged over the whole frame at low resolution, so a small thin figure moving in an otherwise still wide shot can still read as a freeze: frame the figure closer, or give the wide shot a slow push or drift.
 
 ## settleBeats
 

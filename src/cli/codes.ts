@@ -234,8 +234,9 @@ export const FINDING_CODES = {
         fix: 'Size the stage to timeline width and height and hide overflow on html and body.',
     },
     freeze: {
-        meaning: 'The picture does not change for longer than allowed in a scene without hold.',
-        fix: 'Keep something moving in that scene, or set "hold": true on it in timeline.json when the still is intended.',
+        meaning:
+            'The picture does not change for longer than allowed in a scene without hold. Change is judged over the whole frame, scaled down: a small thin figure moving in an otherwise still wide shot can count as no change.',
+        fix: 'Keep something moving in that scene, or set "hold": true on it in timeline.json when the still is intended. When only a small figure moves in a wide shot, give the shot a slow camera move (a gentle push or drift) or bring the camera closer.',
     },
     glitch: {
         meaning: 'Decoded video frames do not match the captured frames.',
