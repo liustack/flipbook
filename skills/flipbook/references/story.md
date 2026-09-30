@@ -8,14 +8,14 @@ Write the story as one sentence with four slots, and fill all four:
 
 > **Who** wants (or fears losing) **what**, **because** of what, and in the end **gets it, loses it, or becomes something else**.
 
-| Field | Write | A paper boat, for example |
+| Field | Write | An ant, for example |
 |---|---|---|
-| `who` | who the story is about | a paper boat |
-| `wants` | what it wants, or fears losing | to reach the far shore |
-| `because` | what stands in the way, or the event that turns things | the rain soaks it and the snow buries it |
-| `becomes` | how it ends up | it shakes the snow off and rides high again |
-| `leave` | one sentence: what the viewer feels or remembers at the end | Small things make it through |
-| `device` | `what`: the one visual device that runs through the film. `why`: why it fits this story | The boat stays on one line while the weather changes behind it, so the eye stays on the boat and the world is what changes |
+| `who` | who the story is about | an ant |
+| `wants` | what it wants, or fears losing | to get its crumb home |
+| `because` | what stands in the way, or the event that turns things | a raindrop turns the path ahead into a puddle |
+| `becomes` | how it ends up | it crosses on a leaf and gets the crumb home |
+| `leave` | one sentence: what the viewer feels or remembers at the end | The small relief of getting something home |
+| `device` | `what`: the one visual device that runs through the film. `why`: why it fits this story | One straight path runs across the frame to the hole, so every stop and detour the ant makes shows against it |
 | `beats` | 3 to 6 beats, in order | below |
 
 Each slot is `{ "what": one sentence, "where": ... }`, and `where` says where the viewer finds it (see "Where each slot lands" below). The slots are linked by cause: it ends that way because of that event, not "and then, and then". A film of 10 to 60 seconds holds one such sentence. Two make two weak films: pick one.
@@ -183,14 +183,14 @@ Change the story only when the user changes it. Once the timeline is written, th
     "bpm": 120,
     "beatsPerBar": 4,
     "scenes": [
-        { "id": "sun", "bars": 2 },
-        { "id": "rain", "bars": 1 },
-        { "id": "snow", "bars": 3 }
+        { "id": "path", "bars": 2 },
+        { "id": "puddle", "bars": 2 },
+        { "id": "leaf", "bars": 1 },
+        { "id": "home", "bars": 3 }
     ],
     "cues": [
-        { "id": "go", "scene": "sun", "beat": 1, "kind": "text", "text": "到对岸去", "settleBeats": 1 },
-        { "id": "drop", "scene": "rain", "beat": 0, "kind": "sfx", "sfx": "drop" },
-        { "id": "end", "scene": "snow", "beat": 6, "kind": "text", "text": "撑过去", "settleBeats": 1 }
+        { "id": "go", "scene": "path", "beat": 1, "kind": "text", "text": "搬回家", "settleBeats": 1 },
+        { "id": "drop", "scene": "puddle", "beat": 0, "kind": "sfx", "sfx": "drop" }
     ]
 }
 ```
@@ -199,66 +199,90 @@ Change the story only when the user changes it. Once the timeline is written, th
 ```json
 {
     "version": 2,
-    "who": { "what": "a paper boat", "where": { "beat": "calm", "via": ["picture"] } },
-    "wants": { "what": "to reach the far shore", "where": { "beat": "calm", "via": ["picture", "words"] } },
-    "because": { "what": "the rain soaks it and the snow buries it", "where": { "beat": "soak", "via": ["picture", "sound"] } },
-    "becomes": { "what": "it shakes the snow off and rides high again", "where": { "beat": "lift", "via": ["picture", "words"] } },
-    "leave": "Small things make it through",
+    "who": { "what": "an ant", "where": { "beat": "carry", "via": ["picture"] } },
+    "wants": { "what": "to get its crumb home", "where": { "beat": "carry", "via": ["picture", "words"] } },
+    "because": { "what": "a raindrop turns the path ahead into a puddle", "where": { "beat": "puddle", "via": ["picture", "sound"] } },
+    "becomes": { "what": "it crosses on a leaf and gets the crumb home", "where": { "beat": "home", "via": ["picture"] } },
+    "leave": "The small relief of getting something home",
     "device": {
-        "what": "the boat stays on one line while the weather changes behind it",
-        "why": "the eye stays on the boat, the world is what changes"
+        "what": "one straight path runs across the frame to the hole",
+        "why": "every stop and detour the ant makes shows against the straight line"
     },
     "beats": [
-        { "id": "calm", "role": "opening", "at": "sun", "change": { "from": "the boat drifts under a clear sky", "to": "the sky greys over" }, "text": ["到对岸去"] },
-        { "id": "soak", "role": "turn", "at": "rain", "change": { "from": "the first drops fall", "to": "the boat sits low in the water" }, "sound": "drop" },
-        { "id": "cold", "role": "build", "at": "snow", "change": { "from": "rain turns to snow", "to": "snow piles on the boat" } },
-        { "id": "lift", "role": "resolution", "at": { "scene": "snow", "beat": 4 }, "change": { "from": "the snow slides off", "to": "the boat rides high again" }, "text": ["撑过去"], "callback": "calm" }
+        { "id": "carry", "role": "opening", "at": "path", "change": { "from": "the ant sets off with a crumb bigger than its head", "to": "it is halfway along the path and the sky has greyed" }, "text": ["搬回家"] },
+        { "id": "puddle", "role": "turn", "at": "puddle", "change": { "from": "a drop hits the path ahead", "to": "a puddle lies across the path and the ant stops at its edge, turning one way, then the other" }, "sound": "drop" },
+        { "id": "leaf", "role": "build", "at": "leaf", "change": { "from": "the ant steps onto a fallen leaf at the puddle's edge", "to": "the leaf has carried it across" } },
+        { "id": "home", "role": "resolution", "at": "home", "change": { "from": "the ant walks the last stretch in the rain", "to": "the crumb and the ant have gone into the hole and the sky has cleared" }, "callback": "carry" }
     ]
 }
 ```
 
+The ant chooses at the puddle: it stops, looks one way and the other, and takes the leaf instead of turning back. The words say only what the picture cannot, what it wants. The ending answers the wanting: the crumb goes home. No words go over the ending, the picture already shows it.
+
 <!-- check: pass -->
 ```js
-import { composition, cueProgress, ease, progress, rand, setupCanvas, timeline } from '/__flipbook/runtime.js';
+import { composition, ease, progress, rand, setupCanvas, timeline, cueProgress } from '/__flipbook/runtime.js';
 
 const tl = await timeline();
 const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
-const [sun, rain, snow] = tl.scenes;
-const lift = tl.story.beats[3];
-const line = (text) => {
-  const p = Object.assign(document.createElement('p'), { textContent: text });
-  p.style.cssText = 'position:absolute;left:0;right:0;top:40px;margin:0;text-align:center;font:600 44px "Noto Serif SC";color:#2b2622';
-  document.body.append(p);
-  return p;
-};
-const go = line('到对岸去');
-const words = line('撑过去');
+const [path, puddle, leaf, home] = tl.scenes;
+const GROUND = 250;
+const HOLE = 560;
+const words = Object.assign(document.createElement('p'), { textContent: '搬回家' });
+words.style.cssText = 'position:absolute;left:0;right:0;top:40px;margin:0;text-align:center;font:600 44px "Noto Serif SC";color:#2b2622';
+document.body.append(words);
+
+// Where the ant is, which way it faces, and how far into the hole it has gone.
+function ant(t) {
+  if (t < puddle.start) return { x: 60 + 165 * progress(t, path.start, path.end), face: 1, gone: 0 };
+  if (t < leaf.start) {
+    const x = 225 + 10 * ease.outSine(progress(t, puddle.start, puddle.start + 0.8));
+    // Stopped at the edge: it looks back, ahead, back, then ahead at the leaf.
+    const look = t > puddle.start + 1.5 && Math.floor((t - puddle.start - 1.5) * 1.5) % 2 === 0 ? -1 : 1;
+    return { x, face: look, gone: 0 };
+  }
+  if (t < leaf.start + 0.5) return { x: 235 + 55 * progress(t, leaf.start, leaf.start + 0.5), face: 1, gone: 0 };
+  if (t < home.start) return { x: 290 + 110 * ease.inOutSine(progress(t, leaf.start + 0.5, leaf.end)), face: 1, gone: 0, raft: true };
+  return { x: 400 + (HOLE - 400) * progress(t, home.start, home.start + 3), face: 1, gone: progress(t, home.start + 3, home.start + 4) };
+}
 
 composition({
   seek(t) {
-    const grey = progress(t, sun.start + 1, sun.end);
-    const sink = ease.inOutSine(progress(t, rain.start, rain.end)) * (1 - ease.outBack(progress(t, lift.start, lift.start + 1.2)));
-    const pile = progress(t, snow.start, lift.start) * (1 - progress(t, lift.start, lift.start + 0.6));
+    const grey = progress(t, path.start + 1, path.end) * (1 - progress(t, home.start + 3.5, home.end - 1));
     ctx.fillStyle = `rgb(${214 - 90 * grey}, ${226 - 80 * grey}, ${236 - 60 * grey})`;
     ctx.fillRect(0, 0, tl.width, tl.height);
-    ctx.fillStyle = '#6f8aa0';
-    ctx.fillRect(0, 250, tl.width, 110);
-    for (let i = 0; i < 40 && t >= rain.start; i++) {
+    ctx.fillStyle = '#8a6a48';
+    ctx.fillRect(0, GROUND, tl.width, tl.height - GROUND);
+    ctx.fillStyle = '#2b2622';
+    ctx.beginPath(); ctx.ellipse(HOLE + 14, GROUND + 3, 22, 6, 0, 0, Math.PI * 2); ctx.fill();
+    // The puddle spreads from the first drop.
+    const spread = ease.outCubic(progress(t, puddle.start, puddle.start + 1.2));
+    ctx.fillStyle = '#4f7391';
+    ctx.beginPath(); ctx.ellipse(345, GROUND + 4, 1 + 70 * spread, 1 + 8 * spread, 0, 0, Math.PI * 2); ctx.fill();
+    const a = ant(t);
+    // The leaf lies at the puddle's edge until the ant rides it across.
+    const leafX = a.raft ? a.x : t < home.start ? 290 : 400;
+    ctx.fillStyle = '#5d8a3c';
+    ctx.beginPath(); ctx.ellipse(leafX, GROUND + 2, 30, 7, 0, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 40 && t >= puddle.start && t < home.start + 3.5; i++) {
       const x = rand(tl.seed, 'x', i) * tl.width;
-      const y = ((rand(tl.seed, 'y', i) * 250 + t * (t < snow.start ? 400 : 60)) % 250);
-      ctx.fillStyle = t < snow.start ? '#3d5566' : '#ffffff';
-      ctx.fillRect(x, y, t < snow.start ? 2 : 5, t < snow.start ? 10 : 5);
+      const y = (rand(tl.seed, 'y', i) * GROUND + t * 300) % GROUND;
+      ctx.fillStyle = '#3d5566';
+      ctx.fillRect(x, y, 2, 10);
     }
-    const x = 120 + t * 30;
-    const y = 232 + 26 * sink;
-    ctx.fillStyle = '#f4efe4';
-    ctx.beginPath();
-    ctx.moveTo(x - 50, y); ctx.lineTo(x + 50, y); ctx.lineTo(x + 30, y + 22); ctx.lineTo(x - 30, y + 22);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x - 46, y - 22 * pile, 92, 22 * pile);
-    go.style.opacity = String(cueProgress(tl, t, 'go') * (1 - progress(t, rain.start - 0.5, rain.start)));
-    words.style.opacity = String(cueProgress(tl, t, 'end'));
+    if (a.gone < 1) {
+      const y = GROUND - 8 + (a.raft || Math.abs(a.x - 290) < 30 ? -5 : 0) + 16 * a.gone;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, tl.width, GROUND - 2 + (a.gone > 0 ? 0 : 20)); ctx.clip();
+      ctx.fillStyle = '#1c1a17';
+      for (const [dx, r] of [[-11, 6], [0, 4], [9, 5]]) {
+        ctx.beginPath(); ctx.arc(a.x + dx * a.face, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = '#f1e2b8';
+      ctx.fillRect(a.x + 8 * a.face - 8, y - 22, 16, 13);
+      ctx.restore();
+    }
+    words.style.opacity = String(cueProgress(tl, t, 'go') * (1 - progress(t, puddle.start - 0.5, puddle.start)));
   },
 });
 ```

@@ -16,20 +16,20 @@ read_when:
 ```json
 {
     "version": 2,
-    "who": { "what": "a paper boat", "where": { "beat": "calm", "via": ["picture"] } },
-    "wants": { "what": "to reach the far shore", "where": { "beat": "calm", "via": ["picture", "words"] } },
-    "because": { "what": "the rain soaks it and the snow buries it", "where": { "beat": "soak", "via": ["picture", "sound"] } },
-    "becomes": { "what": "it shakes the snow off and rides high again", "where": { "beat": "lift", "via": ["picture", "words"] } },
-    "leave": "Small things make it through",
+    "who": { "what": "an ant", "where": { "beat": "carry", "via": ["picture"] } },
+    "wants": { "what": "to get its crumb home", "where": { "beat": "carry", "via": ["picture", "words"] } },
+    "because": { "what": "a raindrop turns the path ahead into a puddle", "where": { "beat": "puddle", "via": ["picture", "sound"] } },
+    "becomes": { "what": "it crosses on a leaf and gets the crumb home", "where": { "beat": "home", "via": ["picture"] } },
+    "leave": "The small relief of getting something home",
     "device": {
-        "what": "the boat stays on one line while the weather changes behind it",
-        "why": "the eye stays on the boat, the world is what changes"
+        "what": "one straight path runs across the frame to the hole",
+        "why": "every stop and detour the ant makes shows against the straight line"
     },
     "beats": [
-        { "id": "calm", "role": "opening", "at": "sun", "change": { "from": "the boat drifts in sun", "to": "clouds gather" }, "text": ["到对岸去"] },
-        { "id": "soak", "role": "turn", "at": "rain", "change": { "from": "the first drop hits", "to": "the boat sags" }, "sound": "drop" },
-        { "id": "cold", "role": "build", "at": "snow", "change": { "from": "rain turns to snow", "to": "snow covers the boat" } },
-        { "id": "lift", "role": "resolution", "at": { "scene": "snow", "beat": 4 }, "change": { "from": "a hand brushes the snow off", "to": "the boat floats again" }, "text": ["撑过去"], "callback": "calm" }
+        { "id": "carry", "role": "opening", "at": "path", "change": { "from": "the ant sets off with a crumb bigger than its head", "to": "it is halfway along the path and the sky has greyed" }, "text": ["搬回家"] },
+        { "id": "puddle", "role": "turn", "at": "puddle", "change": { "from": "a drop hits the path ahead", "to": "a puddle lies across the path and the ant stops at its edge, turning one way, then the other" }, "sound": "drop" },
+        { "id": "leaf", "role": "build", "at": "leaf", "change": { "from": "the ant steps onto a fallen leaf at the puddle's edge", "to": "the leaf has carried it across" } },
+        { "id": "home", "role": "resolution", "at": "home", "change": { "from": "the ant walks the last stretch in the rain", "to": "the crumb and the ant have gone into the hole and the sky has cleared" }, "callback": "carry" }
     ]
 }
 ```
