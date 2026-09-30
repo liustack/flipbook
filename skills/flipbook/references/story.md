@@ -41,11 +41,11 @@ Doesn't count: things that only change (an egg becoming a fly, a stain spreading
 
 Fearing a loss counts: wanting to keep something.
 
-### Why four slots
+### Check the four slots
 
-Each slot keeps out a kind of film. Take one away and see what is left:
+Before going on, check each slot: cover it and read what the other three make. If that reads like one of these, the slot you covered is empty or too weak. Fill it before writing the timeline:
 
-| Without | What is left | For example |
+| Covered | What is left | For example |
 |---|---|---|
 | who | a process: things change and nobody cares how they end up | an egg to a fly to its death, an empty room painted into a fantasy (a show of technique) |
 | wants | an encounter: things happen to someone who doesn't mind, so nothing is won or lost | someone walks down a street and it rains |
