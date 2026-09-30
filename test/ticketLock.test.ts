@@ -6,8 +6,8 @@ import * as path from 'path';
 import { pathToFileURL } from 'url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { updateSources } from '../src/engine/assetSources.ts';
-import { tryTicketLock, withTicketLock } from '../src/engine/ticketLock.ts';
-import { Workspace, WorkspaceError } from '../src/engine/workspace.ts';
+import { LockBusyError, tryTicketLock, withTicketLock } from '../src/engine/ticketLock.ts';
+import { Workspace } from '../src/engine/workspace.ts';
 import { cleanTemps, tempDir } from './helpers.ts';
 
 afterAll(cleanTemps);
@@ -123,7 +123,7 @@ describe('the sources lock', () => {
         const a = writer(dir, 'a', 1, true);
         await until(dir, 'a-in');
         await expect(withTicketLock(dir, 'sources', () => 1, 300)).rejects.toBeInstanceOf(
-            WorkspaceError,
+            LockBusyError,
         );
         fs.writeFileSync(path.join(dir, 'a-go'), '');
         expect(await a.exit).toBe(0);

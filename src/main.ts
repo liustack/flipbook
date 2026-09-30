@@ -25,6 +25,7 @@ import { win32Allowed } from './engine/browser.ts';
 import { pruneCache } from './engine/prune.ts';
 import { workspaceFinding } from './engine/session.ts';
 import { parseSize } from './engine/size.ts';
+import { LockBusyError } from './engine/ticketLock.ts';
 import { WorkspaceError } from './engine/workspace.ts';
 import { COMMAND_NAME } from './names.ts';
 import { appVersion } from './paths.ts';
@@ -103,6 +104,12 @@ async function execute(
             rb.report.environmentError = diagnosis;
             emit(rb.finish(EXIT.env));
             writeJson(process.stderr, diagnosis);
+        } else if (error instanceof LockBusyError) {
+            // Another command holds the lock: a wait, not a broken path. Like render-busy,
+            // it records no attempt (only check and render count, and they never take it).
+            const rb = new ReportBuilder(command, dir);
+            rb.add(finding('sources-busy', error.message, { detail: { lock: error.lock } }));
+            emit(rb.finish());
         } else if (error instanceof WorkspaceError) {
             const rb = new ReportBuilder(command, dir);
             rb.add(workspaceFinding(error));

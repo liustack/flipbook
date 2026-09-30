@@ -12,14 +12,33 @@
 // file name). A process that joins while another is waiting creates its file
 // after that one wrote its ticket, so it reads that ticket and queues behind.
 // Files of dead processes are skipped and removed: a dead process never acts
-// again. A live process's file is only removed by itself. On Windows a file
-// that is being removed while another process reads it cannot be opened for a
-// moment (EPERM): such a file is read as unknown, waited on like a process
-// still choosing, and a ticket is only chosen once every file could be read.
+// again. A live process's file is only removed by itself. A file that cannot
+// be opened (EPERM, seen on Windows while other processes create, read and
+// remove files there, most likely one being removed, though access rules or
+// scanners can do the same) is read as the unknown ticket of a live process:
+// waited on like a process still choosing, and a ticket is only chosen once
+// every live process's file could be read. When the wait runs out the lock is
+// busy: tryTicketLock returns null, withTicketLock throws a LockBusyError.
+// Neither ever calls a lock folder a broken path: it may be in use.
 import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { pidAlive, Workspace, WorkspaceError } from './workspace.ts';
+import { pidAlive, Workspace } from './workspace.ts';
+
+/**
+ * Another flipbook process held or was taking the lock for longer than the
+ * caller waits. The lock folder is in use, not broken: nothing in it may be removed.
+ */
+export class LockBusyError extends Error {
+    /** The lock's name: .flipbook/<name>.d. */
+    readonly lock: string;
+
+    constructor(lock: string, message: string) {
+        super(message);
+        this.name = 'LockBusyError';
+        this.lock = lock;
+    }
+}
 
 const ENTRY = /^p\.(\d+)\.[0-9a-f]+$/;
 const pause = new Int32Array(new SharedArrayBuffer(4));
@@ -30,7 +49,7 @@ interface Entry {
     file: string;
     /** The ticket, or null while the process is still choosing (or already gone). */
     ticket: number | null;
-    /** The file could not be read just now: on Windows, it is being removed. */
+    /** The file could not be opened just now (EPERM): its ticket is unknown. */
     unreadable: boolean;
 }
 
@@ -62,26 +81,28 @@ function entries(folder: string): Entry[] {
     return out;
 }
 
-/** How long a file may stay unreadable before joining gives up. */
-const UNREADABLE_MS = 2_000;
-
 /**
  * Make this process's file and write its ticket: one more than the highest
- * seen, once every other file could be read.
+ * seen, once every live process's file could be read. Null when one still
+ * cannot be read at `deadline` (a Date.now() time): this process's file is
+ * gone again and the lock counts as busy.
  */
-function join(folder: string): { me: string; mine: string; ticket: number } {
+function join(
+    folder: string,
+    deadline: number,
+): { me: string; mine: string; ticket: number } | null {
     const me = `p.${process.pid}.${randomBytes(6).toString('hex')}`;
     const mine = path.join(folder, me);
     fs.writeFileSync(mine, '', { flag: 'wx' });
     try {
-        const start = Date.now();
         // A dead process's ticket no longer counts: only a live one's is waited for.
         const stuck = (list: Entry[]) =>
-            list.find((e) => e.unreadable && e.name !== me && pidAlive(e.pid));
+            list.some((e) => e.unreadable && e.name !== me && pidAlive(e.pid));
         let seen = entries(folder);
-        for (let s = stuck(seen); s; s = stuck(seen)) {
-            if (Date.now() - start > UNREADABLE_MS) {
-                throw new WorkspaceError(folder, `${s.file} could not be read.`);
+        while (stuck(seen)) {
+            if (Date.now() > deadline) {
+                fs.rmSync(mine, { force: true });
+                return null;
             }
             Atomics.wait(pause, 0, 0, 5);
             seen = entries(folder);
@@ -109,7 +130,7 @@ function ahead(folder: string, me: string, ticket: number): 'choosing' | 'ahead'
     let lower = false;
     for (const e of entries(folder)) {
         if (e.name === me) continue;
-        // Being removed right now: gone by the next look, or its holder is waited on.
+        // Its ticket is unknown: a live holder is waited on like one still choosing.
         if (e.unreadable) {
             if (pidAlive(e.pid)) choosing = true;
             continue;
@@ -128,14 +149,17 @@ function ahead(folder: string, me: string, ticket: number): 'choosing' | 'ahead'
 /**
  * Take .flipbook/<name>.d without waiting for a holder: the release function,
  * or null when another live process holds it or is ahead in line. A process
- * still writing its ticket is waited for up to `choosingMs` (writing one takes
- * microseconds), then counted as busy.
+ * still writing its ticket, or whose file cannot be read, is waited for up to
+ * `choosingMs` in all, from the call (writing one takes microseconds), then
+ * counted as busy. It never throws for a busy lock.
  */
 export function tryTicketLock(dir: string, name: string, choosingMs = 2_000): (() => void) | null {
     const ws = Workspace.open(dir);
     const folder = ws.ensureDir(ws.path('.flipbook', `${name}.d`));
-    const { me, mine, ticket } = join(folder);
     const start = Date.now();
+    const joined = join(folder, start + choosingMs);
+    if (!joined) return null;
+    const { me, mine, ticket } = joined;
     for (;;) {
         const before = ahead(folder, me, ticket);
         if (before === null) return () => fs.rmSync(mine, { force: true });
@@ -158,7 +182,8 @@ export function acquireLock(dir: string): (() => void) | null {
 /**
  * Run `fn` holding .flipbook/<name>.d of the composition in `dir`: every
  * other process waiting on the same name runs its `fn` before or after, never
- * alongside. Throws a WorkspaceError after `timeoutMs` of waiting.
+ * alongside. Throws a LockBusyError after `timeoutMs` of waiting in all, from
+ * the call: for a ticket that cannot be read and for the queue alike.
  */
 export async function withTicketLock<T>(
     dir: string,
@@ -168,16 +193,18 @@ export async function withTicketLock<T>(
 ): Promise<T> {
     const ws = Workspace.open(dir);
     const folder = ws.ensureDir(ws.path('.flipbook', `${name}.d`));
-    const { me, mine, ticket } = join(folder);
+    const start = Date.now();
+    const busy = () =>
+        new LockBusyError(
+            name,
+            `.flipbook/${name}.d stayed busy for ${Math.round(timeoutMs / 1000)} s: another flipbook command is still writing.`,
+        );
+    const joined = join(folder, start + timeoutMs);
+    if (!joined) throw busy();
+    const { me, mine, ticket } = joined;
     try {
-        const start = Date.now();
         while (ahead(folder, me, ticket) !== null) {
-            if (Date.now() - start > timeoutMs) {
-                throw new WorkspaceError(
-                    folder,
-                    `.flipbook/${name}.d stayed busy for ${Math.round(timeoutMs / 1000)} s: another flipbook command is still writing.`,
-                );
-            }
+            if (Date.now() - start > timeoutMs) throw busy();
             await new Promise((resolve) => setTimeout(resolve, 15));
         }
         return fn();

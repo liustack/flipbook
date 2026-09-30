@@ -302,8 +302,14 @@ export const FINDING_CODES = {
         fix: 'Fetch sounds with stock search --audio and stock fetch, which record both. For a file the user supplied, write its source and license in assets/SOURCES.json from what the user says, and ask when the license is unknown.',
     },
     'render-busy': {
-        meaning: 'Another render of this composition is running.',
-        fix: 'Wait for it to finish, then run render again.',
+        meaning:
+            "Another render (or audio) of this composition is running, or a live process's lock file could not be read within the wait.",
+        fix: 'Wait for it to finish, then run the command again. Leave .flipbook/render.d alone: it may be in use.',
+    },
+    'sources-busy': {
+        meaning:
+            'Another flipbook command (stock fetch, cutout, puppet or sprite) is still writing assets/SOURCES.json in this composition and did not finish while this one waited.',
+        fix: 'Wait for the other command to finish, then run this one again. Do not delete anything under .flipbook/: the lock folders there may be in use, and removing one lets two commands write at once.',
     },
     'internal-error': {
         meaning: 'flipbook itself failed.',

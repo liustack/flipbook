@@ -1,10 +1,10 @@
-// On Windows a lock file that one process is removing while another reads it
-// cannot be opened for a moment: opening it fails with EPERM. The lock reads
-// such a file as unknown instead of failing.
+// A lock file that cannot be opened (EPERM, as on Windows while files come and
+// go in the folder) is read as the unknown ticket of a live process: waited on,
+// then counted as busy, never reported as a broken path.
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
-import { tryTicketLock, withTicketLock } from '../src/engine/ticketLock.ts';
+import { LockBusyError, tryTicketLock, withTicketLock } from '../src/engine/ticketLock.ts';
 import { WorkspaceError } from '../src/engine/workspace.ts';
 import { cleanTemps, tempDir } from './helpers.ts';
 
@@ -62,12 +62,31 @@ describe('a lock file that cannot be read for a moment', () => {
         expect(fs.readdirSync(folder)).toEqual([name]);
     });
 
-    it('stops joining with an error when a live process keeps it unreadable', () => {
+    it('counts as busy, within one deadline, when a live process keeps it unreadable before a ticket is chosen', () => {
         const { dir, folder } = lockFolder('render');
         const name = `p.${process.ppid}.ee`;
         fs.writeFileSync(path.join(folder, name), '1\n');
         unreadable.set(name, { pass: 0 });
-        expect(() => tryTicketLock(dir, 'render')).toThrow(WorkspaceError);
+        const start = Date.now();
+        expect(tryTicketLock(dir, 'render', 200)).toBeNull();
+        const took = Date.now() - start;
+        expect(took).toBeGreaterThanOrEqual(200);
+        // Joining and looking who is ahead share the one wait, not two.
+        expect(took).toBeLessThan(1_000);
+        expect(fs.readdirSync(folder)).toEqual([name]);
+    }, 10_000);
+
+    it('throws a LockBusyError, not a WorkspaceError, when it stays unreadable while queueing to write', async () => {
+        const { dir, folder } = lockFolder('sources');
+        const name = `p.${process.ppid}.ee`;
+        fs.writeFileSync(path.join(folder, name), '1\n');
+        unreadable.set(name, { pass: 0 });
+        const start = Date.now();
+        const error = await withTicketLock(dir, 'sources', () => 1, 300).catch((e) => e);
+        expect(error).toBeInstanceOf(LockBusyError);
+        expect(error).not.toBeInstanceOf(WorkspaceError);
+        expect(error.lock).toBe('sources');
+        expect(Date.now() - start).toBeLessThan(2_000);
         expect(fs.readdirSync(folder)).toEqual([name]);
     }, 10_000);
 

@@ -93,8 +93,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `.flipbook/reports/<命令>.json` | check、snapshot、audio、render、stock search、stock fetch | 这条命令最近一次的报告，和 stdout 上的相同。退 78、`unsafe-output`、`internal-error` 的运行也存，路径在 `artifacts.report` |
 | `.flipbook/tmp/` | render、stock fetch | 中间文件，结束后删掉 |
 | `.flipbook/stock/thumbs/` | stock search | 最近一次搜索的缩略图，每次搜索前清空 |
-| `.flipbook/render.d/` | render、audio | 同一目录同时只跑一个 render（或 audio，同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。每个进程用 O_EXCL 建自己的文件 `p.<pid>.<随机串>`，写入比看到的最大号大 1 的号，没有活进程持有更小的号（同号按文件名）时拿到锁。有活进程还没写完号时最多等 2 秒，已经有活进程持更小号就直接判忙。已退出进程的文件跳过并删除。不删别的活进程的文件 |
-| `.flipbook/sources.d/` | stock fetch、cutout、sprite、puppet | 写 `assets/SOURCES.json` 用同样的排号：写入者等到自己（最多 30 秒），重新读文件再加上自己的条目，同时跑的命令不会冲掉彼此的条目 |
+| `.flipbook/render.d/` | render、audio | 同一目录同时只跑一个 render（或 audio，同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。每个进程用 O_EXCL 建自己的文件 `p.<pid>.<随机串>`，写入比看到的最大号大 1 的号，没有活进程持有更小的号（同号按文件名）时拿到锁。有活进程还没写完号，或者活进程的文件读不了（EPERM，Windows 上见过），从开始算一共最多等 2 秒，之后判忙。已经有活进程持更小号就直接判忙。已退出进程的文件跳过并删除。不删别的活进程的文件 |
+| `.flipbook/sources.d/` | stock fetch、cutout、sprite、puppet | 写 `assets/SOURCES.json` 用同样的排号：写入者等到自己（一共最多 30 秒，读不了的活进程文件当作还在排队），重新读文件再加上自己的条目，同时跑的命令不会冲掉彼此的条目。等过期限报 `sources-busy` |
 | `.flipbook/audio/` | audio、render | 合成的 `music.wav`、`sfx.wav`，`effects.wav`（有 cue 用音效文件时，叠上这些文件的音效轨），`score.json`（和弦、强弱、音效位置），`audio.json`（各轨哈希、峰值、音效实际峰值位置）。audio 命令也拿 render 锁 |
 
 ## Finding
@@ -180,7 +180,8 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `puppet-joint-missing` | puppet | 部件指定的那一头找不到圆形关节舌：那头是方的或参差的，或者舌头在另一边。`detail.part`、`detail.joint` 和 `detail.side` 说是哪里。什么都不写 | 把这个关节写成部件自己像素里的 `[x, y]`，从抠好的图上量，或者改成舌头所在的那一边 |
 | `sprite-invalid` | sprite | 什么都没切：`assets/sprites/<name>/sprite.json` 不存在、不是合法 JSON 或不合 sprite v1，某段动作的表不在 `assets/` 下或它在 `assets/SOURCES.json` 里的条目不全（同 `asset-unlicensed`），表上分得开的画比 `frames` 多或少（`detail.found`、`detail.frames`，有一张典型画三分之一大的就算一张），或者有画超出了裁剪框（`detail.frames` 列出是哪几张），或者写了 `grid` 时格子里的画比 `frames` 多或少（空格子不算），或者像素表分不成整像素的格子。`detail.path` 是出错的字段 | 按提示改那个字段。挨在一起的画分不开：表是均匀格子排的就写 `grid`，不然要一张画之间空隙更宽的表 |
 | `sprite-drift` | sprite，警告 | 有一张画比同一段动作的中位数高或矮 6% 以上（`detail.kind` 为 `height`），或者在不是走路的动作里，它的脚离别的画里脚的位置超过身高的 5%（`feet`），或者在走路里为了让支撑脚不动，一张画横向挪了超过身高的 4%，头在那里会晃（`nudge`），或者跟不上支撑脚、步幅是估的（`stride`，不带 `detail.frame`），或者 `pixel` 为 true 时某段动作比第一段高或矮超过 1 像素（`clip-height`，不带 `detail.frame`）。`detail.clip`、`detail.frame`（从 1 数）和 `detail.share` 说是哪张、差多少。被点到的画在检查图上垫粉色底 | 在检查图上看那张画。变化本来就是动作的一部分（蹲下、跳起）或者晃得自然就留着，不是就重画或者不用它。`stride` 不点名哪张画：看整段走路，每张都要有一只脚着地，并且一张比一张往后移。`clip-height` 就按第一段的大小重画那段动作 |
-| `render-busy` | render | 同一合成目录有另一个 render 在跑，不计入重试次数 | 等它结束 |
+| `render-busy` | render、audio | 同一合成目录有另一个 render 在跑，或者等待期内 `.flipbook/render.d/` 里活进程的文件一直读不了，不计入重试次数 | 等它结束 |
+| `sources-busy` | stock fetch、cutout、puppet、sprite | 另一个 flipbook 命令还在写 `assets/SOURCES.json`，30 秒内没写完（或者 `.flipbook/sources.d/` 里活进程的文件一直读不了）。`detail.lock` 是 `sources`。不计入重试次数 | 等那个命令结束再重跑。不要删 `.flipbook/` 下的任何东西：锁目录可能正在用 |
 | `internal-error` | 全部 | flipbook 自己出错 | 别改合成，带 JSON 报 issue |
 
 `clock-dependent` 和 `random-dependent` 各开一个新页面，把虚拟时钟起点推后约 34 小时或换掉随机底层种子，再取三帧和基准比。扰动页上出的任何问题（加载失败、协议、`seek-failed`、`seek-timeout`、`external-request`、`page-error` 等）只要基准页上没有，就照原类型码报成失败，`message` 末尾写明是在哪种扰动下出现的，`detail.perturbation` 给出扰动条件（`change` 为 `clock` 或 `random seed`，以及偏移量或种子）。
