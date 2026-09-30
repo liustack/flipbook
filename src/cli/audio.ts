@@ -8,8 +8,9 @@ import {
     outputLinksFinding,
     type Session,
 } from '../engine/session.ts';
+import { acquireLock } from '../engine/ticketLock.ts';
 import { loadTimeline } from '../engine/timeline.ts';
-import { acquireLock, Workspace } from '../engine/workspace.ts';
+import { Workspace } from '../engine/workspace.ts';
 import { finding, progress, type Report, ReportBuilder } from './report.ts';
 
 export interface AudioOptions {
@@ -58,7 +59,7 @@ export async function runAudio(options: AudioOptions): Promise<Report> {
         rb.add(
             finding(
                 'render-busy',
-                `Another render holds ${path.join(dir, '.flipbook', 'render.lock')}.`,
+                `Another render of this composition is running (${path.join(dir, '.flipbook', 'render.d')}).`,
             ),
         );
         return rb.finish();

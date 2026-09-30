@@ -9,7 +9,7 @@ import { covered, uncoveredChars } from '../src/engine/fonts.ts';
 import { analysisSize, psnr, RGB_H, RGB_W, sheetLayout } from '../src/engine/pixels.ts';
 import { findOnPath } from '../src/engine/proc.ts';
 import { auditCanvasText } from '../src/engine/textAudit.ts';
-import { acquireLock } from '../src/engine/workspace.ts';
+import { acquireLock } from '../src/engine/ticketLock.ts';
 import { repoRoot, tempDir } from './helpers.ts';
 
 describe('font coverage tables', () => {
@@ -79,49 +79,43 @@ describe('attempt limits', () => {
 });
 
 describe('render lock', () => {
-    const lockFile = (dir: string) => path.join(dir, '.flipbook', 'render.lock');
+    const folder = (dir: string) => path.join(dir, '.flipbook', 'render.d');
+    const DEAD = 2 ** 22 + 13;
 
-    it('refuses a second holder and takes over a dead one', () => {
-        const dir = tempDir('lock');
-        const release = acquireLock(dir);
-        expect(release).not.toBeNull();
-        fs.writeFileSync(lockFile(dir), String(process.ppid));
-        expect(acquireLock(dir)).toBeNull();
-        fs.writeFileSync(lockFile(dir), '999999');
-        const again = acquireLock(dir);
-        expect(again).not.toBeNull();
-        again?.();
-    });
-
-    it('refuses a second acquire from the same process', () => {
+    it('refuses a second acquire from the same process and frees on release', () => {
         const dir = tempDir('lock-same');
         const release = acquireLock(dir);
         expect(release).not.toBeNull();
         expect(acquireLock(dir)).toBeNull();
         release?.();
-        expect(fs.existsSync(lockFile(dir))).toBe(false);
+        expect(fs.readdirSync(folder(dir))).toEqual([]);
+        const again = acquireLock(dir);
+        expect(again).not.toBeNull();
+        again?.();
     });
 
-    it('treats a just-created empty lock as held and an old one as stale', () => {
-        const dir = tempDir('lock-empty');
-        fs.mkdirSync(path.join(dir, '.flipbook'));
-        fs.writeFileSync(lockFile(dir), '');
+    it('skips and removes what a dead process left, holding or still choosing', () => {
+        const dir = tempDir('lock-dead');
+        fs.mkdirSync(folder(dir), { recursive: true });
+        fs.writeFileSync(path.join(folder(dir), `p.${DEAD}.aa`), '1\n');
+        fs.writeFileSync(path.join(folder(dir), `p.${DEAD}.bb`), '');
+        const release = acquireLock(dir);
+        expect(release).not.toBeNull();
+        expect(fs.readdirSync(folder(dir)).filter((f) => f.includes(String(DEAD)))).toEqual([]);
+        release?.();
+    });
+
+    it('is busy while a live process holds a lower ticket, and releases only its own file', () => {
+        const dir = tempDir('lock-live');
+        fs.mkdirSync(folder(dir), { recursive: true });
+        const other = path.join(folder(dir), `p.${process.ppid}.cc`);
+        fs.writeFileSync(other, '1\n');
         expect(acquireLock(dir)).toBeNull();
-        const old = new Date(Date.now() - 60_000);
-        fs.utimesSync(lockFile(dir), old, old);
+        expect(fs.readdirSync(folder(dir))).toEqual([`p.${process.ppid}.cc`]);
+        fs.rmSync(other);
         const release = acquireLock(dir);
         expect(release).not.toBeNull();
         release?.();
-    });
-
-    it('releases only its own lock', () => {
-        const dir = tempDir('lock-owner');
-        const release = acquireLock(dir);
-        expect(release).not.toBeNull();
-        const other = JSON.stringify({ pid: process.ppid, token: 'someone-else' });
-        fs.writeFileSync(lockFile(dir), other);
-        release?.();
-        expect(fs.readFileSync(lockFile(dir), 'utf-8')).toBe(other);
     });
 
     it('lets exactly one of several processes in', async () => {
@@ -136,7 +130,7 @@ describe('render lock', () => {
             `while (!existsSync(${JSON.stringify(file)})) await new Promise((r) => setTimeout(r, 2));`;
         const script = [
             `import { existsSync } from 'node:fs';`,
-            `import { acquireLock } from ${JSON.stringify(pathToFileURL(path.join(repoRoot, 'src/engine/workspace.ts')).href)};`,
+            `import { acquireLock } from ${JSON.stringify(pathToFileURL(path.join(repoRoot, 'src/engine/ticketLock.ts')).href)};`,
             `process.stdout.write('ready\\n');`,
             wait(go),
             `const release = acquireLock(${JSON.stringify(dir)});`,
@@ -180,7 +174,7 @@ describe('render lock', () => {
             outcomes.join(', '),
         ).toHaveLength(1);
         expect(outcomes.filter((o) => o === 'busy')).toHaveLength(7);
-        expect(fs.existsSync(lockFile(dir))).toBe(false);
+        expect(fs.readdirSync(folder(dir))).toEqual([]);
     });
 });
 

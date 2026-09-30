@@ -34,10 +34,11 @@ import {
 } from '../engine/session.ts';
 import { applySize, outputSize, type SizeSpec } from '../engine/size.ts';
 import { dedupe } from '../engine/textAudit.ts';
+import { acquireLock } from '../engine/ticketLock.ts';
 import { audioSource, loadTimeline } from '../engine/timeline.ts';
 import type { ResolvedTimeline } from '../engine/timelineResolve.ts';
 import { verifyAudio, verifyVideo } from '../engine/verify.ts';
-import { acquireLock, compositionHash, Workspace } from '../engine/workspace.ts';
+import { compositionHash, Workspace } from '../engine/workspace.ts';
 import { appVersion } from '../paths.ts';
 import {
     type Determinism,
@@ -127,7 +128,7 @@ export async function runRender(options: RenderOptions): Promise<Report> {
         rb.add(
             finding(
                 'render-busy',
-                `Another render holds ${path.join(dir, '.flipbook', 'render.lock')}.`,
+                `Another render of this composition is running (${path.join(dir, '.flipbook', 'render.d')}).`,
             ),
         );
         return finish();

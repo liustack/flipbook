@@ -47,6 +47,78 @@ function entries(folder: string): Entry[] {
     return out;
 }
 
+/** Make this process's file and write its ticket: one more than the highest seen. */
+function join(folder: string): { me: string; mine: string; ticket: number } {
+    const me = `p.${process.pid}.${randomBytes(6).toString('hex')}`;
+    const mine = path.join(folder, me);
+    fs.writeFileSync(mine, '', { flag: 'wx' });
+    try {
+        const highest = entries(folder).reduce(
+            (n, e) => (e.name !== me && e.ticket !== null ? Math.max(n, e.ticket) : n),
+            0,
+        );
+        const ticket = highest + 1;
+        fs.writeFileSync(mine, `${ticket}\n`);
+        return { me, mine, ticket };
+    } catch (error) {
+        fs.rmSync(mine, { force: true });
+        throw error;
+    }
+}
+
+/**
+ * What stands before this process now: 'choosing' while a live process has not
+ * written its ticket yet, 'ahead' when a live process holds a lower one, null
+ * when it is this process's turn. Files of dead processes are removed.
+ */
+function ahead(folder: string, me: string, ticket: number): 'choosing' | 'ahead' | null {
+    let found: 'choosing' | 'ahead' | null = null;
+    for (const e of entries(folder)) {
+        if (e.name === me) continue;
+        if (!pidAlive(e.pid)) {
+            fs.rmSync(e.file, { force: true });
+            continue;
+        }
+        if (e.ticket === null) found = 'choosing';
+        else if ((e.ticket < ticket || (e.ticket === ticket && e.name < me)) && found === null) {
+            found = 'ahead';
+        }
+    }
+    return found;
+}
+
+const pause = new Int32Array(new SharedArrayBuffer(4));
+
+/**
+ * Take .flipbook/<name>.d without waiting for a holder: the release function,
+ * or null when another live process holds it or is ahead in line. A process
+ * still writing its ticket is waited for up to `choosingMs` (writing one takes
+ * microseconds), then counted as busy.
+ */
+export function tryTicketLock(dir: string, name: string, choosingMs = 2_000): (() => void) | null {
+    const ws = Workspace.open(dir);
+    const folder = ws.ensureDir(ws.path('.flipbook', `${name}.d`));
+    const { me, mine, ticket } = join(folder);
+    const start = Date.now();
+    for (;;) {
+        const before = ahead(folder, me, ticket);
+        if (before === null) return () => fs.rmSync(mine, { force: true });
+        if (before === 'ahead' || Date.now() - start > choosingMs) {
+            fs.rmSync(mine, { force: true });
+            return null;
+        }
+        Atomics.wait(pause, 0, 0, 5);
+    }
+}
+
+/**
+ * One render (or audio synthesis) per composition at a time, re-entry from the
+ * same process included: the release function, or null when one is running.
+ */
+export function acquireLock(dir: string): (() => void) | null {
+    return tryTicketLock(dir, 'render');
+}
+
 /**
  * Run `fn` holding .flipbook/<name>.d of the composition in `dir`: every
  * other process waiting on the same name runs its `fn` before or after, never
@@ -60,29 +132,10 @@ export async function withTicketLock<T>(
 ): Promise<T> {
     const ws = Workspace.open(dir);
     const folder = ws.ensureDir(ws.path('.flipbook', `${name}.d`));
-    const me = `p.${process.pid}.${randomBytes(6).toString('hex')}`;
-    const mine = path.join(folder, me);
-    fs.writeFileSync(mine, '', { flag: 'wx' });
+    const { me, mine, ticket } = join(folder);
     try {
-        const highest = entries(folder).reduce(
-            (n, e) => (e.name !== me && e.ticket !== null ? Math.max(n, e.ticket) : n),
-            0,
-        );
-        const ticket = highest + 1;
-        fs.writeFileSync(mine, `${ticket}\n`);
         const start = Date.now();
-        for (;;) {
-            let wait = false;
-            for (const e of entries(folder)) {
-                if (e.name === me) continue;
-                if (!pidAlive(e.pid)) {
-                    fs.rmSync(e.file, { force: true });
-                    continue;
-                }
-                if (e.ticket === null) wait = true;
-                else if (e.ticket < ticket || (e.ticket === ticket && e.name < me)) wait = true;
-            }
-            if (!wait) break;
+        while (ahead(folder, me, ticket) !== null) {
             if (Date.now() - start > timeoutMs) {
                 throw new WorkspaceError(
                     folder,

@@ -6,7 +6,7 @@ import * as path from 'path';
 import { pathToFileURL } from 'url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { updateSources } from '../src/engine/assetSources.ts';
-import { withTicketLock } from '../src/engine/ticketLock.ts';
+import { tryTicketLock, withTicketLock } from '../src/engine/ticketLock.ts';
 import { Workspace, WorkspaceError } from '../src/engine/workspace.ts';
 import { cleanTemps, tempDir } from './helpers.ts';
 
@@ -128,4 +128,14 @@ describe('the sources lock', () => {
         fs.writeFileSync(path.join(dir, 'a-go'), '');
         expect(await a.exit).toBe(0);
     }, 60_000);
+    it('counts a live process that never finishes choosing as busy, after a short wait', () => {
+        const dir = composition();
+        const folder = path.join(dir, '.flipbook', 'render.d');
+        fs.mkdirSync(folder, { recursive: true });
+        fs.writeFileSync(path.join(folder, `p.${process.ppid}.dd`), '');
+        const start = Date.now();
+        expect(tryTicketLock(dir, 'render', 100)).toBeNull();
+        expect(Date.now() - start).toBeGreaterThanOrEqual(100);
+        expect(fs.readdirSync(folder)).toEqual([`p.${process.ppid}.dd`]);
+    });
 });

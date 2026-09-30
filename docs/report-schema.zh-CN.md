@@ -93,8 +93,9 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `.flipbook/reports/<命令>.json` | check、snapshot、audio、render、stock search、stock fetch | 这条命令最近一次的报告，和 stdout 上的相同。退 78、`unsafe-output`、`internal-error` 的运行也存，路径在 `artifacts.report` |
 | `.flipbook/tmp/` | render、stock fetch | 中间文件，结束后删掉 |
 | `.flipbook/stock/thumbs/` | stock search | 最近一次搜索的缩略图，每次搜索前清空 |
-| `.flipbook/render.lock` | render | 同一目录同时只跑一个 render（同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。锁用 O_EXCL 建，内容是 pid 和随机令牌。持有进程已退出，或锁里没有可读的持有者且建了超过 10 秒，才算过期被接管。释放时只删令牌仍是自己的锁 |
-| `.flipbook/audio/` | audio、render | 合成的 `music.wav`、`sfx.wav`，`effects.wav`（有 cue 用音效文件时，叠上这些文件的音效轨），`score.json`（和弦、强弱、音效位置），`audio.json`（各轨哈希、峰值、音效实际峰值位置）。audio 命令也拿 `render.lock` |
+| `.flipbook/render.d/` | render、audio | 同一目录同时只跑一个 render（或 audio，同一进程重入也算），另一个报 `render-busy` 退 1，不计入重试次数。每个进程用 O_EXCL 建自己的文件 `p.<pid>.<随机串>`，写入比看到的最大号大 1 的号，没有活进程持有更小的号（同号按文件名）时拿到锁。正在写号的进程最多等 2 秒。已退出进程的文件跳过并删除。进程只删自己的文件 |
+| `.flipbook/sources.d/` | stock fetch、cutout、sprite、puppet | 写 `assets/SOURCES.json` 用同样的排号：写入者等到自己（最多 30 秒），重新读文件再加上自己的条目，同时跑的命令不会冲掉彼此的条目 |
+| `.flipbook/audio/` | audio、render | 合成的 `music.wav`、`sfx.wav`，`effects.wav`（有 cue 用音效文件时，叠上这些文件的音效轨），`score.json`（和弦、强弱、音效位置），`audio.json`（各轨哈希、峰值、音效实际峰值位置）。audio 命令也拿 render 锁 |
 
 ## Finding
 
