@@ -118,7 +118,7 @@ read_when:
 | `key` | 是 | 一句话 | 能搜的线索：人名、年份、器物名。最后一拍的字里必须有它 |
 | `materials` | 是 | 对象：资产路径（`assets/...`）对应一句话 | `assets/SOURCES.json` 里的每一份素材，以及它是故事的哪一部分 |
 
-`materials` 的路径、`assets/SOURCES.json` 的键和 `cutFrom` 按同一种写法比较：用正斜杠，算掉 `.` 和 `..`，所以 `assets/./a.png` 和 `assets/a.png` 是同一个文件。算完之后路径必须仍在 `assets/` 里。`materials` 的路径跑出 `assets/`、是绝对路径、用了反斜杠，或者和另一条指同一个文件，都是 `story-invalid`。只认 `assets/SOURCES.json` 里这个文件自己的条目。
+`materials` 的路径、`assets/SOURCES.json` 的键和 `cutFrom` 按同一种写法比较：用正斜杠，算掉 `.` 和 `..`，所以 `assets/./a.png` 和 `assets/a.png` 是同一个文件。算完之后路径必须仍在 `assets/` 里。`materials` 的路径跑出 `assets/`、是绝对路径、用了反斜杠、含 NUL 字符，或者和另一条指同一个文件，都是 `story-invalid`。`assets/SOURCES.json` 的键或 `cutFrom` 违反同样的规则时报 `story-record`，指明是哪个条目。只认 `assets/SOURCES.json` 里这个文件自己的条目。
 
 `story-record` 只查归属需要的部分：每个条目是对象，每个 `cutFrom` 指向另一个条目并且有尽头。磁盘上的每个图片和声音文件有没有来源和许可，由 `asset-unlicensed` 和 `audio-unlicensed` 对所有片子查。
 

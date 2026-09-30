@@ -621,6 +621,13 @@ describe('story.json', () => {
             expect(own({ 'assets/constructor': 'part' }, {})).toEqual([
                 ['story-record', '$.record.materials["assets/constructor"]', 'assets/constructor'],
             ]);
+            // A key or a cutFrom holding a NUL names no file: the entry is named.
+            expect(own({}, { 'a\u0000.png': cc0 })).toEqual([
+                ['story-record', '$.record.materials', 'a\u0000.png'],
+            ]);
+            expect(
+                own({ 'assets/a.png': 'part' }, { 'a.png': { ...cc0, cutFrom: 'b\u0000.png' } }),
+            ).toEqual([['story-record', '$.record.materials', 'a.png']]);
             // A SOURCES.json key outside assets/, or two keys for one file.
             expect(own({}, { '../outside.svg': cc0 })).toEqual([
                 ['story-record', '$.record.materials', '../outside.svg'],
@@ -648,6 +655,10 @@ describe('story.json', () => {
                     ['story-invalid', `$.record.materials[${JSON.stringify(outside)}]`],
                 ]);
             }
+            // No file system takes a NUL in a name: the key itself is refused.
+            expect(paths({ 'assets/a\u0000.png': 'part' })).toEqual([
+                ['story-invalid', '$.record.materials["assets/a\\u0000.png"]'],
+            ]);
             expect(paths({ 'assets/boat.png': 'part', 'assets/./boat.png': 'part' })).toEqual([
                 ['story-invalid', '$.record.materials["assets/./boat.png"]'],
             ]);

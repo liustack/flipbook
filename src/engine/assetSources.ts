@@ -13,10 +13,13 @@ const IMAGES = /\.(png|jpe?g|webp|gif|svg|avif)$/i;
 /**
  * The one spelling of a file under assets/, from a path relative to assets/
  * (a SOURCES.json key, a cutFrom): forward slashes, no `.` or `..` steps. Null
- * when it is empty, absolute, uses backslashes, or leaves assets/.
+ * when it is empty, absolute, uses backslashes, holds a NUL character (no file
+ * system takes one), or leaves assets/.
  */
 export function assetPath(rel: string): string | null {
-    if (rel === '' || rel.includes('\\') || path.posix.isAbsolute(rel)) return null;
+    if (rel === '' || rel.includes('\\') || rel.includes('\0') || path.posix.isAbsolute(rel)) {
+        return null;
+    }
     const normal = path.posix.normalize(rel);
     if (normal === '.' || normal === '..' || normal.startsWith('../') || normal.endsWith('/')) {
         return null;

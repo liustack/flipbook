@@ -118,7 +118,7 @@ A film is told from a record or from memory, not both. A block without a slot le
 | `key` | yes | one sentence | The clue to search for: a name, a year, an object. The last beat's words must contain it |
 | `materials` | yes | an object: an asset path (`assets/...`) to one sentence | Every file in `assets/SOURCES.json` and which part of the story it is |
 
-A path in `materials`, a key of `assets/SOURCES.json` and a `cutFrom` are compared in one spelling: forward slashes, with `.` and `..` steps worked out, so `assets/./a.png` and `assets/a.png` name the same file. After that the path must stay inside `assets/`. A `materials` path that leaves `assets/`, is absolute, uses backslashes or names a file another line already names is `story-invalid`. Only a file's own entry in `assets/SOURCES.json` counts.
+A path in `materials`, a key of `assets/SOURCES.json` and a `cutFrom` are compared in one spelling: forward slashes, with `.` and `..` steps worked out, so `assets/./a.png` and `assets/a.png` name the same file. After that the path must stay inside `assets/`. A `materials` path that leaves `assets/`, is absolute, uses backslashes, holds a NUL character or names a file another line already names is `story-invalid`. A key or `cutFrom` of `assets/SOURCES.json` that breaks the same rule is `story-record`, naming the entry. Only a file's own entry in `assets/SOURCES.json` counts.
 
 `story-record` checks only what placing the files needs: each entry is an object and each `cutFrom` leads to another entry and ends. Whether each picture and sound file on disk has its source and license is checked for every film, by `asset-unlicensed` and `audio-unlicensed`.
 
