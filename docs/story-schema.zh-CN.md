@@ -41,18 +41,28 @@ read_when:
     "version": 2,
     "who": { "what": "Joseph Marie Jacquard", "where": "record" },
     "wants": { "what": "to weave patterns too fine to set by hand", "where": { "beat": "silk", "via": ["picture"] } },
-    "because": { "what": "he sets the loom with punched cards", "where": { "beat": "cards", "via": ["picture"] } },
-    "becomes": { "what": "the holes later become programs", "where": { "beat": "code", "via": ["picture", "words"] } },
+    "because": { "what": "he sets the loom with a chain of punched cards", "where": { "beat": "cards", "via": ["picture"] } },
+    "becomes": { "what": "the holes that wove flowers later hold programs", "where": { "beat": "code", "via": ["picture"] } },
     "record": {
         "story": "Jacquard's loom read a chain of punched cards to lift each thread, and the idea of a pattern stored as holes led to the punched cards of early computers",
         "sources": ["https://en.wikipedia.org/wiki/Jacquard_machine"],
         "key": "Jacquard loom",
         "materials": { "assets/jacquard-portrait.jpg": "the portrait woven in silk from 24,000 cards, what the cards could do" }
-    }
+    },
+    "leave": "A pattern kept as holes outlived the loom",
+    "device": {
+        "what": "one row of holes passes from thread to card to code",
+        "why": "the holes are what the story hands on"
+    },
+    "beats": [
+        { "id": "silk", "role": "opening", "at": "silk", "change": { "from": "threads lifted one by one by hand", "to": "a woven flower half done" } },
+        { "id": "cards", "role": "turn", "at": "cards", "change": { "from": "a row of holes punched in a card", "to": "a chain of cards lifting the threads on its own" } },
+        { "id": "code", "role": "resolution", "at": "code", "change": { "from": "the same holes on an early computer's punched card", "to": "the portrait woven from the cards" }, "text": ["Jacquard loom, 1804"] }
+    ]
 }
 ```
 
-（只列出不同的字段，`leave`、`device` 和 `beats` 同上。）
+线索 `Jacquard loom` 在最后一拍的字里，`assets/SOURCES.json` 只有一条，是 `jacquard-portrait.jpg`。
 
 ## 顶层字段
 
