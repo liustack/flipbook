@@ -1,9 +1,9 @@
 {
     "version": 2,
-    "who": { "what": "Su Shi, on Mid-Autumn night", "where": { "beat": "poem", "via": ["words"] } },
+    "who": { "what": "Su Shi, named under the last line", "where": { "beat": "poem", "via": ["words"] } },
     "wants": { "what": "to see his younger brother Su Zhe again", "where": "record" },
     "because": { "what": "their posts kept them far apart, and the full moon of the festival for families found them apart", "where": "record" },
-    "becomes": { "what": "he takes the waxing and waning moon as the way of things and wishes them the same moon from far apart", "where": { "beat": "poem", "via": ["picture", "words"] } },
+    "becomes": { "what": "he ends on his line 月有阴晴圆缺: the moon waxes and wanes", "where": { "beat": "poem", "via": ["words"] } },
     "record": {
         "story": "On the Mid-Autumn night of 1076, posted in Mizhou, Su Shi drank until dawn missing his younger brother Su Zhe, whom he had not seen for years, and wrote 水调歌头: the moon waxes and wanes as people part and meet, and he wishes only that they live long and share the moon from a thousand li apart.",
         "sources": ["苏轼《水调歌头·明月几时有》及小序：丙辰中秋，欢饮达旦，大醉，作此篇，兼怀子由。"],

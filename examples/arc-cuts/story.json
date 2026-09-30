@@ -1,10 +1,10 @@
 {
     "version": 2,
-    "who": { "what": "someone watching the sun go down over the sea", "where": "memory" },
+    "who": { "what": "someone staying out until the last light is gone", "where": "memory" },
     "wants": { "what": "to keep that curve of light a moment longer", "where": "memory" },
-    "because": { "what": "it slips below the edge while you watch", "where": "memory" },
-    "becomes": { "what": "the curve turns up again in twelve other things and sets once more, with 还有更多值得发现 written along it", "where": { "beat": "set", "via": ["picture", "words"] } },
-    "memory": { "detail": "the rim of the sun slipping below the sea" },
+    "because": { "what": "it sinks below the curve of the horizon while you watch", "where": "memory" },
+    "becomes": { "what": "the curve comes back as a planet's glowing rim, 还有更多值得发现 is written along it, and it sinks away leaving the stars", "where": { "beat": "set", "via": ["picture", "words"] } },
+    "memory": { "detail": "a glowing curve of light sinking below the edge of the dark until only the stars are left" },
     "leave": "The same curve is everywhere, and there is more of it to find.",
     "device": {
         "what": "a match cut: every shot puts a different material's curved edge in the same place",

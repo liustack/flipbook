@@ -3,7 +3,7 @@
     "who": { "what": "a child with a flip book in hand", "where": "memory" },
     "wants": { "what": "to make the still pictures move", "where": "memory" },
     "because": { "what": "every page holds only one frozen picture, and they move only when the pages fly fast enough", "where": "memory" },
-    "becomes": { "what": "the printed horse gallops across the flying pages", "where": { "beat": "gallop", "via": ["picture", "sound"] } },
+    "becomes": { "what": "the printed horse gallops across the flying pages", "where": { "beat": "gallop", "via": ["picture"] } },
     "memory": { "detail": "thumbing the corner of a flip book until the pictures run" },
     "leave": "Twenty still photographs are enough to make a horse run.",
     "device": {

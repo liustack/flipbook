@@ -3,7 +3,7 @@
     "who": { "what": "a little robot", "where": { "beat": "waiting", "via": ["picture"] } },
     "wants": { "what": "the seed it waters every day to come up", "where": { "beat": "waiting", "via": ["picture"] } },
     "because": { "what": "three days and nights go by and the mound stays bare", "where": { "beat": "waiting", "via": ["picture"] } },
-    "becomes": { "what": "on the fourth morning a sprout shows and flowers, and the robot hops", "where": { "beat": "bloom", "via": ["picture", "words"] } },
+    "becomes": { "what": "the sprout has flowered and the robot hops: 发芽了", "where": { "beat": "bloom", "via": ["picture", "words"] } },
     "leave": "Keep tending what you care about, even when nothing shows yet",
     "device": {
         "what": "the sun and the moon crossing the sky over one small mound",

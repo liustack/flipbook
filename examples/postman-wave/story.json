@@ -1,9 +1,9 @@
 {
     "version": 2,
-    "who": { "what": "a child at a dark window on the postman's street", "where": { "beat": "light", "via": ["picture", "sound"] } },
+    "who": { "what": "a child at a dark window on the postman's street", "where": { "beat": "light", "via": ["picture"] } },
     "wants": { "what": "the postman walking by to see her and wave back", "where": { "beat": "hello", "via": ["picture"] } },
     "because": { "what": "he is on his early round, walking past a row of dark windows without stopping", "where": { "beat": "round", "via": ["picture"] } },
-    "becomes": { "what": "he waves back and it is good morning for both of them", "where": { "beat": "hello", "via": ["picture", "words"] } },
+    "becomes": { "what": "he waves back: 早安", "where": { "beat": "hello", "via": ["picture", "words"] } },
     "leave": "A small hello is what makes the round worth walking",
     "device": {
         "what": "one window lighting up warm in a row of cold dark ones",
