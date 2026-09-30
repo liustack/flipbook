@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.0 - 2026-10-01
+
+### 故事改用一句话的四格写（破坏性变更）
+
+以前的 story.json 写一个想法（`idea`）和一个会变的东西（`subject`），挡不住只有变化、没有谁在乎的片子：果蝇从卵到死、空房间被涂成奇幻空间，都写得出想法，也都有东西在变。这一版把故事定成一句话：谁想要（或怕失去）什么，因为什么事，最后得到、失去或变成了什么。四格都要填，每一格都要写明观众在哪里找到它。
+
+- **story.json 升到版本 2，版本 1 的文件直接报 `story-invalid`**：删掉 `idea` 和 `subject`，新增四格 `who`、`wants`、`because`、`becomes`，每格是 `{ "what", "where" }`。`where` 三选一：落在某一拍并写明走哪几条通道（`{ "beat", "via": ["picture" | "words" | "sound"] }`），`"record"`（观众从有记载的故事里补），`"memory"`（观众从自己的记忆里补）。`leave`、`device`、`beats` 不变。只有空白的句子算空。发布前不做兼容，旧文件照新格式重写。
+- **舞台从四格推出，不单写**：四格都落在拍里是台上的片子。有格留给记载，要写 `record` 块（故事简述、出处、能搜的线索 `key`、每份素材是故事的哪一部分 `materials`）。有格留给记忆，要写 `memory` 块（唤起记忆的那个细节 `detail`），并且至少一格留在台上。一条片子不同时用记载和记忆。这些不合都报 `story-invalid`，带 JSON 路径。换算后的故事（`timeline()` 拿到的 `story`）多了 `stage`、四格、`record` 和 `memory`，少了 `idea` 和 `subject`。
+- **新失败 `story-slot`**：台上的格声明的通道在那一拍里缺对应的字段：走字的那一拍没有 `text`，走声音的那一拍没有 `sound`，只走画面的那一拍是 `hold` 拍。字、音效和画面是不是真的讲出了那一格，由 agent 对着联系表和成片核对。
+- **新失败 `story-record`**：从记载讲的片子，`assets/SOURCES.json` 里的素材在 `materials` 里没有归属，`materials` 写了 SOURCES.json 里没有的文件，最后一拍的字里没有 `key`，或者 SOURCES.json 读不了、条目不是对象、`cutFrom` 断链或成环，都会报。`cutout`、`puppet`、`sprite` 切出来的文件顺着 `cutFrom` 跟原图算归属。素材路径统一规范化后比较，跑出 `assets/` 的路径不认。
+- **skill 的 story 一节重写**：写明「谁」和「想要」怎么判定，写 timeline 前逐格自查（盖住一格看剩下的是什么），不做哪些片子（科普只做写得成那句话的），三种舞台各自的判定和交付前的检验，画面、字、声音、音乐各擅长哪一格。教学例子换成一只把面包屑搬回家的蚂蚁。SKILL.md 第 1 步改成写四格和落点，交付时不再只看画面能不能复述，改成按落点逐格核对，走声音的格要去听那一拍。
+
+### 素材来源表只有一种路径写法（破坏性变更）
+
+- **SOURCES.json 的键只认 `assets/` 下的路径**：`a.png`、`./a.png`、`x/../a.png` 算同一个文件，读来源表的地方（图片、声音、字体许可、故事的 `materials`、`cutFrom`、cutout、puppet、sprite、stock fetch、评测器）都按这一条规则查。check 和 render 遇到同一个文件有两个键时直接报错，不替你挑一个（字体报 `font-invalid`）。评测器遇到重名不拿它证明 stock fetch，证据仍留给人看。不再按合成目录起算的完整路径兜底：键写 `assets/a.png` 指的是 `assets/assets/a.png`。含 NUL 的路径拒绝。flipbook 自己写回的条目用规范写法，你写的其他键原样保留。
+- **声音文件必须放在 `assets/` 下**：放在合成目录其他位置的音频以前靠完整路径的键记来源，现在报 `timeline-invalid`，提示挪进 `assets/`。
+
+### 样例和评测用例清空
+
+原来的样例大多是演示技法的片子，里面没有一个想要什么的主体，按新的定义讲不成故事。评测用例也是按旧的故事写法写的。
+
+- **examples/ 清空**，以后按体裁重新补讲故事的样例。references 引用的技法演示（arc-cuts、lens-montage、page-turn、brand-intro、pixel-sprout、postman、postman-print、specimen-board）挪到 `docs/samples/src/` 当技法样张，references 里改叫 "Technique sample"。其余样例删掉。
+- **eval/cases/ 清空**，以后按新的故事定义重写。评测器本身保留，没有用例时 `--dry-run` 报 0/0。
+- **发版门禁去掉完整渲染这一档**：不再在发版前把样例渲成成片比对，推 main 时 Linux 渲全部样例的那一列和 Release 附件一起去掉。帧与帧的确定性、长片这类问题留在针对它们写的引擎测试里。安装检查改渲 `docs/samples/src/specimen-board`。
+
 ## 0.8.7 - 2026-09-30
 
 ### 修复
