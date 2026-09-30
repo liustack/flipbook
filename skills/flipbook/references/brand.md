@@ -142,4 +142,4 @@ Rules:
 - A family may not reuse `"Noto Serif SC"`, `"LXGW WenKai"` or a CSS generic name such as `serif`. Two files may not share a family, weight and style.
 - flipbook serves the files itself: write the family in CSS or `ctx.font`, never an `@font-face` or a `FontFace`.
 - check verifies every character against each font's own character table. A font without Chinese needs `"Noto Serif SC"` after it in the list: `font-family: "Kestrel Display", "Noto Serif SC"`. `b.fonts.title` and `b.font()` already add it.
-- A file without a license, one that is not a readable font, or a family clash stops check with `font-invalid`.
+- A file without a license, one with two license entries (two keys naming the same file), one that is not a readable font, or a family clash stops check with `font-invalid`.

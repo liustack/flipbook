@@ -129,7 +129,7 @@ render 同时开几个浏览器，每个一页，谁空下来谁接下一帧，�
 | `story-ending-short` | 全部（warning） | 故事落定后片子停得太快：最后的字出齐后不到 2 秒就结束，没有字时最后一拍不到 2.5 秒（两个下限都最多取片长的 15%）。`detail.beat` 是最后一拍 | 加长最后一场或让最后的字早些出来，这段时间里留一个收尾的小动作，让镜头、光和音乐慢慢停下 |
 | `story-static-beat` | check、render（warning） | 某拍首尾两帧只有不到 0.2% 的像素不同，`detail.beat` 是哪一拍，`evidence` 是这两帧 | 画出这一拍说的变化，或者把全片唯一一个故意不动的拍标成 `"hold": true` |
 | `brand-invalid` | 全部 | timeline.json 的 `brand` 指的 brand.json 不存在、不是合法 JSON 或不合 brand schema，或者它写的 logo 和字体文件不在 brand.json 所在目录里、不是本地文件、没写许可证、不是能用的 .ttf 或 .otf。`detail.file` 是 brand.json 的路径，`detail.path` 是出错字段的 JSON 路径 | 按 message 改 `detail.path` 指的字段，见 references/brand.md |
-| `font-invalid` | 全部 | assets/fonts/ 里的字体文件没在 assets/SOURCES.json 写许可证、读不出（不是 .ttf 或 .otf、是字体集或 WOFF、没有 Unicode 字符表）、没有字体族名、字体族名和 flipbook 字体或 CSS 通用名撞了，或者两个文件是同一字体族同一字重同一字形。`detail.file` 是出错的文件 | 按 message 补许可证、换文件或改名 |
+| `font-invalid` | 全部 | assets/fonts/ 里的字体文件没在 assets/SOURCES.json 写许可证、在那里有两条记录（比如 `fonts/a.ttf` 和 `./fonts/a.ttf` 两个键指同一个文件）、读不出（不是 .ttf 或 .otf、是字体集或 WOFF、没有 Unicode 字符表）、没有字体族名、字体族名和 flipbook 字体或 CSS 通用名撞了，或者两个文件是同一字体族同一字重同一字形。`detail.file` 是出错的文件 | 按 message 补许可证、删掉重复的键、换文件或改名 |
 | `protocol-missing` | 全部 | 页面没定义 `window.__flipbook`，或读它时抛错 | 调运行时库的 `composition({ seek })` |
 | `protocol-mismatch` | 全部 | `window.__flipbook.protocol` 不是 1 | 设成 1 |
 | `ready-timeout` | 全部 | `ready` 60 秒内没结束（从开始加载页面算）。读 `window.__flipbook` 时页面不再应答（脚本或 getter 里死循环）也算在这 60 秒里，超时报这个码并关掉页面 | ready 里不等定时器和 rAF |

@@ -169,8 +169,8 @@ export const FINDING_CODES = {
     },
     'font-invalid': {
         meaning:
-            'A font file in assets/fonts/ has no license, is not a readable .ttf or .otf, or clashes with another font.',
-        fix: 'Write the license in assets/SOURCES.json, replace the file with its .ttf or .otf, or rename the family, as the message says. See references/brand.md.',
+            'A font file in assets/fonts/ has no license, has two license entries, is not a readable .ttf or .otf, or clashes with another font.',
+        fix: 'Write the license in assets/SOURCES.json (one entry per file: delete the duplicate key), replace the file with its .ttf or .otf, or rename the family, as the message says. See references/brand.md.',
     },
     'stock-no-results': {
         meaning: 'stock search found no image or sound for the query.',
