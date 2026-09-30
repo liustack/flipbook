@@ -36,6 +36,11 @@ export const FINDING_CODES = {
             'A slot of the story on stage has nothing to land on: it goes through the words in a beat with no text, through the sound in a beat with no sound, or through the picture alone in the hold beat.',
         fix: "Carry the slot where the beat can hold it: put the words on screen and list them in the beat's text, give the beat its sfx cue, or land it in a beat whose picture moves. Or change the slot's via or beat to where the film does show it.",
     },
+    'story-record': {
+        meaning:
+            'A film told from a written record does not hold together: a file in assets/SOURCES.json has no line in record.materials (a file cut from another counts with its original), record.materials names a file assets/SOURCES.json does not have, or no words of the last beat contain record.key.',
+        fix: 'Say in record.materials which part of the story each file is, and take out of the film any file that is only decoration. List only files the film uses. End the film on the clue: put record.key in the words of the last beat, as references/story.md describes.',
+    },
     'story-coverage': {
         meaning:
             'The beats do not follow the film: the first beat does not start where the film starts, a beat starts before the one ahead of it, or a beat covers no frame.',

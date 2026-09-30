@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
+import { parseSources } from './assetSources.ts';
 import { Checker, describe, ID_PATTERN, isNum, isObject, type Json } from './schema.ts';
 import {
     BEAT_ROLES,
@@ -80,6 +81,7 @@ export interface StoryV2 {
 type StoryCode =
     | 'story-invalid'
     | 'story-slot'
+    | 'story-record'
     | 'story-coverage'
     | 'story-arc'
     | 'story-text'
@@ -372,6 +374,9 @@ function validateShape(input: Json): { c: Checker; story?: StoryV2; stage?: Stor
         : { c, story: input as unknown as StoryV2, stage };
 }
 
+/** assets/SOURCES.json as read: its entries, or why it cannot be read. */
+export type SourcesRead = { sources: Record<string, unknown> } | { problem: string };
+
 /** Why a slot on stage cannot land in `beat` through `via`: nothing there carries it. */
 function slotProblems(slot: Slot, via: Channel[], beat: StoryBeatV2): string[] {
     const out: string[] = [];
@@ -393,6 +398,75 @@ function slotProblems(slot: Slot, via: Channel[], beat: StoryBeatV2): string[] {
     return out;
 }
 
+/**
+ * Why a story told from a record falls short of what the film can hold: a
+ * file in assets/SOURCES.json with no part in the story, a material the film
+ * does not have, or no clue to search in the last words.
+ */
+function recordProblems(
+    record: StoryRecord,
+    beats: StoryBeatV2[],
+    read: SourcesRead,
+): { path: string; message: string; detail: Record<string, unknown> }[] {
+    const out: { path: string; message: string; detail: Record<string, unknown> }[] = [];
+    if ('problem' in read) {
+        out.push({
+            path: '$.record.materials',
+            message: `cannot be checked: ${read.problem}`,
+            detail: { problem: read.problem },
+        });
+    } else {
+        const { sources } = read;
+        // A file cut from another (cutout, puppet, sprite) names it in cutFrom
+        // and belongs where its original does.
+        const unplaced = new Map<string, string[]>();
+        for (const key of Object.keys(sources)) {
+            let at = key;
+            const seen = new Set<string>();
+            let placed = false;
+            for (;;) {
+                if (`assets/${at}` in record.materials) {
+                    placed = true;
+                    break;
+                }
+                seen.add(at);
+                const entry = sources[at];
+                const from = isObject(entry) ? entry.cutFrom : undefined;
+                if (typeof from !== 'string' || seen.has(from) || !(from in sources)) break;
+                at = from;
+            }
+            if (placed) continue;
+            unplaced.set(at, [...(unplaced.get(at) ?? []), key]);
+        }
+        for (const [root, keys] of unplaced) {
+            const cut = keys.filter((key) => key !== root).length;
+            out.push({
+                path: '$.record.materials',
+                message: `has no line for assets/${root}${cut > 0 ? ` (nor for the ${cut} file${cut === 1 ? '' : 's'} cut from it)` : ''}: say which part of the story it is. A file that is not part of the story is decoration, take it out of the film`,
+                detail: { file: `assets/${root}`, files: keys.map((key) => `assets/${key}`) },
+            });
+        }
+        for (const file of Object.keys(record.materials)) {
+            if (file.slice('assets/'.length) in sources) continue;
+            out.push({
+                path: `$.record.materials[${JSON.stringify(file)}]`,
+                message: `names ${file}, which assets/SOURCES.json has no entry for: list only the files this film uses`,
+                detail: { file },
+            });
+        }
+    }
+    const last = beats[beats.length - 1];
+    const text = last.text ?? [];
+    if (!text.some((line) => line.includes(record.key))) {
+        out.push({
+            path: '$.record.key',
+            message: `"${record.key}" is in none of the words of the last beat "${last.id}" (${text.length === 0 ? 'it has none' : JSON.stringify(text)}): end the film on the clue a viewer can search for`,
+            detail: { key: record.key, beat: last.id, text },
+        });
+    }
+    return out;
+}
+
 interface StoryProblem {
     code: StoryCode;
     path: string;
@@ -408,6 +482,7 @@ interface StoryProblem {
 export function validateStory(
     input: Json,
     timeline: ResolvedTimeline,
+    options: { sources?: SourcesRead } = {},
 ): { problems: StoryProblem[]; story?: ResolvedStory } {
     const problems: StoryProblem[] = [];
     const add = (
@@ -486,6 +561,13 @@ export function validateStory(
                 beat: beat.id,
                 via: where.via,
             });
+        }
+    }
+    if (stage === 'record' && story.record) {
+        // Without SOURCES.json the film has no files: every material then names none.
+        const read = options.sources ?? { sources: {} };
+        for (const problem of recordProblems(story.record, story.beats, read)) {
+            add('story-record', problem.path, problem.message, problem.detail);
         }
     }
     if (starts.some((start) => start === null)) return { problems };
@@ -691,7 +773,23 @@ export function validateStory(
     };
 }
 
-/** Read and check `<dir>/story.json` against the resolved timeline. */
+/** `<dir>/assets/SOURCES.json` as read: no file is no entries. */
+function readSources(dir: string): SourcesRead {
+    let text: string | null;
+    try {
+        text = fs.readFileSync(path.join(dir, 'assets', 'SOURCES.json'), 'utf-8');
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            return {
+                problem: `assets/SOURCES.json cannot be read: ${(error as Error).message}`,
+            };
+        }
+        text = null;
+    }
+    return parseSources(text);
+}
+
+/** Read and check `<dir>/story.json` against the resolved timeline and `<dir>/assets/SOURCES.json`. */
 export function loadStory(
     dir: string,
     timeline: ResolvedTimeline,
@@ -726,7 +824,7 @@ export function loadStory(
             ],
         };
     }
-    const { problems, story } = validateStory(parsed, timeline);
+    const { problems, story } = validateStory(parsed, timeline, { sources: readSources(dir) });
     return {
         story,
         findings: problems.map((p) =>

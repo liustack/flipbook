@@ -1,0 +1,23 @@
+{
+    "version": 2,
+    "who": { "what": "a boy who set a paper boat on the river in 1900", "where": "record" },
+    "wants": { "what": "the boat to reach the sea", "where": { "beat": "sun", "via": ["picture"] } },
+    "because": { "what": "a storm on the river", "where": { "beat": "rain", "via": ["picture"] } },
+    "becomes": { "what": "a fisherman finds it at the river mouth a week later", "where": { "beat": "snow", "via": ["picture", "words"] } },
+    "record": {
+        "story": "A paper boat set on the river in 1900 was found at the river mouth a week later, the town paper wrote",
+        "sources": ["The river town paper, May 1900"],
+        "key": "River town 1900",
+        "materials": {}
+    },
+    "leave": "Small things make it through",
+    "device": {
+        "what": "the boat crosses the frame on one line",
+        "why": "the weather is what changes"
+    },
+    "beats": [
+        { "id": "sun", "role": "opening", "at": "sun", "change": { "from": "the boat in sun", "to": "the boat further on" } },
+        { "id": "rain", "role": "turn", "at": "rain", "change": { "from": "the boat in rain", "to": "the boat further on" } },
+        { "id": "snow", "role": "resolution", "at": "snow", "change": { "from": "the boat in snow", "to": "the boat at the edge" }, "text": ["到了"] }
+    ]
+}

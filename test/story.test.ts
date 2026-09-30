@@ -463,6 +463,124 @@ describe('story.json', () => {
         expect(found(offstage('memory', ['wants']))).toEqual([]);
     });
 
+    describe('a story told from a record', () => {
+        // A picture fetched, cut out, and one part of the cutout rigged; a sound.
+        const SOURCES = {
+            'boat.png': { source: 'https://example.org/boat', license: 'cc0' },
+            'cut/boat/boat-01.png': {
+                source: 'https://example.org/boat',
+                license: 'cc0',
+                cutFrom: 'boat.png',
+            },
+            'puppets/boat/parts/hull.png': {
+                source: 'https://example.org/boat',
+                license: 'cc0',
+                cutFrom: 'cut/boat/boat-01.png',
+            },
+            'rain.mp3': { source: 'https://example.org/rain', license: 'cc0' },
+        };
+        const materials = {
+            'assets/boat.png': 'the boat the child set on the river',
+            'assets/rain.mp3': 'the storm the town paper wrote about',
+        };
+        const told = (edit?: (s: Story) => void) =>
+            offstage('record', ['who', 'wants'], (s) => {
+                (s.record as Record<string, unknown>).materials = { ...materials };
+                edit?.(s);
+            });
+        const found = (input: unknown, sources: Record<string, unknown> = SOURCES) =>
+            validateStory(input, timeline(), { sources: { sources } }).problems;
+
+        it('gives every file a part in the story, a cut file through its original', () => {
+            expect(found(told())).toEqual([]);
+            const unplaced = found(
+                told(
+                    (s) =>
+                        delete (s.record as { materials: Record<string, string> }).materials[
+                            'assets/boat.png'
+                        ],
+                ),
+            );
+            expect(unplaced.map((p) => [p.code, p.path, p.severity])).toEqual([
+                ['story-record', '$.record.materials', 'error'],
+            ]);
+            expect(unplaced[0].detail).toEqual({
+                file: 'assets/boat.png',
+                files: [
+                    'assets/boat.png',
+                    'assets/cut/boat/boat-01.png',
+                    'assets/puppets/boat/parts/hull.png',
+                ],
+            });
+            expect(unplaced[0].message).toContain('the 2 files cut from it');
+            const sound = found(
+                told(
+                    (s) =>
+                        delete (s.record as { materials: Record<string, string> }).materials[
+                            'assets/rain.mp3'
+                        ],
+                ),
+            );
+            expect(sound.map((p) => p.detail?.file)).toEqual(['assets/rain.mp3']);
+        });
+
+        it('lists only files the film has', () => {
+            const extra = found(
+                told(
+                    (s) =>
+                        ((s.record as { materials: Record<string, string> }).materials[
+                            'assets/sun.png'
+                        ] = 'the sun'),
+                ),
+            );
+            expect(extra.map((p) => [p.code, p.path])).toEqual([
+                ['story-record', '$.record.materials["assets/sun.png"]'],
+            ]);
+        });
+
+        it('ends on the clue: the last words contain the key', () => {
+            const lost = found(
+                told((s) => ((s.record as { key: string }).key = 'River town 1900')),
+            );
+            expect(lost.map((p) => [p.code, p.path])).toEqual([['story-record', '$.record.key']]);
+            expect(lost[0].detail).toEqual({
+                key: 'River town 1900',
+                beat: 'lift',
+                text: ['撑过去'],
+            });
+            // Part of a line is enough.
+            expect(found(told((s) => ((s.record as { key: string }).key = '撑过')))).toEqual([]);
+        });
+
+        it('says so when assets/SOURCES.json cannot be read', () => {
+            const { problems } = validateStory(told(), timeline(), {
+                sources: { problem: 'assets/SOURCES.json is not valid JSON: nope' },
+            });
+            expect(problems.map((p) => [p.code, p.path])).toEqual([
+                ['story-record', '$.record.materials'],
+            ]);
+        });
+
+        it('checks nothing of the kind on stage or from memory', () => {
+            expect(found(story())).toEqual([]);
+            expect(found(offstage('memory', ['who']))).toEqual([]);
+        });
+
+        it('reads assets/SOURCES.json next to story.json', () => {
+            const dir = tempDir('story-record');
+            fs.mkdirSync(path.join(dir, 'assets'));
+            fs.writeFileSync(path.join(dir, 'story.json'), JSON.stringify(told()));
+            expect(loadStory(dir, timeline()).findings.map((f) => f.code)).toEqual([
+                'story-record',
+                'story-record',
+            ]);
+            fs.writeFileSync(path.join(dir, 'assets', 'SOURCES.json'), JSON.stringify(SOURCES));
+            const loaded = loadStory(dir, timeline());
+            expect(loaded.findings).toEqual([]);
+            expect(loaded.story?.stage).toBe('record');
+        });
+    });
+
     it('counts sentence length in characters and takes $schema only as a string', () => {
         expect(codesOf(story((s) => (s.leave = '🙂'.repeat(300))))).toEqual([]);
         expect(codesOf(story((s) => (s.leave = '🙂'.repeat(301))))).toEqual(['story-invalid']);

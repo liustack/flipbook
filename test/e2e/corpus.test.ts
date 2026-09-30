@@ -171,6 +171,19 @@ describe('bad composition corpus', () => {
         expect(rendered.artifacts.video).toBeUndefined();
     });
 
+    it('story-record: a story from the record that never gives the clue to search', async () => {
+        const checked = await check('story-record');
+        expect(codes(checked)).toEqual(['story-record']);
+        expect(checked.failures[0].detail).toMatchObject({
+            path: '$.record.key',
+            key: 'River town 1900',
+            beat: 'snow',
+        });
+        const rendered = await render('story-record');
+        expect(codes(rendered)).toEqual(['story-record']);
+        expect(rendered.artifacts.video).toBeUndefined();
+    });
+
     it('story-coverage: a beat a sliver long rounds to no frame at all', async () => {
         const checked = await check('story-empty-beat');
         expect(codes(checked)).toEqual(['story-coverage']);

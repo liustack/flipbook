@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 320px; height: 180px; overflow: hidden; background: #ffffff; }
+  canvas { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<canvas id="ink"></canvas>
+<p id="end" style="position:absolute;left:0;right:0;top:40px;margin:0;text-align:center;font:600 28px 'Noto Serif SC';color:#2b2622;opacity:0">到了</p>
+<script type="module">
+import { composition, cueProgress, setupCanvas, timeline } from '/__flipbook/runtime.js';
+const tl = await timeline();
+const ink = setupCanvas(document.getElementById('ink'), 320, 180);
+const words = document.getElementById('end');
+const SKY = { sun: '#f3d27a', rain: '#8fa3b8', snow: '#e8edf2' };
+composition({
+  seek(t) {
+    const scene = tl.scenes.find((s) => t >= s.start && t < s.end) ?? tl.scenes[tl.scenes.length - 1];
+    ink.fillStyle = SKY[scene.id];
+    ink.fillRect(0, 0, 320, 180);
+    // A boat crossing the frame: it moves in every scene.
+    ink.fillStyle = '#7a4b2a';
+    ink.fillRect(20 + (t / tl.durationSec) * 260, 110, 40, 16);
+    // The words come in as the last scene starts.
+    words.style.opacity = String(cueProgress(tl, t, 'end'));
+  },
+});
+</script>
+</body>
+</html>
