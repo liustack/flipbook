@@ -1,0 +1,74 @@
+{
+    "version": 2,
+    "who": {
+        "what": "the paper boat",
+        "where": {
+            "beat": "sun",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "wants": {
+        "what": "to reach the far shore",
+        "where": {
+            "beat": "sun",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "because": {
+        "what": "the weather turns against it",
+        "where": {
+            "beat": "rain",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "becomes": {
+        "what": "it reaches the far edge and the words say it made it",
+        "where": {
+            "beat": "snow",
+            "via": [
+                "picture",
+                "words"
+            ]
+        }
+    },
+    "leave": "Weather changes",
+    "device": {
+        "what": "the boat crosses the frame on one line",
+        "why": "the weather is what changes"
+    },
+    "beats": [
+        {
+            "id": "sun",
+            "role": "opening",
+            "at": "sun",
+            "change": {
+                "from": "the boat in sun",
+                "to": "the boat further on"
+            }
+        },
+        {
+            "id": "rain",
+            "role": "turn",
+            "at": "rain",
+            "change": {
+                "from": "the boat in rain",
+                "to": "the boat further on"
+            }
+        },
+        {
+            "id": "snow",
+            "role": "resolution",
+            "at": "snow",
+            "change": {
+                "from": "the boat in snow",
+                "to": "the boat at the far edge"
+            }
+        }
+    ]
+}

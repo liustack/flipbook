@@ -46,7 +46,7 @@ type Story = Record<string, unknown> & { beats: Record<string, unknown>[] };
 function story(edit?: (s: Story) => void) {
     const s = {
         version: 2,
-        who: { what: 'a paper boat', where: { beat: 'calm', via: ['picture', 'words'] } },
+        who: { what: 'a paper boat', where: { beat: 'calm', via: ['picture'] } },
         wants: { what: 'to reach the far shore', where: { beat: 'calm', via: ['picture'] } },
         because: {
             what: 'the rain soaks it through and the snow buries it',
@@ -54,7 +54,7 @@ function story(edit?: (s: Story) => void) {
         },
         becomes: {
             what: 'a hand lifts it out and it rides high again',
-            where: { beat: 'lift', via: ['picture', 'words'] },
+            where: { beat: 'lift', via: ['picture'] },
         },
         leave: 'Small things make it through',
         device: {
@@ -262,6 +262,9 @@ describe('story.json', () => {
         const twoHolds = story((s) => {
             s.beats[0].hold = true;
             s.beats[1].hold = true;
+            // The slots there go through words and sound, which a still beat can carry.
+            (s.who as { where: { via: string[] } }).where.via = ['words'];
+            (s.wants as { where: { via: string[] } }).where.via = ['words'];
         });
         expect(codesOf(twoHolds)).toEqual(['story-invalid']);
     });
@@ -342,7 +345,7 @@ describe('story.json', () => {
         expect(onstage.story).toMatchObject({ stage: 'onstage', record: null, memory: null });
         expect(onstage.story?.who).toEqual({
             what: 'a paper boat',
-            where: { beat: 'calm', via: ['picture', 'words'] },
+            where: { beat: 'calm', via: ['picture'] },
         });
         const record = validateStory(offstage('record', ['who', 'wants']), timeline());
         expect(record.problems).toEqual([]);
@@ -420,6 +423,44 @@ describe('story.json', () => {
         // A story told from a record may leave all four to it.
         const record = offstage('record', ['who', 'wants', 'because', 'becomes']);
         expect(validateStory(record, timeline()).problems).toEqual([]);
+    });
+
+    it('lands each slot on stage in a beat that can carry it', () => {
+        const slot = (name: string, beat: string, via: string[]) =>
+            story((s) => ((s[name] as { where: unknown }).where = { beat, via }));
+        const found = (input: unknown) =>
+            validateStory(input, timeline()).problems.map((p) => [p.code, p.path, p.severity]);
+        // Words in a beat with no text, sound in a beat with no sound.
+        expect(found(slot('wants', 'soak', ['picture', 'words']))).toEqual([
+            ['story-slot', '$.wants.where.via', 'error'],
+        ]);
+        expect(found(slot('becomes', 'lift', ['sound']))).toEqual([
+            ['story-slot', '$.becomes.where.via', 'error'],
+        ]);
+        // Words and sound in a beat with words only: one problem, for the sound.
+        const both = validateStory(slot('because', 'calm', ['words', 'sound']), timeline());
+        expect(both.problems.map((p) => [p.code, p.path])).toEqual([
+            ['story-slot', '$.because.where.via'],
+        ]);
+        expect(both.problems[0].message).toContain('names no sound');
+        // The picture alone in the hold beat shows nothing, sound there carries it.
+        const held = (via: string[]) =>
+            story((s) => {
+                s.beats[1].hold = true;
+                (s.because as { where: unknown }).where = { beat: 'soak', via };
+            });
+        const stillPicture = validateStory(held(['picture']), timeline()).problems;
+        expect(stillPicture.map((p) => [p.code, p.path])).toEqual([
+            ['story-slot', '$.because.where.via'],
+        ]);
+        expect(stillPicture[0].detail).toEqual({
+            slot: 'because',
+            beat: 'soak',
+            via: ['picture'],
+        });
+        expect(found(held(['picture', 'sound']))).toEqual([]);
+        // Slots left off stage have no beat to check.
+        expect(found(offstage('memory', ['wants']))).toEqual([]);
     });
 
     it('counts sentence length in characters and takes $schema only as a string', () => {

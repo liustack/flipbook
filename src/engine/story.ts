@@ -79,6 +79,7 @@ export interface StoryV2 {
 
 type StoryCode =
     | 'story-invalid'
+    | 'story-slot'
     | 'story-coverage'
     | 'story-arc'
     | 'story-text'
@@ -371,6 +372,27 @@ function validateShape(input: Json): { c: Checker; story?: StoryV2; stage?: Stor
         : { c, story: input as unknown as StoryV2, stage };
 }
 
+/** Why a slot on stage cannot land in `beat` through `via`: nothing there carries it. */
+function slotProblems(slot: Slot, via: Channel[], beat: StoryBeatV2): string[] {
+    const out: string[] = [];
+    if (via.includes('words') && (beat.text ?? []).length === 0) {
+        out.push(
+            `goes through the words, but beat "${beat.id}" has no text: put the words that carry ${slot} on screen in that beat and list them in its text, or take "words" out of via`,
+        );
+    }
+    if (via.includes('sound') && beat.sound === undefined) {
+        out.push(
+            `goes through the sound, but beat "${beat.id}" names no sound: give it the sfx cue that carries ${slot}, or take "sound" out of via`,
+        );
+    }
+    if (via.length === 1 && via[0] === 'picture' && beat.hold === true) {
+        out.push(
+            `goes through the picture alone, but beat "${beat.id}" is the hold beat, where the picture stands still: land ${slot} in a beat where it shows, or carry it in words or sound too`,
+        );
+    }
+    return out;
+}
+
 interface StoryProblem {
     code: StoryCode;
     path: string;
@@ -445,15 +467,26 @@ export function validateStory(
             );
         }
     });
-    // The slots on stage each land in a beat of the story.
+    // The slots on stage: each lands in a beat that can carry it.
     for (const slot of SLOTS) {
         const where = story[slot].where;
-        if (typeof where === 'string' || story.beats.some((b) => b.id === where.beat)) continue;
-        add(
-            'story-invalid',
-            `$.${slot}.where.beat`,
-            `names no beat (known: ${story.beats.map((b) => b.id).join(', ')})`,
-        );
+        if (typeof where === 'string') continue;
+        const beat = story.beats.find((b) => b.id === where.beat);
+        if (!beat) {
+            add(
+                'story-invalid',
+                `$.${slot}.where.beat`,
+                `names no beat (known: ${story.beats.map((b) => b.id).join(', ')})`,
+            );
+            continue;
+        }
+        for (const problem of slotProblems(slot, where.via, beat)) {
+            add('story-slot', `$.${slot}.where.via`, problem, {
+                slot,
+                beat: beat.id,
+                via: where.via,
+            });
+        }
     }
     if (starts.some((start) => start === null)) return { problems };
     const at = starts as number[];

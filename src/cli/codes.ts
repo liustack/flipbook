@@ -31,6 +31,11 @@ export const FINDING_CODES = {
             'story.json does not match story schema v2 (a v1 file among them), its slots leave the story to a record and to memory at once or lack the record or memory block they need, or it names a scene, cue or beat that does not exist.',
         fix: 'Fix the field named in `detail.path` as the message says.',
     },
+    'story-slot': {
+        meaning:
+            'A slot of the story on stage has nothing to land on: it goes through the words in a beat with no text, through the sound in a beat with no sound, or through the picture alone in the hold beat.',
+        fix: "Carry the slot where the beat can hold it: put the words on screen and list them in the beat's text, give the beat its sfx cue, or land it in a beat whose picture moves. Or change the slot's via or beat to where the film does show it.",
+    },
     'story-coverage': {
         meaning:
             'The beats do not follow the film: the first beat does not start where the film starts, a beat starts before the one ahead of it, or a beat covers no frame.',

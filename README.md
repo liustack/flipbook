@@ -137,7 +137,7 @@ Each command prints a JSON report to stdout. Every failure in it names a code an
 
 | Stage | What it checks |
 |---|---|
-| story (check and render) | the beats follow the film in order with no gap, the story has an opening, a turn and a resolution, each beat lists the words it puts on screen and leaves time to read them, and each beat's picture changes from its first frame to its last |
+| story (check and render) | every slot of the story sentence set on stage lands in a beat that can carry it, the beats follow the film in order with no gap, the story has an opening, a turn and a resolution, each beat lists the words it puts on screen and leaves time to read them, and each beat's picture changes from its first frame to its last |
 | check | timeline fields (errors point to the JSON path), forbidden code patterns and actual calls to forbidden clock and random functions, console errors, missing files, network requests, reads outside the directory, ready and seek timeouts, whether a frame changes when frames are visited in another order, whether it changes under another clock or random seed, late paints, blank frames and frames with nothing but paper, missing glyphs and fallback to system fonts, text off the frame or in the safe margin, text contrast |
 | render | frame count and duration, runs of blank or paper-only frames, freezes in scenes not marked as holds, PSNR between the encoded video and the captured frames, yuv420p and bt709 color tags, audio duration, loudness and true peak, whether each sound effect lands on its frame |
 

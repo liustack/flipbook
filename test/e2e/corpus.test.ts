@@ -158,6 +158,19 @@ describe('bad composition corpus', () => {
         expect(codes(await render('story-invalid'))).toEqual(['story-invalid']);
     });
 
+    it('story-slot: the ending goes through the words, and its beat has none', async () => {
+        const checked = await check('story-slot');
+        expect(codes(checked)).toEqual(['story-slot']);
+        expect(checked.failures[0].detail).toMatchObject({
+            path: '$.becomes.where.via',
+            slot: 'becomes',
+            beat: 'snow',
+        });
+        const rendered = await render('story-slot');
+        expect(codes(rendered)).toEqual(['story-slot']);
+        expect(rendered.artifacts.video).toBeUndefined();
+    });
+
     it('story-coverage: a beat a sliver long rounds to no frame at all', async () => {
         const checked = await check('story-empty-beat');
         expect(codes(checked)).toEqual(['story-coverage']);
