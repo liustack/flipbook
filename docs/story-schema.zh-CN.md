@@ -110,6 +110,8 @@ read_when:
 
 `materials` 的路径、`assets/SOURCES.json` 的键和 `cutFrom` 按同一种写法比较：用正斜杠，算掉 `.` 和 `..`，所以 `assets/./a.png` 和 `assets/a.png` 是同一个文件。算完之后路径必须仍在 `assets/` 里。`materials` 的路径跑出 `assets/`、是绝对路径、用了反斜杠，或者和另一条指同一个文件，都是 `story-invalid`。只认 `assets/SOURCES.json` 里这个文件自己的条目。
 
+`story-record` 只查归属需要的部分：每个条目是对象，每个 `cutFrom` 指向另一个条目并且有尽头。磁盘上的每个图片和声音文件有没有来源和许可，由 `asset-unlicensed` 和 `audio-unlicensed` 对所有片子查。
+
 ## memory
 
 | 字段 | 必填 | 取值 | 含义 |
@@ -136,7 +138,7 @@ read_when:
 | `story-missing` | 没有 story.json |
 | `story-invalid` | 字段缺了、不认识或超出范围，或者文件是版本 1。某格的 `where.beat` 指的拍不存在，或者 `via` 为空、有重复、写了别的通道。四格里 `"record"` 和 `"memory"` 混用，两个块都写了，有格留给它却缺了块，写了块却没有格留给它，或者四格全留给记忆。`record.materials` 的路径不在 `assets/` 里，或者同一个文件写了两条。`at` 指的场不存在，或者拍数超出这一场。`sound` 指的不是 sfx cue，或者不在这一拍里响。`callback` 指的不是前面的拍。`hold` 超过一个 |
 | `story-slot` | 台上的某一格在它那一拍里没有落点：走 `words` 而那一拍没有 `text`，走 `sound` 而那一拍没有 `sound`，或者只走 `picture` 而那一拍是 `hold` 拍。`detail` 给出哪一格、哪一拍和 `via` |
-| `story-record` | 只查从记载讲的片子。`assets/SOURCES.json` 里的某份素材在 `record.materials` 里没有归属（`cutout`、`puppet`、`sprite` 从别的图切出来的文件在 `cutFrom` 里记着原图，原图有归属就算有），`record.materials` 写了 `assets/SOURCES.json` 里没有的文件，`assets/SOURCES.json` 的某个键跑出 `assets/` 或和另一个键指同一个文件，或者最后一拍的 `text` 没有一条包含 `record.key` |
+| `story-record` | 只查从记载讲的片子。`assets/SOURCES.json` 里的某份素材在 `record.materials` 里没有归属（`cutout`、`puppet`、`sprite` 从别的图切出来的文件在 `cutFrom` 里记着原图，原图有归属就算有），`record.materials` 写了 `assets/SOURCES.json` 里没有的文件，`assets/SOURCES.json` 的某个键跑出 `assets/` 或和另一个键指同一个文件，某个条目不是对象，某个 `cutFrom` 指不到自己的条目，或者切出来的文件绕回自己（在断开的地方报，`record.materials` 怎么写都一样），或者最后一拍的 `text` 没有一条包含 `record.key` |
 | `story-coverage` | 第一拍不是从第一场的第一拍开始，某一拍没有比上一拍晚开始，或者某一拍换算成帧之后一帧都没有 |
 | `story-arc` | 第一拍不是 `opening`，最后一拍不是 `resolution`，或者中间没有 `turn`。warning：超过六拍 |
 | `story-text` | 某拍的 `text` 和开始时刻落在这一拍里的 text cue 对不上 |

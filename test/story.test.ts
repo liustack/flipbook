@@ -608,6 +608,60 @@ describe('story.json', () => {
             ]);
         });
 
+        it('follows cutFrom only along entries that hold, and says where it breaks', () => {
+            const cc0 = { source: 'https://example.org/a', license: 'cc0' };
+            const problems = (m: Record<string, string>, sources: Record<string, unknown>) =>
+                found(
+                    told((s) => ((s.record as { materials: unknown }).materials = m)),
+                    sources,
+                ).map((p) => [p.code, p.detail?.entry ?? p.detail?.file]);
+            // A cut file whose original has no entry: a line for the cut file does not hide it.
+            const lost = { 'leaf.png': { ...cc0, cutFrom: 'missing.png' } };
+            expect(problems({ 'assets/leaf.png': 'part' }, lost)).toEqual([
+                ['story-record', 'leaf.png'],
+            ]);
+            expect(problems({}, lost)).toEqual([['story-record', 'leaf.png']]);
+            // Two files cut from each other, and a third cut from one of them.
+            const loop = {
+                'a.png': { ...cc0, cutFrom: 'b.png' },
+                'b.png': { ...cc0, cutFrom: 'a.png' },
+                'c.png': { ...cc0, cutFrom: 'a.png' },
+            };
+            const looped = found(
+                told(
+                    (s) =>
+                        ((s.record as { materials: unknown }).materials = {
+                            'assets/a.png': 'part',
+                        }),
+                ),
+                loop,
+            );
+            expect(looped.map((p) => p.code)).toEqual(['story-record']);
+            expect(looped[0].message).toContain('assets/a.png → assets/b.png → assets/a.png');
+            expect(problems({}, loop)).toEqual([['story-record', 'a.png']]);
+            // An entry that is no object, and a cutFrom that is no path, even with a line.
+            expect(problems({ 'assets/ghost.svg': 'part' }, { 'ghost.svg': null })).toEqual([
+                ['story-record', 'ghost.svg'],
+            ]);
+            expect(
+                problems({ 'assets/a.png': 'part' }, { 'a.png': { ...cc0, cutFrom: 42 } }),
+            ).toEqual([['story-record', 'a.png']]);
+            expect(
+                problems({ 'assets/a.png': 'part' }, { 'a.png': { ...cc0, cutFrom: '../b.png' } }),
+            ).toEqual([['story-record', 'a.png']]);
+            // An inherited name is no original.
+            expect(
+                problems({ 'assets/a.png': 'part' }, { 'a.png': { ...cc0, cutFrom: 'toString' } }),
+            ).toEqual([['story-record', 'a.png']]);
+            // A chain that holds, three files long, needs one line at its start.
+            const chain = {
+                'root.png': cc0,
+                'mid.png': { ...cc0, cutFrom: 'root.png' },
+                'leaf.png': { ...cc0, cutFrom: 'mid.png' },
+            };
+            expect(problems({ 'assets/root.png': 'part' }, chain)).toEqual([]);
+        });
+
         it('says so when assets/SOURCES.json cannot be read', () => {
             const { problems } = validateStory(told(), timeline(), {
                 sources: { problem: 'assets/SOURCES.json is not valid JSON: nope' },

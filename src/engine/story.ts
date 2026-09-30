@@ -462,27 +462,68 @@ function materialProblems(
         });
     }
     // A file cut from another (cutout, puppet, sprite) names it in cutFrom
-    // and belongs where its original does.
+    // and belongs where its original does. Before anything is inherited, each
+    // entry must be an object and each cutFrom must lead to an own entry and
+    // end: a break or a loop is reported where it is, whatever materials says.
+    const broken = new Set<string>();
+    for (const [file, { key, entry }] of entries) {
+        if (!isObject(entry)) {
+            bad(key, `is not an object with source and license (got ${describe(entry as Json)})`);
+            broken.add(file);
+            continue;
+        }
+        if (entry.cutFrom === undefined) continue;
+        const from = typeof entry.cutFrom === 'string' ? assetPath(entry.cutFrom) : null;
+        if (from === null) {
+            bad(
+                key,
+                `has a cutFrom that is not a path inside assets/ (got ${describe(entry.cutFrom as Json)})`,
+            );
+            broken.add(file);
+        } else if (!entries.has(from)) {
+            bad(key, `is cut from ${JSON.stringify(entry.cutFrom)}, which has no entry of its own`);
+            broken.add(file);
+        }
+    }
+    const next = (file: string): string | null => {
+        const entry = entries.get(file)?.entry as Record<string, unknown>;
+        return typeof entry.cutFrom === 'string' ? assetPath(entry.cutFrom) : null;
+    };
+    for (const file of entries.keys()) {
+        const chain: string[] = [];
+        let at: string | null = file;
+        while (at !== null && !broken.has(at) && !chain.includes(at)) {
+            chain.push(at);
+            at = next(at);
+        }
+        if (at === null || broken.has(at)) continue;
+        const loop = chain.slice(chain.indexOf(at));
+        bad(
+            entries.get(at)?.key as string,
+            `is cut from a file that leads back to it (${[...loop, at].map((f) => `assets/${f}`).join(' → ')}): name the original each file was really cut from`,
+        );
+        for (const f of loop) broken.add(f);
+    }
     const unplaced = new Map<string, string[]>();
     for (const file of entries.keys()) {
         let at = file;
-        const seen = new Set<string>();
         let placed = false;
+        let after = false;
         for (;;) {
+            if (broken.has(at)) {
+                after = true;
+                break;
+            }
             if (materials.has(at)) {
                 placed = true;
                 break;
             }
-            seen.add(at);
-            const entry = entries.get(at)?.entry;
-            const from =
-                isObject(entry) && typeof entry.cutFrom === 'string'
-                    ? assetPath(entry.cutFrom)
-                    : null;
-            if (from === null || seen.has(from) || !entries.has(from)) break;
+            const from = next(at);
+            if (from === null) break;
             at = from;
         }
-        if (placed) continue;
+        // A file after a break or a loop has no original to belong with: that is reported above.
+        if (placed || after) continue;
         unplaced.set(at, [...(unplaced.get(at) ?? []), file]);
     }
     for (const [root, files] of unplaced) {
