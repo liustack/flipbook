@@ -729,6 +729,13 @@ describe('story.json', () => {
                 'story-record',
                 'story-record',
             ]);
+            // A file that is no JSON, or no object of entries, is said to be so.
+            for (const broken of ['{', '[]']) {
+                fs.writeFileSync(path.join(dir, 'assets', 'SOURCES.json'), broken);
+                const unread = loadStory(dir, timeline()).findings;
+                expect(unread.map((f) => f.code)).toEqual(['story-record']);
+                expect(unread[0].detail?.problem).toContain('assets/SOURCES.json');
+            }
             fs.writeFileSync(path.join(dir, 'assets', 'SOURCES.json'), JSON.stringify(SOURCES));
             const loaded = loadStory(dir, timeline());
             expect(loaded.findings).toEqual([]);
