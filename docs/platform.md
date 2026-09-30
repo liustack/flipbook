@@ -11,6 +11,8 @@ read_when:
 
 English | [中文](platform.zh-CN.md)
 
+The measurements below name films that were examples in the repository when they were taken: hello, eggs-five (five and shu), long-scroll and beat-title. Those films have since been removed. The names say what was measured, they are not files to open.
+
 ## Support matrix
 
 | Platform | Status | Tested |
@@ -121,7 +123,7 @@ First, confirm the GPU is really on: CDP `SystemInfo.getInfo` shows SwiftShader 
 
 | Composition | Frames | Software raster, two runs | GPU, two runs | PSNR, software against GPU |
 |---|---|---|---|---|
-| examples/hello (canvas square plus DOM text) | 120 | Identical | Identical | Every frame differs, lowest 60.17 dB, mean 62.07 dB |
+| hello (canvas square plus DOM text) | 120 | Identical | Identical | Every frame differs, lowest 60.17 dB, mean 62.07 dB |
 | test/fixtures/color (solid color blocks) | 24 | Identical | Identical | Exactly the same |
 | test/fixtures/music | 24 | Identical | Identical | Every frame differs, lowest 51.40 dB, mean 52.39 dB |
 | stress (canvas gradients, shadow blur, transparency, multiply blending, Bézier curves, DOM rounded-corner shadows and text shadows) | 120 | All six identical | Runs 2 to 6 against run 1: 20, 21, 120, 43 and 43 frames differ | Lowest 48.52 dB, mean 49.02 dB |
@@ -218,7 +220,7 @@ hello and eggs-five, check first, then render with the automatic page count (2 p
 
 ### Memory for a three-minute video
 
-examples/long-scroll (3 minutes, 4320 frames, 1920×1080). During the render, the physical footprint of every process in the render's process tree was read once per second (macOS `phys_footprint`, which counts compressed memory too). The first round measured RSS, but the leaking video fills its array with the same number, macOS compresses it away and RSS barely grows, so the measure was switched. The "leaking video" is long-scroll pushing 50,000 different floats into a global array on every seek (about 400 KB of heap per frame, with the picture unchanged), to see whether reopening pages works.
+long-scroll (3 minutes, 4320 frames, 1920×1080). During the render, the physical footprint of every process in the render's process tree was read once per second (macOS `phys_footprint`, which counts compressed memory too). The first round measured RSS, but the leaking video fills its array with the same number, macOS compresses it away and RSS barely grows, so the measure was switched. The "leaking video" is long-scroll pushing 50,000 different floats into a global array on every seek (about 400 KB of heap per frame, with the picture unchanged), to see whether reopening pages works.
 
 The Chromium column shows 6 readings taken evenly through the capture (MB, all Chromium processes together), and "peak total" includes Node and ffmpeg. ffmpeg stayed at 780 to 865 MB throughout.
 

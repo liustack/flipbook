@@ -97,7 +97,7 @@ https://github.com/user-attachments/assets/a4ac0370-f154-453a-8777-16283a554194
 把这句话交给你的 agent：
 
 ```text
-按 https://github.com/liustack/flipbook/blob/v0.8.7/INSTALL.zh-CN.md 安装 flipbook，装完渲一遍 hello 例子，告诉我结果。
+按 https://github.com/liustack/flipbook/blob/v0.8.7/INSTALL.zh-CN.md 安装 flipbook，装完渲一遍它指定的样张，告诉我结果。
 ```
 
 或者自己装 skill。Claude Code：
@@ -152,7 +152,7 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
 | 项 | 状态 |
 |---|---|
 | macOS arm64 | 支持。本机直跑、Claude Code 沙箱、Codex 沙箱都实测过 |
-| Linux x64（Ubuntu 22.04、24.04，Debian 12） | 支持。CI 按 INSTALL.md 从头装到渲出 hello |
+| Linux x64（Ubuntu 22.04、24.04，Debian 12） | 支持。CI 按 INSTALL.md 从头装到渲出它的样张 |
 | Linux arm64 | 尽力而为。Ubuntu 24.04 arm64 容器里测过受限容器和两家宿主的 Linux 沙箱 |
 | macOS x64（Intel） | 尽力而为，没测 |
 | Windows | 不支持，在 WSL2 里用。原生 Windows 退 78 |

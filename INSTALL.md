@@ -39,7 +39,7 @@ mkdir -p ~/.claude/skills   # replace with your TARGET
 
 ## Step 2: Put `skills/flipbook` into the skill directory
 
-The skill is the `skills/flipbook` folder of the repository: `SKILL.md`, `references/` and `scripts/` with the launcher. Copy the whole folder. Keep the clone: step 4 renders an example from it.
+The skill is the `skills/flipbook` folder of the repository: `SKILL.md`, `references/` and `scripts/` with the launcher. Copy the whole folder. Keep the clone: step 4 renders a sample from it.
 
 ### Path A: clone and copy
 
@@ -191,27 +191,27 @@ bash ~/.claude/skills/flipbook/scripts/run.sh doctor   # replace with your TARGE
 
 `doctor` prints one JSON object. On a fresh machine it exits 78 with `chromium-missing` in `problems`. That is expected before the first render. For any other problem, relay the lines in its top-level `fix`.
 
-Then render the example (this is the first download from step 3d):
+Then render a sample from the repository (this is the first download from step 3d):
 
 ```bash
-HELLO="${TMPDIR:-/tmp}/flipbook-hello"
-rm -rf "$HELLO" && cp -R /tmp/flipbook-src/examples/hello "$HELLO"
-bash ~/.claude/skills/flipbook/scripts/run.sh check "$HELLO"
-bash ~/.claude/skills/flipbook/scripts/run.sh render "$HELLO"
+SAMPLE="${TMPDIR:-/tmp}/flipbook-sample"
+rm -rf "$SAMPLE" && cp -R /tmp/flipbook-src/docs/samples/src/specimen-board "$SAMPLE"
+bash ~/.claude/skills/flipbook/scripts/run.sh check "$SAMPLE"
+bash ~/.claude/skills/flipbook/scripts/run.sh render "$SAMPLE"
 bash ~/.claude/skills/flipbook/scripts/run.sh doctor
 ```
 
 **Success is:**
 - `render` exits 0 and its JSON says `"ok": true`.
-- `$HELLO/out/video.mp4` exists: 5 seconds, 1920×1080, a red square moving under "你好，翻页书" and "Hello, flipbook".
+- `$SAMPLE/out/video.mp4` exists: 10 seconds, 1920×1080, four cut-out natural history plates dropping onto squared paper, then "博物笔记" and "Field notes from the public domain" written under them.
 - The last `doctor` exits 0.
 
-Open `$HELLO/out/contact-sheet.png` to see the frames.
+Open `$SAMPLE/out/contact-sheet.png` to see the frames.
 
 **If it fails:**
 - The launcher printed a JSON diagnosis with `"error": "runtime-missing"` and exited 78: no Node or npx was found. Relay `fix` and redo 3a.
 - Exit 78 from `check` or `render`: read `error` and `fix` in the JSON on stderr. `cache-unwritable`, `chromium-install-failed`, `sandbox-blocked` and `tmp-unwritable` mean 3e, `linux-deps-missing` means 3d, `ffmpeg-missing` means 3b, `resource-exhausted` means 3c, `font-download-failed` means the network or proxy (see the hosts in 3d, a mirror can be set with `FLIPBOOK_FONT_BASE_URL`).
-- Exit 1: the example failed a check on this machine. Send the report JSON to https://github.com/liustack/flipbook/issues.
+- Exit 1: the sample failed a check on this machine. Send the report JSON to https://github.com/liustack/flipbook/issues.
 
 ---
 

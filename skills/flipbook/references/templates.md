@@ -13,7 +13,7 @@ A template carries one device through a whole film. Pick at most one per film:
 
 N objects fly in one after another and land on slots packed inside a digit, a letter or a Chinese character, each landing on a mark cue. The camera eases in while the finished glyph rests, then the film cuts to a title.
 
-Sample image: `docs/samples/templates.png` in the flipbook repository, https://github.com/liustack/flipbook/blob/main/docs/samples/templates.png. Full example with bird eggs: `examples/eggs-five/` (`five` builds a 5, `shu` builds 书).
+Sample image: `docs/samples/templates.png` in the flipbook repository, https://github.com/liustack/flipbook/blob/main/docs/samples/templates.png.
 
 The JavaScript snippets below run inside a 640×360 page with `<canvas id="stage">` and this timeline:
 
@@ -161,7 +161,7 @@ A page curls up from its corner, rolls over and lands on the other side of the s
 - **Opening**: a book on a desk. The cover swings open as a stiff board, the camera pushes into the right-hand page until it fills the frame, and the first scene goes on full frame.
 - **Flipbook**: a turn every beat or half beat, each page one drawing. Turns longer than the gap between them keep several pages in the air at once, and the drawings play as an animation.
 
-Sample image: `docs/samples/page-turn.png` in the flipbook repository. Full example with all three uses: `examples/page-turn/`.
+Sample image: `docs/samples/page-turn.png` in the flipbook repository. Technique sample with all three uses: `docs/samples/src/page-turn/`.
 
 ### Steps
 
@@ -280,7 +280,7 @@ composition({
 
 Plates seen through a round eyepiece: a dark surround, a knurled ring, a vignette and color fringes at the window edge, optional scale marks. The iris can open at the start. Each plate comes up on its cut and pulls into focus. At the end the window grows until it fills the frame and the last plate becomes the whole picture.
 
-Sample image: `docs/samples/lens-montage.png` in the flipbook repository. Full example: `examples/lens-montage/`, six specimen plates and a moon that pulls out into a dusk sky.
+Sample image: `docs/samples/lens-montage.png` in the flipbook repository. Technique sample: `docs/samples/src/lens-montage/`, six specimen plates and a moon that pulls out into a dusk sky.
 
 ### Steps
 
@@ -352,7 +352,7 @@ composition({
 
 One arc stays in the same place from shot to shot while what lies above and below it changes at every cut: an atmosphere, a droplet, a crust of bread, a leaf, a slice of agate. The shots get shorter as the film goes on. The whole picture pushes in slowly across all the shots. Words sit on the arc, one per shot or a whole line at the end.
 
-Sample image: `docs/samples/arc-cuts.png` in the flipbook repository. Full example: `examples/arc-cuts/`, eighteen shots over twelve materials.
+Sample image: `docs/samples/arc-cuts.png` in the flipbook repository. Technique sample: `docs/samples/src/arc-cuts/`, eighteen shots over twelve materials.
 
 ### Steps
 

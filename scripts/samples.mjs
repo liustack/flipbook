@@ -20,12 +20,11 @@ export const SAMPLES = [
     { name: 'paper', dir: 'docs/samples/src/paper', at: 0.5, width: 960 },
     { name: 'materials', dir: 'docs/samples/src/materials', at: 0.5, width: 960 },
     { name: 'riso', dir: 'docs/samples/src/riso', at: 0.5, width: 960 },
-    { name: 'pixel', dir: 'examples/pixel-sprout', at: 10.5, width: 960 },
+    { name: 'pixel', dir: 'docs/samples/src/pixel-sprout', at: 10.5, width: 960 },
     { name: 'text', dir: 'docs/samples/src/text', at: 1.5, width: 960 },
-    { name: 'templates', dir: 'examples/eggs-five/five', at: 2.6, width: 960 },
-    { name: 'page-turn', dir: 'examples/page-turn', at: 6.2, width: 960 },
-    { name: 'lens-montage', dir: 'examples/lens-montage', at: 3.1, width: 960 },
-    { name: 'arc-cuts', dir: 'examples/arc-cuts', at: 7.8, width: 960 },
+    { name: 'page-turn', dir: 'docs/samples/src/page-turn', at: 6.2, width: 960 },
+    { name: 'lens-montage', dir: 'docs/samples/src/lens-montage', at: 3.1, width: 960 },
+    { name: 'arc-cuts', dir: 'docs/samples/src/arc-cuts', at: 7.8, width: 960 },
 ];
 
 function fail(message) {

@@ -4,7 +4,8 @@
 //   node scripts/rebaseline.mjs --old "node ../flipbook-0.1.0/dist/main.js" [--new "node dist/main.js"]
 //                               [--threshold 40] [--out rebaseline] [composition dirs...]
 //
-// Every composition (default: examples/*) is copied twice and rendered with
+// Every composition (default: each sample in docs/samples/src/ with an
+// expected.json, the ones that play as films) is copied twice and rendered with
 // each CLI. Frames whose raw capture hashes differ are decoded from both
 // videos and compared by PSNR. Frames below the threshold are tiled old|new
 // into a comparison sheet. A summary is written to <out>/<date>/summary.json.
@@ -44,10 +45,10 @@ function parseArgs(argv) {
     }
     if (!opts.old) throw new Error('--old "<command that runs the previous flipbook>" is required');
     if (opts.dirs.length === 0) {
-        const examples = join(root, 'examples');
-        opts.dirs = readdirSync(examples, { withFileTypes: true })
-            .filter((d) => d.isDirectory())
-            .map((d) => join(examples, d.name));
+        const samples = join(root, 'docs', 'samples', 'src');
+        opts.dirs = readdirSync(samples, { withFileTypes: true })
+            .filter((d) => d.isDirectory() && existsSync(join(samples, d.name, 'expected.json')))
+            .map((d) => join(samples, d.name));
     }
     return opts;
 }

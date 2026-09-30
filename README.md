@@ -97,7 +97,7 @@ https://github.com/user-attachments/assets/a4ac0370-f154-453a-8777-16283a554194
 Hand this line to your agent:
 
 ```text
-Install flipbook following https://github.com/liustack/flipbook/blob/v0.8.7/INSTALL.md, render the hello example, and tell me the result.
+Install flipbook following https://github.com/liustack/flipbook/blob/v0.8.7/INSTALL.md, render the sample it names, and tell me the result.
 ```
 
 Or install the skill yourself. For Claude Code:
@@ -152,7 +152,7 @@ Before the 0.3 release, Claude Code with Claude Opus 5.5 ran 8 prompts once each
 | Item | Status |
 |---|---|
 | macOS arm64 | Supported. Tested directly, in the Claude Code sandbox and in the Codex sandbox |
-| Linux x64 (Ubuntu 22.04 and 24.04, Debian 12) | Supported. CI installs from scratch following INSTALL.md and renders hello |
+| Linux x64 (Ubuntu 22.04 and 24.04, Debian 12) | Supported. CI installs from scratch following INSTALL.md and renders its sample |
 | Linux arm64 | Best effort. Tested in an Ubuntu 24.04 arm64 container, under restricted container limits and both hosts' Linux sandboxes |
 | macOS x64 (Intel) | Best effort, untested |
 | Windows | Not supported, use WSL2. Native Windows exits 78 |

@@ -130,7 +130,7 @@ composition({
 });
 ```
 
-The full example, a postman who loses a letter to the wind, is `examples/postman/` in the flipbook repository.
+The technique sample, a postman drawn in code who walks, runs and waves, is `docs/samples/src/postman/` in the flipbook repository.
 
 ## Parts from a picture
 
@@ -152,7 +152,7 @@ To an image model, say it plainly: "a cut-out animation puppet parts sheet", the
 3. Rig it: `puppet <dir> <name>`, and open `out/puppet/<name>.png`. It shows every part with its pivot (red) and sockets (blue), and the puppet standing, mid-stride, with its legs passing, mid-stride on the other foot and waving, next to the reference. Fix puppet.json until the joints sit in the tabs and the poses look whole.
 4. Load it in the page with `loadRig()` and build the puppet from it.
 
-An excerpt of the postman's puppet.json, four of its fifteen parts (the whole file is `examples/postman-print/assets/puppets/postman/puppet.json` in the flipbook repository):
+An excerpt of the postman's puppet.json, four of its fifteen parts (the whole file is `docs/samples/src/postman-print/assets/puppets/postman/puppet.json` in the flipbook repository):
 
 ```json
 {
@@ -210,7 +210,7 @@ Every picture under `assets/` needs its entry in `assets/SOURCES.json`, or check
 
 `cutout` and `puppet` write the entries of the pieces and parts for you, each with `cutFrom` pointing at the picture it came from, where the tool and prompt are.
 
-The full example, the same postman cut from a generated woodcut sheet, is `examples/postman-print/` in the flipbook repository.
+The technique sample, the same postman cut from a generated woodcut sheet, is `docs/samples/src/postman-print/` in the flipbook repository.
 
 ## Frame by frame
 

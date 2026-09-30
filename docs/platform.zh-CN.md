@@ -11,6 +11,8 @@ read_when:
 
 [English](platform.md) | 中文
 
+下面的实测里提到的 hello、eggs-five（five 和 shu）、long-scroll、beat-title，是测量时仓库里的样例，现已移除。这些名字只说明测的是哪条片，不是可以打开的文件。
+
 ## 支持矩阵
 
 | 平台 | 状态 | 实测 |
@@ -121,7 +123,7 @@ ubuntu:24.04 arm64，除第一行外都用非 root 用户（uid 1000），缓存
 
 | 合成 | 帧数 | 软件光栅两次 | GPU 两次 | 软件对 GPU 的 PSNR |
 |---|---|---|---|---|
-| examples/hello（canvas 方块加 DOM 文字） | 120 | 一致 | 一致 | 帧帧不同，最低 60.17 dB，平均 62.07 dB |
+| hello（canvas 方块加 DOM 文字） | 120 | 一致 | 一致 | 帧帧不同，最低 60.17 dB，平均 62.07 dB |
 | test/fixtures/color（纯色块） | 24 | 一致 | 一致 | 完全相同 |
 | test/fixtures/music | 24 | 一致 | 一致 | 帧帧不同，最低 51.40 dB，平均 52.39 dB |
 | stress（canvas 渐变、阴影模糊、透明、multiply 混合、贝塞尔，DOM 圆角阴影和文字阴影） | 120 | 六次全一致 | 第 2 到 6 次和第 1 次比，分别有 20、21、120、43、43 帧不同 | 最低 48.52 dB，平均 49.02 dB |
@@ -218,7 +220,7 @@ hello 和 eggs-five 两条，先 check 再 render，页数自动（hello 120 帧
 
 ### 三分钟片的内存
 
-examples/long-scroll（3 分钟，4320 帧，1920×1080），渲染时每秒读一次 render 进程树里每个进程的物理占用（macOS 的 `phys_footprint`，被压缩的内存也算在内）。第一轮用 RSS 量，泄漏片塞的是同一个数，macOS 把它压缩掉，RSS 几乎不涨，所以换了这个口径。「泄漏片」是 long-scroll 每次 seek 往全局数组里塞 5 万个不同的浮点数（每帧约 400 KB 堆，画面不变），用来看重开管不管用。
+long-scroll（3 分钟，4320 帧，1920×1080），渲染时每秒读一次 render 进程树里每个进程的物理占用（macOS 的 `phys_footprint`，被压缩的内存也算在内）。第一轮用 RSS 量，泄漏片塞的是同一个数，macOS 把它压缩掉，RSS 几乎不涨，所以换了这个口径。「泄漏片」是 long-scroll 每次 seek 往全局数组里塞 5 万个不同的浮点数（每帧约 400 KB 堆，画面不变），用来看重开管不管用。
 
 表里 Chromium 一列是截帧期间均匀取的 6 个读数（MB，所有 Chromium 进程加起来），「合计最高」含 Node 和 ffmpeg。ffmpeg 全程在 780 到 865 MB。
 

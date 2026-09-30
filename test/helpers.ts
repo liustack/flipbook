@@ -12,12 +12,12 @@ export const cli = path.join(repoRoot, 'dist', 'main.js');
 
 const temps: string[] = [];
 
-/** Copy test/fixtures/<name> (or examples/<name>) into a fresh temp directory. */
-export function copyFixture(name: string, from: 'fixtures' | 'examples' = 'fixtures'): string {
+/** Copy test/fixtures/<name> (or the sample docs/samples/src/<name>) into a fresh temp directory. */
+export function copyFixture(name: string, from: 'fixtures' | 'samples' = 'fixtures'): string {
     const source =
         from === 'fixtures'
             ? path.join(repoRoot, 'test', 'fixtures', name)
-            : path.join(repoRoot, 'examples', name);
+            : path.join(repoRoot, 'docs', 'samples', 'src', name);
     const target = fs.mkdtempSync(path.join(os.tmpdir(), `flipbook-${name.replace(/\W+/g, '-')}-`));
     fs.cpSync(source, target, {
         recursive: true,

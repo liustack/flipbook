@@ -205,7 +205,7 @@ describe('protocol discovery has a time limit', () => {
         expect(Date.now() - started).toBeLessThan(30_000);
         expect(codes(report)).toContain('ready-timeout');
         const after = await runCheck({
-            dir: copyFixture('hello', 'examples'),
+            dir: copyFixture('stage'),
             session: s,
             recordAttempts: false,
         });
@@ -232,9 +232,9 @@ describe('virtual clock', () => {
     it('gives the virtual time through every native clock entry point', async () => {
         const s = await session();
         const { browser } = await s.browserForPage();
-        const dir = copyFixture('hello', 'examples');
+        const dir = copyFixture('stage');
         const timeline = loadTimeline(dir, false).resolved;
-        if (!timeline) throw new Error('hello timeline did not load');
+        if (!timeline) throw new Error('stage timeline did not load');
         const { page } = await CompositionPage.open({ browser, dir, timeline });
         try {
             const seen = await page.page.evaluate(() => {
@@ -314,9 +314,9 @@ const noUndeletableDir = process.platform === 'win32' || process.getuid?.() === 
 describe('a renderer the system takes away', () => {
     it('makes close() throw resource-exhausted, while a page that crashes on its own stays page-error', async () => {
         const s = await session();
-        const dir = copyFixture('hello', 'examples');
+        const dir = copyFixture('stage');
         const timeline = loadTimeline(dir).resolved;
-        if (!timeline) throw new Error('hello has no timeline');
+        if (!timeline) throw new Error('stage has no timeline');
 
         // Both cases wait for Chromium to report the renderer gone before closing:
         // what is checked here is how the end is classified, and on a loaded
@@ -348,9 +348,9 @@ describe('a renderer the system takes away', () => {
 
     it('waits in close() for the crash of a renderer that stopped answering', async () => {
         const s = await session();
-        const dir = copyFixture('hello', 'examples');
+        const dir = copyFixture('stage');
         const timeline = loadTimeline(dir).resolved;
-        if (!timeline) throw new Error('hello has no timeline');
+        if (!timeline) throw new Error('stage has no timeline');
         const { page } = await openPage(s, { dir, timeline });
         // A renderer that never answers again, and Chromium's crash report 1.5 s
         // into close(): how a crash looks while systemd-coredump writes the dump.
@@ -376,9 +376,9 @@ describe('cleanup when something fails half way', () => {
     it('closes the context when the page cannot be set up', async () => {
         const s = await session();
         const { browser } = await s.browserForPage();
-        const dir = copyFixture('hello', 'examples');
+        const dir = copyFixture('stage');
         const timeline = loadTimeline(dir, false).resolved;
-        if (!timeline) throw new Error('hello timeline did not load');
+        if (!timeline) throw new Error('stage timeline did not load');
         const before = browser.contexts().length;
         await expect(
             CompositionPage.open({ browser: failingNewPage(browser), dir, timeline }),
@@ -391,7 +391,7 @@ describe('cleanup when something fails half way', () => {
         async () => {
             const s = await session();
             const { browser } = await s.browserForPage();
-            const dir = copyFixture('hello', 'examples');
+            const dir = copyFixture('stage');
             const restore = undeletable(path.join(dir, '.flipbook', 'evidence', 'render'));
             const before = browser.contexts().length;
             try {
@@ -415,7 +415,7 @@ describe('cleanup when something fails half way', () => {
         async () => {
             const s = await session();
             const { browser } = await s.browserForPage();
-            const dir = copyFixture('hello', 'examples');
+            const dir = copyFixture('stage');
             const restore = undeletable(path.join(dir, '.flipbook', 'snapshot', 'frames'));
             const before = browser.contexts().length;
             try {

@@ -178,7 +178,7 @@ describe('flipbook audio', () => {
     });
 
     it('warns when there is nothing to synthesize', async () => {
-        const dir = copyFixture('hello', 'examples');
+        const dir = copyFixture('stage');
         const report = await runAudio({ dir, session: await session() });
         expect(report.exitCode).toBe(0);
         expect(warningCodes(report)).toEqual(['audio-skipped']);

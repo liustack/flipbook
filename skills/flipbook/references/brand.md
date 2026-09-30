@@ -2,7 +2,7 @@
 
 For a film about a product or a brand, take the name, colors, logo and type from the brand. Write them into one `brand.json`, name it in `timeline.json`, and read them in the composition with `brand()`.
 
-Full example: `examples/brand-intro/` in the flipbook repository, a made-up stationery brand with a code-drawn SVG logo.
+Technique sample: `docs/samples/src/brand-intro/` in the flipbook repository, a made-up stationery brand with a code-drawn SVG logo. It shows how brand.json and the brand helpers are wired, not a story to copy.
 
 ## Find the brand's assets first
 

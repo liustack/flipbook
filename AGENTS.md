@@ -37,33 +37,32 @@ src/
   runtime/         浏览器端运行时库（core、text、paper、materials、templates、brand、photo、puppet、rig（部件找关节、削描边、读 rig.json）、sprite（逐帧精灵）、riso（孔版印刷）、pixel（像素皮）、audio）
   stock/           找图找声音：Pexels、Pixabay、Openverse 三家的图片搜索和详情，Openverse 的音频搜索，图片和声音格式嗅探、下载防护（只走 HTTPS、拒内网地址、连接钉在核对过的地址上）
   fonts/           字体清单、码位表、OFL 全文
-scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）、examples-baseline.mjs（记样例的帧摘要）
+scripts/           发版（含 CHANGELOG 盖日期）、版本号改写、码位表生成、samples.mjs（重出 docs/samples 的样张）、rebaseline（换 Chromium 后比较两版的逐帧 PSNR）、samples-baseline.mjs（记技法样张的帧摘要）
 skills/flipbook/   SKILL.md（英文）、references/（story、characters、rules、timeline、audio、paper、riso、pixel、materials、text、templates、brand、photo、troubleshooting）、scripts/run.sh 和 run.ps1
 docs/              report-schema.md、timeline-schema.md、story-schema.md、platform.md（支持矩阵、沙箱特征、容器限制）、eval.md
-docs/samples/      reference 引用的样张和它们的源码，只在仓库里，不进 npm 包
-examples/          hello、eggs-five（five 和 shu 两条）、beat-title、page-turn、lens-montage、arc-cuts、brand-intro、long-scroll（三分钟长片）、specimen-board（stock fetch 下的公有领域图版抠成贴纸）、riffle（迈布里奇奔马连拍做成的手翻书，specimens() 自动找格子）、postman（代码画的剪纸纸偶邮差，风把信吹走的故事，puppet() 的样例）、postman-print（同一个故事，部件来自生成的木刻部件图，flipbook puppet 装配），postman-wave（清早的窗里孩子挥手，邮差是生成的逐帧精灵，flipbook sprite 切的）、pixel-sprout（像素小机器人浇了三天水等到发芽，pixel() 的样例），每个例子一份源码加 expected.json，不提交 mp4
+docs/samples/      reference 引用的样张图和它们的源码（src/ 下：paper、materials、riso、text 各出一张图，arc-cuts、brand-intro、lens-montage、page-turn、pixel-sprout、postman、postman-print、specimen-board 是演示技法的完整合成，带 expected.json，story.json 是最小故事，不当故事范例），只在仓库里，不进 npm 包
+examples/          讲故事的样例，暂空，以后按体裁补。样例是内容，不是测试
 eval/              评测器：cases/（用例，暂空，按新的故事定义重写，dry-run 在没有用例时报 0/0 并说明）、models.json、run.mjs（跑）、cases.mjs（用例格式和校验）、judge.mjs（判）、page.mjs（从 index.html 顺着加载的脚本解析：按绑定认运行时调用，列出页面在哪里点到文件，只作给人看的证据）、shim.mjs（放在 PATH 最前面的 flipbook 小脚本，把每次运行的报告留在工作区外、评测器自己的目录，运行前钉住，运行中被改动就一份不读）、recheck.mjs（在工作区副本上独立复检）、files.mjs（共用的文件小工具，以及判定读工作区文件的唯一入口），测试是同名的 .test.mjs，证据写到 eval/results/（不入库）
 test/              vitest 快档，坏片语料在 test/fixtures/bad/
-test/e2e/          vitest 端到端档：坏片语料、reference 片段、每个样例的 check 和帧摘要
-test/release/      vitest 发版档：hello、eggs-five/five、long-scroll 的完整渲染
+test/e2e/          vitest 端到端档：坏片语料、reference 片段、docs/samples/src 下带 expected.json 的技法样张的 check 和帧摘要
 ```
 
 ## 验证
 
 - `pnpm lint && pnpm typecheck && pnpm test && pnpm build`，全部通过才算完成。`pnpm test` 会先构建。
-- 测试分三档。CI（main 和 PR）跑前两档。推 main 时 CI 另有一列 Linux，把全部样例完整渲染并过成片验收，和 release.yml 渲 Release 附件的做法一样，只在 Linux 上出的问题（比如片尾静止时长在 Linux 上刚好越过定格线）在打标签之前就能看到。`scripts/release.mjs` 要求当前提交已推到 origin/main 且 CI 全绿才发版，门禁三档都跑。
+- 测试分两档，CI（main 和 PR）和 `scripts/release.mjs` 的门禁都跑这两档。`scripts/release.mjs` 要求当前提交已推到 origin/main 且 CI 全绿才发版。
   - `pnpm test`（`test/`）：单元测试和拿小 fixture 跑的引擎测试，本机一分钟内，改代码时随手跑。
-  - `pnpm test:e2e`（`test/e2e/`）：坏片语料过 check 和 render，reference 片段过 check，每个样例过 check 再比 snapshot 帧摘要，不渲样例成片，本机约一分钟。本地改了引擎、运行时库、类型码或样例，推送前跑一遍。
-  - `pnpm test:release`（`test/release/`）：hello（纯纸底）和 eggs-five/five（纹理纸底）完整渲染、对 expected.json、另开浏览器再渲一遍逐帧比哈希，long-scroll 渲一遍核帧数和时长，本机约三分半。其他样例的成片由 release.yml 渲成 Release 附件，不在门禁里比。
-- 样例帧摘要只在记下它的那台机器上比。各样例 `expected.json` 的 `snapshot` 里记着 `machine`（平台、内核版本、CPU 型号）、`chromium` 和 `digest`，`machine` 对不上就跳过。同一版 Chromium 换一台 Mac 摘要就不同（CI 的 macOS 列和作者的 M4 全对不上），所以 CI 各列都只跑样例的 check，摘要比对在作者机器上的本地开发和发版门禁里起作用。摘要是 snapshot 那组帧（每场中间一帧加 12 个等距帧）的截图哈希汇总，由 `pnpm examples:baseline` 在作者的 Mac 上生成，系统升级后也要重出。摘要对不上时先看画面是不是有意改的，是就重出，不是就查引擎。
-- 新测试按跑的内容分档：样例的完整渲染放 `test/release/`。坏片语料、reference 片段、样例的 check 和摘要放 `test/e2e/`。其余放 `test/`，包括拿小 fixture 过一次 check 或 render 的引擎测试，这类单条要几秒内跑完：画面小、帧数少、期限短，别等满 60 秒的 ready 期限。
+  - `pnpm test:e2e`（`test/e2e/`）：坏片语料过 check 和 render，reference 片段过 check，带 expected.json 的技法样张过 check 再比 snapshot 帧摘要，不渲成片，本机约两分钟。本地改了引擎、运行时库、类型码或样张，推送前跑一遍。
+- 没有发版档。样例是内容，不是测试：不拿样例的完整渲染当门禁。逐帧确定性、长片的帧数、时长和内存这类问题，只放在针对它们写的引擎测试里（`test/` 和 `test/e2e/`）。
+- 样张帧摘要只在记下它的那台机器上比。各样张 `expected.json` 的 `snapshot` 里记着 `machine`（平台、内核版本、CPU 型号）、`chromium` 和 `digest`，`machine` 对不上就跳过。同一版 Chromium 换一台 Mac 摘要就不同（CI 的 macOS 列和作者的 M4 全对不上），所以 CI 各列都只跑样张的 check，摘要比对在作者机器上的本地开发和发版门禁里起作用。摘要是 snapshot 那组帧（每场中间一帧加 12 个等距帧）的截图哈希汇总，由 `pnpm samples:baseline` 在作者的 Mac 上生成，系统升级后也要重出。摘要对不上时先看画面是不是有意改的，是就重出，不是就查引擎。
+- 新测试按跑的内容分档：坏片语料、reference 片段、样张的 check 和摘要放 `test/e2e/`。其余放 `test/`，包括拿小 fixture 过一次 check 或 render 的引擎测试，这类单条要几秒内跑完：画面小、帧数少、期限短，别等满 60 秒的 ready 期限。
 - 用到浏览器的测试把 fixture 复制到临时目录再跑。首次运行需要联网装 Chromium 和字体，写的是用户缓存目录。
 - 坏片语料每类至少一条，新增检查时先加一条会被拦下的坏片。
-- 每个合成（样例、夹具、坏片、参考片段、测试里现写的合成）都要有 story.json。不是测故事的夹具用 `test/story.ts` 生成最小的三拍故事（`node test/story.ts <目录>`，测试里调 `writeStory(dir)`）。
+- 每个合成（样例、样张、夹具、坏片、参考片段、测试里现写的合成）都要有 story.json。样张和不是测故事的夹具用 `test/story.ts` 生成最小的三拍故事（`node test/story.ts <目录>`，测试里调 `writeStory(dir)`）。
 - `skills/flipbook/references/` 里标了 `<!-- check: ... -->` 的代码片段由 `test/e2e/references.test.ts` 真跑 check。`troubleshooting.md` 从 `src/cli/codes.ts` 生成，改了类型码跑 `UPDATE_REFERENCES=1 pnpm test test/skillText.test.ts`。
 - 评测花真实额度，按 docs/eval.md 本地跑，CI 只跑 `--dry-run`。
-- 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。然后在作者的 Mac 上跑 `pnpm examples:baseline` 重出样例的帧摘要（写进各样例的 `expected.json`），和升级放同一个提交。改了样例的画面也跑它。
-- 原始帧哈希和样例帧摘要都只在同机同版本比，跨机器不比。
+- 升级 playwright-core 后跑 `node scripts/rebaseline.mjs --old "<旧版 CLI 命令>"`，看过对比联系表再发版。然后在作者的 Mac 上跑 `pnpm samples:baseline` 重出样张的帧摘要（写进各样张的 `expected.json`），和升级放同一个提交。改了样张的画面也跑它。
+- 原始帧哈希和样张帧摘要都只在同机同版本比，跨机器不比。
 
 ## 文档
 

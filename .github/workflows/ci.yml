@@ -61,50 +61,6 @@ jobs:
       - run: pnpm test:e2e
       - run: pnpm build
 
-  examples:
-    # Every example rendered in full and passed through acceptance on Linux,
-    # exactly as release.yml renders them for the Release. A render that only
-    # fails on Linux (a still end card a hair past the freeze limit) shows here,
-    # before a tag is pushed: scripts/release.mjs refuses a commit whose CI is
-    # not green. Only on pushes to main, since it takes several minutes.
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22.19'
-          cache: pnpm
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/liustack/flipbook
-          key: flipbook-Linux-${{ hashFiles('pnpm-lock.yaml', 'src/fonts/manifest.json') }}
-      - name: Install the pinned Chromium headless shell
-        run: PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/liustack/flipbook/browsers" pnpm exec playwright-core install --with-deps chromium-headless-shell
-      - run: pnpm build
-      - name: Render the examples
-        run: |
-          mkdir -p example-reports
-          find examples -name timeline.json -not -path '*/.flipbook/*' | sort | while read -r timeline; do
-            dir="$(dirname "$timeline")"
-            name="$(echo "${dir#examples/}" | tr '/' '-')"
-            if ! node dist/main.js render "$dir" > "example-reports/$name-render.json" < /dev/null; then
-              cat "example-reports/$name-render.json"
-              exit 1
-            fi
-          done
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: example-reports
-          path: |
-            example-reports/
-            examples/**/.flipbook/rejected/
-            examples/**/.flipbook/evidence/render/
-
   install:
     # INSTALL.md from scratch on a fresh Ubuntu x64 runner. Before a release the
     # npm package and the git tag do not exist yet, so the packed tarball is
@@ -138,22 +94,22 @@ jobs:
           cat doctor.json
           test "$code" -eq 78
           grep -q chromium-missing doctor.json
-      - name: Step 4, check and render hello
+      - name: Step 4, check and render the sample
         run: |
-          HELLO="$RUNNER_TEMP/flipbook-hello"
-          cp -R examples/hello "$HELLO"
+          SAMPLE="$RUNNER_TEMP/flipbook-sample"
+          cp -R docs/samples/src/specimen-board "$SAMPLE"
           code=0
-          bash ~/.claude/skills/flipbook/scripts/run.sh check "$HELLO" > check.json 2> check.err || code=$?
+          bash ~/.claude/skills/flipbook/scripts/run.sh check "$SAMPLE" > check.json 2> check.err || code=$?
           if [ "$code" -eq 78 ] && grep -q linux-deps-missing check.err; then
             cat check.err
             sudo npx --yes playwright-core@1.63.0 install-deps chromium-headless-shell
             code=0
-            bash ~/.claude/skills/flipbook/scripts/run.sh check "$HELLO" > check.json 2> check.err || code=$?
+            bash ~/.claude/skills/flipbook/scripts/run.sh check "$SAMPLE" > check.json 2> check.err || code=$?
           fi
           if [ "$code" -ne 0 ]; then cat check.json check.err; exit 1; fi
-          bash ~/.claude/skills/flipbook/scripts/run.sh render "$HELLO" > render.json
+          bash ~/.claude/skills/flipbook/scripts/run.sh render "$SAMPLE" > render.json
           bash ~/.claude/skills/flipbook/scripts/run.sh doctor
-          ffprobe -v error -show_entries stream=width,height,pix_fmt,nb_frames:format=duration -of compact "$HELLO/out/video.mp4"
+          ffprobe -v error -show_entries stream=width,height,pix_fmt,nb_frames:format=duration -of compact "$SAMPLE/out/video.mp4"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

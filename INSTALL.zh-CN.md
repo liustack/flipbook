@@ -39,7 +39,7 @@ mkdir -p ~/.claude/skills   # 换成你的 TARGET
 
 ## 第 2 步：把 `skills/flipbook` 放进 skill 目录
 
-skill 就是仓库里的 `skills/flipbook` 文件夹：`SKILL.md`、`references/` 和放启动器的 `scripts/`。整个文件夹拷过去。克隆下来的仓库留着，第 4 步要从里面渲一个例子。
+skill 就是仓库里的 `skills/flipbook` 文件夹：`SKILL.md`、`references/` 和放启动器的 `scripts/`。整个文件夹拷过去。克隆下来的仓库留着，第 4 步要从里面渲一个样张。
 
 ### 路径 A：克隆再拷贝
 
@@ -191,27 +191,27 @@ bash ~/.claude/skills/flipbook/scripts/run.sh doctor   # 换成你的 TARGET
 
 `doctor` 打出一个 JSON 对象。在新机器上它会退 78，`problems` 里有 `chromium-missing`，第一次渲染之前这是正常的。遇到别的问题，把它顶层 `fix` 里的几行转给用户。
 
-然后渲染例子（这一步就会触发 3d 说的首次下载）：
+然后渲染仓库里的一个样张（这一步就会触发 3d 说的首次下载）：
 
 ```bash
-HELLO="${TMPDIR:-/tmp}/flipbook-hello"
-rm -rf "$HELLO" && cp -R /tmp/flipbook-src/examples/hello "$HELLO"
-bash ~/.claude/skills/flipbook/scripts/run.sh check "$HELLO"
-bash ~/.claude/skills/flipbook/scripts/run.sh render "$HELLO"
+SAMPLE="${TMPDIR:-/tmp}/flipbook-sample"
+rm -rf "$SAMPLE" && cp -R /tmp/flipbook-src/docs/samples/src/specimen-board "$SAMPLE"
+bash ~/.claude/skills/flipbook/scripts/run.sh check "$SAMPLE"
+bash ~/.claude/skills/flipbook/scripts/run.sh render "$SAMPLE"
 bash ~/.claude/skills/flipbook/scripts/run.sh doctor
 ```
 
 **成功的标准：**
 - `render` 退 0，JSON 里是 `"ok": true`。
-- `$HELLO/out/video.mp4` 存在：5 秒，1920×1080，一个红方块在「你好，翻页书」和「Hello, flipbook」下面移动。
+- `$SAMPLE/out/video.mp4` 存在：10 秒，1920×1080，四张抠好的博物图版落在方格纸上，下面再写出「博物笔记」和「Field notes from the public domain」。
 - 最后一次 `doctor` 退 0。
 
-打开 `$HELLO/out/contact-sheet.png` 看各帧。
+打开 `$SAMPLE/out/contact-sheet.png` 看各帧。
 
 **失败时：**
 - 启动器打出一份 `"error": "runtime-missing"` 的 JSON 诊断并退 78：没找到 Node 或 npx。把 `fix` 转给用户，重做 3a。
 - `check` 或 `render` 退 78：读 stderr 上那份 JSON 里的 `error` 和 `fix`。`cache-unwritable`、`chromium-install-failed`、`sandbox-blocked` 和 `tmp-unwritable` 看 3e，`linux-deps-missing` 看 3d，`ffmpeg-missing` 看 3b，`resource-exhausted` 看 3c，`font-download-failed` 是网络或代理的问题（见 3d 的域名，镜像可以用 `FLIPBOOK_FONT_BASE_URL` 设）。
-- 退 1：例子在这台机器上没过某项检查。把报告 JSON 发到 https://github.com/liustack/flipbook/issues。
+- 退 1：样张在这台机器上没过某项检查。把报告 JSON 发到 https://github.com/liustack/flipbook/issues。
 
 ---
 

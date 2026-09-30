@@ -159,14 +159,14 @@ describe('doctor checks that the cache can be written', () => {
 
 describe('commands exit 78 or 2 before touching the composition', () => {
     it('check exits 78 without ffmpeg and prints a diagnosis on stderr', () => {
-        const result = runCli(['check', copyFixture('hello', 'examples')], onlyOnPath(nodeOnly));
+        const result = runCli(['check', copyFixture('stage')], onlyOnPath(nodeOnly));
         expect(result.status).toBe(78);
         expect((result.json as { exitCode: number }).exitCode).toBe(78);
         expect(JSON.parse(result.stderr).error).toBe('ffmpeg-missing');
     });
 
     it('saves the report of a run that ended in an environment error', () => {
-        const dir = copyFixture('hello', 'examples');
+        const dir = copyFixture('stage');
         const result = runCli(['check', dir], onlyOnPath(nodeOnly));
         expect(result.status).toBe(78);
         const report = result.json as { artifacts: { report?: string } };
@@ -176,7 +176,7 @@ describe('commands exit 78 or 2 before touching the composition', () => {
     });
 
     it('saves the report of a run stopped by a refused write', () => {
-        const dir = copyFixture('hello', 'examples');
+        const dir = copyFixture('stage');
         fs.mkdirSync(path.join(dir, '.flipbook'));
         fs.writeFileSync(path.join(dir, '.flipbook', 'tmp'), 'not a directory');
         const result = runCli(['render', dir]);
@@ -188,7 +188,7 @@ describe('commands exit 78 or 2 before touching the composition', () => {
     });
 
     it('says so when the report cannot be saved, and writes nothing through the link', () => {
-        const dir = copyFixture('hello', 'examples');
+        const dir = copyFixture('stage');
         const outside = tempDir('reports-outside');
         fs.mkdirSync(path.join(dir, '.flipbook'));
         fs.symlinkSync(outside, path.join(dir, '.flipbook', 'reports'));

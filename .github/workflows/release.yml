@@ -73,20 +73,6 @@ jobs:
             echo "No CHANGELOG section for $version" >&2
             exit 1
           fi
-      - name: Render the examples
-        run: |
-          mkdir -p release-assets
-          # Every folder holding a timeline.json is one composition, at any depth.
-          find examples -name timeline.json -not -path '*/.flipbook/*' | sort | while read -r timeline; do
-            dir="$(dirname "$timeline")"
-            name="$(echo "${dir#examples/}" | tr '/' '-')"
-            if ! node dist/main.js render "$dir" > "release-assets/$name-render.json" < /dev/null; then
-              cat "release-assets/$name-render.json"
-              exit 1
-            fi
-            cp "$dir/out/video.mp4" "release-assets/$name.mp4"
-            cp "$dir/out/contact-sheet.png" "release-assets/$name-contact-sheet.png"
-          done
       - name: Publish to npm (skipped when the version is already live)
         run: |
           VERSION="${TAG#v}"
@@ -96,12 +82,12 @@ jobs:
           else
             npm publish --provenance --access public
           fi
-      - name: Create the GitHub Release with the rendered examples
+      - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; skipping."
           else
-            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md release-assets/*
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md
           fi

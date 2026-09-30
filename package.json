@@ -11,12 +11,11 @@
         "typecheck": "tsc --noEmit",
         "test": "vitest run --project unit",
         "test:e2e": "vitest run --project e2e",
-        "test:release": "vitest run --project release",
         "lint": "biome check",
         "format": "biome check --write",
         "release": "node scripts/release.mjs",
         "fonts:codepoints": "node scripts/build-codepoints.mjs",
-        "examples:baseline": "pnpm build && node scripts/examples-baseline.mjs"
+        "samples:baseline": "pnpm build && node scripts/samples-baseline.mjs"
     },
     "files": [
         "dist",

@@ -1,0 +1,79 @@
+{
+    "version": 2,
+    "who": {
+        "what": "the test composition",
+        "where": {
+            "beat": "b1",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "wants": {
+        "what": "to exercise the engine",
+        "where": {
+            "beat": "b1",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "because": {
+        "what": "the engine has to be tested",
+        "where": {
+            "beat": "b2",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "becomes": {
+        "what": "a composition the tests can run",
+        "where": {
+            "beat": "b3",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "leave": "Nothing: it only exercises the engine",
+    "device": {
+        "what": "none",
+        "why": "a fixture, not a film"
+    },
+    "beats": [
+        {
+            "id": "b1",
+            "role": "opening",
+            "at": "cuts",
+            "change": {
+                "from": "state 1",
+                "to": "state 2"
+            }
+        },
+        {
+            "id": "b2",
+            "role": "turn",
+            "at": {
+                "scene": "cuts",
+                "beat": 8
+            },
+            "change": {
+                "from": "state 2",
+                "to": "state 3"
+            }
+        },
+        {
+            "id": "b3",
+            "role": "resolution",
+            "at": "end",
+            "change": {
+                "from": "state 3",
+                "to": "state 4"
+            },
+            "text": [
+                "还有更多值得发现"
+            ]
+        }
+    ]
+}

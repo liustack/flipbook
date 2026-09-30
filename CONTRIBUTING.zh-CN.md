@@ -24,8 +24,7 @@ pnpm install
 pnpm lint        # Biome
 pnpm typecheck   # tsc --noEmit
 pnpm test        # 单元和快的引擎测试，会先 build，一分钟内
-pnpm test:e2e    # 坏片语料、reference 片段、每个样例的 check 和帧摘要，不渲样例成片
-pnpm test:release  # 发版门禁：几条样例完整渲染，两次渲染逐帧比哈希
+pnpm test:e2e    # 坏片语料、reference 片段、技法样张的 check 和帧摘要，不渲成片
 pnpm build       # tsup，产出 dist/main.js 和 dist/runtime/
 ```
 
@@ -33,7 +32,7 @@ pnpm build       # tsup，产出 dist/main.js 和 dist/runtime/
 
 ## 测试
 
-- 测试放 `test/`。坏片语料、reference 片段、样例的 check 和帧摘要放 `test/e2e/`，样例的完整渲染放 `test/release/`。帧摘要只在记下它的那台机器上比，别的机器上自动跳过。样例画面有意改了，在那台 Mac 上跑 `pnpm examples:baseline` 重出。坏片语料放 `test/fixtures/bad/<类型>/`，每类坏法至少一条，必须被拦下。
+- 测试放 `test/`。坏片语料、reference 片段、`docs/samples/src/` 里每个技法样张的 check 和帧摘要放 `test/e2e/`。没有发版档：`examples/` 里讲故事的样例是内容，不是测试，逐帧确定性、长片内存这类引擎问题各有针对它们写的引擎测试。帧摘要只在记下它的那台机器上比，别的机器上自动跳过。样张画面有意改了，在那台 Mac 上跑 `pnpm samples:baseline` 重出。坏片语料放 `test/fixtures/bad/<类型>/`，每类坏法至少一条，必须被拦下。
 - 新行为或修 bug 的提交带上测试。
 - 单元测试不联网。用到浏览器的测试把 fixture 复制到临时目录再跑，不往仓库里写 `.flipbook/` 和 `out/`。
 

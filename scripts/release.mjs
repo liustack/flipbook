@@ -4,8 +4,8 @@
 //   pnpm release 0.1.0        explicit version
 //   pnpm release patch        bump from the current one
 //
-// Runs every refusal check first, then the gates (lint, typecheck, the unit,
-// e2e and release test tiers, build), regenerates docs/samples, then bumps, stamps the launchers, turns
+// Runs every refusal check first, then the gates (lint, typecheck, the unit
+// and e2e test tiers, build), regenerates docs/samples, then bumps, stamps the launchers, turns
 // "## Unreleased" in CHANGELOG.md into "## <version> - <today>" (or dates the
 // version's own heading), commits, tags and pushes main and the tag
 // atomically. It does not publish: the pushed tag triggers
@@ -74,9 +74,8 @@ try {
 } catch {
     fail('local main is behind or diverged from origin/main. Pull first.');
 }
-// The commit being released must already be on origin/main with a green CI,
-// the Linux render of every example included: release.yml renders them again
-// for the Release, and a failure there comes after the tag is out.
+// The commit being released must already be on origin/main with a green CI:
+// release.yml runs the same tests again after the tag is out.
 const head = run('git', ['rev-parse', 'HEAD']);
 if (run('git', ['rev-parse', 'origin/main']) !== head) {
     fail('HEAD is not on origin/main yet. Push main, wait for CI to pass, then release.');
@@ -136,7 +135,6 @@ runLoud('pnpm', ['lint']);
 runLoud('pnpm', ['typecheck']);
 runLoud('pnpm', ['test']);
 runLoud('pnpm', ['test:e2e']);
-runLoud('pnpm', ['test:release']);
 runLoud('pnpm', ['build']);
 runLoud('node', ['scripts/samples.mjs']);
 

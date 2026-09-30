@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { loadTimeline, validateTimeline } from '../src/engine/timeline.ts';
 import { resolveTimeline, sceneAtFrame, type TimelineV1 } from '../src/engine/timelineResolve.ts';
 import { cueProgress } from '../src/runtime/core/timeline.ts';
-import { repoRoot, tempDir } from './helpers.ts';
+import { copyFixture, tempDir } from './helpers.ts';
 import { writeStory } from './story.ts';
 
 const base = (): Record<string, unknown> => ({
@@ -196,18 +196,13 @@ describe('resolveTimeline', () => {
         expect(sceneAtFrame(r, 60).id).toBe('b');
     });
 
-    it('matches the hello example', () => {
-        const dir = tempDir('timeline');
-        for (const name of ['timeline.json', 'story.json']) {
-            fs.copyFileSync(path.join(repoRoot, 'examples/hello', name), path.join(dir, name));
-        }
+    it('loads a composition and writes the resolved timeline', () => {
+        // The stage fixture: one bar at 120 bpm, 2 s at 12 fps.
+        const dir = copyFixture('stage');
         const loaded = loadTimeline(dir);
-        const expected = JSON.parse(
-            fs.readFileSync(path.join(repoRoot, 'examples/hello/expected.json'), 'utf-8'),
-        );
         expect(loaded.findings).toEqual([]);
-        expect(loaded.resolved?.frameCount).toBe(expected.frames);
-        expect(loaded.resolved?.durationSec).toBe(expected.durationSec);
+        expect(loaded.resolved?.frameCount).toBe(24);
+        expect(loaded.resolved?.durationSec).toBe(2);
         expect(fs.existsSync(path.join(dir, '.flipbook', 'timeline.resolved.json'))).toBe(true);
     });
 

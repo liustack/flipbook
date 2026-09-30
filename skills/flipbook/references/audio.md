@@ -239,7 +239,7 @@ bash <skill-dir>/scripts/run.sh stock search <dir> cello suite --audio --length 
 bash <skill-dir>/scripts/run.sh stock fetch <dir> openverse-audio:<id> --as page-turn
 ```
 
-Full example: `examples/page-turn/` in the flipbook repository, a found page turn on both page cues over a written score.
+Technique sample: `docs/samples/src/page-turn/` in the flipbook repository, a found page turn on both page cues over a written score. It shows the technique, not a story to copy.
 
 - Search with one to three concrete English words for the sound itself: `page turn`, `pencil scribble`, `typewriter`, `stamp`, `rain`, `minuet`, `cello suite`, `bach prelude`, `gymnopedie`. Every word must match, so start short and add a word only to narrow down. Leave out moods and quality words.
 - `--audio` asks Openverse only, for public domain (`cc0`, `pdm`) only. Short effects mostly come from Freesound's CC0 recordings (`--source freesound`), whole recorded pieces from Wikimedia Commons (`--source wikimedia_audio`).
