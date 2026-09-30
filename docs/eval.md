@@ -103,6 +103,8 @@ A case's `notCopied` files never fail a run automatically. Reading markup and co
 - runtime loader paths built from pieces that could be one of them, and loader calls whose path the runner cannot read
 - SOURCES.json entries that only mention the file, and pictures whose source is neither `stock fetch` nor generated, which could be it re-encoded or cropped.
 
+Files, SOURCES.json keys, `cutFrom` and the page's references are matched in the one spelling flipbook reads them in, so `./root.png` and `root.png` are one file. A file two SOURCES.json keys name has no entry to back a stock fetch with. The keys as written are kept only for a person to read.
+
 Comments, story.json and the host's reply may mention the file freely: saying why it was left out is what the case hopes for.
 
 ### How `uses` is read

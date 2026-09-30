@@ -446,6 +446,67 @@ describe('eval verdict on a picture of unknown source', () => {
         }
     });
 
+    it('follows files, keys, cutFrom and page references in the one spelling flipbook reads them in', () => {
+        const watchedOf = (cutFrom, src) => {
+            const run = finishedRun(spec, {
+                workspace: { [PLATE]: BYTES },
+                files: {
+                    'assets/root.png': BYTES,
+                    'assets/leaf.png': 'a cut piece',
+                    'assets/SOURCES.json': {
+                        'root.png': { source: 'the user', license: 'unknown' },
+                        'leaf.png': { source: 'the user', license: 'unknown', cutFrom },
+                    },
+                    'index.html': `<img src="${src}">`,
+                },
+            });
+            return inspect(run.dir, {
+                spec,
+                wsRoot: run.ws,
+                workspaceFiles: run.workspaceFiles,
+            }).watched.filter((w) => w.path === 'assets/leaf.png');
+        };
+        const leaf = [
+            {
+                path: 'assets/leaf.png',
+                of: PLATE,
+                how: 'cut',
+                certain: true,
+                named: ['element'],
+                built: false,
+            },
+        ];
+        expect(watchedOf('root.png', 'assets/leaf.png')).toEqual(leaf);
+        expect(watchedOf('./root.png', 'assets/leaf.png')).toEqual(leaf);
+        expect(watchedOf('x/../root.png', './assets/leaf.png')).toEqual(leaf);
+    });
+
+    it('backs a fetch under any spelling of its key, and none when two keys name the file', () => {
+        const run = (sources) =>
+            finishedRun(spec, {
+                workspace: { [PLATE]: BYTES },
+                files: {
+                    'assets/shells.jpg': BYTES,
+                    'assets/SOURCES.json': sources,
+                    'index.html': page("photo('assets/shells.jpg');"),
+                },
+            });
+        const howOf = (sources) => {
+            const r = run(sources);
+            const dir = join(r.ws, r.composition.dir);
+            return inspect(dir, {
+                spec,
+                wsRoot: r.ws,
+                workspaceFiles: r.workspaceFiles,
+                stockReports: [fetchReport(dir, { file: './assets/shells.jpg' })],
+            }).watched.map((w) => [w.path, w.how, w.certain]);
+        };
+        expect(howOf({ './shells.jpg': ENTRY })).toEqual([['assets/shells.jpg', 'fetched', false]]);
+        expect(howOf({ 'shells.jpg': ENTRY, './shells.jpg': ENTRY })).toEqual([
+            ['assets/shells.jpg', 'copy', true],
+        ]);
+    });
+
     it('lists a link to the file with where the page names it', () => {
         const run = finishedRun(spec, {
             workspace: { [PLATE]: BYTES },

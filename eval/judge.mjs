@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { lstatSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { HOST_DIRS } from './cases.mjs';
-import { globMatches, listFiles, workspaceReader } from './files.mjs';
+import { assetPath, compositionAsset, globMatches, listFiles, workspaceReader } from './files.mjs';
 import { pageModel } from './page.mjs';
 
 /** What `stock fetch` writes as an entry's id: the picture came with a known license. */
@@ -100,7 +100,7 @@ function stockProof(reports, dir, path, entry) {
             r?.command === 'stock-fetch' &&
             r.ok === true &&
             r.stock?.id === entry.id &&
-            r.stock?.file === path &&
+            compositionAsset(r.stock?.file) === path &&
             typeof r.composition?.dir === 'string' &&
             sameDir(r.composition.dir, dir),
     );
@@ -117,15 +117,28 @@ function stockProof(reports, dir, path, entry) {
  * lists where the page names it (see page.mjs), `built` whether a path the
  * page builds for a runtime loader could be it. None of this says the page
  * loads it: comments name nothing, and markup or a string may load nothing.
+ * Files, SOURCES.json keys, cutFrom and the page's references are matched in
+ * the one spelling flipbook reads them in (assetPath). A file two keys name
+ * has no entry to prove a fetch with, and its keys stay only for reading.
  */
 function watchedFiles(dir, wsRoot, watched, page, stockReports, readers) {
     if (watched.length === 0) return [];
     const { reader, outputs } = readers;
     const sources = reader.json(join(dir, 'assets', 'SOURCES.json'));
-    const entries = isObject(sources) ? sources : {};
+    // Every own key under its one spelling, with the files more than one key names.
+    const keyed = [];
+    const count = new Map();
+    for (const [key, entry] of Object.entries(isObject(sources) ? sources : {})) {
+        const file = assetPath(key);
+        if (file === null) continue;
+        keyed.push({ file, entry });
+        count.set(file, (count.get(file) ?? 0) + 1);
+    }
+    const only = (file) =>
+        count.get(file) === 1 ? keyed.find((k) => k.file === file).entry : undefined;
     const saved = outputs.json(join(dir, '.flipbook', 'reports', 'stock-fetch.json'));
     const reports = saved ? [...stockReports, saved] : stockReports;
-    const proof = (key) => stockProof(reports, dir, `assets/${key}`, entries[key]);
+    const proof = (file) => stockProof(reports, dir, `assets/${file}`, only(file));
     const originals = watched.map((w) => {
         try {
             return realpathSync(join(wsRoot, w.rel));
@@ -148,7 +161,8 @@ function watchedFiles(dir, wsRoot, watched, page, stockReports, readers) {
                 continue;
             }
             if (w.size !== size || reader.sha256(full) !== w.sha256) continue;
-            const stock = rel.startsWith('assets/') ? proof(rel.slice('assets/'.length)) : 'none';
+            const asset = compositionAsset(rel);
+            const stock = asset ? proof(asset.slice('assets/'.length)) : 'none';
             const how = { proven: 'fetched', claimed: 'claimed', none: 'copy' }[stock];
             found.push({ path: rel, of: w.rel, how, certain: how === 'copy' });
         }
@@ -157,30 +171,38 @@ function watchedFiles(dir, wsRoot, watched, page, stockReports, readers) {
         const stem = basename(w.rel).replace(/\.[^.]+$/, '');
         const tainted = new Map();
         for (const f of found) {
-            if (f.of === w.rel && f.path.startsWith('assets/'))
-                tainted.set(f.path.slice('assets/'.length), f.certain && f.how !== 'fetched');
+            const asset = f.of === w.rel ? compositionAsset(f.path) : null;
+            if (asset) tainted.set(asset.slice('assets/'.length), f.certain && f.how !== 'fetched');
         }
-        for (const [key, entry] of Object.entries(entries)) {
-            if (tainted.has(key) || proof(key) === 'proven') continue;
+        for (const { file, entry } of keyed) {
+            if (tainted.has(file) || proof(file) === 'proven') continue;
             if (JSON.stringify(entry).includes(stem)) {
-                tainted.set(key, false);
-                found.push({ path: `assets/${key}`, of: w.rel, how: 'named', certain: false });
+                tainted.set(file, false);
+                found.push({ path: `assets/${file}`, of: w.rel, how: 'named', certain: false });
             }
         }
         for (let grew = true; grew; ) {
             grew = false;
-            for (const [key, entry] of Object.entries(entries)) {
-                if (tainted.has(key) || !isObject(entry) || !tainted.has(entry.cutFrom)) continue;
-                const certain = tainted.get(entry.cutFrom);
-                tainted.set(key, certain);
-                found.push({ path: `assets/${key}`, of: w.rel, how: 'cut', certain });
+            for (const { file, entry } of keyed) {
+                if (tainted.has(file) || !isObject(entry)) continue;
+                const from = assetPath(entry.cutFrom);
+                if (from === null || !tainted.has(from)) continue;
+                const certain = tainted.get(from);
+                tainted.set(file, certain);
+                found.push({ path: `assets/${file}`, of: w.rel, how: 'cut', certain });
                 grew = true;
             }
         }
     }
+    // Where the page names each file, whatever spelling the page used.
+    const named = new Map();
+    for (const [ref, where] of Object.entries(page.references ?? {})) {
+        const key = compositionAsset(ref) ?? ref;
+        named.set(key, [...new Set([...(named.get(key) ?? []), ...where])]);
+    }
     return found.map((f) => ({
         ...f,
-        named: page.references?.[f.path] ?? [],
+        named: named.get(compositionAsset(f.path) ?? f.path) ?? [],
         built: (page.builtPaths ?? []).some((prefix) => f.path.startsWith(prefix)),
     }));
 }

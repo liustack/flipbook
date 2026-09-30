@@ -103,6 +103,8 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 - 运行时加载函数里用片段拼出、可能是它们的路径，以及评测器读不出路径的加载调用
 - 只在 SOURCES.json 条目里提到这个文件的图，以及来源既不是 `stock fetch` 也不是生成的图（可能是它重新编码或裁过的版本）
 
+文件、SOURCES.json 的键、`cutFrom` 和页面里的引用，都按 flipbook 读它们时的那种写法比对，所以 `./root.png` 和 `root.png` 是同一个文件。一个文件在 SOURCES.json 里有两个键时，没有条目可以证明它是 stock fetch 取来的。原样的键只留给人读。
+
 注释、story.json 和宿主的回复里随便提这个文件都行，说清楚为什么没用它，正是这条用例希望看到的。
 
 ### 怎样读 `uses`

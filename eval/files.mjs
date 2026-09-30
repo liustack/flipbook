@@ -2,7 +2,34 @@
 // code reads what an agent left in a workspace.
 import { createHash } from 'node:crypto';
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { isAbsolute, join, relative, sep } from 'node:path';
+import { isAbsolute, join, posix, relative, sep } from 'node:path';
+
+/**
+ * The one spelling of a file under assets/, from a path relative to assets/
+ * (a SOURCES.json key, a cutFrom), or null when it names no file inside
+ * assets/. The same rule as assetPath in src/engine/assetSources.ts (the
+ * eval stays plain JavaScript, eval/files.test.mjs keeps the two in step).
+ */
+export function assetPath(rel) {
+    if (typeof rel !== 'string' || rel === '' || rel.includes('\\') || rel.includes('\0')) {
+        return null;
+    }
+    if (posix.isAbsolute(rel)) return null;
+    const normal = posix.normalize(rel);
+    if (normal === '.' || normal === '..' || normal.startsWith('../') || normal.endsWith('/')) {
+        return null;
+    }
+    return normal;
+}
+
+/** A path from the composition (`assets/x.png`, `./assets/x.png`) in the one spelling, or null outside assets/. */
+export function compositionAsset(path) {
+    if (typeof path !== 'string' || path.includes('\\') || path.includes('\0')) return null;
+    const normal = posix.normalize(path);
+    if (!normal.startsWith('assets/')) return null;
+    const file = assetPath(normal.slice('assets/'.length));
+    return file === null ? null : `assets/${file}`;
+}
 
 export function sha256File(file) {
     return createHash('sha256').update(readFileSync(file)).digest('hex');
