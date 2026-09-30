@@ -4,6 +4,7 @@
 import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { pathToFileURL } from 'url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { cleanTemps, cli, copyFixture, runCli, tempDir } from './helpers.ts';
 
@@ -46,11 +47,15 @@ function runLocked(args: string[], dir: string, lock: string, env: Record<string
     const peer = path.join(folder, `p.${process.pid}.eeee`);
     fs.writeFileSync(peer, '1\n');
     const start = Date.now();
-    const result = spawnSync(process.execPath, ['--import', loader, cli, ...args], {
-        encoding: 'utf-8',
-        timeout: 120_000,
-        env: { ...process.env, FLIPBOOK_QUIET: '1', FLIPBOOK_TEST_EPERM: peer, ...env },
-    });
+    const result = spawnSync(
+        process.execPath,
+        ['--import', pathToFileURL(loader).href, cli, ...args],
+        {
+            encoding: 'utf-8',
+            timeout: 120_000,
+            env: { ...process.env, FLIPBOOK_QUIET: '1', FLIPBOOK_TEST_EPERM: peer, ...env },
+        },
+    );
     const report = JSON.parse(result.stdout) as {
         exitCode: number;
         failures: { code: string; fix: string; detail?: Record<string, unknown> }[];
