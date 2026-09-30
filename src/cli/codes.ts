@@ -38,8 +38,8 @@ export const FINDING_CODES = {
     },
     'story-record': {
         meaning:
-            'A film told from a written record does not hold together: a file in assets/SOURCES.json has no line in record.materials (a file cut from another counts with its original), record.materials names a file assets/SOURCES.json does not have, or no words of the last beat contain record.key.',
-        fix: 'Say in record.materials which part of the story each file is, and take out of the film any file that is only decoration. List only files the film uses. End the film on the clue: put record.key in the words of the last beat, as references/story.md describes.',
+            'A film told from a written record does not hold together: a file in assets/SOURCES.json has no line in record.materials (a file cut from another counts with its original), record.materials names a file assets/SOURCES.json does not have, a key of assets/SOURCES.json leaves assets/ or names the same file as another key, or no words of the last beat contain record.key.',
+        fix: 'Say in record.materials which part of the story each file is, and take out of the film any file that is only decoration. List only files the film uses, and give each file in assets/SOURCES.json one key inside assets/. End the film on the clue: put record.key in the words of the last beat, as references/story.md describes.',
     },
     'story-coverage': {
         meaning:

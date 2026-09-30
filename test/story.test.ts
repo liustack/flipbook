@@ -552,6 +552,62 @@ describe('story.json', () => {
             expect(found(told((s) => ((s.record as { key: string }).key = '撑过')))).toEqual([]);
         });
 
+        it('spells every path one way, inside assets/, matching own entries only', () => {
+            const cc0 = { source: 'https://example.org/a', license: 'cc0' };
+            const own = (m: Record<string, string>, sources: Record<string, unknown>) =>
+                found(
+                    told((s) => ((s.record as { materials: unknown }).materials = m)),
+                    sources,
+                ).map((p) => [p.code, p.path, p.detail?.file ?? p.detail?.entry]);
+            // The same file spelled with . and .. steps, on either side.
+            expect(own({ 'assets/./a.png': 'part' }, { 'a.png': cc0 })).toEqual([]);
+            expect(own({ 'assets/sub/../a.png': 'part' }, { 'a.png': cc0 })).toEqual([]);
+            expect(own({ 'assets/a.png': 'part' }, { './a.png': cc0 })).toEqual([]);
+            expect(
+                own(
+                    { 'assets/a.png': 'part' },
+                    { 'a.png': cc0, 'cut/a-01.png': { ...cc0, cutFrom: './a.png' } },
+                ),
+            ).toEqual([]);
+            // Names an object has by inheritance are no entries.
+            expect(own({ 'assets/toString': 'part' }, {})).toEqual([
+                ['story-record', '$.record.materials["assets/toString"]', 'assets/toString'],
+            ]);
+            expect(own({ 'assets/constructor': 'part' }, {})).toEqual([
+                ['story-record', '$.record.materials["assets/constructor"]', 'assets/constructor'],
+            ]);
+            // A SOURCES.json key outside assets/, or two keys for one file.
+            expect(own({}, { '../outside.svg': cc0 })).toEqual([
+                ['story-record', '$.record.materials', '../outside.svg'],
+            ]);
+            expect(own({ 'assets/a.png': 'part' }, { 'a.png': cc0, 'x/../a.png': cc0 })).toEqual([
+                ['story-record', '$.record.materials', 'x/../a.png'],
+            ]);
+        });
+
+        it('refuses materials outside assets/ or named twice, in the shape', () => {
+            const paths = (m: Record<string, string>) =>
+                validateStory(
+                    told((s) => ((s.record as { materials: unknown }).materials = m)),
+                    timeline(),
+                    { sources: { sources: SOURCES } },
+                ).problems.map((p) => [p.code, p.path]);
+            for (const outside of [
+                'assets/../outside.svg',
+                'assets/',
+                'boat.png',
+                '/assets/boat.png',
+                'assets/a\\b.png',
+            ]) {
+                expect(paths({ [outside]: 'part' })).toEqual([
+                    ['story-invalid', `$.record.materials[${JSON.stringify(outside)}]`],
+                ]);
+            }
+            expect(paths({ 'assets/boat.png': 'part', 'assets/./boat.png': 'part' })).toEqual([
+                ['story-invalid', '$.record.materials["assets/./boat.png"]'],
+            ]);
+        });
+
         it('says so when assets/SOURCES.json cannot be read', () => {
             const { problems } = validateStory(told(), timeline(), {
                 sources: { problem: 'assets/SOURCES.json is not valid JSON: nope' },

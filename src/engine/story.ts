@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
-import { parseSources } from './assetSources.ts';
+import { assetPath, parseSources } from './assetSources.ts';
 import { Checker, describe, ID_PATTERN, isNum, isObject, type Json } from './schema.ts';
 import {
     BEAT_ROLES,
@@ -182,13 +182,34 @@ function validateRecord(c: Checker, value: Json): void {
         );
         return;
     }
+    const spelled = new Map<string, string>();
     for (const [file, part] of Object.entries(value.materials)) {
         const at = `$.record.materials[${JSON.stringify(file)}]`;
-        if (!file.startsWith('assets/')) {
-            c.fail(at, 'must name a file under assets/, as a path from the composition');
-        }
         sentence(c, part, at);
+        const asset = materialPath(file);
+        if (asset === null) {
+            c.fail(
+                at,
+                'must name a file inside assets/, as a path from the composition such as "assets/horse.jpg"',
+            );
+            continue;
+        }
+        const same = spelled.get(asset);
+        if (same !== undefined) {
+            c.fail(at, `names the same file as ${JSON.stringify(same)}: give each file one line`);
+            continue;
+        }
+        spelled.set(asset, file);
     }
+}
+
+/**
+ * The file under assets/ a record.materials key names, in the spelling
+ * assetPath gives (so "assets/./a.png" is "a.png"), or null when the key is
+ * not a path inside assets/.
+ */
+function materialPath(file: string): string | null {
+    return file.startsWith('assets/') ? assetPath(file.slice('assets/'.length)) : null;
 }
 
 function validateMemory(c: Checker, value: Json): void {
@@ -399,6 +420,83 @@ function slotProblems(slot: Slot, via: Channel[], beat: StoryBeatV2): string[] {
 }
 
 /**
+ * Files of assets/SOURCES.json with no part in the story, and materials that
+ * name no file there. Keys, cutFrom and materials are matched in the one
+ * spelling assetPath gives, as own entries only.
+ */
+function materialProblems(
+    record: StoryRecord,
+    sources: Record<string, unknown>,
+): { path: string; message: string; detail: Record<string, unknown> }[] {
+    const out: { path: string; message: string; detail: Record<string, unknown> }[] = [];
+    const bad = (key: string, problem: string) =>
+        out.push({
+            path: '$.record.materials',
+            message: `cannot be checked against assets/SOURCES.json: its entry ${JSON.stringify(key)} ${problem}`,
+            detail: { sources: 'assets/SOURCES.json', entry: key, problem },
+        });
+    // SOURCES.json entries by file, each in one spelling.
+    const entries = new Map<string, { key: string; entry: unknown }>();
+    for (const [key, entry] of Object.entries(sources)) {
+        const file = assetPath(key);
+        if (file === null) {
+            bad(key, 'is not a path inside assets/');
+            continue;
+        }
+        const same = entries.get(file);
+        if (same) {
+            bad(key, `names the same file as ${JSON.stringify(same.key)}`);
+            continue;
+        }
+        entries.set(file, { key, entry });
+    }
+    const materials = new Set<string>();
+    for (const file of Object.keys(record.materials)) {
+        const asset = materialPath(file) as string; // checked with the shape
+        materials.add(asset);
+        if (entries.has(asset)) continue;
+        out.push({
+            path: `$.record.materials[${JSON.stringify(file)}]`,
+            message: `names ${file}, which assets/SOURCES.json has no entry for: list only the files this film uses`,
+            detail: { file },
+        });
+    }
+    // A file cut from another (cutout, puppet, sprite) names it in cutFrom
+    // and belongs where its original does.
+    const unplaced = new Map<string, string[]>();
+    for (const file of entries.keys()) {
+        let at = file;
+        const seen = new Set<string>();
+        let placed = false;
+        for (;;) {
+            if (materials.has(at)) {
+                placed = true;
+                break;
+            }
+            seen.add(at);
+            const entry = entries.get(at)?.entry;
+            const from =
+                isObject(entry) && typeof entry.cutFrom === 'string'
+                    ? assetPath(entry.cutFrom)
+                    : null;
+            if (from === null || seen.has(from) || !entries.has(from)) break;
+            at = from;
+        }
+        if (placed) continue;
+        unplaced.set(at, [...(unplaced.get(at) ?? []), file]);
+    }
+    for (const [root, files] of unplaced) {
+        const cut = files.filter((file) => file !== root).length;
+        out.push({
+            path: '$.record.materials',
+            message: `has no line for assets/${root}${cut > 0 ? ` (nor for the ${cut} file${cut === 1 ? '' : 's'} cut from it)` : ''}: say which part of the story it is. A file that is not part of the story is decoration, take it out of the film`,
+            detail: { file: `assets/${root}`, files: files.map((file) => `assets/${file}`) },
+        });
+    }
+    return out;
+}
+
+/**
  * Why a story told from a record falls short of what the film can hold: a
  * file in assets/SOURCES.json with no part in the story, a material the film
  * does not have, or no clue to search in the last words.
@@ -416,44 +514,7 @@ function recordProblems(
             detail: { problem: read.problem },
         });
     } else {
-        const { sources } = read;
-        // A file cut from another (cutout, puppet, sprite) names it in cutFrom
-        // and belongs where its original does.
-        const unplaced = new Map<string, string[]>();
-        for (const key of Object.keys(sources)) {
-            let at = key;
-            const seen = new Set<string>();
-            let placed = false;
-            for (;;) {
-                if (`assets/${at}` in record.materials) {
-                    placed = true;
-                    break;
-                }
-                seen.add(at);
-                const entry = sources[at];
-                const from = isObject(entry) ? entry.cutFrom : undefined;
-                if (typeof from !== 'string' || seen.has(from) || !(from in sources)) break;
-                at = from;
-            }
-            if (placed) continue;
-            unplaced.set(at, [...(unplaced.get(at) ?? []), key]);
-        }
-        for (const [root, keys] of unplaced) {
-            const cut = keys.filter((key) => key !== root).length;
-            out.push({
-                path: '$.record.materials',
-                message: `has no line for assets/${root}${cut > 0 ? ` (nor for the ${cut} file${cut === 1 ? '' : 's'} cut from it)` : ''}: say which part of the story it is. A file that is not part of the story is decoration, take it out of the film`,
-                detail: { file: `assets/${root}`, files: keys.map((key) => `assets/${key}`) },
-            });
-        }
-        for (const file of Object.keys(record.materials)) {
-            if (file.slice('assets/'.length) in sources) continue;
-            out.push({
-                path: `$.record.materials[${JSON.stringify(file)}]`,
-                message: `names ${file}, which assets/SOURCES.json has no entry for: list only the files this film uses`,
-                detail: { file },
-            });
-        }
+        out.push(...materialProblems(record, read.sources));
     }
     const last = beats[beats.length - 1];
     const text = last.text ?? [];

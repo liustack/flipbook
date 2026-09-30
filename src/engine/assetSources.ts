@@ -11,6 +11,20 @@ import type { Workspace } from './workspace.ts';
 const IMAGES = /\.(png|jpe?g|webp|gif|svg|avif)$/i;
 
 /**
+ * The one spelling of a file under assets/, from a path relative to assets/
+ * (a SOURCES.json key, a cutFrom): forward slashes, no `.` or `..` steps. Null
+ * when it is empty, absolute, uses backslashes, or leaves assets/.
+ */
+export function assetPath(rel: string): string | null {
+    if (rel === '' || rel.includes('\\') || path.posix.isAbsolute(rel)) return null;
+    const normal = path.posix.normalize(rel);
+    if (normal === '.' || normal === '..' || normal.startsWith('../') || normal.endsWith('/')) {
+        return null;
+    }
+    return normal;
+}
+
+/**
  * assets/SOURCES.json as an object of entries, from its text (null when the
  * file is missing: no entries yet), or why it cannot be read as one.
  */
