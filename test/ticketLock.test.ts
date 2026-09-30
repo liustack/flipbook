@@ -138,4 +138,14 @@ describe('the sources lock', () => {
         expect(Date.now() - start).toBeGreaterThanOrEqual(100);
         expect(fs.readdirSync(folder)).toEqual([`p.${process.ppid}.dd`]);
     });
+    it('is busy at once when a live lower ticket is there, even beside one still choosing', () => {
+        const dir = composition();
+        const folder = path.join(dir, '.flipbook', 'render.d');
+        fs.mkdirSync(folder, { recursive: true });
+        fs.writeFileSync(path.join(folder, `p.${process.ppid}.aacc`), '1\n');
+        fs.writeFileSync(path.join(folder, `p.${process.ppid}.aabb`), '');
+        const start = Date.now();
+        expect(tryTicketLock(dir, 'render')).toBeNull();
+        expect(Date.now() - start).toBeLessThan(500);
+    });
 });

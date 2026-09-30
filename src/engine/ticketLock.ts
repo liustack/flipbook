@@ -72,19 +72,19 @@ function join(folder: string): { me: string; mine: string; ticket: number } {
  * when it is this process's turn. Files of dead processes are removed.
  */
 function ahead(folder: string, me: string, ticket: number): 'choosing' | 'ahead' | null {
-    let found: 'choosing' | 'ahead' | null = null;
+    let choosing = false;
+    let lower = false;
     for (const e of entries(folder)) {
         if (e.name === me) continue;
         if (!pidAlive(e.pid)) {
             fs.rmSync(e.file, { force: true });
             continue;
         }
-        if (e.ticket === null) found = 'choosing';
-        else if ((e.ticket < ticket || (e.ticket === ticket && e.name < me)) && found === null) {
-            found = 'ahead';
-        }
+        if (e.ticket === null) choosing = true;
+        else if (e.ticket < ticket || (e.ticket === ticket && e.name < me)) lower = true;
     }
-    return found;
+    // A live lower ticket settles it at once: no need to wait for anyone choosing.
+    return lower ? 'ahead' : choosing ? 'choosing' : null;
 }
 
 const pause = new Int32Array(new SharedArrayBuffer(4));

@@ -11,6 +11,7 @@ import { runRender } from '../src/cli/render.ts';
 import { runSnapshot } from '../src/cli/snapshot.ts';
 import { CompositionPage } from '../src/engine/page.ts';
 import { openPage } from '../src/engine/session.ts';
+import { acquireLock } from '../src/engine/ticketLock.ts';
 import { loadTimeline } from '../src/engine/timeline.ts';
 import { closeSession, session } from './browser.ts';
 import { cleanTemps, codes, copyFixture, tempDir } from './helpers.ts';
@@ -400,7 +401,10 @@ describe('cleanup when something fails half way', () => {
             } finally {
                 restore();
             }
-            expect(fs.existsSync(path.join(dir, '.flipbook', 'render.lock'))).toBe(false);
+            expect(fs.readdirSync(path.join(dir, '.flipbook', 'render.d'))).toEqual([]);
+            const again = acquireLock(dir);
+            expect(again).not.toBeNull();
+            again?.();
             expect(fs.readdirSync(path.join(dir, '.flipbook', 'tmp'))).toEqual([]);
             expect(browser.contexts().length).toBe(before);
         },
