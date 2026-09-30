@@ -136,10 +136,41 @@ export interface ResolvedStoryBeat {
     hold: boolean;
 }
 
+/** One slot of the story sentence: what it holds and where the viewer finds it. */
+export interface ResolvedStorySlot {
+    what: string;
+    where: { beat: string; via: ('picture' | 'words' | 'sound')[] } | 'record' | 'memory';
+}
+
+/** A story told off stage from a written record: the story, where it is written, the clue to search. */
+export interface StoryRecord {
+    story: string;
+    sources: string[];
+    key: string;
+    /** Each file of assets/SOURCES.json, as a path from the composition, and the part of the story it is. */
+    materials: Record<string, string>;
+}
+
+/** A story told off stage from the viewer's memory: the detail that brings it back. */
+export interface StoryMemory {
+    detail: string;
+}
+
+/**
+ * Where the story plays, worked out from its slots: all on stage, some left to
+ * a written record, or some left to the viewer's memory.
+ */
+export type StoryStage = 'onstage' | 'record' | 'memory';
+
 export interface ResolvedStory {
-    idea: string;
+    stage: StoryStage;
+    who: ResolvedStorySlot;
+    wants: ResolvedStorySlot;
+    because: ResolvedStorySlot;
+    becomes: ResolvedStorySlot;
+    record: StoryRecord | null;
+    memory: StoryMemory | null;
     leave: string;
-    subject: string;
     device: { what: string; why: string };
     beats: ResolvedStoryBeat[];
 }

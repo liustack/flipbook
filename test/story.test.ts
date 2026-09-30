@@ -41,12 +41,22 @@ function timeline() {
     return resolveTimeline(t as NonNullable<typeof t>);
 }
 
-function story(edit?: (s: Record<string, unknown> & { beats: Record<string, unknown>[] }) => void) {
+type Story = Record<string, unknown> & { beats: Record<string, unknown>[] };
+
+function story(edit?: (s: Story) => void) {
     const s = {
-        version: 1,
-        idea: 'A paper boat soaks through in the rain and is lifted out of the snow',
+        version: 2,
+        who: { what: 'a paper boat', where: { beat: 'calm', via: ['picture', 'words'] } },
+        wants: { what: 'to reach the far shore', where: { beat: 'calm', via: ['picture'] } },
+        because: {
+            what: 'the rain soaks it through and the snow buries it',
+            where: { beat: 'soak', via: ['picture', 'sound'] },
+        },
+        becomes: {
+            what: 'a hand lifts it out and it rides high again',
+            where: { beat: 'lift', via: ['picture', 'words'] },
+        },
         leave: 'Small things make it through',
-        subject: 'the paper boat',
         device: {
             what: 'the boat stays on one line while the weather changes behind it',
             why: 'the eye stays on the boat',
@@ -75,9 +85,27 @@ function story(edit?: (s: Record<string, unknown> & { beats: Record<string, unkn
                 callback: 'calm',
             },
         ],
-    } as Record<string, unknown> & { beats: Record<string, unknown>[] };
+    } as Story;
     edit?.(s);
     return s;
+}
+
+/** The story left partly off stage: `slots` go to `kind`, with its block. */
+function offstage(kind: 'record' | 'memory', slots: string[], edit?: (s: Story) => void) {
+    return story((s) => {
+        for (const slot of slots) (s[slot] as Record<string, unknown>).where = kind;
+        if (kind === 'record') {
+            s.record = {
+                story: 'A paper boat a child set on the river in 1900 was found at the sea',
+                sources: ['The river town paper, 3 May 1900'],
+                key: '撑过去',
+                materials: {},
+            };
+        } else {
+            s.memory = { detail: 'a paper boat on a rain puddle' };
+        }
+        edit?.(s);
+    });
 }
 
 const codesOf = (input: unknown) => validateStory(input, timeline()).problems.map((p) => p.code);
@@ -241,8 +269,8 @@ describe('story.json', () => {
     it('checks the shape field by field', () => {
         const { problems } = validateStory(
             story((s) => {
-                s.version = 2;
-                s.idea = '';
+                s.version = 3;
+                s.leave = '';
                 s.mood = 'hopeful';
                 s.beats[0].role = 'climax';
                 s.beats[1].change = 'rain';
@@ -254,11 +282,144 @@ describe('story.json', () => {
         expect(problems.map((p) => p.path)).toEqual([
             '$.mood',
             '$.version',
-            '$.idea',
+            '$.leave',
             '$.beats[0].role',
             '$.beats[1].change',
             '$.beats[2].id',
         ]);
+    });
+
+    it('refuses a story v1 file outright', () => {
+        const v1 = {
+            version: 1,
+            idea: 'A paper boat soaks through in the rain',
+            leave: 'Small things make it through',
+            subject: 'the paper boat',
+            device: { what: 'one line', why: 'the eye stays on the boat' },
+            beats: story().beats,
+        };
+        const { problems } = validateStory(v1, timeline());
+        expect(problems.map((p) => [p.code, p.path])).toEqual([['story-invalid', '$.version']]);
+        expect(problems[0].message).toContain('who, wants, because and becomes');
+    });
+
+    it('needs all four slots, each with what and where', () => {
+        const { problems } = validateStory(
+            story((s) => {
+                delete s.who;
+                s.wants = { what: '', where: { beat: 'calm', via: ['picture'] } };
+                s.because = { what: 'rain', where: 'offstage' };
+                s.becomes = { what: 'lifted', where: { beat: 'lift', via: [] }, why: 'luck' };
+            }),
+            timeline(),
+        );
+        expect(problems.map((p) => [p.code, p.path])).toEqual([
+            ['story-invalid', '$.who'],
+            ['story-invalid', '$.wants.what'],
+            ['story-invalid', '$.because.where'],
+            ['story-invalid', '$.becomes.why'],
+            ['story-invalid', '$.becomes.where.via'],
+        ]);
+    });
+
+    it('takes each channel once, from picture, words and sound', () => {
+        const via = (list: unknown[]) =>
+            validateStory(
+                story((s) => ((s.wants as { where: { via: unknown[] } }).where.via = list)),
+                timeline(),
+            ).problems.map((p) => [p.code, p.path]);
+        expect(via(['picture', 'picture'])).toEqual([['story-invalid', '$.wants.where.via[1]']]);
+        expect(via(['smell'])).toEqual([['story-invalid', '$.wants.where.via[0]']]);
+        expect(via(['picture', 'words'])).toEqual([]);
+        const missing = story((s) => ((s.who as { where: { beat: string } }).where.beat = 'dusk'));
+        expect(validateStory(missing, timeline()).problems.map((p) => [p.code, p.path])).toEqual([
+            ['story-invalid', '$.who.where.beat'],
+        ]);
+    });
+
+    it('works out the stage from the slots', () => {
+        const onstage = validateStory(story(), timeline());
+        expect(onstage.story).toMatchObject({ stage: 'onstage', record: null, memory: null });
+        expect(onstage.story?.who).toEqual({
+            what: 'a paper boat',
+            where: { beat: 'calm', via: ['picture', 'words'] },
+        });
+        const record = validateStory(offstage('record', ['who', 'wants']), timeline());
+        expect(record.problems).toEqual([]);
+        expect(record.story).toMatchObject({ stage: 'record', memory: null });
+        expect(record.story?.record?.key).toBe('撑过去');
+        const memory = validateStory(offstage('memory', ['who', 'wants', 'because']), timeline());
+        expect(memory.problems).toEqual([]);
+        expect(memory.story).toMatchObject({
+            stage: 'memory',
+            record: null,
+            memory: { detail: 'a paper boat on a rain puddle' },
+        });
+    });
+
+    it('asks for the block of the slots left off stage, and only for it', () => {
+        const paths = (input: unknown) =>
+            validateStory(input, timeline()).problems.map((p) => [p.code, p.path]);
+        expect(paths(offstage('record', ['who'], (s) => delete s.record))).toEqual([
+            ['story-invalid', '$.record'],
+        ]);
+        expect(paths(offstage('memory', ['who'], (s) => delete s.memory))).toEqual([
+            ['story-invalid', '$.memory'],
+        ]);
+        // A block with no slot left to it.
+        expect(paths(story((s) => (s.memory = { detail: 'a puddle' })))).toEqual([
+            ['story-invalid', '$.memory'],
+        ]);
+        expect(
+            paths(
+                offstage(
+                    'record',
+                    ['who'],
+                    (s) =>
+                        ((s.who as { where: unknown }).where = {
+                            beat: 'calm',
+                            via: ['picture'],
+                        }),
+                ),
+            ),
+        ).toEqual([['story-invalid', '$.record']]);
+        // A block of the wrong shape.
+        expect(paths(offstage('memory', ['who'], (s) => (s.memory = { detail: '' })))).toEqual([
+            ['story-invalid', '$.memory.detail'],
+        ]);
+        const record = offstage('record', ['who'], (s) => {
+            s.record = { story: 'x', sources: [], key: '', materials: { 'boat.png': 'the boat' } };
+        });
+        expect(paths(record)).toEqual([
+            ['story-invalid', '$.record.sources'],
+            ['story-invalid', '$.record.key'],
+            ['story-invalid', '$.record.materials["boat.png"]'],
+        ]);
+    });
+
+    it('tells a film from a record or from memory, not both', () => {
+        const paths = (input: unknown) =>
+            validateStory(input, timeline()).problems.map((p) => [p.code, p.path]);
+        const mixed = offstage('record', ['who'], (s) => {
+            (s.wants as { where: unknown }).where = 'memory';
+            s.memory = { detail: 'a paper boat on a rain puddle' };
+        });
+        expect(paths(mixed)).toEqual([
+            ['story-invalid', '$.wants.where'],
+            ['story-invalid', '$.memory'],
+        ]);
+        const blocks = offstage('record', ['who'], (s) => (s.memory = { detail: 'a puddle' }));
+        expect(paths(blocks)).toEqual([['story-invalid', '$.memory']]);
+    });
+
+    it('keeps at least one slot on stage in a film told from memory', () => {
+        const all = offstage('memory', ['who', 'wants', 'because', 'becomes']);
+        const { problems } = validateStory(all, timeline());
+        expect(problems.map((p) => [p.code, p.path])).toEqual([['story-invalid', '$.memory']]);
+        expect(problems[0].message).toContain('at least one on stage');
+        // A story told from a record may leave all four to it.
+        const record = offstage('record', ['who', 'wants', 'because', 'becomes']);
+        expect(validateStory(record, timeline()).problems).toEqual([]);
     });
 
     it('counts sentence length in characters and takes $schema only as a string', () => {

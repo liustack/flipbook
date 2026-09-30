@@ -3,8 +3,9 @@ import * as path from 'path';
 
 // A plain story for compositions that are not about the story: three beats
 // (opening, turn, resolution) at the start, a third and two thirds of the
-// film, each listing the text cues that fall inside it. Tests of the story
-// checks themselves write their own story.json.
+// film, each listing the text cues that fall inside it, and the four slots on
+// stage in the picture of those beats (none of them a hold beat). Tests of the
+// story checks themselves write their own story.json.
 
 interface Scene {
     id: string;
@@ -63,11 +64,14 @@ export function storyFor(timeline: Timeline): Record<string, unknown> {
             ...(text.length > 0 ? { text } : {}),
         };
     });
+    const onstage = (beat: string) => ({ beat, via: ['picture'] });
     return {
-        version: 1,
-        idea: 'A test composition',
+        version: 2,
+        who: { what: 'the test composition', where: onstage('b1') },
+        wants: { what: 'to exercise the engine', where: onstage('b1') },
+        because: { what: 'the engine has to be tested', where: onstage('b2') },
+        becomes: { what: 'a composition the tests can run', where: onstage('b3') },
         leave: 'Nothing: it only exercises the engine',
-        subject: 'the picture',
         device: { what: 'none', why: 'a fixture, not a film' },
         beats,
     };

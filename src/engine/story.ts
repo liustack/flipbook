@@ -8,16 +8,24 @@ import {
     frameAt,
     type ResolvedStory,
     type ResolvedStoryBeat,
+    type ResolvedStorySlot,
     type ResolvedTimeline,
+    type StoryMemory,
+    type StoryRecord,
+    type StoryStage,
 } from './timelineResolve.ts';
 
 // story.json: the film's story, written before the timeline and checked
-// against it. A story is one idea told in beats. Each beat starts at a moment
-// on the timeline (a scene, or a beat inside one) and runs until the next
-// beat starts, so the beats cover the whole film with no gaps and no overlap.
+// against it. A story is one sentence in four slots: who wants what, because
+// of what, and what they become. Each slot says where the viewer finds it: on
+// stage in one beat, through the picture, the words or the sound, or off stage,
+// filled in from a written record or from the viewer's own memory. The beats
+// tell it in order: each starts at a moment on the timeline (a scene, or a
+// beat inside one) and runs until the next beat starts, so the beats cover the
+// whole film with no gaps and no overlap.
 
 export const STORY_FILE = 'story.json';
-export const STORY_VERSION = 1;
+export const STORY_VERSION = 2;
 
 /** Beats past this many are allowed but get a warning: a short film holds three to six. */
 export const MAX_BEATS = 6;
@@ -37,7 +45,14 @@ export const ENDING_SHARE = 0.15;
 
 const TEXT_MAX = 300;
 
-export interface StoryBeatV1 {
+/** The four slots of the story sentence, in the order it reads. */
+export const SLOTS = ['who', 'wants', 'because', 'becomes'] as const;
+export type Slot = (typeof SLOTS)[number];
+/** The ways a slot on stage reaches the viewer. */
+export const CHANNELS = ['picture', 'words', 'sound'] as const;
+export type Channel = (typeof CHANNELS)[number];
+
+export interface StoryBeatV2 {
     id: string;
     role: BeatRole;
     /** A scene id (the beat starts with the scene), or a beat inside a scene. */
@@ -49,13 +64,17 @@ export interface StoryBeatV1 {
     hold?: boolean;
 }
 
-export interface StoryV1 {
-    version: 1;
-    idea: string;
+export interface StoryV2 {
+    version: 2;
+    who: ResolvedStorySlot;
+    wants: ResolvedStorySlot;
+    because: ResolvedStorySlot;
+    becomes: ResolvedStorySlot;
+    record?: StoryRecord;
+    memory?: StoryMemory;
     leave: string;
-    subject: string;
     device: { what: string; why: string };
-    beats: StoryBeatV1[];
+    beats: StoryBeatV2[];
 }
 
 type StoryCode =
@@ -90,23 +109,188 @@ function sentence(c: Checker, value: Json, at: string): value is string {
     return true;
 }
 
+/** Check one slot of the story sentence: `{ what, where }`. */
+function validateSlot(c: Checker, value: Json, at: string): void {
+    if (!isObject(value)) {
+        c.fail(at, `must be an object with what and where (got ${describe(value)})`);
+        return;
+    }
+    c.keys(value, at, ['what', 'where']);
+    sentence(c, value.what, `${at}.what`);
+    const where = value.where;
+    if (where === 'record' || where === 'memory') return;
+    if (!isObject(where)) {
+        c.fail(
+            `${at}.where`,
+            `must be { "beat": ..., "via": [...] }, "record" or "memory" (got ${describe(where)})`,
+        );
+        return;
+    }
+    c.keys(where, `${at}.where`, ['beat', 'via']);
+    c.str(where.beat, `${at}.where.beat`, ID_PATTERN, 'a beat id');
+    const channels = CHANNELS.map((ch) => `"${ch}"`).join(', ');
+    if (!Array.isArray(where.via) || where.via.length === 0) {
+        c.fail(
+            `${at}.where.via`,
+            `must be a non-empty array of ${channels} (got ${describe(where.via)})`,
+        );
+        return;
+    }
+    const seen = new Set<string>();
+    where.via.forEach((ch: Json, i: number) => {
+        if (!CHANNELS.includes(ch as Channel)) {
+            c.fail(`${at}.where.via[${i}]`, `must be ${channels} (got ${describe(ch)})`);
+        } else if (seen.has(ch as string)) {
+            c.fail(`${at}.where.via[${i}]`, `repeats "${ch as string}"`);
+        } else seen.add(ch as string);
+    });
+}
+
+function validateRecord(c: Checker, value: Json): void {
+    if (!isObject(value)) {
+        c.fail(
+            '$.record',
+            `must be an object with story, sources, key and materials (got ${describe(value)})`,
+        );
+        return;
+    }
+    c.keys(value, '$.record', ['story', 'sources', 'key', 'materials']);
+    sentence(c, value.story, '$.record.story');
+    if (!Array.isArray(value.sources) || value.sources.length === 0) {
+        c.fail(
+            '$.record.sources',
+            `must be a non-empty array of where the story is written (got ${describe(value.sources)})`,
+        );
+    } else {
+        for (const [i, source] of value.sources.entries()) {
+            c.str(
+                source,
+                `$.record.sources[${i}]`,
+                undefined,
+                'a source: a book, an archive, a link',
+            );
+        }
+    }
+    sentence(c, value.key, '$.record.key');
+    if (!isObject(value.materials)) {
+        c.fail(
+            '$.record.materials',
+            `must be an object of asset paths and the part of the story each one is (got ${describe(value.materials)})`,
+        );
+        return;
+    }
+    for (const [file, part] of Object.entries(value.materials)) {
+        const at = `$.record.materials[${JSON.stringify(file)}]`;
+        if (!file.startsWith('assets/')) {
+            c.fail(at, 'must name a file under assets/, as a path from the composition');
+        }
+        sentence(c, part, at);
+    }
+}
+
+function validateMemory(c: Checker, value: Json): void {
+    if (!isObject(value)) {
+        c.fail('$.memory', `must be an object with detail (got ${describe(value)})`);
+        return;
+    }
+    c.keys(value, '$.memory', ['detail']);
+    sentence(c, value.detail, '$.memory.detail');
+}
+
+/**
+ * Where the story plays, from its slots, or the problems that keep it from
+ * having one stage: a record and memory mixed, a block missing for the slots
+ * left off stage, or a block no slot uses.
+ */
+function validateStage(c: Checker, input: Record<string, Json>): StoryStage | null {
+    const offstage = (kind: 'record' | 'memory') =>
+        SLOTS.filter((slot) => isObject(input[slot]) && input[slot].where === kind);
+    const record = offstage('record');
+    const memory = offstage('memory');
+    const errors = c.errors.length;
+    const names = (slots: Slot[]) => slots.join(', ');
+    if (record.length > 0 && memory.length > 0) {
+        c.fail(
+            `$.${memory[0]}.where`,
+            `leaves ${names(memory)} to memory while ${names(record)} ${record.length === 1 ? 'is' : 'are'} left to the record: a film is told from a record or from memory, not both`,
+        );
+    }
+    if (input.record !== undefined && input.memory !== undefined) {
+        c.fail(
+            '$.memory',
+            'stands beside record: a film is told from a record or from memory, not both',
+        );
+    } else {
+        if (record.length > 0 && input.record === undefined) {
+            c.fail(
+                '$.record',
+                `is required: ${names(record)} ${record.length === 1 ? 'is' : 'are'} left to the record. Write the story, its sources, the key to search and what each asset is`,
+            );
+        }
+        if (record.length === 0 && input.record !== undefined) {
+            c.fail(
+                '$.record',
+                'is set, but no slot is left to the record: set a slot\'s where to "record", or drop the block',
+            );
+        }
+        if (memory.length > 0 && input.memory === undefined) {
+            c.fail(
+                '$.memory',
+                `is required: ${names(memory)} ${memory.length === 1 ? 'is' : 'are'} left to memory. Write the detail that brings the memory back`,
+            );
+        }
+        if (memory.length === 0 && input.memory !== undefined) {
+            c.fail(
+                '$.memory',
+                'is set, but no slot is left to memory: set a slot\'s where to "memory", or drop the block',
+            );
+        }
+    }
+    if (memory.length === SLOTS.length) {
+        c.fail(
+            '$.memory',
+            'leaves all four slots to memory: put at least one on stage, the one the film shows (usually wants or becomes)',
+        );
+    }
+    if (c.errors.length > errors) return null;
+    return record.length > 0 ? 'record' : memory.length > 0 ? 'memory' : 'onstage';
+}
+
 /** Check the shape of a parsed story.json. References to the timeline are checked later. */
-function validateShape(input: Json): { c: Checker; story?: StoryV1 } {
-    const c = new Checker('story v1');
+function validateShape(input: Json): { c: Checker; story?: StoryV2; stage?: StoryStage } {
+    const c = new Checker('story v2');
     if (!isObject(input)) {
         c.fail('$', 'must be a JSON object');
         return { c };
     }
-    c.keys(input, '$', ['$schema', 'version', 'idea', 'leave', 'subject', 'device', 'beats']);
+    if (input.version === 1) {
+        c.fail(
+            '$.version',
+            `must be ${STORY_VERSION}: this is a story v1 file. Version 2 replaces idea and subject with who, wants, because and becomes, see references/story.md`,
+        );
+        return { c };
+    }
+    c.keys(input, '$', [
+        '$schema',
+        'version',
+        ...SLOTS,
+        'record',
+        'memory',
+        'leave',
+        'device',
+        'beats',
+    ]);
     if (input.$schema !== undefined && typeof input.$schema !== 'string') {
         c.fail('$.$schema', `must be a string (got ${describe(input.$schema)})`);
     }
     if (input.version !== STORY_VERSION) {
         c.fail('$.version', `must be ${STORY_VERSION} (got ${describe(input.version)})`);
     }
-    sentence(c, input.idea, '$.idea');
+    for (const slot of SLOTS) validateSlot(c, input[slot], `$.${slot}`);
+    if (input.record !== undefined) validateRecord(c, input.record);
+    if (input.memory !== undefined) validateMemory(c, input.memory);
+    const stage = validateStage(c, input);
     sentence(c, input.leave, '$.leave');
-    sentence(c, input.subject, '$.subject');
     if (!isObject(input.device)) {
         c.fail('$.device', `must be an object with what and why (got ${describe(input.device)})`);
     } else {
@@ -182,7 +366,9 @@ function validateShape(input: Json): { c: Checker; story?: StoryV1 } {
             c.fail(`${at}.hold`, `must be true or false (got ${describe(beat.hold)})`);
         }
     });
-    return c.errors.length > 0 ? { c } : { c, story: input as unknown as StoryV1 };
+    return c.errors.length > 0 || stage === null
+        ? { c }
+        : { c, story: input as unknown as StoryV2, stage };
 }
 
 interface StoryProblem {
@@ -210,9 +396,9 @@ export function validateStory(
         severity: 'error' | 'warning' = 'error',
     ) => problems.push({ code, path: at, message, severity, ...(detail ? { detail } : {}) });
 
-    const { c, story } = validateShape(input);
+    const { c, story, stage } = validateShape(input);
     for (const error of c.errors) add('story-invalid', error.path, error.message);
-    if (!story) return { problems };
+    if (!story || !stage) return { problems };
 
     // References to the timeline: where each beat starts, its sound, its callback.
     const scenes = new Map(timeline.scenes.map((scene) => [scene.id, scene]));
@@ -259,6 +445,16 @@ export function validateStory(
             );
         }
     });
+    // The slots on stage each land in a beat of the story.
+    for (const slot of SLOTS) {
+        const where = story[slot].where;
+        if (typeof where === 'string' || story.beats.some((b) => b.id === where.beat)) continue;
+        add(
+            'story-invalid',
+            `$.${slot}.where.beat`,
+            `names no beat (known: ${story.beats.map((b) => b.id).join(', ')})`,
+        );
+    }
     if (starts.some((start) => start === null)) return { problems };
     const at = starts as number[];
 
@@ -444,8 +640,22 @@ export function validateStory(
         }
     }
     if (problems.some((p) => p.severity === 'error')) return { problems };
-    const { idea, leave, subject, device } = story;
-    return { problems, story: { idea, leave, subject, device, beats } };
+    const { who, wants, because, becomes, leave, device } = story;
+    return {
+        problems,
+        story: {
+            stage,
+            who,
+            wants,
+            because,
+            becomes,
+            record: story.record ?? null,
+            memory: story.memory ?? null,
+            leave,
+            device,
+            beats,
+        },
+    };
 }
 
 /** Read and check `<dir>/story.json` against the resolved timeline. */
@@ -462,7 +672,7 @@ export function loadStory(
             findings: [
                 finding(
                     'story-missing',
-                    `No ${STORY_FILE} in ${dir}. Write the story first: the idea, what it leaves the viewer with, the subject that changes, the device and the beats.`,
+                    `No ${STORY_FILE} in ${dir}. Write the story first: who wants what, because of what, what they become and where the viewer finds each, what it leaves the viewer with, the device and the beats.`,
                 ),
             ],
         };

@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "A pencil sketch of a persimmon on a ruled notebook page turns into the 青柿文具 logo, and the brand writes out its promise by hand.",
+    "version": 2,
+    "who": { "what": "someone who still writes by hand", "where": "memory" },
+    "wants": { "what": "a good sheet of paper to write on", "where": { "beat": "promise", "via": ["picture", "words"] } },
+    "because": { "what": "ink bleeds through the thin paper of a cheap notebook", "where": "memory" },
+    "becomes": { "what": "a notebook brand made for them: the persimmon of 青柿文具 over its promise", "where": { "beat": "lockup", "via": ["picture", "words"] } },
+    "memory": { "detail": "the first stroke of a sharp pencil on a fresh ruled notebook page" },
     "leave": "This is a stationery brand for people who write by hand.",
-    "subject": "the persimmon, from pencil sketch to finished mark",
     "device": {
         "what": "a ruled notebook page that everything is drawn and written on",
         "why": "the brand sells paper, so its story is told on its own paper"

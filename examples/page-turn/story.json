@@ -1,8 +1,18 @@
 {
-    "version": 1,
-    "idea": "A cloth-bound book of moon drawings opens on a desk, its pages start to flip on their own and the crescent grows to a full moon, and the last page turns to a line of Su Shi about the moon.",
+    "version": 2,
+    "who": { "what": "Su Shi, on Mid-Autumn night", "where": { "beat": "poem", "via": ["words"] } },
+    "wants": { "what": "to see his younger brother Su Zhe again", "where": "record" },
+    "because": { "what": "their posts kept them far apart, and the full moon of the festival for families found them apart", "where": "record" },
+    "becomes": { "what": "he takes the waxing and waning moon as the way of things and wishes them the same moon from far apart", "where": { "beat": "poem", "via": ["picture", "words"] } },
+    "record": {
+        "story": "On the Mid-Autumn night of 1076, posted in Mizhou, Su Shi drank until dawn missing his younger brother Su Zhe, whom he had not seen for years, and wrote 水调歌头: the moon waxes and wanes as people part and meet, and he wishes only that they live long and share the moon from a thousand li apart.",
+        "sources": ["苏轼《水调歌头·明月几时有》及小序：丙辰中秋，欢饮达旦，大醉，作此篇，兼怀子由。"],
+        "key": "水调歌头",
+        "materials": {
+            "assets/page-turn.mp3": "the pages of the moon book turning: the month going by from a new moon to the Mid-Autumn full moon the poem was written under"
+        }
+    },
     "leave": "The moon waxes and wanes, and a flip book can hold a whole month of it.",
-    "subject": "the moon on the pages, from thin crescent to full",
     "device": {
         "what": "a hand-drawn flip book, one moon phase per page, turned twice a beat",
         "why": "a month of moon phases is a slow change that a riffled book shows in a few seconds"

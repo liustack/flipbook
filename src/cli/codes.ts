@@ -24,11 +24,11 @@ export const FINDING_CODES = {
     },
     'story-missing': {
         meaning: 'The composition directory has no story.json.',
-        fix: 'Write story.json before the timeline, as references/story.md describes: the idea, what the film leaves the viewer with, the subject that changes, the device and the beats.',
+        fix: 'Write story.json before the timeline, as references/story.md describes: who wants what, because of what, what they become and where the viewer finds each, what the film leaves the viewer with, the device and the beats.',
     },
     'story-invalid': {
         meaning:
-            'story.json does not match story schema v1, or names a scene, cue or beat that does not exist.',
+            'story.json does not match story schema v2 (a v1 file among them), its slots leave the story to a record and to memory at once or lack the record or memory block they need, or it names a scene, cue or beat that does not exist.',
         fix: 'Fix the field named in `detail.path` as the message says.',
     },
     'story-coverage': {

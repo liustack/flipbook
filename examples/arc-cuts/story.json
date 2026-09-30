@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "One curved edge is cut through twelve materials, faster and faster, until it turns back into the rim of a planet and sets.",
+    "version": 2,
+    "who": { "what": "someone watching the sun go down over the sea", "where": "memory" },
+    "wants": { "what": "to keep that curve of light a moment longer", "where": "memory" },
+    "because": { "what": "it slips below the edge while you watch", "where": "memory" },
+    "becomes": { "what": "the curve turns up again in twelve other things and sets once more, with 还有更多值得发现 written along it", "where": { "beat": "set", "via": ["picture", "words"] } },
+    "memory": { "detail": "the rim of the sun slipping below the sea" },
     "leave": "The same curve is everywhere, and there is more of it to find.",
-    "subject": "the arc across the lower half of the frame",
     "device": {
         "what": "a match cut: every shot puts a different material's curved edge in the same place",
         "why": "keeping the curve still while the world behind it changes makes the viewer see one shape in many things"

@@ -1,8 +1,10 @@
 {
-    "version": 1,
-    "idea": "A little paper postman loses his last letter to a gust of wind, chases it down the street, and it drops into the mailbox on its own",
+    "version": 2,
+    "who": { "what": "a little paper postman on his round", "where": { "beat": "round", "via": ["picture"] } },
+    "wants": { "what": "to deliver his last letter", "where": { "beat": "chase", "via": ["picture"] } },
+    "because": { "what": "a gust of wind takes the letter out of his hand", "where": { "beat": "gust", "via": ["picture", "sound"] } },
+    "becomes": { "what": "the letter drops into the mailbox on its own and he waves at it", "where": { "beat": "home", "via": ["picture", "words"] } },
     "leave": "Some things find their way even when you drop them",
-    "subject": "the red letter",
     "device": {
         "what": "the letter is the only red thing in a grey paper street",
         "why": "the eye follows the letter the whole way, from his hand to the slot"

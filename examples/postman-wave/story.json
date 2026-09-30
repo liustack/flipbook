@@ -1,8 +1,10 @@
 {
-    "version": 1,
-    "idea": "On his early round a postman walks past a row of dark windows; one lights up, a child waves, and he waves back",
+    "version": 2,
+    "who": { "what": "a child at a dark window on the postman's street", "where": { "beat": "light", "via": ["picture", "sound"] } },
+    "wants": { "what": "the postman walking by to see her and wave back", "where": { "beat": "hello", "via": ["picture"] } },
+    "because": { "what": "he is on his early round, walking past a row of dark windows without stopping", "where": { "beat": "round", "via": ["picture"] } },
+    "becomes": { "what": "he waves back and it is good morning for both of them", "where": { "beat": "hello", "via": ["picture", "words"] } },
     "leave": "A small hello is what makes the round worth walking",
-    "subject": "the windows along the street",
     "device": {
         "what": "one window lighting up warm in a row of cold dark ones",
         "why": "the light is the child: it turns the street from empty to someone there"

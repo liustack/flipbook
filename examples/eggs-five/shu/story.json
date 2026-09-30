@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "Eighty speckled bird eggs fly onto a bare page until, together, they write the character 书, and then the page names the film 手翻书.",
+    "version": 2,
+    "who": { "what": "a child at a craft table", "where": "memory" },
+    "wants": { "what": "to make a clear shape out of many small pieces", "where": "memory" },
+    "because": { "what": "the pieces land a few at a time and only hint at a character for a long while", "where": { "beat": "scatter", "via": ["picture"] } },
+    "becomes": { "what": "together they write the character 书", "where": { "beat": "shu", "via": ["picture"] } },
+    "memory": { "detail": "gluing dried beans one by one onto card until they make a character" },
     "leave": "A book can be built from many small, different pieces.",
-    "subject": "the pile of eggs, from a scatter to the character 书",
     "device": {
         "what": "eggs that land on quarter beats, two at a time at first and then in fours, fives and sixes",
         "why": "the character only reads once enough eggs are down, so the speed-up carries the viewer toward it"

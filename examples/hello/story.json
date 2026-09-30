@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "A red square tumbles across an empty page while the page says hello, first in Chinese and then in English.",
+    "version": 2,
+    "who": { "what": "someone at a blank screen trying their first program", "where": "memory" },
+    "wants": { "what": "to make the machine say something back", "where": "memory" },
+    "because": { "what": "nothing shows until the first line is right", "where": "memory" },
+    "becomes": { "what": "the blank page answers: 你好，翻页书", "where": { "beat": "hello", "via": ["picture", "words"] } },
+    "memory": { "detail": "the first program that printed hello on an empty screen" },
     "leave": "A blank page can greet you back.",
-    "subject": "the page, from blank to greeting",
     "device": {
         "what": "a red square that rolls along the bottom edge from left to right for the whole film",
         "why": "its trip across the page is the film's clock, so the viewer feels the greeting arrive on time"

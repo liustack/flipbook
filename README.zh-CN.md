@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/5ee87eff-1436-473b-b31a-81c74769659d
 
 <p align="center"><sub>每条视频都能直接播放，全部由 flipbook 渲染：纸船和蝴蝶来自评测，模型只拿到一句话，独自做完。</sub></p>
 
-flipbook 是一个做讲故事的动画短片的 agent skill。agent 先写故事，一个想法分成三到六拍，再写按拍计时的时间轴和一个 HTML 合成文件。skill 逐帧渲染成带配乐的 mp4，交付前拿故事核对一遍成片。默认是纸感：剪纸、铅笔、版画。产品片也这么做：一个想法，产品推动故事。
+flipbook 是一个做讲故事的动画短片的 agent skill。agent 先写故事，一句话（谁想要什么，因为什么事，最后变成了什么）分成三到六拍讲，再写按拍计时的时间轴和一个 HTML 合成文件。skill 逐帧渲染成带配乐的 mp4，交付前拿故事核对一遍成片。默认是纸感：剪纸、铅笔、版画。产品片也这么做：一个想法，产品推动故事。
 
 给想用 AI 做短动画的人：片头、数据动画、概念讲解、书摘、跟着音乐打点的短片。
 
@@ -122,7 +122,7 @@ npx -y skills add liustack/flipbook#v0.8.7 --skill flipbook --global --agent cod
 做一段 20 秒的纸感动画：暴风雨吹灭了灯塔的灯，一只小船借着孩子手里的灯笼找到了回家的路。
 ```
 
-agent 照 skill 的步骤走：先写 `story.json`（想法、转折、三到六拍）给你看，定规格，写 `timeline.json`（每拍一两场），写 `index.html`，跑 `check` 和 `snapshot` 看联系表改到通过，跑 `render`，拿成片联系表对照故事看一遍后交付：
+agent 照 skill 的步骤走：先写 `story.json`（谁想要什么、因为什么事、最后变成了什么、各在片子哪里出现，再分三到六拍）给你看，定规格，写 `timeline.json`（每拍一两场），写 `index.html`，跑 `check` 和 `snapshot` 看联系表改到通过，跑 `render`，拿成片联系表对照故事看一遍后交付：
 
 ```bash
 bash ~/.claude/skills/flipbook/scripts/run.sh check lighthouse
@@ -181,8 +181,8 @@ bash ~/.claude/skills/flipbook/scripts/run.sh render lighthouse
 |---|---|
 | [INSTALL.zh-CN.md](INSTALL.zh-CN.md) | 安装，写给 agent 的步骤 |
 | [skills/flipbook/SKILL.md](skills/flipbook/SKILL.md) | agent 做片的流程和硬规矩 |
-| [故事](skills/flipbook/references/story.md) | 写 story.json：想法、转折、节拍 |
-| [story.json v1](docs/story-schema.zh-CN.md) | 故事的字段，check 拿它核对什么 |
+| [故事](skills/flipbook/references/story.md) | 写 story.json：谁想要什么、台上还是台下、转折、节拍 |
+| [story.json v2](docs/story-schema.zh-CN.md) | 故事的字段，check 拿它核对什么 |
 | [合成规矩](skills/flipbook/references/rules.md) | 写 index.html |
 | [时间轴](skills/flipbook/references/timeline.md) | 写 timeline.json，凑片长 |
 | [配乐和音效](skills/flipbook/references/audio.md) | 挑预设、调和强弱，放音效，用自己的音乐 |

@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "Old natural-history plates are cut out and dropped one by one onto a squared page, and once the board is full it is named as a notebook of public domain field notes.",
+    "version": 2,
+    "who": { "what": "a child keeping a nature notebook", "where": "memory" },
+    "wants": { "what": "to fill a page with the things found outdoors", "where": "memory" },
+    "because": { "what": "the finds turn up one at a time, and the page stays half empty for a long while", "where": "memory" },
+    "becomes": { "what": "the page fills with specimens and gets its name, 博物笔记", "where": { "beat": "named", "via": ["picture", "words"] } },
+    "memory": { "detail": "sticking a beetle and a butterfly side by side on a squared notebook page and writing a title under them" },
     "leave": "Old public domain plates can make a new page.",
-    "subject": "the squared page, from empty to a named specimen board",
     "device": {
         "what": "cut-out specimens that fall onto the page like stickers, each with a paper sound as it lands",
         "why": "sticking finds onto a page is how a field notebook fills up"

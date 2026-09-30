@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "A worn pad printed with Muybridge's running horse lies still on a desk until its pages start to riffle, the horse gallops, and the pad slows and stops on the first frame of the stride.",
+    "version": 2,
+    "who": { "what": "a child with a flip book in hand", "where": "memory" },
+    "wants": { "what": "to make the still pictures move", "where": "memory" },
+    "because": { "what": "every page holds only one frozen picture, and they move only when the pages fly fast enough", "where": "memory" },
+    "becomes": { "what": "the printed horse gallops across the flying pages", "where": { "beat": "gallop", "via": ["picture", "sound"] } },
+    "memory": { "detail": "thumbing the corner of a flip book until the pictures run" },
     "leave": "Twenty still photographs are enough to make a horse run.",
-    "subject": "the horse printed on the pages, from still picture to gallop and back",
     "device": {
         "what": "a real flip book, filmed from above, whose pages turn faster and then slower",
         "why": "the horse only moves while the pages turn, so the speed of the riffle is the speed of the story"

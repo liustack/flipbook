@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "A blank card lands on the page, three words drop onto it one per bar, and once they are swept away the card is given its name.",
+    "version": 2,
+    "who": { "what": "a child making a first flip book", "where": "memory" },
+    "wants": { "what": "to make a drawing move", "where": "memory" },
+    "because": { "what": "it takes one beat, one frame and one character at a time", "where": { "beat": "words", "via": ["picture", "words"] } },
+    "becomes": { "what": "the blank card gets its name, 翻页书, and a red stamp", "where": { "beat": "name", "via": ["picture", "words"] } },
+    "memory": { "detail": "writing the title on the cover of a flip book you made yourself" },
     "leave": "A flip book is made of beats, frames and characters.",
-    "subject": "the card, from blank to titled",
     "device": {
         "what": "every word and mark lands on a beat, with a drop sound where it hits",
         "why": "the words name the parts of a flip book, and landing on the beat shows them at work"

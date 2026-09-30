@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "An eyepiece looks at one small specimen after another, a fern, cells, rings of light, until the last thing in it is the moon and the lens pulls out into the open sky.",
+    "version": 2,
+    "who": { "what": "a child at a first microscope", "where": "memory" },
+    "wants": { "what": "to see things closer than the eye can go", "where": "memory" },
+    "because": { "what": "the eyepiece only ever shows one small circle at a time", "where": "memory" },
+    "becomes": { "what": "from a fern leaf, looking leads all the way to the moon in the open sky", "where": { "beat": "sky", "via": ["picture", "words"] } },
+    "memory": { "detail": "onion-skin cells under the school microscope" },
     "leave": "Looking closely at small things can lead you all the way to the sky.",
-    "subject": "what fills the round eyepiece",
     "device": {
         "what": "a round eyepiece with a ticked rim that stays in the middle of the frame while the plate inside it changes every two beats",
         "why": "the fixed circle makes a fern, a cell and the moon look like the same kind of thing, which is the point of the film"

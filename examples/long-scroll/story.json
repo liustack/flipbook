@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "A long sheet of paper scrolls up for three minutes while its rows of marks change kind every half minute, from dots to stars, as a pen crosses the top from one edge to the other.",
+    "version": 2,
+    "who": { "what": "a child working through a practice book", "where": "memory" },
+    "wants": { "what": "to get to the end of the page", "where": "memory" },
+    "because": { "what": "it goes row after row, one kind of mark at a time", "where": "memory" },
+    "becomes": { "what": "a page of stars, and the line along the top drawn all the way to the right", "where": { "beat": "stars", "via": ["picture"] } },
+    "memory": { "detail": "a practice book of rows to copy: dots first, then circles, then lines and waves" },
     "leave": "A long, steady scroll can still keep changing under your eyes.",
-    "subject": "the kind of mark in the rows",
     "device": {
         "what": "a line along the top that a pen draws from left to right over the whole film",
         "why": "it shows how far along the scroll is, so each new kind of mark lands at a place the viewer can see"

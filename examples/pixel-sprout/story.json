@@ -1,8 +1,10 @@
 {
-    "version": 1,
-    "idea": "A little robot waters a seed for three days and nights and nothing comes up; on the fourth morning a sprout shows, and it blooms",
+    "version": 2,
+    "who": { "what": "a little robot", "where": { "beat": "waiting", "via": ["picture"] } },
+    "wants": { "what": "the seed it waters every day to come up", "where": { "beat": "waiting", "via": ["picture"] } },
+    "because": { "what": "three days and nights go by and the mound stays bare", "where": { "beat": "waiting", "via": ["picture"] } },
+    "becomes": { "what": "on the fourth morning a sprout shows and flowers, and the robot hops", "where": { "beat": "bloom", "via": ["picture", "words"] } },
     "leave": "Keep tending what you care about, even when nothing shows yet",
-    "subject": "the mound of earth",
     "device": {
         "what": "the sun and the moon crossing the sky over one small mound",
         "why": "the days going by without change are the waiting; the mound is where the change comes"

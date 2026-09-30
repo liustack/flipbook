@@ -1,8 +1,42 @@
 {
-    "version": 1,
-    "idea": "A test composition",
+    "version": 2,
+    "who": {
+        "what": "the test composition",
+        "where": {
+            "beat": "b1",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "wants": {
+        "what": "to exercise the engine",
+        "where": {
+            "beat": "b1",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "because": {
+        "what": "the engine has to be tested",
+        "where": {
+            "beat": "b2",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "becomes": {
+        "what": "a composition the tests can run",
+        "where": {
+            "beat": "b3",
+            "via": [
+                "picture"
+            ]
+        }
+    },
     "leave": "Nothing: it only exercises the engine",
-    "subject": "the picture",
     "device": {
         "what": "none",
         "why": "a fixture, not a film"

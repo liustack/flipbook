@@ -29,10 +29,12 @@ function write(root, rel, content) {
 }
 
 const STORY = {
-    version: 1,
-    idea: 'an old man waits for pigeons that do not come',
+    version: 2,
+    who: { what: 'an old man on a bench', where: { beat: 'feed', via: ['picture'] } },
+    wants: { what: 'the pigeons to come to his crumbs', where: { beat: 'feed', via: ['picture'] } },
+    because: { what: 'one day none come', where: { beat: 'empty', via: ['picture'] } },
+    becomes: { what: 'one comes back, then many', where: { beat: 'back', via: ['picture'] } },
     leave: 'the waiting was the point',
-    subject: 'the old man',
     device: { what: 'one bench', why: 'the bench stays, the day changes' },
     beats: [
         { id: 'feed', role: 'opening', at: 'a', change: { from: 'crumbs', to: 'pigeons' } },

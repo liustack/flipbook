@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/5ee87eff-1436-473b-b31a-81c74769659d
 
 <p align="center"><sub>Every video plays in place. All three are flipbook renders: the paper boat and the butterfly come from eval runs where the model worked alone from one prompt.</sub></p>
 
-flipbook is an agent skill for short animated films that tell a story. Your agent writes the story first, one idea in three to six beats, then a timeline counted in beats and one HTML composition. The skill renders it frame by frame into an MP4 with music and checks the video against the story before you get it. Paper is the house look: cut paper, pencil, prints. A film about a product works the same way, one idea with the product moving the story.
+flipbook is an agent skill for short animated films that tell a story. Your agent writes the story first, one sentence (who wants what, what stands in the way, what they end up with) told in three to six beats, then a timeline counted in beats and one HTML composition. The skill renders it frame by frame into an MP4 with music and checks the video against the story before you get it. Paper is the house look: cut paper, pencil, prints. A film about a product works the same way, one idea with the product moving the story.
 
 It is for anyone who wants short animations from AI: intros, data animations, concept explainers, book quotes, clips cut to music.
 
@@ -122,7 +122,7 @@ You say:
 Make a 20-second paper animation: a storm puts out the lighthouse lamp, and a small boat finds its way home by a child's lantern.
 ```
 
-The agent follows the skill's steps: write `story.json` (the idea, the turn, three to six beats) and show it to you, settle the spec, write `timeline.json` (a scene or two per beat), write `index.html`, run `check` and `snapshot` and fix things until the contact sheet looks right, run `render`, then read the final contact sheet against the story and deliver:
+The agent follows the skill's steps: write `story.json` (who wants what, what stands in the way, what they end up with, where the film shows each, and three to six beats) and show it to you, settle the spec, write `timeline.json` (a scene or two per beat), write `index.html`, run `check` and `snapshot` and fix things until the contact sheet looks right, run `render`, then read the final contact sheet against the story and deliver:
 
 ```bash
 bash ~/.claude/skills/flipbook/scripts/run.sh check lighthouse
@@ -181,8 +181,8 @@ What each platform was tested on, the sandbox settings and the memory a containe
 |---|---|
 | [INSTALL.md](INSTALL.md) | Installing, step by step (written for an agent) |
 | [skills/flipbook/SKILL.md](skills/flipbook/SKILL.md) | Seeing how the agent makes a video and which rules it must keep |
-| [Story](skills/flipbook/references/story.md) | Writing story.json: the idea, the turn, the beats |
-| [story.json v1](docs/story-schema.md) | The story's fields and what check verifies against it |
+| [Story](skills/flipbook/references/story.md) | Writing story.json: who wants what, on stage or off, the turn, the beats |
+| [story.json v2](docs/story-schema.md) | The story's fields and what check verifies against it |
 | [Composition rules](skills/flipbook/references/rules.md) | Writing index.html |
 | [Timeline](skills/flipbook/references/timeline.md) | Writing timeline.json and hitting a target duration |
 | [Music and sound effects](skills/flipbook/references/audio.md) | Picking a preset, setting dynamics, placing effects, using your own music |

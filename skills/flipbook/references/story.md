@@ -6,9 +6,8 @@ Every film tells one story. Write it as `story.json` before the timeline: the st
 
 | Field | Write | A paper boat, for example |
 |---|---|---|
-| `idea` | one sentence: who or what, meets what, becomes what | A paper boat soaks through in the rain, and a child's hand lifts it out of the snow |
+| `who`, `wants`, `because`, `becomes` | the story in one sentence, four slots: who wants what, because of what, and what they become. Each says where the viewer finds it | a paper boat wants to reach the far shore, the rain soaks it and the snow buries it, it shakes the snow off and rides high again |
 | `leave` | one sentence: what the viewer feels or remembers at the end | Small things make it through |
-| `subject` | the one thing that changes over the film | the paper boat |
 | `device` | `what`: the one visual device that runs through the film. `why`: why it fits this story | The boat stays on one line while the weather changes behind it, so the eye stays on the boat and the world is what changes |
 | `beats` | 3 to 6 beats, in order | below |
 
@@ -54,7 +53,7 @@ The ending is where the viewer decides what they felt, and a rushed ending is th
 ## Order of work
 
 1. Write `story.json`.
-2. When the user is there, show them the idea, what it leaves, the subject, the device and the beats in one message, and go on once they agree. When they said to just make it, go on with your own.
+2. When the user is there, show them the four slots, what it leaves, the device and the beats in one message, and go on once they agree. When they said to just make it, go on with your own.
 3. Write `timeline.json`: a scene or two per beat, text and sfx cues where the beats need them.
 4. Write `index.html`. Run `check`: `story-coverage`, `story-arc`, `story-text` and `story-invalid` name the field to fix.
 5. Before delivery, read the contact sheet against the story: does each beat's first and last frame show its `change`? Retell the film from the pictures alone. If the retelling misses the turn, the film misses it too.
@@ -79,6 +78,7 @@ Change the story only when the user changes it. Once the timeline is written, th
         { "id": "snow", "bars": 3 }
     ],
     "cues": [
+        { "id": "go", "scene": "sun", "beat": 1, "kind": "text", "text": "到对岸去", "settleBeats": 1 },
         { "id": "drop", "scene": "rain", "beat": 0, "kind": "sfx", "sfx": "drop" },
         { "id": "end", "scene": "snow", "beat": 6, "kind": "text", "text": "撑过去", "settleBeats": 1 }
     ]
@@ -88,16 +88,18 @@ Change the story only when the user changes it. Once the timeline is written, th
 <!-- snippet-file: story.json -->
 ```json
 {
-    "version": 1,
-    "idea": "A paper boat soaks through in the rain, and a hand lifts it out of the snow",
+    "version": 2,
+    "who": { "what": "a paper boat", "where": { "beat": "calm", "via": ["picture"] } },
+    "wants": { "what": "to reach the far shore", "where": { "beat": "calm", "via": ["picture", "words"] } },
+    "because": { "what": "the rain soaks it and the snow buries it", "where": { "beat": "soak", "via": ["picture", "sound"] } },
+    "becomes": { "what": "it shakes the snow off and rides high again", "where": { "beat": "lift", "via": ["picture", "words"] } },
     "leave": "Small things make it through",
-    "subject": "the paper boat",
     "device": {
         "what": "the boat stays on one line while the weather changes behind it",
         "why": "the eye stays on the boat, the world is what changes"
     },
     "beats": [
-        { "id": "calm", "role": "opening", "at": "sun", "change": { "from": "the boat drifts under a clear sky", "to": "the sky greys over" } },
+        { "id": "calm", "role": "opening", "at": "sun", "change": { "from": "the boat drifts under a clear sky", "to": "the sky greys over" }, "text": ["到对岸去"] },
         { "id": "soak", "role": "turn", "at": "rain", "change": { "from": "the first drops fall", "to": "the boat sits low in the water" }, "sound": "drop" },
         { "id": "cold", "role": "build", "at": "snow", "change": { "from": "rain turns to snow", "to": "snow piles on the boat" } },
         { "id": "lift", "role": "resolution", "at": { "scene": "snow", "beat": 4 }, "change": { "from": "the snow slides off", "to": "the boat rides high again" }, "text": ["撑过去"], "callback": "calm" }
@@ -113,9 +115,14 @@ const tl = await timeline();
 const ctx = setupCanvas(document.getElementById('stage'), tl.width, tl.height);
 const [sun, rain, snow] = tl.scenes;
 const lift = tl.story.beats[3];
-const words = Object.assign(document.createElement('p'), { textContent: '撑过去' });
-words.style.cssText = 'position:absolute;left:0;right:0;top:40px;margin:0;text-align:center;font:600 44px "Noto Serif SC";color:#2b2622';
-document.body.append(words);
+const line = (text) => {
+  const p = Object.assign(document.createElement('p'), { textContent: text });
+  p.style.cssText = 'position:absolute;left:0;right:0;top:40px;margin:0;text-align:center;font:600 44px "Noto Serif SC";color:#2b2622';
+  document.body.append(p);
+  return p;
+};
+const go = line('到对岸去');
+const words = line('撑过去');
 
 composition({
   seek(t) {
@@ -140,6 +147,7 @@ composition({
     ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(x - 46, y - 22 * pile, 92, 22 * pile);
+    go.style.opacity = String(cueProgress(tl, t, 'go') * (1 - progress(t, rain.start - 0.5, rain.start)));
     words.style.opacity = String(cueProgress(tl, t, 'end'));
   },
 });

@@ -1,8 +1,42 @@
 {
-    "version": 1,
-    "idea": "A paper boat stalls in the rain, then sails on into the snow",
+    "version": 2,
+    "who": {
+        "what": "the paper boat",
+        "where": {
+            "beat": "sun",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "wants": {
+        "what": "to reach the far shore",
+        "where": {
+            "beat": "sun",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "because": {
+        "what": "the weather turns against it",
+        "where": {
+            "beat": "rain",
+            "via": [
+                "picture"
+            ]
+        }
+    },
+    "becomes": {
+        "what": "the boat at the edge",
+        "where": {
+            "beat": "snow",
+            "via": [
+                "picture"
+            ]
+        }
+    },
     "leave": "Weather changes",
-    "subject": "the paper boat",
     "device": {
         "what": "the boat crosses the frame on one line",
         "why": "the weather is what changes"

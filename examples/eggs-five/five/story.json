@@ -1,8 +1,11 @@
 {
-    "version": 1,
-    "idea": "Speckled bird eggs fly onto a bare page one by one until, together, they spell the numeral 5, and then the page gives the film its name.",
+    "version": 2,
+    "who": { "what": "a child at a craft table", "where": "memory" },
+    "wants": { "what": "to make a clear shape out of many small pieces", "where": "memory" },
+    "because": { "what": "the pieces land one at a time and only hint at a shape for a long while", "where": { "beat": "scatter", "via": ["picture"] } },
+    "becomes": { "what": "together they fill a 5", "where": { "beat": "five", "via": ["picture"] } },
+    "memory": { "detail": "gluing dried beans one by one onto card until they make a number" },
     "leave": "Many small, different things can add up to one clear shape.",
-    "subject": "the pile of eggs, from a scatter to a 5",
     "device": {
         "what": "eggs that land on quarter beats, one at a time at first and then in twos and threes",
         "why": "the shape only reads once enough eggs are down, so the speed-up carries the viewer toward it"
