@@ -264,7 +264,7 @@ describe('fonts in assets/fonts/', () => {
             'assets/SOURCES.json',
             JSON.stringify({
                 'fonts/Hand.ttf': { license: 'OFL-1.1' },
-                'assets/fonts/Clash.otf': { license: 'OFL-1.1' },
+                'fonts/Clash.otf': { license: 'OFL-1.1' },
             }),
         );
         loaded = loadTimeline(dir, false);
@@ -272,6 +272,34 @@ describe('fonts in assets/fonts/', () => {
             ['font-invalid', 'assets/fonts/Clash.otf'],
         ]);
         expect(loaded.findings[0].message).toMatch(/flipbook font already/);
+    });
+
+    it('find their license under their path in assets/, in any spelling, one key each', () => {
+        const dir = composition();
+        write(dir, 'assets/fonts/Hand.ttf', buildTestFont({ family: 'Wren Hand', chars: 'ab' }));
+        const license = { license: 'OFL-1.1' };
+        const findings = (keys: string[]) => {
+            write(
+                dir,
+                'assets/SOURCES.json',
+                JSON.stringify(Object.fromEntries(keys.map((k) => [k, license]))),
+            );
+            return loadTimeline(dir, false).findings;
+        };
+        expect(findings(['./fonts/Hand.ttf'])).toEqual([]);
+        expect(findings(['fonts/x/../Hand.ttf'])).toEqual([]);
+        // "assets/fonts/Hand.ttf" would be a font in assets/assets/fonts/.
+        for (const keys of [['assets/fonts/Hand.ttf'], ['./assets/fonts/Hand.ttf']]) {
+            const found = findings(keys);
+            expect(
+                found.map((f) => f.code),
+                keys[0],
+            ).toEqual(['font-invalid']);
+            expect(found[0].message).toContain('has no license');
+        }
+        const twice = findings(['fonts/Hand.ttf', './fonts/Hand.ttf']);
+        expect(twice.map((f) => f.code)).toEqual(['font-invalid']);
+        expect(twice[0].message).toContain('has 2 entries ("fonts/Hand.ttf", "./fonts/Hand.ttf")');
     });
 
     // Windows needs admin rights to make symbolic links.

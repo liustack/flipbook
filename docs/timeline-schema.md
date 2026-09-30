@@ -72,7 +72,7 @@ Any other field is an error, so a misspelled field is never silently ignored.
 | `text` | when kind is text | non-empty string | The text on screen. check uses it to verify glyph coverage |
 | `settleBeats` | no | 0 to 64 | How many beats until the text has fully appeared. check and render run the text checks at that moment. Defaults to 0 (fully there at the cue time). A text cue must finish appearing before its scene ends |
 | `sfx` | when kind is sfx, unless `file` is given | `paper`, `drop`, `ding`, `sweep` | Built-in sound effect. Its peak lands on the cue's frame, see the audio section |
-| `file` | kind sfx only, instead of `sfx` | path relative to the composition directory, such as `assets/page-turn.mp3` | A sound file from the composition, usually one `stock fetch` saved. Its loudest sample lands on the cue's frame. Needs its source and license in `assets/SOURCES.json` (`audio-unlicensed` otherwise). Giving both `sfx` and `file` is `timeline-invalid` |
+| `file` | kind sfx only, instead of `sfx` | a file under `assets/`, as a path from the composition directory, such as `assets/page-turn.mp3` | A sound file from the composition, usually one `stock fetch` saved. `timeline-invalid` when it is not under `assets/`. Its loudest sample lands on the cue's frame. Needs its source and license in `assets/SOURCES.json` (`audio-unlicensed` otherwise). Giving both `sfx` and `file` is `timeline-invalid` |
 
 ## audio
 
@@ -84,7 +84,7 @@ Any other field is an error, so a misspelled field is never silently ignored.
 | `progression` | preset | integer from 0 to 5, defaults to 0 | Chord progression number, see the table below |
 | `dynamics` | preset | map from scene id to `rest`, `soft`, `medium`, `full` | Dynamics per scene. Scenes left out play `medium` |
 | `score` | score, required | object, see [Written score](#written-score) | The music written out: parts, chords, notes and drum steps per scene |
-| `file` | file, required | path relative to the composition directory | Music from a file: the user's own or one `stock fetch` saved. `timeline-invalid` when the file is not inside the composition directory, `audio-unlicensed` when `assets/SOURCES.json` does not give its source and license |
+| `file` | file, required | a file under `assets/`, as a path from the composition directory | Music from a file: the user's own or one `stock fetch` saved. `timeline-invalid` when the file is not under `assets/` in the composition directory, `audio-unlicensed` when `assets/SOURCES.json` does not give its source and license |
 | `bpmOffset` | file | 0 to 60, defaults to 0 | The second where beat 1 falls in the music, when the timeline follows its beat |
 | `offset` | file | 0 to 3600 | The second of the file the video starts at, for music whose beat the timeline does not follow. Giving both `offset` and `bpmOffset` is `timeline-invalid` |
 | `fadeIn` | file | 0 to 30, defaults to 0 | Seconds of fade in at the start |
@@ -95,7 +95,7 @@ A field written under a mode that does not use it (such as `preset` with `mode: 
 - `none`: no music. With `sfx` cues the video carries only the effects. Without them it is silent.
 - `preset`: the `audio` command synthesizes music from the preset, key, progression and per-scene dynamics. render calls it on its own.
 - `score`: the `audio` command plays the written score note for note with the synthesized instruments below. Mixing and loudness are the same as for a preset.
-- `file`: music from a file, with no beat detection. For the user's own song the user supplies `bpm` and `bpmOffset`. For a found piece whose beat the timeline does not follow, `offset` picks where it starts. After resolving symlinks the file must be a regular file inside the composition directory, otherwise `timeline-invalid`. ffmpeg reads it only as a local file, and only in these formats: wav, w64, mp3, flac, ogg, aac, the mov family (m4a, mp4), aiff, the matroska family (mkv, webm). Formats that pull in other files, such as playlists and concat, are refused.
+- `file`: music from a file, with no beat detection. For the user's own song the user supplies `bpm` and `bpmOffset`. For a found piece whose beat the timeline does not follow, `offset` picks where it starts. The file must be named under `assets/` (where `assets/SOURCES.json` keys it by its path under `assets/`) and, after resolving symlinks, be a regular file inside the composition directory, otherwise `timeline-invalid`. ffmpeg reads it only as a local file, and only in these formats: wav, w64, mp3, flac, ogg, aac, the mov family (m4a, mp4), aiff, the matroska family (mkv, webm). Formats that pull in other files, such as playlists and concat, are refused.
 
 ### Chord progressions
 

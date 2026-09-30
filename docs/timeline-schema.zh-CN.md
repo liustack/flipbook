@@ -72,7 +72,7 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `text` | kind 为 text 时必填 | 非空字符串 | 上屏文字，check 用它核对字形覆盖 |
 | `settleBeats` | 否 | 0 到 64 | 文字完全出来要几拍，check 和 render 在这个时刻做文字检查，缺省 0（在 cue 时刻就完全出来）。文字 cue 必须在本场结束前出完 |
 | `sfx` | kind 为 sfx 且没给 `file` 时必填 | `paper`、`drop`、`ding`、`sweep` | 内置音效，峰值对准 cue 所在的帧，见 audio 一节 |
-| `file` | 只用于 kind 为 sfx，代替 `sfx` | 合成目录内的相对路径，如 `assets/page-turn.mp3` | 合成目录里的音效文件，一般是 `stock fetch` 存下的。文件里最响的采样对准 cue 所在的帧。`assets/SOURCES.json` 里要有它的来源和许可，否则报 `audio-unlicensed`。`sfx` 和 `file` 都给报 `timeline-invalid` |
+| `file` | 只用于 kind 为 sfx，代替 `sfx` | `assets/` 下的文件，从合成目录算起，如 `assets/page-turn.mp3` | 合成目录里的音效文件，一般是 `stock fetch` 存下的。不在 `assets/` 下报 `timeline-invalid`。文件里最响的采样对准 cue 所在的帧。`assets/SOURCES.json` 里要有它的来源和许可，否则报 `audio-unlicensed`。`sfx` 和 `file` 都给报 `timeline-invalid` |
 
 ## audio
 
@@ -84,7 +84,7 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 | `progression` | preset | 0 到 5 的整数，缺省 0 | 和声进行编号，见下表 |
 | `dynamics` | preset | 场景 id 到 `rest`、`soft`、`medium`、`full` 的映射 | 每场强弱，没写的场景按 `medium` |
 | `score` | score，必填 | 对象，见[手写乐谱](#手写乐谱) | 写出来的音乐：各场的声部、和弦、音符和鼓的步进 |
-| `file` | file，必填 | 合成目录内的相对路径 | 来自文件的音乐：用户自带的，或 `stock fetch` 存下的。文件不在合成目录里报 `timeline-invalid`，`assets/SOURCES.json` 里没有它的来源和许可报 `audio-unlicensed` |
+| `file` | file，必填 | `assets/` 下的文件，从合成目录算起 | 来自文件的音乐：用户自带的，或 `stock fetch` 存下的。文件不在合成目录的 `assets/` 下报 `timeline-invalid`，`assets/SOURCES.json` 里没有它的来源和许可报 `audio-unlicensed` |
 | `bpmOffset` | file | 0 到 60，缺省 0 | timeline 跟着这首音乐的节拍走时，它的第一拍落在第几秒 |
 | `offset` | file | 0 到 3600 | 成片从文件的第几秒开始用，给 timeline 不跟节拍的音乐用。`offset` 和 `bpmOffset` 都给报 `timeline-invalid` |
 | `fadeIn` | file | 0 到 30，缺省 0 | 开头淡入几秒 |
@@ -95,7 +95,7 @@ timeline.json 是画面和声音唯一的时间来源。时间一律用拍写，
 - `none`：没有配乐。有 `sfx` cue 时成片只带音效，没有 `sfx` cue 时是无声成片。
 - `preset`：`audio` 命令按预设、调、和声进行和每场强弱合成配乐，render 自动调用。
 - `score`：`audio` 命令用下面的合成乐器照谱逐音演奏。混音和响度与 preset 相同。
-- `file`：来自文件的音乐，不做节拍检测。用户自带的歌由用户给 `bpm` 和 `bpmOffset`。找来的曲子 timeline 不跟它的节拍时，用 `offset` 选从哪里开始。文件解析软链后必须是合成目录里的普通文件，否则报 `timeline-invalid`。ffmpeg 只按本地文件读它，格式限 wav、w64、mp3、flac、ogg、aac、mov 系（m4a、mp4）、aiff、matroska 系（mkv、webm），播放列表和 concat 这类会引用别的文件的格式不收。
+- `file`：来自文件的音乐，不做节拍检测。用户自带的歌由用户给 `bpm` 和 `bpmOffset`。找来的曲子 timeline 不跟它的节拍时，用 `offset` 选从哪里开始。文件必须写成 `assets/` 下的路径（`assets/SOURCES.json` 按它在 `assets/` 下的路径记它），解析软链后必须是合成目录里的普通文件，否则报 `timeline-invalid`。ffmpeg 只按本地文件读它，格式限 wav、w64、mp3、flac、ogg、aac、mov 系（m4a、mp4）、aiff、matroska 系（mkv、webm），播放列表和 concat 这类会引用别的文件的格式不收。
 
 ### 和声进行
 

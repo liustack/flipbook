@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
-import { indexSources, pictureSourceFindings, sourceEntry } from './assetSources.ts';
+import { assetPath, indexSources, pictureSourceFindings, sourceEntry } from './assetSources.ts';
 import {
     DYNAMICS,
     type Dynamic,
@@ -380,6 +380,13 @@ export function audioSource(dir: string, file: string): { file: string } | { pro
     if (!fs.statSync(real).isFile()) {
         return { problem: `names ${file}, which is not a regular file.` };
     }
+    // Sound files live in assets/, where SOURCES.json keys them by their path under assets/.
+    const named = path.normalize(file).split(path.sep).join('/');
+    if (!named.startsWith('assets/') || assetPath(named.slice('assets/'.length)) === null) {
+        return {
+            problem: `names ${file}, which is not under assets/. Put sound files in assets/, with their source and license in assets/SOURCES.json.`,
+        };
+    }
     return { file: real };
 }
 
@@ -397,7 +404,7 @@ export function audioFiles(timeline: TimelineV1): { path: string; file: string }
 }
 
 /**
- * The audio files must be regular files inside the composition
+ * The audio files must be regular files under the composition's assets/
  * (timeline-invalid otherwise), each with its source and license in
  * assets/SOURCES.json (audio-unlicensed otherwise).
  */
@@ -429,20 +436,13 @@ function audioFileFindings(dir: string, timeline: TimelineV1): Finding[] {
     const index = indexSources(sources);
     const findings: Finding[] = [];
     for (const { path: at, file } of files) {
-        // Keyed by the path under assets/, in any spelling of it, or by its
-        // path from the composition directory (the only key for a file
-        // elsewhere in the composition), own keys only.
+        // Keyed by its path under assets/ (audioSource keeps sound files
+        // there), in any spelling, like every other entry.
         const shown = path.normalize(file).split(path.sep).join('/');
-        const inAssets = shown.startsWith('assets/');
-        const key = inAssets ? shown.slice('assets/'.length) : shown;
-        const found = inAssets ? sourceEntry(index, key) : null;
-        const twice = found && 'problem' in found && found.problem !== 'has no entry';
-        const entry =
-            found && 'entry' in found
-                ? found.entry
-                : !twice && Object.hasOwn(sources, shown)
-                  ? sources[shown]
-                  : undefined;
+        const key = shown.slice('assets/'.length);
+        const found = sourceEntry(index, key);
+        const twice = 'problem' in found && found.problem !== 'has no entry';
+        const entry = 'entry' in found ? found.entry : undefined;
         const lacking = broken
             ? ['source', 'license']
             : ['source', 'license'].filter(

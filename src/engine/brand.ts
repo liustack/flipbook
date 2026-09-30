@@ -151,20 +151,24 @@ function reservedFamily(family: string): string | null {
     return null;
 }
 
-/** The license written for `file` (relative to the composition) in assets/SOURCES.json. */
-function licenseFor(sources: Record<string, Json> | null, rel: string): string | null {
-    if (!sources) return null;
+/**
+ * The license written for `file` (a font under assets/, as a path from the
+ * composition) in assets/SOURCES.json, keyed by its path under assets/ in any
+ * spelling, or why there is none: no entry, no license, or two keys for it.
+ */
+function licenseFor(
+    sources: Record<string, Json> | null,
+    rel: string,
+): { license: string } | { problem: string } {
     const underAssets = path.relative('assets', rel).split(path.sep).join('/');
-    const full = rel.split(path.sep).join('/');
-    // Under assets/ in any spelling (two keys for one file count as none), or by the full path.
-    const found = sourceEntry(indexSources(sources), underAssets);
-    const entry =
-        'entry' in found
-            ? found.entry
-            : found.problem === 'has no entry' && Object.hasOwn(sources, full)
-              ? sources[full]
-              : undefined;
-    return isObject(entry) && nonEmpty(entry.license) ? entry.license : null;
+    const found = sources ? sourceEntry(indexSources(sources), underAssets) : null;
+    if (found && 'problem' in found && found.problem !== 'has no entry') {
+        return { problem: found.problem };
+    }
+    const entry = found && 'entry' in found ? found.entry : undefined;
+    return isObject(entry) && nonEmpty(entry.license)
+        ? { license: entry.license }
+        : { problem: 'has no license' };
 }
 
 /** A file in assets/fonts/: its face when readable, and what is wrong with it for use on its own. */
@@ -267,15 +271,19 @@ function droppedFonts(dir: string, findings: Finding[]): Dropped[] {
             continue;
         }
         const license = licenseFor(sources, rel);
+        const sourcesShown = SOURCES_FILE.split(path.sep).join('/');
         out.push({
             real,
             face: faceFor(font, font.family, shown),
-            problem: license
-                ? null
-                : fontProblem(
-                      shown,
-                      `has no license. Add "${shown.replace(/^assets\//, '')}": { "source": "...", "license": "..." } to ${SOURCES_FILE.split(path.sep).join('/')}`,
-                  ),
+            problem:
+                'license' in license
+                    ? null
+                    : license.problem === 'has no license'
+                      ? fontProblem(
+                            shown,
+                            `has no license. Add "${shown.replace(/^assets\//, '')}": { "source": "...", "license": "..." } to ${sourcesShown}`,
+                        )
+                      : fontProblem(shown, `${license.problem} in ${sourcesShown}. Keep one`),
         });
     }
     return out;

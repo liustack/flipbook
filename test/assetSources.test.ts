@@ -142,6 +142,50 @@ describe('one spelling for every reader of assets/SOURCES.json', () => {
         const twice = loadTimeline(dir, false).findings;
         expect(twice.map((f) => f.code)).toEqual(['audio-unlicensed']);
         expect(twice[0].message).toContain('has 2 entries');
+        // Keys are paths under assets/: "assets/music.wav" names assets/assets/music.wav.
+        for (const keys of [
+            ['assets/music.wav'],
+            ['./assets/music.wav'],
+            ['assets/music.wav', './assets/music.wav'],
+        ]) {
+            fs.writeFileSync(file, JSON.stringify(Object.fromEntries(keys.map((k) => [k, entry]))));
+            const found = loadTimeline(dir, false).findings;
+            expect(
+                found.map((f) => f.code),
+                keys.join(', '),
+            ).toEqual(['audio-unlicensed']);
+            expect(found[0].message).toContain('has no source and license');
+        }
+        // A real assets/assets/ folder is a folder like any other.
+        fs.mkdirSync(path.join(dir, 'assets', 'assets'));
+        fs.renameSync(
+            path.join(dir, 'assets', 'music.wav'),
+            path.join(dir, 'assets', 'assets', 'music.wav'),
+        );
+        const timelineFile = path.join(dir, 'timeline.json');
+        const timeline = JSON.parse(fs.readFileSync(timelineFile, 'utf-8'));
+        timeline.audio.file = 'assets/assets/music.wav';
+        fs.writeFileSync(timelineFile, JSON.stringify(timeline));
+        fs.writeFileSync(file, JSON.stringify({ 'assets/music.wav': entry }));
+        expect(loadTimeline(dir, false).findings).toEqual([]);
+    });
+
+    it('keeps sound files in assets/', () => {
+        const dir = copyFixture('music');
+        fs.writeFileSync(path.join(dir, 'music.wav'), 'RIFF');
+        const timelineFile = path.join(dir, 'timeline.json');
+        const timeline = JSON.parse(fs.readFileSync(timelineFile, 'utf-8'));
+        timeline.audio.file = 'music.wav';
+        fs.writeFileSync(timelineFile, JSON.stringify(timeline));
+        fs.writeFileSync(
+            path.join(dir, 'assets', 'SOURCES.json'),
+            JSON.stringify({ 'music.wav': cc0 }),
+        );
+        const found = loadTimeline(dir, false).findings;
+        expect(found.map((f) => [f.code, f.detail?.path])).toEqual([
+            ['timeline-invalid', '$.audio.file'],
+        ]);
+        expect(found[0].message).toContain('not under assets/');
     });
 
     /**
