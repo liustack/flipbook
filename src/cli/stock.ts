@@ -5,12 +5,13 @@
 import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { indexSources, putSources, sourceEntry, updateSources } from '../engine/assetSources.ts';
+import { indexSources, putSources, sourceEntry, withSources } from '../engine/assetSources.ts';
 import { SOURCES_FILE } from '../engine/brand.ts';
 import { sandboxHost } from '../engine/browser.ts';
 import { requireFfmpeg } from '../engine/ffmpeg.ts';
 import { sheetLayout } from '../engine/pixels.ts';
 import { run, tail } from '../engine/proc.ts';
+import { isObject } from '../engine/schema.ts';
 import { compositionDir, outputLinksFinding } from '../engine/session.ts';
 import { Workspace } from '../engine/workspace.ts';
 import { type DnsLookup, download, type HttpGet } from '../stock/download.ts';
@@ -404,27 +405,77 @@ function scratch(ws: Workspace): string {
     return ws.path('.flipbook', 'tmp', `stock-${process.pid}-${randomBytes(4).toString('hex')}`);
 }
 
-/** Record `entry` for assets/<file> in SOURCES.json, next to whatever others wrote meanwhile. */
-async function recordSource(
+/**
+ * Put a fetched file in assets/ and record its entry in SOURCES.json, both in
+ * one turn of the sources lock, so a lock that stays busy leaves assets/ as it
+ * was and a rerun under the same name starts clean. In that turn the name is
+ * checked again: a file of the same kind already there is this fetch only when
+ * its entry holds the same id (then nothing is written), and anything else is
+ * a conflict. A user's file is never replaced. When recording the entry fails,
+ * the file just written is removed again.
+ */
+async function publish(
     rb: ReportBuilder,
     ws: Workspace,
-    file: string,
+    fetched: { name: string; fileName: string; extensions: string[]; bytes: Buffer; id: string },
     entry: Record<string, string>,
-): Promise<string | null> {
-    const written = await updateSources(ws, (sources) => putSources(sources, { [file]: entry }));
-    if ('path' in written) return written.path;
+): Promise<{ file: string; target: string; sources: string; skipped: boolean } | null> {
     const shown = SOURCES_FILE.split(path.sep).join('/');
-    rb.add(
-        finding(
-            'asset-conflict',
-            `${shown} ${written.problem.replace(/^assets\/SOURCES\.json /, '')}`,
-            {
-                element: shown,
-                detail: { reason: 'sources-invalid', file: shown },
-            },
-        ),
-    );
-    return null;
+    type Turn = { same: string } | { taken: string } | { target: string; sources: string };
+    const done = await withSources(ws, (sources, save): Turn => {
+        const index = indexSources(sources);
+        const existing = taken(ws.path(), fetched.name, fetched.extensions);
+        if (existing.length > 0) {
+            const same = existing.find((file) => {
+                const found = sourceEntry(index, file);
+                return 'entry' in found && isObject(found.entry) && found.entry.id === fetched.id;
+            });
+            return same ? { same } : { taken: existing[0] };
+        }
+        const target = ws.writeFile(ws.path('assets', fetched.fileName), fetched.bytes);
+        try {
+            putSources(sources, { [fetched.fileName]: entry });
+            return { target, sources: save() };
+        } catch (error) {
+            fs.rmSync(target, { force: true });
+            throw error;
+        }
+    });
+    if ('problem' in done) {
+        rb.add(
+            finding(
+                'asset-conflict',
+                `${shown} ${done.problem.replace(/^assets\/SOURCES\.json /, '')}`,
+                {
+                    element: shown,
+                    detail: { reason: 'sources-invalid', file: shown },
+                },
+            ),
+        );
+        return null;
+    }
+    if ('taken' in done) {
+        rb.add(
+            finding(
+                'asset-conflict',
+                `assets/${done.taken} already exists and is not ${fetched.id}. Pass another --as name.`,
+                {
+                    element: `assets/${done.taken}`,
+                    detail: { reason: 'name-taken', file: `assets/${done.taken}` },
+                },
+            ),
+        );
+        return null;
+    }
+    if ('same' in done) {
+        return {
+            file: done.same,
+            target: ws.path('assets', done.same),
+            sources: ws.path(SOURCES_FILE),
+            skipped: true,
+        };
+    }
+    return { file: fetched.fileName, target: done.target, sources: done.sources, skipped: false };
 }
 
 function readSources(ws: Workspace): { sources: SourcesFile } | { problem: string } {
@@ -709,7 +760,6 @@ export async function runStockFetch(
     }
 
     const fileName = `${options.as}${EXTENSION[normalized.info.format]}`;
-    const target = ws.writeFile(ws.path('assets', fileName), normalized.bytes);
     const entry: Record<string, string> = {
         source: image.pageUrl,
         license: image.license,
@@ -719,14 +769,25 @@ export async function runStockFetch(
     if (image.title) entry.title = image.title;
     if (image.creator) entry.creator = image.creator;
     entry.url = image.url;
-    const sourcesPath = await recordSource(rb, ws, fileName, entry);
-    if (!sourcesPath) return rb.finish();
+    const published = await publish(
+        rb,
+        ws,
+        {
+            name: options.as,
+            fileName,
+            extensions: IMAGE_EXTENSIONS,
+            bytes: normalized.bytes,
+            id,
+        },
+        entry,
+    );
+    if (!published) return rb.finish();
 
     rb.report.stock = {
         id,
         provider: ref.provider,
         kind: 'image',
-        file: `assets/${fileName}`,
+        file: `assets/${published.file}`,
         format: normalized.info.format,
         width: normalized.info.width,
         height: normalized.info.height,
@@ -737,10 +798,10 @@ export async function runStockFetch(
         source: image.pageUrl,
         title: image.title,
         creator: image.creator,
-        skipped: false,
+        skipped: published.skipped,
     };
-    rb.report.artifacts.image = target;
-    rb.report.artifacts.sources = sourcesPath;
+    rb.report.artifacts.image = published.target;
+    rb.report.artifacts.sources = published.sources;
     return rb.finish();
 }
 
@@ -848,20 +909,24 @@ async function fetchAudio(
         return;
     }
     const fileName = `${target.as}${AUDIO_EXTENSION[format]}`;
-    const file = ws.writeFile(ws.path('assets', fileName), bytes);
     const entry: Record<string, string> = { source: sound.pageUrl, license: sound.license };
     if (sound.licenseUrl) entry.licenseUrl = sound.licenseUrl;
     entry.id = id;
     if (sound.title) entry.title = sound.title;
     if (sound.creator) entry.creator = sound.creator;
     entry.url = sound.preview;
-    const sourcesPath = await recordSource(rb, ws, fileName, entry);
-    if (!sourcesPath) return;
+    const published = await publish(
+        rb,
+        ws,
+        { name: target.as, fileName, extensions: AUDIO_EXTENSIONS, bytes, id },
+        entry,
+    );
+    if (!published) return;
     rb.report.stock = {
         id,
         provider: ref.provider,
         kind: 'audio',
-        file: `assets/${fileName}`,
+        file: `assets/${published.file}`,
         format,
         codec: probe.codec,
         durationSec: probe.durationSec,
@@ -873,8 +938,8 @@ async function fetchAudio(
         source: sound.pageUrl,
         title: sound.title,
         creator: sound.creator,
-        skipped: false,
+        skipped: published.skipped,
     };
-    rb.report.artifacts.audio = file;
-    rb.report.artifacts.sources = sourcesPath;
+    rb.report.artifacts.audio = published.target;
+    rb.report.artifacts.sources = published.sources;
 }

@@ -410,7 +410,7 @@ Fix: Wait for it to finish, then run the command again. Leave .flipbook/render.d
 
 Another flipbook command (stock fetch, cutout, puppet or sprite) is still writing assets/SOURCES.json in this composition and did not finish while this one waited.
 
-Fix: Wait for the other command to finish, then run this one again. Do not delete anything under .flipbook/: the lock folders there may be in use, and removing one lets two commands write at once.
+Fix: Wait for the other command to finish, then run this one again, under the same name: stock fetch left assets/ as it was, and cutout, puppet and sprite rebuild their own output folder and record every file in it. Do not delete anything under .flipbook/: the lock folders there may be in use, and removing one lets two commands write at once.
 
 ### `internal-error`
 

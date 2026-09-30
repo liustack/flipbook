@@ -4,9 +4,10 @@ import { execFileSync } from 'child_process';
 // network call goes through injected fakes: nothing here reaches the network.
 import * as fs from 'fs';
 import * as path from 'path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import * as zlib from 'zlib';
 import { runStockFetch, runStockSearch, type StockDeps } from '../src/cli/stock.ts';
+import { LockBusyError } from '../src/engine/ticketLock.ts';
 import { download, type HttpGet } from '../src/stock/download.ts';
 import { imageInfo } from '../src/stock/image.ts';
 import { redactSecrets } from '../src/stock/net.ts';
@@ -1039,5 +1040,120 @@ describe('stock command line', () => {
         const report = run.json as { command: string; environmentError: { error: string } };
         expect(report.command).toBe('stock-fetch');
         expect(report.environmentError.error).toBe('stock-key-missing');
+    });
+});
+
+describe('stock fetch and a busy assets/SOURCES.json', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    /**
+     * A composition whose sources lock another live process (this one) holds
+     * with a lower ticket, and a clock withTicketLock reads a second ahead on
+     * every look, so its 30 s wait runs out at once. Returns the unlock.
+     */
+    function held(dir: string): () => void {
+        const folder = path.join(dir, '.flipbook', 'sources.d');
+        fs.mkdirSync(folder, { recursive: true });
+        const peer = path.join(folder, `p.${process.pid}.eeee`);
+        fs.writeFileSync(peer, '0\n');
+        const now = Date.now.bind(Date);
+        let ahead = 0;
+        vi.spyOn(Date, 'now').mockImplementation(() => {
+            if (!(new Error().stack ?? '').includes('withTicketLock')) return now();
+            ahead += 1000;
+            return now() + ahead;
+        });
+        return () => {
+            vi.restoreAllMocks();
+            fs.rmSync(peer);
+        };
+    }
+
+    function composition(): string {
+        const dir = tempDir('stock-busy');
+        fs.mkdirSync(path.join(dir, 'assets'));
+        fs.writeFileSync(path.join(dir, 'assets', 'SOURCES.json'), '{}\n');
+        return dir;
+    }
+
+    const assets = (dir: string) => fs.readdirSync(path.join(dir, 'assets')).sort();
+    const sourcesOf = (dir: string) =>
+        JSON.parse(fs.readFileSync(path.join(dir, 'assets', 'SOURCES.json'), 'utf-8'));
+
+    it('leaves assets/ as it was while the lock is busy, and the same fetch run again succeeds', async () => {
+        const dir = composition();
+        const unlock = held(dir);
+        await expect(
+            runStockFetch({ dir, id: 'openverse:ov-1', as: 'plate' }, openverseDetail(DETAIL).deps),
+        ).rejects.toBeInstanceOf(LockBusyError);
+        expect(assets(dir)).toEqual(['SOURCES.json']);
+        expect(sourcesOf(dir)).toEqual({});
+        unlock();
+        const report = await runStockFetch(
+            { dir, id: 'openverse:ov-1', as: 'plate' },
+            openverseDetail(DETAIL).deps,
+        );
+        expect(report.failures).toEqual([]);
+        expect(report.stock).toMatchObject({ file: 'assets/plate.png', skipped: false });
+        expect(assets(dir)).toEqual(['SOURCES.json', 'plate.png']);
+        expect(sourcesOf(dir)['plate.png']).toMatchObject({ id: 'openverse:ov-1', license: 'pdm' });
+    });
+
+    it('does the same for a sound', async () => {
+        const dir = composition();
+        const deps = () =>
+            fake(
+                { 'api.openverse.org': () => json(AUDIO_RESULTS.results[0]) },
+                { [String(AUDIO_RESULTS.results[0].url)]: TAP },
+            ).deps;
+        const unlock = held(dir);
+        await expect(
+            runStockFetch({ dir, id: 'openverse-audio:au-1', as: 'tap' }, deps()),
+        ).rejects.toBeInstanceOf(LockBusyError);
+        expect(assets(dir)).toEqual(['SOURCES.json']);
+        unlock();
+        const report = await runStockFetch({ dir, id: 'openverse-audio:au-1', as: 'tap' }, deps());
+        expect(report.failures).toEqual([]);
+        expect(assets(dir)).toEqual(['SOURCES.json', 'tap.wav']);
+        expect(sourcesOf(dir)['tap.wav']).toMatchObject({ id: 'openverse-audio:au-1' });
+    });
+
+    it('checks the name again in the lock: a file that turned up meanwhile is kept, never replaced', async () => {
+        const dir = composition();
+        const { deps } = openverseDetail(DETAIL);
+        const get = deps.get as HttpGet;
+        const user = path.join(dir, 'assets', 'plate.jpg');
+        // The user drops a picture under the same name while the image downloads.
+        deps.get = async (url, pin, options) => {
+            fs.writeFileSync(user, "the user's own picture");
+            return get(url, pin, options);
+        };
+        const report = await runStockFetch({ dir, id: 'openverse:ov-1', as: 'plate' }, deps);
+        expect(report.failures.map((f) => [f.code, f.detail?.reason])).toEqual([
+            ['asset-conflict', 'name-taken'],
+        ]);
+        expect(fs.readFileSync(user, 'utf-8')).toBe("the user's own picture");
+        expect(assets(dir)).toEqual(['SOURCES.json', 'plate.jpg']);
+        expect(sourcesOf(dir)).toEqual({});
+    });
+
+    it('takes a file another fetch of the same id saved meanwhile as this one', async () => {
+        const dir = composition();
+        const { deps } = openverseDetail(DETAIL);
+        const get = deps.get as HttpGet;
+        deps.get = async (url, pin, options) => {
+            fs.writeFileSync(path.join(dir, 'assets', 'plate.png'), RED);
+            fs.writeFileSync(
+                path.join(dir, 'assets', 'SOURCES.json'),
+                JSON.stringify({
+                    'plate.png': { source: 'x', license: 'pdm', id: 'openverse:ov-1' },
+                }),
+            );
+            return get(url, pin, options);
+        };
+        const report = await runStockFetch({ dir, id: 'openverse:ov-1', as: 'plate' }, deps);
+        expect(report.failures).toEqual([]);
+        expect(report.stock).toMatchObject({ file: 'assets/plate.png', skipped: true });
+        expect(sourcesOf(dir)['plate.png'].source).toBe('x');
     });
 });

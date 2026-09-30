@@ -47,25 +47,42 @@ export function parseSources(
 }
 
 /**
- * Change assets/SOURCES.json: read it afresh holding the sources lock (.flipbook/sources.d),
- * apply `edit`, write it back. Commands that run side by side (several stock
- * fetches, a cutout next to a fetch) each see the others' entries. Returns the
- * file's path, or why the file as it is now cannot be read.
+ * Run `fn` holding the sources lock (.flipbook/sources.d), with
+ * assets/SOURCES.json read afresh and `save` to write it back. Commands that
+ * run side by side (several stock fetches, a cutout next to a fetch) each see
+ * the others' entries, and whatever `fn` puts in assets/ is decided in the
+ * same turn. Returns what `fn` returns, or why the file as it is now cannot be
+ * read (then `fn` does not run). Throws a LockBusyError when the lock stays
+ * busy: nothing has run then.
+ */
+export async function withSources<T>(
+    ws: Workspace,
+    fn: (sources: Record<string, unknown>, save: () => string) => T,
+): Promise<T | { problem: string }> {
+    return withTicketLock(ws.path(), 'sources', () => {
+        const read = parseSources(ws.readText(ws.path('assets', 'SOURCES.json')));
+        if ('problem' in read) return read;
+        const save = () =>
+            ws.writeFile(
+                ws.path('assets', 'SOURCES.json'),
+                `${JSON.stringify(read.sources, null, 4)}\n`,
+            );
+        return fn(read.sources, save);
+    });
+}
+
+/**
+ * Change assets/SOURCES.json: read it afresh holding the sources lock, apply
+ * `edit`, write it back. Returns the file's path, or why the file as it is now
+ * cannot be read.
  */
 export async function updateSources(
     ws: Workspace,
     edit: (sources: Record<string, unknown>) => void,
 ): Promise<{ path: string } | { problem: string }> {
-    return withTicketLock(ws.path(), 'sources', () => {
-        const read = parseSources(ws.readText(ws.path('assets', 'SOURCES.json')));
-        if ('problem' in read) return read;
-        edit(read.sources);
-        return {
-            path: ws.writeFile(
-                ws.path('assets', 'SOURCES.json'),
-                `${JSON.stringify(read.sources, null, 4)}\n`,
-            ),
-        };
+    return withSources(ws, (sources, save) => {
+        edit(sources);
+        return { path: save() };
     });
 }
 

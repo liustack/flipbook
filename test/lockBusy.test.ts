@@ -5,7 +5,7 @@ import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { cleanTemps, cli, copyFixture, tempDir } from './helpers.ts';
+import { cleanTemps, cli, copyFixture, runCli, tempDir } from './helpers.ts';
 
 afterAll(cleanTemps);
 
@@ -95,5 +95,20 @@ describe('a busy lock in the real CLI', () => {
         expect(report.failures.map((f) => f.code)).not.toContain('unsafe-output');
         expect(fs.readFileSync(path.join(dir, 'assets', 'SOURCES.json'), 'utf-8')).toBe(sources);
         expect(fs.readdirSync(folder)).toEqual([path.basename(peer)]);
-    }, 120_000);
+        // The cut files already written have no entry yet. cutout owns
+        // assets/cut/plate/: run again once the other command is done, it
+        // rebuilds the folder whole and records every file in it.
+        fs.rmSync(peer);
+        const again = runCli(['cutout', dir, 'assets/plate.svg']);
+        expect(again.status).toBe(0);
+        const cut = fs
+            .readdirSync(path.join(dir, 'assets', 'cut', 'plate'))
+            .filter((f) => f.endsWith('.png'));
+        const entries = JSON.parse(
+            fs.readFileSync(path.join(dir, 'assets', 'SOURCES.json'), 'utf-8'),
+        );
+        expect(cut.length).toBeGreaterThan(0);
+        for (const file of cut)
+            expect(entries[`cut/plate/${file}`]).toMatchObject({ cutFrom: 'plate.svg' });
+    }, 180_000);
 });
