@@ -7,7 +7,7 @@ metadata:
 
 # flipbook
 
-Use it to turn a request into a short animated film that tells one story, checked before delivery. A film about a product or a brand is made the same way: one idea, with the product moving the story rather than starring in it. Do not use it for editing real footage, 3D characters, voice-over, AI-generated video, or a tour of product features.
+Use it to turn a request into a short animated film that tells one story, checked before delivery. A film about a product or a brand is made the same way: one story, with the product moving it rather than starring in it. Do not use it for editing real footage, 3D characters, voice-over, AI-generated video, or a tour of product features.
 
 ## Run it
 
@@ -60,13 +60,13 @@ If scripts cannot run, use the first line that works (the pinned version is 0.8.
 
 ## The steps
 
-1. **Story.** Write `story.json`: who wants what, because of what and what they become, where the viewer finds each, what it leaves the viewer with, the device and three to six beats. Plan the ending as carefully as the turn: stay on the resolution, let the motion and the music come to rest, and put any title after the story. Read `references/story.md` before writing the first one. When the user is there, show them the story in one message and go on once they agree. When they said to just make it, go on with your own.
+1. **Story.** Write `story.json`: the story as one sentence in four slots (who wants what, because of what, and what they become), and where each slot lands: in a beat through the picture, the words or the sound, or off stage in a written record or the viewer's memory. Then what it leaves the viewer with, the device and three to six beats. Plan the ending as carefully as the turn: stay on the resolution, let the motion and the music come to rest, and put any title after the story. Read `references/story.md` before writing the first one. When the user is there, show them the story in one message and go on once they agree. When they said to just make it, go on with your own.
 2. **Spec.** Settle size, duration, frame rate, look, text and music. Use the defaults for anything the user did not say. When the request is about a product or a brand, first search the workspace for its assets (logo files, theme color variables, design tokens, color values in the README) and list them for the user to confirm. When none turn up, ask for them instead of guessing. Then write `brand.json` as `references/brand.md` describes.
 3. **timeline.json.** Scenes in bars, text and marker cues in beats, a scene or two per story beat. Read `references/timeline.md` before writing the first one.
 4. **index.html.** One composition that calls `composition({ setup, seek })` from `/__flipbook/runtime.js`. Read `references/rules.md` before writing the first one.
 5. **Check and look.** Run `check`, fix every failure, repeat until it exits 0. Then run `snapshot`, open `out/snapshot/contact-sheet.png` and fix what looks wrong. Rerun `check` after every edit.
 6. **Render.** Run `render`. Exit 1 means the finished video failed acceptance: fix the codes and go back to step 5.
-7. **Deliver.** Open `out/contact-sheet.png` and read it against the story: each beat's first and last pictures show its `change`, and the film can be retold from the pictures alone. Then give the user `out/video.mp4` and the contact sheet path.
+7. **Deliver.** Open `out/contact-sheet.png` and check the story slot by slot where it lands: a slot through the picture shows in that beat's pictures, a slot through the words reads in that beat's words, and a slot left to the record or to memory passes the tests for it in `references/story.md`. Each beat's first and last pictures show its `change`. Then give the user `out/video.mp4` and the contact sheet path.
 
 Defaults:
 
