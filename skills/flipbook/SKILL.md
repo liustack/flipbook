@@ -66,7 +66,7 @@ If scripts cannot run, use the first line that works (the pinned version is 0.8.
 4. **index.html.** One composition that calls `composition({ setup, seek })` from `/__flipbook/runtime.js`. Read `references/rules.md` before writing the first one.
 5. **Check and look.** Run `check`, fix every failure, repeat until it exits 0. Then run `snapshot`, open `out/snapshot/contact-sheet.png` and fix what looks wrong. Rerun `check` after every edit.
 6. **Render.** Run `render`. Exit 1 means the finished video failed acceptance: fix the codes and go back to step 5.
-7. **Deliver.** Open `out/contact-sheet.png` and check the story slot by slot where it lands: a slot through the picture shows in that beat's pictures, a slot through the words reads in that beat's words, and a slot left to the record or to memory passes the tests for it in `references/story.md`. Each beat's first and last pictures show its `change`. Then give the user `out/video.mp4` and the contact sheet path.
+7. **Deliver.** Open `out/contact-sheet.png` and check the story slot by slot where it lands: a slot through the picture shows in that beat's pictures, a slot through the words reads in that beat's words, a slot through the sound is heard when you play that beat of `out/video.mp4` (the sound effect itself must carry the slot, the music does not count), and a slot left to the record or to memory passes the tests for it in `references/story.md`. Each beat's first and last pictures show its `change`. Then give the user `out/video.mp4` and the contact sheet path.
 
 Defaults:
 

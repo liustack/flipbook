@@ -166,7 +166,7 @@ The ending is where the viewer decides what they felt, and a rushed ending is th
 2. When the user is there, show them the four slots, what it leaves, the device and the beats in one message, and go on once they agree. When they said to just make it, go on with your own.
 3. Write `timeline.json`: a scene or two per beat, text and sfx cues where the beats need them.
 4. Write `index.html`. Run `check`: `story-invalid`, `story-slot`, `story-record`, `story-coverage`, `story-arc` and `story-text` name the field to fix.
-5. Before delivery, read the contact sheet against the story, slot by slot where each lands. A slot through the picture must be visible in that beat's pictures. A slot through the words must be readable in that beat's words. A slot left to the record or to memory must pass the tests for it above. Then check each beat: do its first and last pictures show its `change`? A slot you cannot find where the story says it lands is missing from the film too.
+5. Before delivery, read the contact sheet against the story, slot by slot where each lands. A slot through the picture must be visible in that beat's pictures. A slot through the words must be readable in that beat's words. A slot through the sound: play that beat of the video and listen. The sound effect itself must carry the slot (the splash of the drop that makes the puddle), and the music never counts as carrying one. A slot left to the record or to memory must pass the tests for it above. Then check each beat: do its first and last pictures show its `change`? A slot you cannot find where the story says it lands is missing from the film too.
 
 Change the story only when the user changes it. Once the timeline is written, the timeline and the video are what count.
 
