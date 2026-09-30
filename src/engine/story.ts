@@ -101,8 +101,18 @@ export function readingUnits(text: string): number {
     return (cjk?.length ?? 0) + 2 * (words?.length ?? 0);
 }
 
+/** True when `value` holds something besides white space. The value itself is kept as written. */
+function filled(c: Checker, value: Json, at: string, what: string): value is string {
+    if (!c.str(value, at, undefined, what)) return false;
+    if (value.trim() === '') {
+        c.fail(at, `must be ${what}, not only white space`);
+        return false;
+    }
+    return true;
+}
+
 function sentence(c: Checker, value: Json, at: string): value is string {
-    if (!c.str(value, at, undefined, 'a sentence')) return false;
+    if (!filled(c, value, at, 'a sentence')) return false;
     // Counted in characters, not UTF-16 units: an emoji is one.
     const length = [...value].length;
     if (length > TEXT_MAX) {
@@ -166,12 +176,7 @@ function validateRecord(c: Checker, value: Json): void {
         );
     } else {
         for (const [i, source] of value.sources.entries()) {
-            c.str(
-                source,
-                `$.record.sources[${i}]`,
-                undefined,
-                'a source: a book, an archive, a link',
-            );
+            filled(c, source, `$.record.sources[${i}]`, 'a source: a book, an archive, a link');
         }
     }
     sentence(c, value.key, '$.record.key');

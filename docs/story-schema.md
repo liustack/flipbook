@@ -70,7 +70,7 @@ A story told from a written record leaves some slots to it and adds a `record` b
 | `device` | yes | `{ "what", "why" }`, a sentence each | The one visual device that runs through the film, and why it fits this story |
 | `beats` | yes | 3 to 6 beats, in order | The story in beats. More than six is a `story-arc` warning |
 
-A field not listed here is `story-invalid`. Every sentence (each slot's `what`, `leave`, `device.what`, `device.why`, `change.from`, `change.to`, `record.story`, `record.key`, each line of `record.materials`, `memory.detail`) is a non-empty string of at most 300 characters, counted as Unicode characters (an emoji is one).
+A field not listed here is `story-invalid`. Every sentence (each slot's `what`, `leave`, `device.what`, `device.why`, `change.from`, `change.to`, `record.story`, `record.key`, each line of `record.materials`, `memory.detail`) is a string of at most 300 characters, counted as Unicode characters (an emoji is one), and holds something besides white space: a sentence of spaces, tabs or line breaks alone is empty. Each of `record.sources` must hold something besides white space too. The words on screen in `beats[].text` are matched against the text cues exactly as written.
 
 ## Slots
 

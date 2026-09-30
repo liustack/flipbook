@@ -70,7 +70,7 @@ read_when:
 | `device` | 是 | `{ "what", "why" }`，各一句 | 贯穿全片的一个视觉装置，以及它为什么适合这个故事 |
 | `beats` | 是 | 3 到 6 个节拍，按顺序 | 按节拍讲的故事。超过六个是 `story-arc` warning |
 
-不在表里的字段是 `story-invalid`。每一句（每格的 `what`、`leave`、`device.what`、`device.why`、`change.from`、`change.to`、`record.story`、`record.key`、`record.materials` 的每一条、`memory.detail`）都是非空字符串，最多 300 个字符，按 Unicode 字符数算（一个 emoji 算一个）。
+不在表里的字段是 `story-invalid`。每一句（每格的 `what`、`leave`、`device.what`、`device.why`、`change.from`、`change.to`、`record.story`、`record.key`、`record.materials` 的每一条、`memory.detail`）都是字符串，最多 300 个字符，按 Unicode 字符数算（一个 emoji 算一个），并且除了空白还得有内容：只有空格、制表符或换行的一句算空。`record.sources` 的每一条也一样。`beats[].text` 里的上屏字照原样和 text cue 比对。
 
 ## 四格
 

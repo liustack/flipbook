@@ -292,6 +292,51 @@ describe('story.json', () => {
         ]);
     });
 
+    it('takes white space alone as empty, and keeps words on screen as written', () => {
+        const blank = ' \t\n ';
+        const { problems } = validateStory(
+            story((s) => {
+                for (const slot of ['who', 'wants', 'because', 'becomes']) {
+                    (s[slot] as { what: string }).what = blank;
+                }
+                s.leave = blank;
+            }),
+            timeline(),
+        );
+        expect(problems.map((p) => [p.code, p.path])).toEqual([
+            ['story-invalid', '$.who.what'],
+            ['story-invalid', '$.wants.what'],
+            ['story-invalid', '$.because.what'],
+            ['story-invalid', '$.becomes.what'],
+            ['story-invalid', '$.leave'],
+        ]);
+        expect(problems[0].message).toContain('not only white space');
+        const record = offstage('record', ['who'], (s) => {
+            s.record = {
+                story: blank,
+                sources: [blank],
+                key: blank,
+                materials: { 'assets/a.png': blank },
+            };
+        });
+        expect(validateStory(record, timeline()).problems.map((p) => [p.code, p.path])).toEqual([
+            ['story-invalid', '$.record.story'],
+            ['story-invalid', '$.record.sources[0]'],
+            ['story-invalid', '$.record.key'],
+            ['story-invalid', '$.record.materials["assets/a.png"]'],
+        ]);
+        const memory = offstage('memory', ['who'], (s) => (s.memory = { detail: blank }));
+        expect(validateStory(memory, timeline()).problems.map((p) => [p.code, p.path])).toEqual([
+            ['story-invalid', '$.memory.detail'],
+        ]);
+        // A sentence with white space around it is kept as written.
+        const padded = validateStory(
+            story((s) => ((s.who as { what: string }).what = ' a paper boat ')),
+            timeline(),
+        );
+        expect(padded.story?.who.what).toBe(' a paper boat ');
+    });
+
     it('refuses a story v1 file outright', () => {
         const v1 = {
             version: 1,
