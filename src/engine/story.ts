@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
-import { assetPath, parseSources } from './assetSources.ts';
+import { assetPath, indexSources, parseSources } from './assetSources.ts';
 import { Checker, describe, ID_PATTERN, isNum, isObject, type Json } from './schema.ts';
 import {
     BEAT_ROLES,
@@ -440,21 +440,13 @@ function materialProblems(
             message: `cannot be checked against assets/SOURCES.json: its entry ${JSON.stringify(key)} ${problem}`,
             detail: { sources: 'assets/SOURCES.json', entry: key, problem },
         });
-    // SOURCES.json entries by file, each in one spelling.
-    const entries = new Map<string, { key: string; entry: unknown }>();
-    for (const [key, entry] of Object.entries(sources)) {
-        const file = assetPath(key);
-        if (file === null) {
-            bad(key, 'is not a path inside assets/');
-            continue;
-        }
-        const same = entries.get(file);
-        if (same) {
-            bad(key, `names the same file as ${JSON.stringify(same.key)}`);
-            continue;
-        }
-        entries.set(file, { key, entry });
+    // SOURCES.json entries by file, each in one spelling, read as every other check reads them.
+    const index = indexSources(sources);
+    for (const key of index.outside) bad(key, 'is not a path inside assets/');
+    for (const [, [first, ...rest]] of index.twice) {
+        for (const key of rest) bad(key, `names the same file as ${JSON.stringify(first)}`);
     }
+    const entries = index.files;
     const materials = new Set<string>();
     for (const file of Object.keys(record.materials)) {
         const asset = materialPath(file) as string; // checked with the shape

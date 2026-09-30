@@ -293,12 +293,12 @@ export const FINDING_CODES = {
     },
     'asset-unlicensed': {
         meaning:
-            'A picture under assets/ (fonts and the brand.json logo aside) has no source and license in assets/SOURCES.json, or is generated and does not name the tool and the prompt that made it.',
-        fix: 'Add its entry to assets/SOURCES.json: "source" and "license", and for a generated picture "license": "generated" with "tool" and "prompt". Pictures from stock fetch, cutout and puppet get theirs written for them.',
+            'A picture under assets/ (fonts and the brand.json logo aside) has no source and license in assets/SOURCES.json, two keys there name it (such as a.png and ./a.png), or it is generated and does not name the tool and the prompt that made it.',
+        fix: 'Add its entry to assets/SOURCES.json: "source" and "license", and for a generated picture "license": "generated" with "tool" and "prompt". Keep one key per file. Pictures from stock fetch, cutout and puppet get theirs written for them.',
     },
     'audio-unlicensed': {
         meaning:
-            'An audio file timeline.json names (audio.file or an sfx cue file) has no source and license in assets/SOURCES.json.',
+            'An audio file timeline.json names (audio.file or an sfx cue file) has no source and license in assets/SOURCES.json, or two keys there name it.',
         fix: 'Fetch sounds with stock search --audio and stock fetch, which record both. For a file the user supplied, write its source and license in assets/SOURCES.json from what the user says, and ask when the license is unknown.',
     },
     'render-busy': {

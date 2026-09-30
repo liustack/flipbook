@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
-import { pictureSourceFindings } from './assetSources.ts';
+import { indexSources, pictureSourceFindings, sourceEntry } from './assetSources.ts';
 import {
     DYNAMICS,
     type Dynamic,
@@ -426,14 +426,23 @@ function audioFileFindings(dir: string, timeline: TimelineV1): Finding[] {
             broken = `is not valid JSON: ${(error as Error).message}`;
         }
     }
+    const index = indexSources(sources);
     const findings: Finding[] = [];
     for (const { path: at, file } of files) {
-        // Keyed by the path under assets/ (or, for a file elsewhere in the
-        // composition, by its path from the composition directory).
+        // Keyed by the path under assets/, in any spelling of it, or by its
+        // path from the composition directory (the only key for a file
+        // elsewhere in the composition), own keys only.
         const shown = path.normalize(file).split(path.sep).join('/');
         const inAssets = shown.startsWith('assets/');
         const key = inAssets ? shown.slice('assets/'.length) : shown;
-        const entry = inAssets ? (sources[key] ?? sources[shown]) : sources[shown];
+        const found = inAssets ? sourceEntry(index, key) : null;
+        const twice = found && 'problem' in found && found.problem !== 'has no entry';
+        const entry =
+            found && 'entry' in found
+                ? found.entry
+                : !twice && Object.hasOwn(sources, shown)
+                  ? sources[shown]
+                  : undefined;
         const lacking = broken
             ? ['source', 'license']
             : ['source', 'license'].filter(
@@ -445,7 +454,9 @@ function audioFileFindings(dir: string, timeline: TimelineV1): Finding[] {
         if (lacking.length === 0) continue;
         const why = broken
             ? `${sourcesShown} ${broken}`
-            : `${shown} has no ${lacking.join(' and ')} in ${sourcesShown}`;
+            : twice
+              ? `${shown} ${(found as { problem: string }).problem} in ${sourcesShown}`
+              : `${shown} has no ${lacking.join(' and ')} in ${sourcesShown}`;
         findings.push(
             finding(
                 'audio-unlicensed',

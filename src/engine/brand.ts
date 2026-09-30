@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { type Finding, finding } from '../cli/report.ts';
+import { indexSources, sourceEntry } from './assetSources.ts';
 import { FontFileError } from './fontFile.ts';
 import {
     FONT_URL_PREFIX,
@@ -155,7 +156,14 @@ function licenseFor(sources: Record<string, Json> | null, rel: string): string |
     if (!sources) return null;
     const underAssets = path.relative('assets', rel).split(path.sep).join('/');
     const full = rel.split(path.sep).join('/');
-    const entry = sources[underAssets] ?? sources[full];
+    // Under assets/ in any spelling (two keys for one file count as none), or by the full path.
+    const found = sourceEntry(indexSources(sources), underAssets);
+    const entry =
+        'entry' in found
+            ? found.entry
+            : found.problem === 'has no entry' && Object.hasOwn(sources, full)
+              ? sources[full]
+              : undefined;
     return isObject(entry) && nonEmpty(entry.license) ? entry.license : null;
 }
 

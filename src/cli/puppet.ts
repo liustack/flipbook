@@ -6,7 +6,13 @@
 // puppet posed standing, striding and waving, next to its reference picture.
 import * as fs from 'fs';
 import * as path from 'path';
-import { cutEntry, parseSources, sourceProblem, updateSources } from '../engine/assetSources.ts';
+import {
+    cutEntry,
+    parseSources,
+    putSources,
+    sourceProblem,
+    updateSources,
+} from '../engine/assetSources.ts';
 import { Checker, describe, ID_PATTERN, isNum, isObject, type Json } from '../engine/schema.ts';
 import { compositionDir, openSession, type Session } from '../engine/session.ts';
 import { openToolPage } from '../engine/toolPage.ts';
@@ -618,12 +624,9 @@ export async function runPuppet(options: PuppetOptions): Promise<Report> {
     }
     const rigFile = path.join(folder, 'rig.json').split(path.sep).join('/');
     ws.writeFile(ws.path(rigFile), `${JSON.stringify(rig, null, 2)}\n`);
-    const written = await updateSources(ws, (current) => {
-        for (const key of Object.keys(current)) {
-            if (key.startsWith(`puppets/${name}/parts/`)) delete current[key];
-        }
-        Object.assign(current, added);
-    });
+    const written = await updateSources(ws, (current) =>
+        putSources(current, added, `puppets/${name}/parts/`),
+    );
     if ('problem' in written) {
         rb.add(
             finding('puppet-invalid', written.problem, {

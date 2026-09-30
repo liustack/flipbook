@@ -7,7 +7,13 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { cutEntry, parseSources, sourceProblem, updateSources } from '../engine/assetSources.ts';
+import {
+    cutEntry,
+    parseSources,
+    putSources,
+    sourceProblem,
+    updateSources,
+} from '../engine/assetSources.ts';
 import { compositionDir, openSession, type Session } from '../engine/session.ts';
 import { openToolPage } from '../engine/toolPage.ts';
 import { type VisionMasks, visionMasks } from '../engine/vision.ts';
@@ -221,12 +227,9 @@ export async function runCutout(options: CutoutOptions): Promise<Report> {
             2,
         )}\n`,
     );
-    const written = await updateSources(ws, (current) => {
-        for (const name of Object.keys(current)) {
-            if (name.startsWith(`cut/${stem}/`)) delete current[name];
-        }
-        Object.assign(current, added);
-    });
+    const written = await updateSources(ws, (current) =>
+        putSources(current, added, `cut/${stem}/`),
+    );
     if ('problem' in written) {
         rb.add(
             finding('cutout-invalid', written.problem, {

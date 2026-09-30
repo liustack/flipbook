@@ -5,7 +5,7 @@
 import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { updateSources } from '../engine/assetSources.ts';
+import { indexSources, putSources, sourceEntry, updateSources } from '../engine/assetSources.ts';
 import { SOURCES_FILE } from '../engine/brand.ts';
 import { sandboxHost } from '../engine/browser.ts';
 import { requireFfmpeg } from '../engine/ffmpeg.ts';
@@ -411,9 +411,7 @@ async function recordSource(
     file: string,
     entry: Record<string, string>,
 ): Promise<string | null> {
-    const written = await updateSources(ws, (sources) => {
-        sources[file] = entry;
-    });
+    const written = await updateSources(ws, (sources) => putSources(sources, { [file]: entry }));
     if ('path' in written) return written.path;
     const shown = SOURCES_FILE.split(path.sep).join('/');
     rb.add(
@@ -554,7 +552,12 @@ export async function runStockFetch(
         );
         return rb.finish();
     }
-    const sources = read.sources;
+    const index = indexSources(read.sources);
+    /** The entry SOURCES.json holds for assets/<file>, in any spelling of it. */
+    const entryOf = (file: string): unknown => {
+        const found = sourceEntry(index, file);
+        return 'entry' in found ? found.entry : undefined;
+    };
     const existing = taken(
         dir,
         options.as,
@@ -562,7 +565,7 @@ export async function runStockFetch(
     );
     if (existing.length > 0) {
         const same = existing.find((file) => {
-            const entry = sources[file];
+            const entry = entryOf(file);
             return (
                 typeof entry === 'object' &&
                 entry !== null &&
@@ -571,7 +574,7 @@ export async function runStockFetch(
         });
         if (same && ref.kind === 'audio') {
             const file = path.join(dir, 'assets', same);
-            const entry = sources[same] as Record<string, unknown>;
+            const entry = entryOf(same) as Record<string, unknown>;
             const bytes = fs.readFileSync(file);
             const format = audioFormat(bytes);
             const probe = format ? await probeSound(ws, bytes, format, env) : null;
@@ -595,7 +598,7 @@ export async function runStockFetch(
         if (same) {
             const file = path.join(dir, 'assets', same);
             const info = imageInfo(fs.readFileSync(file));
-            const entry = sources[same] as Record<string, unknown>;
+            const entry = entryOf(same) as Record<string, unknown>;
             rb.report.stock = {
                 id,
                 provider: ref.provider,

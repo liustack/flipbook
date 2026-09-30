@@ -7,7 +7,13 @@
 // one another on their anchor (drift shows as a blur) and side by side.
 import * as fs from 'fs';
 import * as path from 'path';
-import { cutEntry, parseSources, sourceProblem, updateSources } from '../engine/assetSources.ts';
+import {
+    cutEntry,
+    parseSources,
+    putSources,
+    sourceProblem,
+    updateSources,
+} from '../engine/assetSources.ts';
 import { Checker, describe, ID_PATTERN, isObject, type Json } from '../engine/schema.ts';
 import { compositionDir, openSession, type Session } from '../engine/session.ts';
 import { openToolPage } from '../engine/toolPage.ts';
@@ -718,12 +724,9 @@ export async function runSprite(options: SpriteOptions): Promise<Report> {
     }
     const clipsFile = path.join(folder, 'clips.json').split(path.sep).join('/');
     ws.writeFile(ws.path(clipsFile), `${JSON.stringify(file, null, 2)}\n`);
-    const written = await updateSources(ws, (current) => {
-        for (const key of Object.keys(current)) {
-            if (key.startsWith(`sprites/${name}/frames/`)) delete current[key];
-        }
-        Object.assign(current, added);
-    });
+    const written = await updateSources(ws, (current) =>
+        putSources(current, added, `sprites/${name}/frames/`),
+    );
     if ('problem' in written) {
         rb.add(
             finding('sprite-invalid', written.problem, {

@@ -70,12 +70,71 @@ export async function updateSources(
 }
 
 /**
- * Why the entry for `key` (a path under assets/) in assets/SOURCES.json falls
- * short, or null when it holds. A picture cut from another names it in
- * `cutFrom`: a generated one finds its tool and prompt up that chain.
+ * assets/SOURCES.json read by file: every own key in the one spelling
+ * assetPath gives. Every reader of the file (picture and sound sources, cut
+ * files, the story's materials, cutout, puppet, sprite, stock) looks entries
+ * up through it, so "a.png" and "./a.png" name the same file everywhere.
  */
-export function sourceProblem(sources: Record<string, unknown>, key: string): string | null {
-    const entry = sources[key];
+export interface SourceIndex {
+    /** Each file with its first key, as written, and that key's entry. */
+    files: Map<string, { key: string; entry: unknown }>;
+    /** Files that two or more keys name, with those keys: none of them is used. */
+    twice: Map<string, string[]>;
+    /** Keys that are not a path inside assets/. */
+    outside: string[];
+}
+
+export function indexSources(sources: Record<string, unknown>): SourceIndex {
+    const files = new Map<string, { key: string; entry: unknown }>();
+    const twice = new Map<string, string[]>();
+    const outside: string[] = [];
+    for (const [key, entry] of Object.entries(sources)) {
+        const file = assetPath(key);
+        if (file === null) {
+            outside.push(key);
+            continue;
+        }
+        const first = files.get(file);
+        if (first) {
+            twice.set(file, [...(twice.get(file) ?? [first.key]), key]);
+            continue;
+        }
+        files.set(file, { key, entry });
+    }
+    return { files, twice, outside };
+}
+
+/**
+ * The entry for `file` (a path under assets/, in any spelling): its key as
+ * written and its value, or why there is none to use. Two keys for one file
+ * are refused, never one picked over the other.
+ */
+export function sourceEntry(
+    index: SourceIndex,
+    file: string,
+): { key: string; entry: unknown } | { problem: string } {
+    const at = assetPath(file);
+    if (at === null) return { problem: 'is not a path inside assets/' };
+    const keys = index.twice.get(at);
+    if (keys) {
+        return {
+            problem: `has ${keys.length} entries (${keys.map((k) => JSON.stringify(k)).join(', ')})`,
+        };
+    }
+    return index.files.get(at) ?? { problem: 'has no entry' };
+}
+
+/**
+ * Why the entry for `file` (a path under assets/, in any spelling) in
+ * assets/SOURCES.json falls short, or null when it holds. A picture cut from
+ * another names it in `cutFrom`: a generated one finds its tool and prompt up
+ * that chain, looked up the same way.
+ */
+export function sourceProblem(sources: Record<string, unknown>, file: string): string | null {
+    const index = indexSources(sources);
+    const found = sourceEntry(index, file);
+    if ('problem' in found) return found.problem;
+    const entry = found.entry;
     if (!isObject(entry)) return 'has no entry';
     if (typeof entry.source !== 'string' || !entry.source) return 'has no source';
     if (typeof entry.license !== 'string' || !entry.license) return 'has no license';
@@ -83,14 +142,19 @@ export function sourceProblem(sources: Record<string, unknown>, key: string): st
     let tool: unknown = entry.tool;
     let prompt: unknown = entry.prompt;
     let at: Record<string, unknown> = entry;
-    const seen = new Set([key]);
+    const seen = new Set([assetPath(file)]);
     while ((tool === undefined || prompt === undefined) && typeof at.cutFrom === 'string') {
         const from = at.cutFrom;
-        const next = sources[from];
-        if (seen.has(from)) return `is cut from ${from}, which leads back to itself`;
-        if (!isObject(next)) return `is cut from ${from}, which has no entry of its own`;
-        seen.add(from);
-        at = next;
+        if (seen.has(assetPath(from))) return `is cut from ${from}, which leads back to itself`;
+        const next = sourceEntry(index, from);
+        if ('problem' in next) {
+            return next.problem === 'has no entry'
+                ? `is cut from ${from}, which has no entry of its own`
+                : `is cut from ${from}, which ${next.problem}`;
+        }
+        if (!isObject(next.entry)) return `is cut from ${from}, which has no entry of its own`;
+        seen.add(assetPath(from));
+        at = next.entry;
         tool ??= at.tool;
         prompt ??= at.prompt;
     }
@@ -99,10 +163,36 @@ export function sourceProblem(sources: Record<string, unknown>, key: string): st
     return null;
 }
 
-/** What a picture cut from `key` records: the plate's source and license, and where it was cut from. */
-export function cutEntry(sources: Record<string, unknown>, key: string): Record<string, unknown> {
-    const entry = sources[key] as Record<string, unknown>;
-    return { source: entry.source, license: entry.license, cutFrom: key };
+/**
+ * What a picture cut from `file` records: the plate's source and license, and
+ * where it was cut from, in the one spelling. `file` must have passed sourceProblem.
+ */
+export function cutEntry(sources: Record<string, unknown>, file: string): Record<string, unknown> {
+    const found = sourceEntry(indexSources(sources), file) as { entry: Record<string, unknown> };
+    return { source: found.entry.source, license: found.entry.license, cutFrom: assetPath(file) };
+}
+
+/**
+ * Put `added` (entries flipbook writes, keyed by path under assets/ in the one
+ * spelling) into `current`, SOURCES.json as read for a write. A key that names
+ * the same file in another spelling goes first, and so does every entry under
+ * `under` (a folder a rerun replaces whole), so no file ends up with two keys.
+ * The other keys stay as the user wrote them.
+ */
+export function putSources(
+    current: Record<string, unknown>,
+    added: Record<string, unknown>,
+    under?: string,
+): void {
+    const replaced = new Set(Object.keys(added).map((key) => assetPath(key)));
+    for (const key of Object.keys(current)) {
+        const file = assetPath(key);
+        if (file === null) continue;
+        if (replaced.has(file) || (under !== undefined && file.startsWith(under))) {
+            delete current[key];
+        }
+    }
+    Object.assign(current, added);
 }
 
 /** Pictures under assets/, fonts aside, as paths relative to assets/. */
