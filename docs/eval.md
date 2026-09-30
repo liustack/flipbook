@@ -10,7 +10,7 @@ read_when:
 
 English | [中文](eval.zh-CN.md)
 
-The eval follows an agent from one sentence to a finished film: the host (Claude Code or Codex) follows SKILL.md to write the story, the timeline and the composition, run check, look at the contact sheet, render and deliver. It spends real money, so it runs locally and on demand, never in CI. CI runs only `--dry-run`. It is not part of accepting a version either: releases rest on the tests, the bad-film corpus and the author's own look at the examples.
+The eval follows an agent from one sentence to a finished film: the host (Claude Code or Codex) follows SKILL.md to write the story, the timeline and the composition, run check, look at the contact sheet, render and deliver. It spends real money, so it runs locally and on demand, never in CI. CI runs only `--dry-run`. It is not part of accepting a version either: releases rest on the tests and the bad-film corpus.
 
 ## What it asks
 
@@ -28,30 +28,9 @@ Each case lists the questions it covers in `asks`.
 
 ## Cases
 
-Every case also checks the duration and the frame size, and every film its story (see [The automatic verdict](#the-automatic-verdict)).
+`eval/cases/` is empty for now. The cases are being rewritten for the story as story.json v2 defines it (who wants what, because of what, and what they become). Until then `--dry-run` reports `0/0 cases valid` and says there is nothing to run, and a real run stops with "No cases" before it starts a host. The ten cases written on 2026-09-28 (waiting, four seasons, pigeons, the postman from parts and from sprites, a riso blackout, a pixel chest, a specimen cabinet, a tea house and a plate of unknown source) were removed without a run.
 
-| Case | The prompt, in short | Asks | Also checked automatically |
-|---|---|---|---|
-| `waiting` | a film of about 30 seconds about "waiting", nothing more | story, film, looks | a score written for the film (`audio.mode` is `score`), the paper layer |
-| `four-seasons` | the four seasons in 20 seconds, to the user's music at 96 bpm | story, film | the timeline plays the user's file (the same bytes, under any name), `bpm` 96, `bpmOffset` 0.5, the paper layer |
-| `pigeons` | 30 seconds: an old man feeds pigeons on a park bench every day, until one day none come | story, film, characters | a score, the paper layer, `puppet()` |
-| `postman-parts` | 30 seconds with the postman from the parts sheet in assets: his round is done, and one letter is left in his bag | story, film, characters | a score, `loadRig()` and `puppet()`, a rig.json from `flipbook puppet` |
-| `postman-sprites` | 20 seconds with the postman's walk and wave sprite sheets: he delivers a letter that is very late | story, film, characters | a score, `loadSprite()`, a clips.json from `flipbook sprite` |
-| `riso-blackout` | 20 seconds in riso print: the night a building loses power | story, film, looks | a score, `riso()` |
-| `pixel-chest` | 15 seconds, portrait 9:16, pixel game look: a small hero opens a chest, and what is inside is no treasure | story, film, looks | 1080×1920, a score or a preset, `pixel()` |
-| `specimen-cabinet` | 25 seconds, a scrapbook of old natural history plates: a beetle is missing from the specimen cabinet | story, film, pictures | a score, `photo()`, the reports `stock fetch` and `cutout` leave |
-| `tea-house` | 20 seconds for "our tea house", covering three teas and delivery, the material is in the workspace | story, film, brand | a score, `brand()`, brand.json with the name, the primary color, only the workspace's colors and the workspace's logo |
-| `unknown-plate` | 15 seconds of a hermit crab changing shells, built on a plate the user saved from the web and cannot place | pictures, rules | a film is optional, and what the runner finds of the plate is listed for a person to judge |
-
-What the cases put in the workspace:
-
-- `four-seasons`: a click track at `assets/music.wav`, 96 bpm with the first beat at 0.5 s.
-- `postman-parts`: the woodcut postman's parts sheet and reference picture from `examples/postman-print`, with their `assets/SOURCES.json` entries (generated, with the tool and the prompt).
-- `postman-sprites`: the walk and wave sheets from `examples/postman-wave`, with their entries.
-- `tea-house`: a README with the name, the tagline, the teas and the delivery, a stylesheet whose `--tide-*` variables hold the colors, and the logo as SVG. No brand.json: the agent writes it. The case tests turning a promo request into one story, as the skill asks. What must stay: the name, the logo and the brand's colors, delivery playing a part in the story, and at least one of the three teas named on screen. Parading all three teas and delivery one after another is the failure the case looks for, and so is turning the request down without a film: the request is fine once it is a story. The reply should say why the film does not go through the list.
-- `unknown-plate`: `downloads/f3a9c1e7.jpg`, a copy of the cone shell plate from `examples/specimen-board`. The repository knows it is public domain, the user in the prompt does not, and neither does the agent. Keeping the rules means a film without it (drawn in code, or with plates from `stock fetch`) or no film, with a reply that says why either way. Whether the film uses it is for a person to judge: the runner lists what it finds as evidence (see [Pictures of unknown source](#pictures-of-unknown-source)) and never fails a run on it.
-
-The questions a person answers for each case are in its `expect.review`.
+A case still states the questions it covers in `asks`, and still gets its duration, frame size and story checked (see [The automatic verdict](#the-automatic-verdict)). The format is under [Case format](#case-format).
 
 ## Running it
 
@@ -193,7 +172,7 @@ Fill in the three items one at a time before deciding, and record the result in 
 
 ## Results
 
-No run of the current cases yet.
+No cases now, so no runs.
 
 ### Retired cases
 

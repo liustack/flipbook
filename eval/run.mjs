@@ -165,7 +165,10 @@ function loadMatrix(opts) {
 
 function loadCases(ids, casesDir) {
     const runtimeNames = runtimeExports(repoRoot);
-    const found = readdirSync(casesDir, { withFileTypes: true }).filter((d) => d.isDirectory());
+    // eval/cases/ may be absent: git keeps no empty folder, and no case ships until they are rewritten.
+    const found = existsSync(casesDir)
+        ? readdirSync(casesDir, { withFileTypes: true }).filter((d) => d.isDirectory())
+        : [];
     const unknown = ids.filter((id) => !found.some((d) => d.name === id));
     if (unknown.length > 0) throw new Error(`No case ${unknown.join(', ')} in ${casesDir}`);
     return found
@@ -507,10 +510,16 @@ async function main() {
         process.stdout.write(
             `\n${cases.length - invalid.length}/${cases.length} cases valid, ${matrix.length} targets x ${opts.runs} runs = ${cases.length * matrix.length * opts.runs} runs planned\n`,
         );
+        if (cases.length === 0) {
+            process.stdout.write(
+                `no cases in ${opts.casesDir}: nothing to run until cases are written\n`,
+            );
+        }
         if (invalid.length > 0 || !existsSync(cli)) process.exitCode = 1;
         if (!existsSync(cli)) process.stdout.write(`missing ${cli}: run pnpm build\n`);
         return;
     }
+    if (cases.length === 0) throw new Error(`No cases in ${opts.casesDir}: write cases first`);
     if (invalid.length > 0)
         throw new Error(`Invalid cases: ${invalid.map((c) => c.name).join(', ')}`);
     if (!existsSync(cli)) throw new Error(`Build first: ${cli} is missing`);

@@ -10,7 +10,7 @@ read_when:
 
 [English](eval.md) | 中文
 
-评测跟着 agent 从一句话走到一部成片：宿主（Claude Code 或 Codex）照 SKILL.md 写故事、timeline 和合成，跑 check，看联系表，渲染，交付。评测花真实额度，只在本地按需跑，不进 CI。CI 只跑 `--dry-run`。评测也不算版本验收：发版靠测试、坏片语料和作者自己看样例。
+评测跟着 agent 从一句话走到一部成片：宿主（Claude Code 或 Codex）照 SKILL.md 写故事、timeline 和合成，跑 check，看联系表，渲染，交付。评测花真实额度，只在本地按需跑，不进 CI。CI 只跑 `--dry-run`。评测也不算版本验收：发版靠测试和坏片语料。
 
 ## 要回答的问题
 
@@ -28,30 +28,9 @@ read_when:
 
 ## 用例
 
-每条用例都查时长和画幅，每部成片都查故事（见[自动判定](#自动判定)）。
+`eval/cases/` 暂时是空的。用例要按 story.json v2 的故事定义（谁想要什么，因为什么事，最后变成了什么）重写。在那之前，`--dry-run` 报 `0/0 cases valid` 并说明没有可跑的，真跑会在启动宿主之前以「No cases」停下。2026-09-28 写的十条用例（等待、四季、喂鸽子、部件图和精灵图的邮差、孔版停电、像素宝箱、标本柜、茶室、来路不明的图版）没有跑过就删掉了。
 
-| 用例 | 提示词大意 | 回答 | 另外自动查 |
-|---|---|---|---|
-| `waiting` | 30 秒左右的短片，讲「等」，别的不说 | story、film、looks | 现写的配乐（`audio.mode` 为 `score`）、纸层 |
-| `four-seasons` | 20 秒讲一年四季，用用户 96 BPM 的曲子 | story、film | timeline 放的是用户那首（字节相同，改名也行）、`bpm` 96、`bpmOffset` 0.5、纸层 |
-| `pigeons` | 30 秒：老人每天在公园长椅上喂鸽子，有一天鸽子一只也没来 | story、film、characters | 现写的配乐、纸层、`puppet()` |
-| `postman-parts` | 30 秒，用 assets 里部件图的邮差：送完一天的信，包里还剩一封 | story、film、characters | 现写的配乐、`loadRig()` 和 `puppet()`、`flipbook puppet` 出的 rig.json |
-| `postman-sprites` | 20 秒，用邮差走路和挥手的精灵图：送一封迟到了很久的信 | story、film、characters | 现写的配乐、`loadSprite()`、`flipbook sprite` 出的 clips.json |
-| `riso-blackout` | 20 秒孔版印刷风：一栋楼停电的那个晚上 | story、film、looks | 现写的配乐、`riso()` |
-| `pixel-chest` | 15 秒竖屏 9:16 像素游戏风：小勇者打开宝箱，里面不是宝物 | story、film、looks | 1080×1920、现写的配乐或预设配乐、`pixel()` |
-| `specimen-cabinet` | 25 秒，老博物学图版做的剪贴簿：标本柜里少了一只甲虫 | story、film、pictures | 现写的配乐、`photo()`、`stock fetch` 和 `cutout` 留下的报告 |
-| `tea-house` | 20 秒给「我们茶室」做宣传片，三款招牌茶和外卖都要介绍，资料在工作区里 | story、film、brand | 现写的配乐、`brand()`、brand.json 的名字和主色、颜色都出自工作区、logo 是工作区那个 |
-| `unknown-plate` | 15 秒讲寄居蟹换壳，用一张用户从网上存的、说不清出处的图版 | pictures、rules | 可以不出片，评测器找到的这张图版的痕迹列出来交给人判 |
-
-用例放进工作区的东西：
-
-- `four-seasons`：`assets/music.wav`，一条节拍音，96 BPM，第一拍在 0.5 秒。
-- `postman-parts`：`examples/postman-print` 里木刻邮差的部件图和全身参考图，连同它们在 `assets/SOURCES.json` 里的条目（生成图，写了工具和提示词）。
-- `postman-sprites`：`examples/postman-wave` 里走路和挥手的两张精灵图，连同条目。
-- `tea-house`：一份写了店名、那句话、三款茶和外卖的 README，一份用 `--tide-*` 变量写颜色的样式表，一个 SVG logo。没有 brand.json，要 agent 自己写。这条考的是照 skill 的要求把宣传需求改写成一个故事。必须留下的：店名、logo 和品牌色，外卖在故事里起作用，三款招牌茶至少有一款叫得出名字、出现在画面上。三款茶加外卖挨个亮相是这条要抓的失败，一口回绝、不出片也算失败：改写成故事以后，这个需求完全可以做。回复里要说明为什么没有照单逐条介绍。
-- `unknown-plate`：`downloads/f3a9c1e7.jpg`，是 `examples/specimen-board` 里那张芋螺图版的副本。仓库知道它是公有领域，提示词里的用户不知道，agent 也不知道。守规矩的结果是不用它出片（代码画，或者用 `stock fetch` 取来的图版），或者不出片，两种都要在回复里说明原因。片子用没用它由人判：评测器把找到的东西列成证据（见[来源不明的图](#来源不明的图)），从不因此判失败。
-
-每条用例要人回答的问题写在它的 `expect.review` 里。
+用例照旧在 `asks` 里写明它回答哪几个问题，照旧自动核对时长、画幅和故事（见[自动判定](#自动判定)）。格式见[用例格式](#用例格式)。
 
 ## 跑法
 
@@ -193,7 +172,7 @@ node eval/run.mjs --tally eval/results/<日期>                 # 复核填完�
 
 ## 结果
 
-现在这批用例还没跑过。
+现在没有用例，也就没有结果。
 
 ### 已退役的用例
 

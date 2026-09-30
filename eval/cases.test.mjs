@@ -1,13 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import {
-    mkdirSync,
-    mkdtempSync,
-    readdirSync,
-    readFileSync,
-    rmSync,
-    symlinkSync,
-    writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,27 +15,41 @@ afterAll(() => {
 });
 
 const runtimeNames = runtimeExports(repoRoot);
-const dirs = {
-    name: 'four-seasons',
-    caseDir: join(evalDir, 'cases', 'four-seasons'),
-    repoRoot,
-    runtimeNames,
+// A case written for these tests: eval/cases/ ships none until the cases are rewritten.
+const caseDir = mkdtempSync(join(tmpdir(), 'flipbook-eval-case-'));
+temps.push(caseDir);
+const dirs = { name: 'four-seasons', caseDir, repoRoot, runtimeNames };
+
+const FOUR_SEASONS = {
+    id: 'four-seasons',
+    title: '一年四季，跟着用户的曲子',
+    asks: ['story', 'film'],
+    prompt: '用我放在 assets/music.wav 的曲子（96 BPM，第一拍在 0.5 秒）做一条 20 秒的短片，讲一年四季。',
+    workspace: {
+        'assets/music.wav': { generator: 'clicks', bpm: 96, offsetSec: 0.5, seconds: 30 },
+    },
+    expect: {
+        durationSec: [19, 21],
+        width: 1920,
+        height: 1080,
+        audio: 'file',
+        audioFile: 'assets/music.wav',
+        timeline: { bpm: 96, 'audio.bpmOffset': 0.5 },
+        uses: ['paperLayer|drawPaper'],
+        review: ['春夏秋冬四季在画面上都认得出来'],
+    },
 };
 
-/** four-seasons as shipped, changed by `edit`. */
+/** The four-seasons case above, changed by `edit`. */
 function fourSeasons(edit = () => {}) {
-    const spec = JSON.parse(readFileSync(join(dirs.caseDir, 'case.json'), 'utf-8'));
+    const spec = structuredClone(FOUR_SEASONS);
     edit(spec);
     return spec;
 }
 
 describe('eval case validation', () => {
-    it('accepts every shipped case', () => {
-        for (const name of readdirSync(join(evalDir, 'cases'))) {
-            const caseDir = join(evalDir, 'cases', name);
-            const spec = JSON.parse(readFileSync(join(caseDir, 'case.json'), 'utf-8'));
-            expect(validateCase(spec, { name, caseDir, repoRoot, runtimeNames }), name).toEqual([]);
-        }
+    it('accepts a valid case', () => {
+        expect(validateCase(fourSeasons(), dirs)).toEqual([]);
     });
 
     it('names a misspelled field inside a workspace file, and the field it lacks', () => {
@@ -82,7 +88,7 @@ describe('eval case validation', () => {
                 '.claude/skills/x.wav': clicks,
                 'plate.jpg': { generator: 'repo', from: '../outside.jpg' },
                 'notes.md': { generator: 'copy', from: 'files/none.md' },
-                'examples.jpg': { generator: 'repo', from: 'examples' },
+                'folder.jpg': { generator: 'repo', from: 'docs' },
                 'x.png': { generator: 'download', url: 'https://example.org/x.png' },
             };
         });
@@ -93,7 +99,7 @@ describe('eval case validation', () => {
             'workspace[".claude/skills/x.wav"]: lands in a folder kept for the host or the eval',
             'workspace["plate.jpg"].from: leaves the repository',
             'workspace["notes.md"].from: no file files/none.md in the case directory',
-            'workspace["examples.jpg"].from: examples is not a regular file',
+            'workspace["folder.jpg"].from: docs is not a regular file',
             'workspace["x.png"].generator: must be one of clicks, copy, repo, not "download"',
         ]);
     });
